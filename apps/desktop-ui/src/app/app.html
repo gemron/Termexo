@@ -1,0 +1,220 @@
+<main class="app-shell" [class.inspector-collapsed]="!inspectorOpen()">
+  <app-workspace-sidebar
+    [workspaces]="state.workspaces()"
+    [activeWorkspaceId]="state.activeWorkspace()?.id ?? null"
+    (workspaceSelected)="state.selectWorkspace($event)"
+    (favoriteToggled)="state.toggleFavorite($event)"
+    (createRequested)="createWorkspaceOpen.set(true)"
+    (settingsRequested)="showPlaceholder('设置')"
+  />
+
+  <section class="workspace-main">
+    <header class="topbar">
+      <div class="workspace-title">
+        <strong>{{ state.activeWorkspace()?.name ?? '加载中' }}</strong>
+        <span>{{ state.activeWorkspace()?.projectPath ?? '' }}</span>
+      </div>
+
+      <div class="toolbar" role="toolbar" aria-label="工作区工具">
+        <button
+          type="button"
+          class="tool-button"
+          title="新建 Shell 终端"
+          (click)="createTerminal('shell')"
+        >
+          <app-icon name="terminal" [size]="14" />
+          <span>终端</span>
+        </button>
+
+        <div class="menu-anchor">
+          <button
+            type="button"
+            class="tool-button"
+            [class.active]="agentMenuOpen()"
+            (click)="agentMenuOpen.set(!agentMenuOpen())"
+          >
+            <app-icon name="bot" [size]="14" />
+            <span>Agent</span>
+            <app-icon name="chevron-down" [size]="12" />
+          </button>
+          @if (agentMenuOpen()) {
+            <div class="agent-menu">
+              <button type="button" (click)="createTerminal('claude')">
+                <span data-tone="green"><app-icon name="bot" [size]="14" /></span>
+                <div><strong>Claude Code</strong><small>Claude Sonnet</small></div>
+              </button>
+              <button type="button" (click)="createTerminal('codex')">
+                <span data-tone="blue"><app-icon name="bot" [size]="14" /></span>
+                <div><strong>Codex CLI</strong><small>GPT Codex</small></div>
+              </button>
+              <button type="button" (click)="createTerminal('gemini')">
+                <span data-tone="amber"><app-icon name="sparkles" [size]="14" /></span>
+                <div><strong>Gemini CLI</strong><small>Gemini Pro</small></div>
+              </button>
+            </div>
+          }
+        </div>
+
+        <span class="tool-divider"></span>
+        <button
+          type="button"
+          class="tool-button"
+          title="恢复会话"
+          (click)="showPlaceholder('会话中心')"
+        >
+          <app-icon name="play" [size]="14" />
+          <span>恢复</span>
+        </button>
+        <button
+          type="button"
+          class="tool-button"
+          title="批量切换模型"
+          (click)="modelSwitchOpen.set(true)"
+        >
+          <app-icon name="zap" [size]="14" />
+          <span>切换模型</span>
+        </button>
+        <button
+          type="button"
+          class="tool-button"
+          title="保存 Workspace 快照"
+          (click)="saveSnapshot()"
+        >
+          <app-icon name="save" [size]="14" />
+          <span>快照</span>
+        </button>
+      </div>
+
+      <div class="window-tools">
+        <button
+          type="button"
+          title="任务看板"
+          aria-label="任务看板"
+          (click)="showPlaceholder('任务看板')"
+        >
+          <app-icon name="task" [size]="15" />
+        </button>
+        <button
+          type="button"
+          title="切换检查器"
+          aria-label="切换检查器"
+          [class.active]="inspectorOpen()"
+          (click)="inspectorOpen.set(!inspectorOpen())"
+        >
+          <app-icon name="panel-close" [size]="15" />
+        </button>
+      </div>
+    </header>
+
+    <div class="terminal-tabs">
+      <div class="tab-strip" role="tablist" aria-label="终端标签">
+        @for (terminal of state.activeWorkspace()?.terminals ?? []; track terminal.id) {
+          <button
+            type="button"
+            role="tab"
+            [class.active]="terminal.id === activeTerminalId()"
+            (click)="state.selectTerminal(terminal.id)"
+          >
+            <i [attr.data-status]="terminal.status"></i>
+            <span>{{ terminal.name }}</span>
+            <small>{{ terminal.agentType }}</small>
+          </button>
+        }
+        <button
+          type="button"
+          class="add-tab"
+          title="新建终端"
+          aria-label="新建终端"
+          (click)="createTerminal('shell')"
+        >
+          <app-icon name="plus" [size]="14" />
+        </button>
+      </div>
+
+      <div class="layout-controls" aria-label="终端布局">
+        <button
+          type="button"
+          title="单终端"
+          [class.active]="state.activeWorkspace()?.layout === 'single'"
+          (click)="changeLayout('single')"
+        >
+          <app-icon name="square" [size]="13" />
+        </button>
+        <button
+          type="button"
+          title="左右分屏"
+          [class.active]="state.activeWorkspace()?.layout === 'columns'"
+          (click)="changeLayout('columns')"
+        >
+          <app-icon name="columns" [size]="13" />
+        </button>
+        <button
+          type="button"
+          title="上下分屏"
+          [class.active]="state.activeWorkspace()?.layout === 'rows'"
+          (click)="changeLayout('rows')"
+        >
+          <app-icon name="rows" [size]="13" />
+        </button>
+        <button
+          type="button"
+          title="网格布局"
+          [class.active]="state.activeWorkspace()?.layout === 'grid'"
+          (click)="changeLayout('grid')"
+        >
+          <app-icon name="grid" [size]="13" />
+        </button>
+      </div>
+    </div>
+
+    <section class="workbench-area">
+      @if (state.activeWorkspace(); as workspace) {
+        <app-terminal-workbench
+          [terminals]="workspace.terminals"
+          [layout]="workspace.layout"
+          [activeTerminalId]="activeTerminalId()"
+          (terminalSelected)="state.selectTerminal($event)"
+          (terminalClosed)="closeTerminal($event)"
+          (terminalRequested)="createTerminal('shell')"
+        />
+      }
+    </section>
+
+    <footer class="statusbar">
+      <span class="connection"><i></i> Desktop Core</span>
+      <span>{{ state.runningAgentCount() }} Agent 活动</span>
+      <span class="status-spacer"></span>
+      <span>{{ state.activeWorkspace()?.activeBranch ?? '' }}</span>
+      <span>UTF-8</span>
+    </footer>
+  </section>
+
+  @if (inspectorOpen()) {
+    <app-inspector-panel
+      [workspace]="state.activeWorkspace()"
+      [activeTerminal]="state.activeTerminal()"
+    />
+  }
+</main>
+
+@if (createWorkspaceOpen()) {
+  <app-create-workspace-dialog
+    (created)="createWorkspace($event)"
+    (cancelled)="createWorkspaceOpen.set(false)"
+  />
+}
+
+@if (modelSwitchOpen()) {
+  <app-model-switch-dialog
+    [agentCount]="state.runningAgentCount()"
+    (confirmed)="switchModels($event)"
+    (cancelled)="modelSwitchOpen.set(false)"
+  />
+}
+
+@if (toastMessage(); as message) {
+  <div class="toast" role="status">
+    <app-icon name="check" [size]="14" />
+    {{ message }}
+  </div>
+}

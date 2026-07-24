@@ -1,0 +1,68 @@
+import { Workspace } from './workspace.models';
+
+const DEFAULT_PROJECT_PATH = 'D:\\dev\\agentdock';
+
+export function createDefaultWorkspaces(): Workspace[] {
+  const now = Date.now();
+
+  return [
+    {
+      id: crypto.randomUUID(),
+      name: 'AgentDock',
+      projectPath: DEFAULT_PROJECT_PATH,
+      projectType: 'Angular + Rust',
+      activeBranch: 'feature/terminal-runtime',
+      favorite: true,
+      lastOpenedAt: now,
+      layout: 'columns',
+      terminals: [
+        {
+          id: crypto.randomUUID(),
+          name: 'Claude - Core',
+          workingDirectory: DEFAULT_PROJECT_PATH,
+          shell: 'powershell.exe',
+          agentType: 'claude',
+          status: 'THINKING',
+          model: 'Claude Sonnet',
+          branch: 'feature/terminal-runtime',
+          command: 'claude',
+          nativeSessionId: 'claude-local-01',
+        },
+        {
+          id: crypto.randomUUID(),
+          name: 'Codex - Tests',
+          workingDirectory: DEFAULT_PROJECT_PATH,
+          shell: 'powershell.exe',
+          agentType: 'codex',
+          status: 'WAITING_INPUT',
+          model: 'GPT Codex',
+          branch: 'feature/terminal-runtime',
+          command: 'codex',
+          nativeSessionId: 'codex-local-02',
+        },
+      ],
+    },
+    {
+      id: crypto.randomUUID(),
+      name: 'MTS Cloud',
+      projectPath: 'D:\\dev\\mts-cloud',
+      projectType: 'Angular + Java',
+      activeBranch: 'main',
+      favorite: true,
+      lastOpenedAt: now - 3_600_000,
+      layout: 'grid',
+      terminals: [],
+    },
+    {
+      id: crypto.randomUUID(),
+      name: 'Device Health',
+      projectPath: 'D:\\dev\\device-health',
+      projectType: 'Spring Boot',
+      activeBranch: 'develop',
+      favorite: false,
+      lastOpenedAt: now - 86_400_000,
+      layout: 'single',
+      terminals: [],
+    },
+  ];
+}

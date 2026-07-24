@@ -1,0 +1,70 @@
+:root {
+  color-scheme: dark;
+  --sans: Inter, 'Segoe UI Variable Text', 'Segoe UI', system-ui, -apple-system, sans-serif;
+  --mono: 'Cascadia Code', 'JetBrains Mono', Consolas, monospace;
+  --sidebar: #171a19;
+  --surface-0: #1b1f1d;
+  --surface-1: #202522;
+  --surface-2: #292f2c;
+  --border: #303633;
+  --border-strong: #444c48;
+  --text: #e2e5e3;
+  --text-secondary: #bdc3bf;
+  --text-muted: #7f8782;
+  --accent: #58c7a0;
+  --info: #68a9e8;
+  --warning: #d6a34a;
+  --danger: #d97171;
+  font-family: var(--sans);
+  font-synthesis: none;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  overflow: hidden;
+  background: var(--surface-0);
+}
+
+button,
+input {
+  font: inherit;
+}
+
+button {
+  cursor: pointer;
+}
+
+button:focus-visible,
+input:focus-visible,
+[tabindex]:focus-visible {
+  outline: 2px solid #4d9077;
+  outline-offset: 1px;
+}
+
+::selection {
+  color: #f1f6f3;
+  background: #31594c;
+}
+
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  border: 2px solid transparent;
+  border-radius: 4px;
+  background: #404743;
+  background-clip: padding-box;
+}

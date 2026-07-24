@@ -1,0 +1,20 @@
+# Angular
+apps/desktop-ui/.angular/
+apps/desktop-ui/dist/
+apps/desktop-ui/node_modules/
+apps/desktop-ui/coverage/
+
+# Tauri / Rust
+src-tauri/target/
+.tooling/
+
+# Local data
+*.db
+*.db-shm
+*.db-wal
+
+# Editors and operating systems
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db

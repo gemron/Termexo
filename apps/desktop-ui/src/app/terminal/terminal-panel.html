@@ -1,0 +1,32 @@
+<section class="terminal-panel" [class.active]="active()" (mousedown)="focus()">
+  <header>
+    <div class="terminal-identity">
+      <span class="agent-icon" [attr.data-agent]="session().agentType">
+        <app-icon [name]="session().agentType === 'shell' ? 'terminal' : 'bot'" [size]="14" />
+      </span>
+      <strong>{{ session().name }}</strong>
+      <span class="status" [attr.data-status]="session().status">
+        <i></i>{{ statusLabels[session().status] }}
+      </span>
+    </div>
+    <div class="terminal-meta">
+      <span>{{ session().model }}</span>
+      <button type="button" title="放大终端" aria-label="放大终端">
+        <app-icon name="maximize" [size]="13" />
+      </button>
+      <button
+        type="button"
+        title="关闭终端"
+        aria-label="关闭终端"
+        (click)="$event.stopPropagation(); closeRequested.emit(session().id)"
+      >
+        <app-icon name="x" [size]="13" />
+      </button>
+    </div>
+  </header>
+  <div #terminal class="terminal-host" aria-label="终端"></div>
+  <footer>
+    <span>{{ session().workingDirectory }}</span>
+    <span>{{ session().branch }}</span>
+  </footer>
+</section>

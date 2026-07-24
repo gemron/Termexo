@@ -1,0 +1,22 @@
+@if (terminals().length > 0) {
+  <div class="terminal-grid" [attr.data-layout]="layout()">
+    @for (terminal of terminals(); track terminal.id) {
+      <app-terminal-panel
+        [session]="terminal"
+        [active]="terminal.id === activeTerminalId()"
+        (selected)="terminalSelected.emit($event)"
+        (closeRequested)="terminalClosed.emit($event)"
+      />
+    }
+  </div>
+} @else {
+  <div class="empty-state">
+    <span class="empty-icon"><app-icon name="terminal" [size]="24" /></span>
+    <h2>此工作区还没有终端</h2>
+    <p>创建 Shell 或 Agent 终端开始工作。</p>
+    <button type="button" (click)="terminalRequested.emit()">
+      <app-icon name="plus" [size]="15" />
+      新建终端
+    </button>
+  </div>
+}

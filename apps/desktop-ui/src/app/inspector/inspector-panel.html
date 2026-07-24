@@ -1,0 +1,129 @@
+<aside class="inspector">
+  <div class="tab-list" role="tablist" aria-label="检查器">
+    <button type="button" [class.active]="tab() === 'agents'" (click)="tab.set('agents')">
+      Agent
+    </button>
+    <button type="button" [class.active]="tab() === 'git'" (click)="tab.set('git')">Git</button>
+    <button type="button" [class.active]="tab() === 'tasks'" (click)="tab.set('tasks')">
+      任务
+    </button>
+  </div>
+
+  <div class="inspector-body">
+    @switch (tab()) {
+      @case ('agents') {
+        <section>
+          <header class="section-header">
+            <span>活动 Agent</span>
+            <small>{{ workspace()?.terminals?.length ?? 0 }}</small>
+          </header>
+          <div class="agent-list">
+            @for (terminal of workspace()?.terminals ?? []; track terminal.id) {
+              <article class="agent-row" [class.selected]="terminal.id === activeTerminal()?.id">
+                <span class="agent-avatar" [attr.data-agent]="terminal.agentType">
+                  <app-icon
+                    [name]="terminal.agentType === 'shell' ? 'terminal' : 'bot'"
+                    [size]="15"
+                  />
+                </span>
+                <span class="agent-copy">
+                  <strong>{{ terminal.name }}</strong>
+                  <small>{{ terminal.model }}</small>
+                </span>
+                <span class="state" [attr.data-status]="terminal.status">
+                  <i></i>{{ statusLabels[terminal.status] }}
+                </span>
+              </article>
+            } @empty {
+              <p class="inline-empty">没有活动 Agent</p>
+            }
+          </div>
+        </section>
+
+        @if (activeTerminal(); as terminal) {
+          <section class="details">
+            <header class="section-header"><span>会话详情</span></header>
+            <dl>
+              <div>
+                <dt>Agent</dt>
+                <dd>{{ agentLabels[terminal.agentType] }}</dd>
+              </div>
+              <div>
+                <dt>模型</dt>
+                <dd>{{ terminal.model }}</dd>
+              </div>
+              <div>
+                <dt>分支</dt>
+                <dd>{{ terminal.branch }}</dd>
+              </div>
+              <div>
+                <dt>会话</dt>
+                <dd>{{ terminal.nativeSessionId ?? '新会话' }}</dd>
+              </div>
+            </dl>
+          </section>
+        }
+
+        <section class="activity">
+          <header class="section-header"><span>最近活动</span></header>
+          <div class="event-row">
+            <span class="event-icon success"><app-icon name="check" [size]="12" /></span>
+            <span><strong>工具调用完成</strong><small>Read workspace store · 12 秒前</small></span>
+          </div>
+          <div class="event-row">
+            <span class="event-icon"><app-icon name="diff" [size]="12" /></span>
+            <span><strong>文件已修改</strong><small>terminal-manager.rs · 1 分钟前</small></span>
+          </div>
+        </section>
+      }
+
+      @case ('git') {
+        <section class="git-summary">
+          <header class="section-header"><span>仓库状态</span></header>
+          <div class="branch-row">
+            <app-icon name="folder" [size]="15" />
+            <strong>{{ workspace()?.activeBranch ?? git.branch }}</strong>
+            <span>↑{{ git.ahead }} ↓{{ git.behind }}</span>
+          </div>
+          <div class="diff-stats">
+            <div>
+              <strong>{{ git.changedFiles }}</strong
+              ><span>变更文件</span>
+            </div>
+            <div>
+              <strong class="added">+{{ git.additions }}</strong
+              ><span>新增</span>
+            </div>
+            <div>
+              <strong class="deleted">-{{ git.deletions }}</strong
+              ><span>删除</span>
+            </div>
+          </div>
+          <button type="button" class="wide-action">
+            <app-icon name="diff" [size]="14" />查看 Git Diff
+          </button>
+        </section>
+      }
+
+      @case ('tasks') {
+        <section>
+          <header class="section-header">
+            <span>当前任务</span><small>{{ tasks.length }}</small>
+          </header>
+          <div class="task-list">
+            @for (task of tasks; track task.id) {
+              <article class="task-row">
+                <div>
+                  <strong>{{ task.title }}</strong
+                  ><small>{{ task.status }}</small>
+                </div>
+                <span>{{ task.progress }}%</span>
+                <progress max="100" [value]="task.progress"></progress>
+              </article>
+            }
+          </div>
+        </section>
+      }
+    }
+  </div>
+</aside>

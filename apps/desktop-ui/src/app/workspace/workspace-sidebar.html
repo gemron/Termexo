@@ -1,0 +1,64 @@
+<aside class="workspace-sidebar">
+  <header class="brand-row">
+    <div class="brand-mark"><app-icon name="command" [size]="17" /></div>
+    <strong>AgentDock</strong>
+    <span class="version">0.1</span>
+  </header>
+
+  <div class="sidebar-tools">
+    <label class="search-field">
+      <app-icon name="search" [size]="14" />
+      <input type="search" aria-label="搜索工作区" placeholder="搜索工作区" />
+    </label>
+    <button
+      class="icon-button"
+      type="button"
+      title="新建工作区"
+      aria-label="新建工作区"
+      (click)="createRequested.emit()"
+    >
+      <app-icon name="plus" [size]="16" />
+    </button>
+  </div>
+
+  <nav aria-label="工作区">
+    <p class="section-label">工作区</p>
+    <div class="workspace-list">
+      @for (workspace of workspaces(); track workspace.id) {
+        <button
+          type="button"
+          class="workspace-item"
+          [class.active]="workspace.id === activeWorkspaceId()"
+          (click)="workspaceSelected.emit(workspace.id)"
+        >
+          <span class="workspace-glyph">
+            <app-icon name="folder" [size]="15" />
+          </span>
+          <span class="workspace-copy">
+            <strong>{{ workspace.name }}</strong>
+            <small>{{ workspace.activeBranch }}</small>
+          </span>
+          <span
+            class="favorite"
+            [class.selected]="workspace.favorite"
+            role="button"
+            tabindex="0"
+            [attr.aria-label]="workspace.favorite ? '取消收藏' : '收藏'"
+            (click)="$event.stopPropagation(); favoriteToggled.emit(workspace.id)"
+            (keydown.enter)="$event.stopPropagation(); favoriteToggled.emit(workspace.id)"
+          >
+            <app-icon name="star" [size]="13" />
+          </span>
+        </button>
+      }
+    </div>
+  </nav>
+
+  <footer>
+    <button type="button" class="footer-action" (click)="settingsRequested.emit()">
+      <app-icon name="settings" [size]="15" />
+      <span>设置</span>
+    </button>
+    <span class="runtime-state"><i></i> 本地运行</span>
+  </footer>
+</aside>

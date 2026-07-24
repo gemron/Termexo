@@ -1,0 +1,43 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "AgentDock",
+  "version": "0.1.0",
+  "identifier": "dev.agentdock.desktop",
+  "build": {
+    "beforeDevCommand": "npm --prefix apps/desktop-ui start -- --host 127.0.0.1 --port 4200",
+    "devUrl": "http://127.0.0.1:4200",
+    "beforeBuildCommand": "npm --prefix apps/desktop-ui run build",
+    "frontendDist": "../apps/desktop-ui/dist/desktop-ui/browser"
+  },
+  "app": {
+    "windows": [
+      {
+        "title": "AgentDock",
+        "width": 1440,
+        "height": 900,
+        "minWidth": 900,
+        "minHeight": 600,
+        "resizable": true,
+        "fullscreen": false,
+        "center": true,
+        "decorations": true
+      }
+    ],
+    "security": {
+      "csp": null
+    }
+  },
+  "bundle": {
+    "active": true,
+    "targets": "all",
+    "category": "DeveloperTool",
+    "shortDescription": "Local-first AI coding workspace",
+    "icon": [
+      "icons/32x32.png",
+      "icons/128x128.png",
+      "icons/128x128@2x.png",
+      "icons/icon.icns",
+      "icons/icon.ico"
+    ]
+  }
+}
