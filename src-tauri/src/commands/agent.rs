@@ -12,10 +12,14 @@ use crate::database::WorkspaceDatabase;
 use crate::hooks::HookEventStore;
 
 #[tauri::command]
-pub fn detect_claude() -> Result<AgentInstallation, String> {
-    ClaudeCodeAdapter::new()
-        .detect()
-        .map_err(|error| error.to_string())
+pub async fn detect_claude() -> Result<AgentInstallation, String> {
+    tauri::async_runtime::spawn_blocking(|| {
+        ClaudeCodeAdapter::new()
+            .detect()
+            .map_err(|error| error.to_string())
+    })
+    .await
+    .map_err(|error| error.to_string())?
 }
 
 #[tauri::command]

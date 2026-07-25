@@ -13,6 +13,7 @@ describe('AppStateService', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    repository.list.mockResolvedValue([]);
     TestBed.configureTestingModule({
       providers: [AppStateService, { provide: WorkspaceRepository, useValue: repository }],
     });
@@ -24,7 +25,71 @@ describe('AppStateService', () => {
 
     expect(service.workspaces().length).toBeGreaterThan(0);
     expect(service.activeWorkspace()?.name).toBe('Termexo');
+    expect(service.activeTerminal()?.status).toBe('STARTING');
     expect(repository.saveAll).toHaveBeenCalledOnce();
+  });
+
+  it('marks persisted terminals for automatic restart', async () => {
+    repository.list.mockResolvedValueOnce([
+      {
+        id: 'workspace-1',
+        name: 'Persisted workspace',
+        projectPath: 'D:\\dev\\persisted',
+        projectType: 'Local project',
+        activeBranch: 'main',
+        favorite: false,
+        lastOpenedAt: Date.now(),
+        layout: 'single',
+        terminals: [
+          {
+            id: 'terminal-1',
+            name: 'Old terminal',
+            workingDirectory: 'D:\\dev\\persisted',
+            shell: 'powershell.exe',
+            agentType: 'shell',
+            status: 'RUNNING',
+            model: 'Local',
+            branch: 'main',
+            command: 'echo restored',
+          },
+          {
+            id: 'terminal-claude',
+            name: 'Claude session',
+            workingDirectory: 'D:\\dev\\persisted',
+            shell: 'powershell.exe',
+            agentType: 'claude',
+            status: 'STOPPED',
+            model: 'Claude Sonnet',
+            branch: 'main',
+            nativeSessionId: 'session-123',
+          },
+        ],
+      },
+    ]);
+
+    await service.initialize();
+
+    expect(service.activeTerminal()).toEqual(
+      expect.objectContaining({
+        id: 'terminal-1',
+        status: 'STARTING',
+        command: 'echo restored',
+        workingDirectory: 'D:\\dev\\persisted',
+      }),
+    );
+    expect(repository.saveAll).toHaveBeenCalledWith([
+      expect.objectContaining({
+        id: 'workspace-1',
+        terminals: [
+          expect.objectContaining({ id: 'terminal-1', status: 'STARTING' }),
+          expect.objectContaining({
+            id: 'terminal-claude',
+            status: 'STARTING',
+            command: "claude --resume 'session-123'",
+          }),
+        ],
+      }),
+    ]);
   });
 
   it('adds a terminal to the active workspace', async () => {

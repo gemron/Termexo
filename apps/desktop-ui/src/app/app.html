@@ -206,9 +206,9 @@
     [installation]="agents.installation()"
     [profiles]="agents.modelProfiles()"
     [mcpProfiles]="agents.mcpProfiles()"
-    [workingDirectory]="state.activeWorkspace()?.projectPath ?? ''"
+    [workingDirectory]="selectedTerminalDirectory() ?? ''"
     (launched)="launchClaude($event)"
-    (cancelled)="claudeLaunchOpen.set(false)"
+    (cancelled)="closeClaudeLaunch()"
   />
 }
 

@@ -65,7 +65,7 @@ export class AgentService {
       return;
     }
 
-    await Promise.all([this.detectClaude(), this.loadProfiles(), this.refreshSessions()]);
+    await Promise.all([this.detectClaude(), this.loadProfiles(), this.loadSessions()]);
     await this.syncEvents();
     this.pollingHandle = window.setInterval(() => {
       void this.syncEvents();
@@ -152,6 +152,12 @@ export class AgentService {
       ]);
       this.modelProfileItems.set(modelProfiles);
       this.mcpProfileItems.set(mcpProfiles);
+    });
+  }
+
+  private async loadSessions(): Promise<void> {
+    await this.run(async () => {
+      this.sessionItems.set(await invoke<AgentSession[]>('list_agent_sessions'));
     });
   }
 

@@ -48,7 +48,7 @@ export class AppStateService {
     const storedWorkspaces = await this.repository.list();
     const initialWorkspaces =
       storedWorkspaces.length > 0
-        ? this.suspendRestoredTerminals(storedWorkspaces)
+        ? this.restartRestoredTerminals(storedWorkspaces)
         : createDefaultWorkspaces();
 
     this.workspaceItems.set(this.sortWorkspaces(initialWorkspaces));
@@ -261,14 +261,22 @@ export class AppStateService {
     );
   }
 
-  private suspendRestoredTerminals(workspaces: Workspace[]): Workspace[] {
+  private restartRestoredTerminals(workspaces: Workspace[]): Workspace[] {
     return workspaces.map((workspace) => ({
       ...workspace,
       terminals: workspace.terminals.map((terminal) => ({
         ...terminal,
-        status: 'STOPPED',
-        command: undefined,
+        status: 'STARTING',
+        command: terminal.command ?? this.restoredCommand(terminal),
       })),
     }));
+  }
+
+  private restoredCommand(terminal: TerminalSession): string {
+    if (terminal.agentType === 'claude' && terminal.nativeSessionId) {
+      const sessionId = terminal.nativeSessionId.replaceAll("'", "''");
+      return `claude --resume '${sessionId}'`;
+    }
+    return this.defaultCommand(terminal.agentType);
   }
 }

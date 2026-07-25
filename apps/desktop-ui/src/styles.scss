@@ -1,3 +1,5 @@
+@use '@xterm/xterm/css/xterm.css';
+
 :root {
   color-scheme: dark;
   --sans: Inter, 'Segoe UI Variable Text', 'Segoe UI', system-ui, -apple-system, sans-serif;
@@ -67,4 +69,8 @@ input:focus-visible,
   border-radius: 4px;
   background: #404743;
   background-clip: padding-box;
+}
+
+app-terminal-panel .terminal-host > .xterm {
+  height: 100%;
 }

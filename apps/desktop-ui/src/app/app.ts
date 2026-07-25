@@ -4,6 +4,7 @@ import { McpProfileInput, ModelProfileInput } from './core/models/agent.models';
 import { AgentType, LayoutMode } from './core/models/workspace.models';
 import { AgentService } from './core/services/agent.service';
 import { AppStateService } from './core/services/app-state.service';
+import { DirectoryPickerService } from './core/services/directory-picker.service';
 import { TerminalGatewayService } from './core/services/terminal-gateway.service';
 import { AgentSettingsDialogComponent } from './dialogs/agent-settings-dialog';
 import {
@@ -37,6 +38,7 @@ import { WorkspaceSidebarComponent } from './workspace/workspace-sidebar';
 export class App {
   protected readonly state = inject(AppStateService);
   protected readonly agents = inject(AgentService);
+  private readonly directoryPicker = inject(DirectoryPickerService);
   private readonly terminalGateway = inject(TerminalGatewayService);
   private readonly handledEventKeys = new Set<string>();
 
@@ -48,6 +50,7 @@ export class App {
   protected readonly agentMenuOpen = signal(false);
   protected readonly inspectorOpen = signal(true);
   protected readonly launchingClaude = signal(false);
+  protected readonly selectedTerminalDirectory = signal<string | null>(null);
   protected readonly toastMessage = signal<string | null>(null);
   protected readonly activeTerminalId = computed(() => this.state.activeTerminal()?.id ?? null);
 
@@ -63,22 +66,34 @@ export class App {
     });
   }
 
-  protected createTerminal(agentType: AgentType): void {
-    const terminal = this.state.createTerminal({ agentType });
+  protected async createTerminal(agentType: AgentType): Promise<void> {
     this.agentMenuOpen.set(false);
+    const workingDirectory = await this.selectTerminalDirectory();
+    if (!workingDirectory) {
+      return;
+    }
+
+    const terminal = this.state.createTerminal({ agentType, workingDirectory });
     if (terminal) {
       this.showToast(`${terminal.name} 已创建`);
     }
   }
 
-  protected openClaudeLaunch(): void {
+  protected async openClaudeLaunch(): Promise<void> {
     this.agentMenuOpen.set(false);
+    const workingDirectory = await this.selectTerminalDirectory();
+    if (!workingDirectory) {
+      return;
+    }
+
+    this.selectedTerminalDirectory.set(workingDirectory);
     this.claudeLaunchOpen.set(true);
   }
 
   protected async launchClaude(value: ClaudeLaunchDialogValue): Promise<void> {
     const workspace = this.state.activeWorkspace();
-    if (!workspace || this.launchingClaude()) {
+    const workingDirectory = this.selectedTerminalDirectory();
+    if (!workspace || !workingDirectory || this.launchingClaude()) {
       return;
     }
 
@@ -98,8 +113,10 @@ export class App {
         name: value.name || undefined,
         command: launch.command,
         model: profile?.name ?? 'Claude Sonnet',
+        workingDirectory,
       });
       this.claudeLaunchOpen.set(false);
+      this.selectedTerminalDirectory.set(null);
       if (terminal) {
         this.showToast(`${terminal.name} 已启动`);
       }
@@ -108,6 +125,11 @@ export class App {
     } finally {
       this.launchingClaude.set(false);
     }
+  }
+
+  protected closeClaudeLaunch(): void {
+    this.claudeLaunchOpen.set(false);
+    this.selectedTerminalDirectory.set(null);
   }
 
   protected async openSessionCenter(): Promise<void> {
@@ -231,6 +253,20 @@ export class App {
 
   private errorMessage(error: unknown): string {
     return error instanceof Error ? error.message : String(error);
+  }
+
+  private async selectTerminalDirectory(): Promise<string | null> {
+    const workspace = this.state.activeWorkspace();
+    if (!workspace) {
+      return null;
+    }
+
+    try {
+      return await this.directoryPicker.select(workspace.projectPath);
+    } catch (error) {
+      this.showToast(`选择目录失败：${this.errorMessage(error)}`);
+      return null;
+    }
   }
 
   private async initialize(): Promise<void> {

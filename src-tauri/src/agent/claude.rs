@@ -1,5 +1,6 @@
 use std::cmp::Reverse;
 use std::env;
+use std::ffi::OsStr;
 use std::fs::{self, File};
 use std::io::{BufRead, BufReader};
 use std::path::{Path, PathBuf};
@@ -78,18 +79,24 @@ impl ClaudeCodeAdapter {
             .extension()
             .is_some_and(|extension| extension.eq_ignore_ascii_case("cmd"))
         {
-            Command::new("cmd.exe")
+            let mut command = command_without_window("cmd.exe");
+            command
                 .args(["/d", "/c", "call"])
                 .arg(executable)
-                .arg("--version")
-                .output()
-                .ok()?
+                .arg("--version");
+            command.output().ok()?
         } else {
-            Command::new(executable).arg("--version").output().ok()?
+            let mut command = command_without_window(executable);
+            command.arg("--version");
+            command.output().ok()?
         };
 
         #[cfg(not(windows))]
-        let output = Command::new(executable).arg("--version").output().ok()?;
+        let output = {
+            let mut command = command_without_window(executable);
+            command.arg("--version");
+            command.output().ok()?
+        };
 
         if !output.status.success() {
             return None;
@@ -208,22 +215,46 @@ impl AgentAdapter for ClaudeCodeAdapter {
 
 fn command_paths(command: &str) -> Vec<PathBuf> {
     #[cfg(windows)]
-    let output = Command::new("where.exe").arg(command).output();
-    #[cfg(not(windows))]
-    let output = Command::new("which").arg(command).output();
+    {
+        let mut paths = env::current_dir()
+            .ok()
+            .map(|directory| vec![directory.join(command)])
+            .unwrap_or_default();
+        if let Some(search_path) = env::var_os("PATH") {
+            paths.extend(env::split_paths(&search_path).map(|directory| directory.join(command)));
+        }
+        paths
+    }
 
-    output
-        .ok()
-        .filter(|result| result.status.success())
-        .map(|result| {
-            String::from_utf8_lossy(&result.stdout)
-                .lines()
-                .map(str::trim)
-                .filter(|line| !line.is_empty())
-                .map(PathBuf::from)
-                .collect()
-        })
-        .unwrap_or_default()
+    #[cfg(not(windows))]
+    {
+        let output = command_without_window("which").arg(command).output();
+
+        output
+            .ok()
+            .filter(|result| result.status.success())
+            .map(|result| {
+                String::from_utf8_lossy(&result.stdout)
+                    .lines()
+                    .map(str::trim)
+                    .filter(|line| !line.is_empty())
+                    .map(PathBuf::from)
+                    .collect()
+            })
+            .unwrap_or_default()
+    }
+}
+
+fn command_without_window(program: impl AsRef<OsStr>) -> Command {
+    let mut command = Command::new(program);
+    #[cfg(windows)]
+    {
+        use std::os::windows::process::CommandExt;
+
+        const CREATE_NO_WINDOW: u32 = 0x0800_0000;
+        command.creation_flags(CREATE_NO_WINDOW);
+    }
+    command
 }
 
 fn home_directory() -> Option<PathBuf> {
