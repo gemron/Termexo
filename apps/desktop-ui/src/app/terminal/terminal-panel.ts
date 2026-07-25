@@ -65,10 +65,18 @@ export class TerminalPanelComponent implements AfterViewInit {
     this.terminal.open(this.container().nativeElement);
     this.fitTerminal();
 
-    void this.initializeRuntime();
-    const inputDisposable = this.terminal.onData((data) => {
-      void this.gateway.write(this.session(), data);
-    });
+    const stopped = this.session().status === 'STOPPED';
+    if (stopped) {
+      this.terminal.writeln('\u001b[38;2;150;157;164m已恢复终端配置，原进程未重新启动。\u001b[0m');
+      this.terminal.writeln('请从会话中心恢复 Claude 会话，或新建终端。');
+    } else {
+      void this.initializeRuntime();
+    }
+    const inputDisposable = stopped
+      ? { dispose: () => undefined }
+      : this.terminal.onData((data) => {
+          void this.gateway.write(this.session(), data);
+        });
 
     this.resizeObserver = new ResizeObserver(() => this.fitTerminal());
     this.resizeObserver.observe(this.container().nativeElement);

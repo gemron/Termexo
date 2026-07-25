@@ -45,7 +45,12 @@ pub struct PtyManager {
 }
 
 impl PtyManager {
-    pub fn start(&self, request: TerminalStartRequest, app: AppHandle) -> Result<(), PtyError> {
+    pub fn start(
+        &self,
+        request: TerminalStartRequest,
+        app: AppHandle,
+        environment: HashMap<String, String>,
+    ) -> Result<(), PtyError> {
         let mut sessions = self.sessions.lock().map_err(|_| PtyError::LockPoisoned)?;
         if sessions.contains_key(&request.terminal_id) {
             return Ok(());
@@ -62,6 +67,9 @@ impl PtyManager {
 
         let mut command = CommandBuilder::new(&request.shell);
         command.cwd(&request.working_directory);
+        for (key, value) in environment {
+            command.env(key, value);
+        }
         configure_shell(&mut command, &request.shell);
 
         let child = pair

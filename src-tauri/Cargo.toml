@@ -1,6 +1,6 @@
 [package]
 name = "agentdock"
-version = "0.1.0"
+version = "0.2.0"
 description = "Local-first AI coding workspace"
 authors = ["AgentDock contributors"]
 edition = "2021"
@@ -14,6 +14,7 @@ crate-type = ["staticlib", "cdylib", "rlib"]
 tauri-build = { version = "2.5.1", features = [] }
 
 [dependencies]
+keyring = "3.6.3"
 portable-pty = "0.9.0"
 rusqlite = { version = "0.40.1", features = ["bundled"] }
 serde = { version = "1.0", features = ["derive"] }

@@ -48,4 +48,26 @@ describe('AppStateService', () => {
       service.activeWorkspace()?.terminals.find((terminal) => terminal.id === shell?.id)?.model,
     ).toBe('Local');
   });
+
+  it('applies Claude hook events to the matching terminal', async () => {
+    await service.initialize();
+    const terminal = service.createTerminal({
+      id: 'terminal-claude',
+      agentType: 'claude',
+    });
+
+    service.applyAgentEvent({
+      eventKey: 'event-1',
+      agentType: 'claude',
+      terminalId: 'terminal-claude',
+      nativeSessionId: 'session-1',
+      eventType: 'approval.required',
+      detail: {},
+      createdAt: Date.now(),
+    });
+
+    expect(terminal?.id).toBe('terminal-claude');
+    expect(service.activeTerminal()?.status).toBe('WAITING_APPROVAL');
+    expect(service.activeTerminal()?.nativeSessionId).toBe('session-1');
+  });
 });

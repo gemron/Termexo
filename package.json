@@ -1,6 +1,6 @@
 {
   "name": "agentdock",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "private": true,
   "scripts": {
     "dev": "npm --prefix apps/desktop-ui start -- --host 127.0.0.1 --port 4200",

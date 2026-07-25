@@ -9,14 +9,10 @@ const projectNode = resolve(
   process.platform === 'win32' ? 'node.exe' : 'node',
 );
 const tauriCli = resolve('node_modules', '@tauri-apps', 'cli', 'tauri.js');
-const result = spawnSync(
-  projectNode,
-  [tauriCli, ...process.argv.slice(2)],
-  {
-    cwd: repositoryRoot,
-    stdio: 'inherit',
-  },
-);
+const result = spawnSync(projectNode, [tauriCli, ...process.argv.slice(2)], {
+  cwd: repositoryRoot,
+  stdio: 'inherit',
+});
 
 if (result.error) {
   console.error(`Unable to start the Tauri CLI: ${result.error.message}`);

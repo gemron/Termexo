@@ -1,5 +1,6 @@
 import { computed, inject, Injectable, signal } from '@angular/core';
 
+import { AgentEvent, EVENT_STATUS } from '../models/agent.models';
 import { createDefaultWorkspaces } from '../models/workspace.fixtures';
 import {
   AGENT_LABELS,
@@ -46,16 +47,16 @@ export class AppStateService {
   async initialize(): Promise<void> {
     const storedWorkspaces = await this.repository.list();
     const initialWorkspaces =
-      storedWorkspaces.length > 0 ? storedWorkspaces : createDefaultWorkspaces();
+      storedWorkspaces.length > 0
+        ? this.suspendRestoredTerminals(storedWorkspaces)
+        : createDefaultWorkspaces();
 
     this.workspaceItems.set(this.sortWorkspaces(initialWorkspaces));
     const firstWorkspace = initialWorkspaces[0];
     this.activeWorkspaceId.set(firstWorkspace?.id ?? null);
     this.activeTerminalId.set(firstWorkspace?.terminals[0]?.id ?? null);
 
-    if (storedWorkspaces.length === 0) {
-      await this.repository.saveAll(initialWorkspaces);
-    }
+    await this.repository.saveAll(initialWorkspaces);
   }
 
   selectWorkspace(workspaceId: string): void {
@@ -152,6 +153,31 @@ export class AppStateService {
     this.updateTerminal(terminalId, (terminal) => ({ ...terminal, status }));
   }
 
+  applyAgentEvent(event: AgentEvent): void {
+    const status = EVENT_STATUS[event.eventType];
+    const workspace = this.workspaceItems().find((item) =>
+      item.terminals.some((terminal) => terminal.id === event.terminalId),
+    );
+    if (!workspace || !status) {
+      return;
+    }
+
+    const updatedWorkspace = {
+      ...workspace,
+      terminals: workspace.terminals.map((terminal) =>
+        terminal.id === event.terminalId
+          ? {
+              ...terminal,
+              status,
+              nativeSessionId: event.nativeSessionId ?? terminal.nativeSessionId,
+            }
+          : terminal,
+      ),
+    };
+    this.replaceWorkspace(updatedWorkspace);
+    void this.repository.save(updatedWorkspace);
+  }
+
   switchAllModels(profileId: string): number {
     const profile = MODEL_PROFILES.find((item) => item.id === profileId);
     const workspace = this.activeWorkspace();
@@ -203,9 +229,9 @@ export class AppStateService {
     const agentLabel = AGENT_LABELS[agentType];
 
     return {
-      id: crypto.randomUUID(),
+      id: input.id ?? crypto.randomUUID(),
       name: input.name?.trim() || `${agentLabel} ${workspace.terminals.length + 1}`,
-      workingDirectory: workspace.projectPath,
+      workingDirectory: input.workingDirectory ?? workspace.projectPath,
       shell: DEFAULT_SHELL,
       agentType,
       status: 'STARTING',
@@ -220,6 +246,7 @@ export class AppStateService {
               : 'Local'),
       branch: workspace.activeBranch,
       command: input.command ?? this.defaultCommand(agentType),
+      nativeSessionId: input.nativeSessionId,
     };
   }
 
@@ -232,5 +259,16 @@ export class AppStateService {
       (left, right) =>
         Number(right.favorite) - Number(left.favorite) || right.lastOpenedAt - left.lastOpenedAt,
     );
+  }
+
+  private suspendRestoredTerminals(workspaces: Workspace[]): Workspace[] {
+    return workspaces.map((workspace) => ({
+      ...workspace,
+      terminals: workspace.terminals.map((terminal) => ({
+        ...terminal,
+        status: 'STOPPED',
+        command: undefined,
+      })),
+    }));
   }
 }

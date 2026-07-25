@@ -2,12 +2,9 @@ import { Injectable } from '@angular/core';
 import { invoke } from '@tauri-apps/api/core';
 
 import { Workspace } from '../models/workspace.models';
+import { isTauriRuntime } from './tauri-runtime';
 
 const STORAGE_KEY = 'agentdock.workspaces.v1';
-
-function isTauriRuntime(): boolean {
-  return typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window;
-}
 
 @Injectable({ providedIn: 'root' })
 export class WorkspaceRepository {

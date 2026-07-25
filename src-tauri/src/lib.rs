@@ -1,13 +1,22 @@
+mod agent;
 mod commands;
+mod config;
 mod database;
+mod hooks;
 mod pty;
 
 use std::fs;
 
 use tauri::Manager;
 
+use crate::config::{CredentialStore, LaunchEnvironmentStore};
 use crate::database::WorkspaceDatabase;
+use crate::hooks::HookEventStore;
 use crate::pty::PtyManager;
+
+pub fn capture_hook_event_from_cli() -> Result<(), String> {
+    hooks::capture_hook_event_from_cli().map_err(|error| error.to_string())
+}
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
@@ -24,11 +33,30 @@ pub fn run() {
             fs::create_dir_all(&app_data_dir)?;
 
             let database = WorkspaceDatabase::open(app_data_dir.join("agentdock.db"))?;
+            let hooks = HookEventStore::new(&app_data_dir)?;
             app.manage(database);
+            app.manage(CredentialStore);
+            app.manage(LaunchEnvironmentStore::default());
+            app.manage(hooks);
             app.manage(PtyManager::default());
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
+            commands::agent::detect_claude,
+            commands::agent::scan_claude_sessions,
+            commands::agent::list_agent_sessions,
+            commands::agent::build_claude_launch_command,
+            commands::agent::prepare_claude_launch,
+            commands::config::list_model_profiles,
+            commands::config::save_model_profile,
+            commands::config::delete_model_profile,
+            commands::config::list_mcp_profiles,
+            commands::config::save_mcp_profile,
+            commands::config::delete_mcp_profile,
+            commands::config::validate_claude_profile,
+            commands::hooks::prepare_claude_runtime,
+            commands::hooks::sync_agent_events,
+            commands::hooks::list_agent_events,
             commands::workspace::list_workspaces,
             commands::workspace::save_workspace,
             commands::terminal::create_terminal,

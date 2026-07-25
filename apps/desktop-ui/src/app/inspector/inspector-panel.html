@@ -66,14 +66,27 @@
 
         <section class="activity">
           <header class="section-header"><span>最近活动</span></header>
-          <div class="event-row">
-            <span class="event-icon success"><app-icon name="check" [size]="12" /></span>
-            <span><strong>工具调用完成</strong><small>Read workspace store · 12 秒前</small></span>
-          </div>
-          <div class="event-row">
-            <span class="event-icon"><app-icon name="diff" [size]="12" /></span>
-            <span><strong>文件已修改</strong><small>terminal-manager.rs · 1 分钟前</small></span>
-          </div>
+          @for (event of recentEvents(); track event.eventKey) {
+            <div class="event-row">
+              <span
+                class="event-icon"
+                [class.success]="
+                  event.eventType === 'tool.completed' || event.eventType === 'task.completed'
+                "
+              >
+                <app-icon
+                  [name]="event.eventType === 'tool.completed' ? 'check' : 'radio'"
+                  [size]="12"
+                />
+              </span>
+              <span
+                ><strong>{{ eventLabel(event) }}</strong
+                ><small>{{ eventDetail(event) }}</small></span
+              >
+            </div>
+          } @empty {
+            <p class="inline-empty">暂无 Agent 事件</p>
+          }
         </section>
       }
 

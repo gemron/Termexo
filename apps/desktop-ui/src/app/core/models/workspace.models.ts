@@ -40,10 +40,13 @@ export interface Workspace {
 }
 
 export interface CreateTerminalInput {
+  id?: string;
   agentType: AgentType;
   name?: string;
   command?: string;
   model?: string;
+  nativeSessionId?: string;
+  workingDirectory?: string;
 }
 
 export interface ModelProfile {

@@ -3,6 +3,7 @@ import { invoke } from '@tauri-apps/api/core';
 import { listen, UnlistenFn } from '@tauri-apps/api/event';
 
 import { TerminalSession } from '../models/workspace.models';
+import { isTauriRuntime } from './tauri-runtime';
 
 interface TerminalOutputEvent {
   terminalId: string;
@@ -16,10 +17,6 @@ interface TerminalStartRequest {
   command?: string;
   cols: number;
   rows: number;
-}
-
-function isTauriRuntime(): boolean {
-  return typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window;
 }
 
 @Injectable({ providedIn: 'root' })

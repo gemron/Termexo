@@ -1,6 +1,7 @@
 use serde::Deserialize;
 use tauri::{AppHandle, State};
 
+use crate::config::LaunchEnvironmentStore;
 use crate::pty::PtyManager;
 
 #[derive(Debug, Deserialize)]
@@ -19,9 +20,13 @@ pub fn create_terminal(
     request: TerminalStartRequest,
     app: AppHandle,
     manager: State<'_, PtyManager>,
+    launch_environment: State<'_, LaunchEnvironmentStore>,
 ) -> Result<(), String> {
+    let environment = launch_environment
+        .take(&request.terminal_id)
+        .map_err(|error| error.to_string())?;
     manager
-        .start(request, app)
+        .start(request, app, environment)
         .map_err(|error| error.to_string())
 }
 
