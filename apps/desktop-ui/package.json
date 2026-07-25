@@ -5,6 +5,7 @@
     "ng": "node scripts/run-angular.mjs",
     "start": "node scripts/run-angular.mjs serve",
     "build": "node scripts/run-angular.mjs build",
+    "capture:readme": "node scripts/capture-readme.mjs",
     "watch": "node scripts/run-angular.mjs build --watch --configuration development",
     "test": "node scripts/run-angular.mjs test",
     "e2e:smoke": "node scripts/smoke.mjs",

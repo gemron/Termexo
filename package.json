@@ -5,6 +5,7 @@
   "scripts": {
     "dev": "npm --prefix apps/desktop-ui start -- --host 127.0.0.1 --port 4200",
     "build": "npm --prefix apps/desktop-ui run build",
+    "capture:readme": "npm --prefix apps/desktop-ui run capture:readme",
     "test": "npm --prefix apps/desktop-ui test -- --watch=false",
     "tauri:dev": "scripts\\tauri-msvc.cmd dev",
     "tauri:build": "scripts\\tauri-msvc.cmd build"
