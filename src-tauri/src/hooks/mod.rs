@@ -139,14 +139,21 @@ impl HookEventStore {
         let mut reader = BufReader::new(file);
         reader.seek(SeekFrom::Start(*cursor))?;
         let mut events = Vec::new();
-        let mut line = String::new();
+        let mut line = Vec::new();
 
-        while reader.read_line(&mut line)? > 0 {
-            let consumed = line.len() as u64;
-            if let Ok(stored) = serde_json::from_str::<StoredHookEvent>(line.trim()) {
+        loop {
+            let consumed = reader.read_until(b'\n', &mut line)?;
+            if consumed == 0 {
+                break;
+            }
+            if !line.ends_with(b"\n") {
+                break;
+            }
+
+            if let Ok(stored) = serde_json::from_slice::<StoredHookEvent>(&line) {
                 events.push(map_hook_event(stored));
             }
-            *cursor += consumed;
+            *cursor += consumed as u64;
             line.clear();
         }
 
@@ -178,8 +185,9 @@ pub fn capture_hook_event_from_cli() -> Result<(), HookError> {
         .create(true)
         .append(true)
         .open(event_file)?;
-    serde_json::to_writer(&mut file, &event)?;
-    file.write_all(b"\n")?;
+    let mut serialized = serde_json::to_vec(&event)?;
+    serialized.push(b'\n');
+    file.write_all(&serialized)?;
     Ok(())
 }
 
@@ -288,6 +296,42 @@ mod tests {
         assert!(settings.pointer("/hooks/SessionStart/0").is_some());
         assert!(settings.pointer("/hooks/PermissionRequest/0").is_some());
         assert!(settings.pointer("/hooks/SessionEnd/0").is_some());
+
+        fs::remove_dir_all(directory).unwrap();
+    }
+
+    #[test]
+    fn waits_for_a_complete_hook_event_before_advancing_the_cursor() {
+        let directory = test_directory("partial-hook");
+        let store = HookEventStore::new(&directory).unwrap();
+        let stored = StoredHookEvent {
+            event_key: "event-partial".into(),
+            terminal_id: "terminal-1".into(),
+            received_at: 10,
+            payload: json!({
+                "hook_event_name": "SessionStart",
+                "session_id": "session-1"
+            }),
+        };
+        let serialized = serde_json::to_vec(&stored).unwrap();
+        let split = serialized.len() / 2;
+        fs::write(&store.event_file, &serialized[..split]).unwrap();
+
+        assert!(store.read_new_events().unwrap().is_empty());
+
+        let mut file = OpenOptions::new()
+            .append(true)
+            .open(&store.event_file)
+            .unwrap();
+        file.write_all(&serialized[split..]).unwrap();
+        file.write_all(b"\n").unwrap();
+        drop(file);
+
+        let events = store.read_new_events().unwrap();
+        assert_eq!(events.len(), 1);
+        assert_eq!(events[0].event_key, "event-partial");
+        assert_eq!(events[0].native_session_id.as_deref(), Some("session-1"));
+        assert!(store.read_new_events().unwrap().is_empty());
 
         fs::remove_dir_all(directory).unwrap();
     }

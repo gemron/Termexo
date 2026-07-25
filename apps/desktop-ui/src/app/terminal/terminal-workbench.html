@@ -6,6 +6,7 @@
         [active]="terminal.id === activeTerminalId()"
         (selected)="terminalSelected.emit($event)"
         (closeRequested)="terminalClosed.emit($event)"
+        (statusChanged)="terminalStatusChanged.emit($event)"
       />
     }
   </div>

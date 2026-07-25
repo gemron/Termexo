@@ -74,9 +74,10 @@ impl ClaudeCodeAdapter {
             .extension()
             .is_some_and(|extension| extension.eq_ignore_ascii_case("cmd"))
         {
-            let command = format!("\"{}\" --version", executable.display());
             Command::new("cmd.exe")
-                .args(["/d", "/s", "/c", &command])
+                .args(["/d", "/c", "call"])
+                .arg(executable)
+                .arg("--version")
                 .output()
                 .ok()?
         } else {
@@ -474,5 +475,19 @@ mod tests {
             command,
             "& 'C:\\Tools\\Claude Code\\claude.cmd' --name 'Auth refactor' --model 'sonnet' --resume 'session-1'"
         );
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn reads_versions_from_windows_command_shims() {
+        let directory = test_directory("version-shim");
+        fs::create_dir_all(&directory).unwrap();
+        let shim = directory.join("claude.cmd");
+        fs::write(&shim, "@echo off\r\necho 9.9.9 (Claude Code)\r\n").unwrap();
+
+        let version = ClaudeCodeAdapter::new().read_version(&shim);
+
+        assert_eq!(version.as_deref(), Some("9.9.9 (Claude Code)"));
+        fs::remove_dir_all(directory).unwrap();
     }
 }

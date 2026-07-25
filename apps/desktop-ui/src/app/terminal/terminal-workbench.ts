@@ -1,6 +1,6 @@
 import { Component, input, output } from '@angular/core';
 
-import { LayoutMode, TerminalSession } from '../core/models/workspace.models';
+import { LayoutMode, TerminalSession, TerminalStatus } from '../core/models/workspace.models';
 import { IconComponent } from '../shared/icon/icon';
 import { TerminalPanelComponent } from './terminal-panel';
 
@@ -18,4 +18,5 @@ export class TerminalWorkbenchComponent {
   readonly terminalSelected = output<string>();
   readonly terminalClosed = output<string>();
   readonly terminalRequested = output<void>();
+  readonly terminalStatusChanged = output<{ terminalId: string; status: TerminalStatus }>();
 }

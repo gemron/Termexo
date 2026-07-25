@@ -34,6 +34,11 @@ try {
   const toolbar = page.getByRole('toolbar', { name: '工作区工具' });
   await toolbar.getByRole('button', { name: '终端', exact: true }).click();
   await page.getByText(/Shell 3 已创建/).waitFor();
+  await page
+    .locator('.terminal-panel')
+    .filter({ hasText: 'Shell 3' })
+    .getByText('运行中', { exact: true })
+    .waitFor();
 
   const updatedTerminalCount = await page.locator('.terminal-panel').count();
   if (updatedTerminalCount !== initialTerminalCount + 1) {
@@ -83,6 +88,23 @@ try {
   const settingsDialog = page.getByRole('dialog', { name: 'Claude Code 设置' });
   await settingsDialog.waitFor();
   await settingsDialog.getByRole('button', { name: '模型 Profile' }).click();
+  await settingsDialog.getByRole('button', { name: /新建 Profile/ }).click();
+  await settingsDialog.getByLabel('名称', { exact: true }).fill('Smoke Profile');
+  await settingsDialog.getByLabel('模型', { exact: true }).fill('sonnet');
+  const saveProfileButton = settingsDialog.getByRole('button', { name: '保存 Profile' });
+  await saveProfileButton.click();
+  await settingsDialog
+    .locator('.profile-nav button')
+    .filter({ hasText: 'Smoke Profile' })
+    .waitFor();
+  await saveProfileButton.click();
+  const smokeProfileCount = await settingsDialog
+    .locator('.profile-nav button')
+    .filter({ hasText: 'Smoke Profile' })
+    .count();
+  if (smokeProfileCount !== 1) {
+    throw new Error('saving a new model profile twice created duplicate profiles');
+  }
 
   const compactDialogBox = await settingsDialog.boundingBox();
   if (

@@ -171,6 +171,7 @@
           (terminalSelected)="state.selectTerminal($event)"
           (terminalClosed)="closeTerminal($event)"
           (terminalRequested)="createTerminal('shell')"
+          (terminalStatusChanged)="state.updateTerminalStatus($event.terminalId, $event.status)"
         />
       }
     </section>

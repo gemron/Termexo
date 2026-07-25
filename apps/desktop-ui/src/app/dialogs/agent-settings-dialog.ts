@@ -1,4 +1,4 @@
-import { Component, input, output, signal } from '@angular/core';
+import { Component, effect, input, output, signal, untracked } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 
 import {
@@ -41,14 +41,14 @@ type SettingsTab = 'diagnostics' | 'models' | 'mcp';
           <button
             type="button"
             [class.active]="tab() === 'diagnostics'"
-            (click)="tab.set('diagnostics')"
+            (click)="selectTab('diagnostics')"
           >
             诊断
           </button>
-          <button type="button" [class.active]="tab() === 'models'" (click)="tab.set('models')">
+          <button type="button" [class.active]="tab() === 'models'" (click)="selectTab('models')">
             模型 Profile
           </button>
-          <button type="button" [class.active]="tab() === 'mcp'" (click)="tab.set('mcp')">
+          <button type="button" [class.active]="tab() === 'mcp'" (click)="selectTab('mcp')">
             MCP Profile
           </button>
         </nav>
@@ -233,6 +233,22 @@ export class AgentSettingsDialogComponent {
   protected clearCredential = false;
   protected mcpName = '';
   protected mcpConfig = '{\n  "mcpServers": {}\n}';
+  private modelProfilesInitialized = false;
+  private mcpProfilesInitialized = false;
+
+  constructor() {
+    effect(() => this.syncModelProfileEditor(this.modelProfiles()));
+    effect(() => this.syncMcpProfileEditor(this.mcpProfiles()));
+  }
+
+  protected selectTab(tab: SettingsTab): void {
+    this.tab.set(tab);
+    if (tab === 'models') {
+      this.syncModelProfileEditor(this.modelProfiles());
+    } else if (tab === 'mcp') {
+      this.syncMcpProfileEditor(this.mcpProfiles());
+    }
+  }
 
   protected editModel(profile: ModelProfile): void {
     this.modelId.set(profile.id);
@@ -257,8 +273,10 @@ export class AgentSettingsDialogComponent {
   }
 
   protected saveModel(): void {
+    const profileId = this.modelId() || crypto.randomUUID();
+    this.modelId.set(profileId);
     this.modelSaved.emit({
-      id: this.modelId() || crypto.randomUUID(),
+      id: profileId,
       name: this.modelName.trim(),
       provider: 'Anthropic',
       model: this.modelNameValue.trim(),
@@ -282,10 +300,41 @@ export class AgentSettingsDialogComponent {
   }
 
   protected saveMcp(): void {
+    const profileId = this.mcpId() || crypto.randomUUID();
+    this.mcpId.set(profileId);
     this.mcpSaved.emit({
-      id: this.mcpId() || crypto.randomUUID(),
+      id: profileId,
       name: this.mcpName.trim(),
       configJson: this.mcpConfig,
     });
+  }
+
+  private syncModelProfileEditor(profiles: ModelProfile[]): void {
+    const selectedId = untracked(this.modelId);
+    const selectedProfile = profiles.find((profile) => profile.id === selectedId);
+    if (
+      !this.modelProfilesInitialized ||
+      (!selectedId && profiles.length > 0) ||
+      (selectedId && !selectedProfile)
+    ) {
+      const fallback =
+        selectedProfile ?? profiles.find((profile) => profile.isDefault) ?? profiles[0];
+      fallback ? this.editModel(fallback) : this.newModel();
+      this.modelProfilesInitialized = true;
+    }
+  }
+
+  private syncMcpProfileEditor(profiles: McpProfile[]): void {
+    const selectedId = untracked(this.mcpId);
+    const selectedProfile = profiles.find((profile) => profile.id === selectedId);
+    if (
+      !this.mcpProfilesInitialized ||
+      (!selectedId && profiles.length > 0) ||
+      (selectedId && !selectedProfile)
+    ) {
+      const fallback = selectedProfile ?? profiles[0];
+      fallback ? this.editMcp(fallback) : this.newMcp();
+      this.mcpProfilesInitialized = true;
+    }
   }
 }
