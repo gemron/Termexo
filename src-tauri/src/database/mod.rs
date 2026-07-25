@@ -491,8 +491,8 @@ mod tests {
 
         let workspace = Workspace {
             id: "workspace-1".into(),
-            name: "AgentDock".into(),
-            project_path: "D:\\dev\\agentdock".into(),
+            name: "Termexo".into(),
+            project_path: "D:\\dev\\termexo".into(),
             project_type: "Angular + Rust".into(),
             active_branch: "main".into(),
             favorite: true,
@@ -524,7 +524,7 @@ mod tests {
             id: "claude:session-1".into(),
             agent_type: "claude".into(),
             native_session_id: "session-1".into(),
-            project_path: Some("D:\\dev\\AgentDock".into()),
+            project_path: Some("D:\\dev\\Termexo".into()),
             model_name: Some("sonnet".into()),
             title: "Implement restore".into(),
             summary: None,

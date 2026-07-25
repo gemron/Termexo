@@ -261,7 +261,7 @@ mod tests {
             .duration_since(UNIX_EPOCH)
             .unwrap()
             .as_nanos();
-        std::env::temp_dir().join(format!("agentdock-{name}-{unique}"))
+        std::env::temp_dir().join(format!("termexo-{name}-{unique}"))
     }
 
     #[test]

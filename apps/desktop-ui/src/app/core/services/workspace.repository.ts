@@ -4,7 +4,8 @@ import { invoke } from '@tauri-apps/api/core';
 import { Workspace } from '../models/workspace.models';
 import { isTauriRuntime } from './tauri-runtime';
 
-const STORAGE_KEY = 'agentdock.workspaces.v1';
+const STORAGE_KEY = 'termexo.workspaces.v1';
+const LEGACY_STORAGE_KEY = 'agentdock.workspaces.v1';
 
 @Injectable({ providedIn: 'root' })
 export class WorkspaceRepository {
@@ -13,15 +14,22 @@ export class WorkspaceRepository {
       return invoke<Workspace[]>('list_workspaces');
     }
 
-    const value = localStorage.getItem(STORAGE_KEY);
+    const currentValue = localStorage.getItem(STORAGE_KEY);
+    const value = currentValue ?? localStorage.getItem(LEGACY_STORAGE_KEY);
     if (!value) {
       return [];
     }
 
     try {
-      return JSON.parse(value) as Workspace[];
+      const workspaces = JSON.parse(value) as Workspace[];
+      if (currentValue === null) {
+        localStorage.setItem(STORAGE_KEY, value);
+        localStorage.removeItem(LEGACY_STORAGE_KEY);
+      }
+      return workspaces;
     } catch {
       localStorage.removeItem(STORAGE_KEY);
+      localStorage.removeItem(LEGACY_STORAGE_KEY);
       return [];
     }
   }
@@ -40,6 +48,7 @@ export class WorkspaceRepository {
       workspaces.push(workspace);
     }
     localStorage.setItem(STORAGE_KEY, JSON.stringify(workspaces));
+    localStorage.removeItem(LEGACY_STORAGE_KEY);
   }
 
   async saveAll(workspaces: Workspace[]): Promise<void> {
@@ -49,5 +58,6 @@ export class WorkspaceRepository {
     }
 
     localStorage.setItem(STORAGE_KEY, JSON.stringify(workspaces));
+    localStorage.removeItem(LEGACY_STORAGE_KEY);
   }
 }

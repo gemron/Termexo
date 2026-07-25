@@ -59,7 +59,7 @@ export class TerminalGatewayService {
     this.emit(
       session.id,
       [
-        '\u001b[38;2;88;199;160mAgentDock browser runtime\u001b[0m',
+        '\u001b[38;2;88;199;160mTermexo browser runtime\u001b[0m',
         `Workspace: ${session.workingDirectory}`,
         `Agent: ${session.name}  Model: ${session.model}`,
         'Install Rust and run `npm run tauri:dev` for a real PTY.',

@@ -1,7 +1,7 @@
 {
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "default",
-  "description": "Default AgentDock desktop capability",
+  "description": "Default Termexo desktop capability",
   "windows": ["main"],
   "permissions": ["core:default"]
 }

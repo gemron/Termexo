@@ -1,6 +1,6 @@
 import { Workspace } from './workspace.models';
 
-const DEFAULT_PROJECT_PATH = 'D:\\dev\\agentdock';
+const DEFAULT_PROJECT_PATH = 'D:\\dev\\termexo';
 
 export function createDefaultWorkspaces(): Workspace[] {
   const now = Date.now();
@@ -8,7 +8,7 @@ export function createDefaultWorkspaces(): Workspace[] {
   return [
     {
       id: crypto.randomUUID(),
-      name: 'AgentDock',
+      name: 'Termexo',
       projectPath: DEFAULT_PROJECT_PATH,
       projectType: 'Angular + Rust',
       activeBranch: 'feature/terminal-runtime',

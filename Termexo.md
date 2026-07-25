@@ -1,8 +1,8 @@
-# AgentDock 产品功能、软件架构与开发计划
+# Termexo 产品功能、软件架构与开发计划
 
 ## 一、产品定位
 
-AgentDock 是一个面向开发者和企业研发团队的本地优先 AI 编程工作台，用于统一管理：
+Termexo 是一个面向开发者和企业研发团队的本地优先 AI 编程工作台，用于统一管理：
 
 * Claude Code
 * OpenAI Codex CLI
@@ -30,7 +30,7 @@ AgentDock 是一个面向开发者和企业研发团队的本地优先 AI 编程
 * 任务状态
 * 上下文摘要
 
-Claude Code 已支持命名会话恢复、模型配置、Hooks 和本地会话记录；Codex CLI 和 Gemini CLI 也具备会话恢复能力，因此 AgentDock 应优先调用各 Agent 的原生恢复机制，而不是自行模拟对话恢复。
+Claude Code 已支持命名会话恢复、模型配置、Hooks 和本地会话记录；Codex CLI 和 Gemini CLI 也具备会话恢复能力，因此 Termexo 应优先调用各 Agent 的原生恢复机制，而不是自行模拟对话恢复。
 
 ---
 
@@ -332,7 +332,7 @@ Git 分支
 ```text
 只读扫描原生会话目录
 +
-AgentDock 自己保存索引和扩展元数据
+Termexo 自己保存索引和扩展元数据
 ```
 
 避免 CLI 升级后出现文件格式不兼容。
@@ -1544,7 +1544,7 @@ Claude 专用 MVP：5～6 周
 # 十一、推荐代码目录
 
 ```text
-agentdock/
+termexo/
 ├── apps/
 │   └── desktop-ui/
 │       ├── src/app/

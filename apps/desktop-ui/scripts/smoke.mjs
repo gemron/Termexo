@@ -3,7 +3,7 @@ import { join } from 'node:path';
 
 import { chromium } from 'playwright-core';
 
-const APP_URL = process.env.AGENTDOCK_URL ?? 'http://127.0.0.1:4200';
+const APP_URL = process.env.TERMEXO_URL ?? process.env.AGENTDOCK_URL ?? 'http://127.0.0.1:4200';
 const EDGE_PATH =
   process.env.EDGE_PATH ?? 'C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe';
 
@@ -24,6 +24,10 @@ try {
 
   await page.goto(APP_URL, { waitUntil: 'networkidle' });
   await page.locator('.terminal-panel').first().waitFor();
+  if ((await page.title()) !== 'Termexo') {
+    throw new Error(`unexpected document title: ${await page.title()}`);
+  }
+  await page.getByText('Termexo', { exact: true }).first().waitFor();
 
   const terminalBox = await page.locator('.xterm-screen').first().boundingBox();
   if (!terminalBox || terminalBox.width < 100 || terminalBox.height < 100) {
@@ -78,7 +82,7 @@ try {
   }
 
   await page.screenshot({
-    path: join(tmpdir(), 'agentdock-desktop.png'),
+    path: join(tmpdir(), 'termexo-desktop.png'),
     fullPage: true,
   });
 
@@ -125,7 +129,7 @@ try {
   }
 
   await page.screenshot({
-    path: join(tmpdir(), 'agentdock-compact.png'),
+    path: join(tmpdir(), 'termexo-compact.png'),
     fullPage: true,
   });
 
@@ -137,10 +141,7 @@ try {
     JSON.stringify({
       terminalPanels: updatedTerminalCount,
       terminalCanvas: terminalBox,
-      screenshots: [
-        join(tmpdir(), 'agentdock-desktop.png'),
-        join(tmpdir(), 'agentdock-compact.png'),
-      ],
+      screenshots: [join(tmpdir(), 'termexo-desktop.png'), join(tmpdir(), 'termexo-compact.png')],
     }),
   );
 } finally {

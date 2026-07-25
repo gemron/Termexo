@@ -23,7 +23,7 @@ describe('AppStateService', () => {
     await service.initialize();
 
     expect(service.workspaces().length).toBeGreaterThan(0);
-    expect(service.activeWorkspace()?.name).toBe('AgentDock');
+    expect(service.activeWorkspace()?.name).toBe('Termexo');
     expect(repository.saveAll).toHaveBeenCalledOnce();
   });
 

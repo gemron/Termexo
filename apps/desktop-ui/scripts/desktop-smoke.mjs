@@ -9,8 +9,10 @@ if (process.platform !== 'win32') {
 }
 
 const repositoryRoot = resolve('../..');
-const executablePath = resolve(repositoryRoot, 'src-tauri', 'target', 'release', 'agentdock.exe');
-const debugPort = Number(process.env.AGENTDOCK_DESKTOP_DEBUG_PORT ?? 9224);
+const executablePath = resolve(repositoryRoot, 'src-tauri', 'target', 'release', 'termexo.exe');
+const debugPort = Number(
+  process.env.TERMEXO_DESKTOP_DEBUG_PORT ?? process.env.AGENTDOCK_DESKTOP_DEBUG_PORT ?? 9224,
+);
 const debugUrl = `http://127.0.0.1:${debugPort}`;
 const child = spawn(executablePath, [], {
   cwd: repositoryRoot,
@@ -29,7 +31,7 @@ try {
   const pages = browser.contexts().flatMap((context) => context.pages());
   const page = pages.find((candidate) => candidate.url().startsWith('http://tauri.localhost'));
   if (!page) {
-    throw new Error('AgentDock WebView did not expose an application page.');
+    throw new Error('Termexo WebView did not expose an application page.');
   }
 
   const errors = [];
@@ -40,6 +42,10 @@ try {
   });
   page.on('pageerror', (error) => errors.push(error.message));
 
+  if ((await page.title()) !== 'Termexo') {
+    throw new Error(`unexpected document title: ${await page.title()}`);
+  }
+  await page.getByText('Termexo', { exact: true }).first().waitFor();
   const toolbar = page.getByRole('toolbar', { name: '工作区工具' });
   await toolbar.waitFor();
   const backendInstallation = await page.evaluate(() =>
@@ -110,7 +116,7 @@ try {
 async function waitForDebugEndpoint(url, process) {
   for (let attempt = 0; attempt < 60; attempt += 1) {
     if (process.exitCode !== null) {
-      throw new Error(`AgentDock exited before WebView2 became ready (${process.exitCode}).`);
+      throw new Error(`Termexo exited before WebView2 became ready (${process.exitCode}).`);
     }
     try {
       const response = await fetch(`${url}/json/version`);
@@ -122,7 +128,7 @@ async function waitForDebugEndpoint(url, process) {
     }
     await new Promise((resolveDelay) => setTimeout(resolveDelay, 250));
   }
-  throw new Error(`Timed out waiting for AgentDock WebView2 at ${url}.`);
+  throw new Error(`Timed out waiting for Termexo WebView2 at ${url}.`);
 }
 
 async function stopChildProcess(process) {
@@ -136,6 +142,6 @@ async function stopChildProcess(process) {
     new Promise((resolveDelay) => setTimeout(resolveDelay, 15_000)),
   ]);
   if (process.exitCode === null && process.signalCode === null) {
-    throw new Error('AgentDock desktop smoke process did not exit cleanly.');
+    throw new Error('Termexo desktop smoke process did not exit cleanly.');
   }
 }

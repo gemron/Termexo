@@ -1,6 +1,6 @@
-# AgentDock
+# Termexo
 
-AgentDock 是一个本地优先的 AI 编程工作台。当前仓库实现 `AgentDock.md`
+Termexo 是一个本地优先的 AI 编程工作台。当前仓库实现 `Termexo.md`
 定义的 V0.2 Claude Code 专用版：Workspace 管理、多终端布局、Claude
 安装检测、历史会话索引与恢复、Hooks 状态识别、模型/API Profile 和
 MCP Profile。
@@ -44,7 +44,8 @@ npm run tauri:dev
 ```
 
 Tauri 模式使用真实 PTY，并将 Workspace、Claude 会话索引、Profile 和
-Agent 事件保存到应用数据目录中的 `agentdock.db`。退出的操作系统进程
+Agent 事件保存到应用数据目录中的 `agentdock.db`。为兼容已有安装，
+数据库文件和 Tauri 应用标识继续沿用旧内部标识。退出的操作系统进程
 不会被伪恢复；历史 Claude 会话需要从会话中心显式恢复。
 
 ## 验证

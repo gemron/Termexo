@@ -14,6 +14,8 @@ use super::{AgentAdapter, AgentInstallation, AgentLaunchSpec, AgentSession, Clau
 const AGENT_TYPE: &str = "claude";
 const SESSION_STATUS: &str = "HISTORICAL";
 const MAX_TITLE_LENGTH: usize = 96;
+const CLAUDE_PATH_ENV: &str = "TERMEXO_CLAUDE_PATH";
+const LEGACY_CLAUDE_PATH_ENV: &str = "AGENTDOCK_CLAUDE_PATH";
 
 #[derive(Debug, Error)]
 pub enum ClaudeError {
@@ -38,7 +40,9 @@ impl ClaudeCodeAdapter {
     fn find_executable(&self) -> Option<PathBuf> {
         let mut candidates = Vec::new();
 
-        if let Some(configured) = env::var_os("AGENTDOCK_CLAUDE_PATH") {
+        if let Some(configured) =
+            env::var_os(CLAUDE_PATH_ENV).or_else(|| env::var_os(LEGACY_CLAUDE_PATH_ENV))
+        {
             candidates.push(PathBuf::from(configured));
         }
 
@@ -426,7 +430,7 @@ mod tests {
             .duration_since(UNIX_EPOCH)
             .unwrap()
             .as_nanos();
-        env::temp_dir().join(format!("agentdock-{name}-{unique}"))
+        env::temp_dir().join(format!("termexo-{name}-{unique}"))
     }
 
     #[test]
@@ -437,7 +441,7 @@ mod tests {
         let mut file = File::create(&transcript).unwrap();
         writeln!(
             file,
-            r#"{{"type":"user","cwd":"D:\\dev\\AgentDock","gitBranch":"main","message":{{"content":"Implement session restore"}}}}"#
+            r#"{{"type":"user","cwd":"D:\\dev\\Termexo","gitBranch":"main","message":{{"content":"Implement session restore"}}}}"#
         )
         .unwrap();
         writeln!(
@@ -448,7 +452,7 @@ mod tests {
         let original = fs::read_to_string(&transcript).unwrap();
 
         let sessions = ClaudeCodeAdapter::new()
-            .scan_directory(&directory, Some("D:/dev/AgentDock"))
+            .scan_directory(&directory, Some("D:/dev/Termexo"))
             .unwrap();
 
         assert_eq!(sessions.len(), 1);
