@@ -204,7 +204,17 @@ impl AgentAdapter for ClaudeCodeAdapter {
             "--mcp-config",
             options.mcp_config_path.as_deref(),
         );
-        append_option(&mut command, "--resume", options.session_id.as_deref());
+        if let Some(session_id) = options
+            .session_id
+            .as_deref()
+            .filter(|value| !value.trim().is_empty())
+        {
+            append_option(
+                &mut command,
+                session_argument_flag(&self.projects_directory(), session_id),
+                Some(session_id),
+            );
+        }
 
         Ok(AgentLaunchSpec {
             command,
@@ -288,6 +298,22 @@ fn collect_transcripts(
         }
     }
     Ok(())
+}
+
+fn session_argument_flag(projects_directory: &Path, session_id: &str) -> &'static str {
+    let mut transcripts = Vec::new();
+    let transcript_exists = collect_transcripts(projects_directory, &mut transcripts).is_ok()
+        && transcripts.iter().any(|path| {
+            path.file_stem()
+                .and_then(|value| value.to_str())
+                .is_some_and(|value| value.eq_ignore_ascii_case(session_id))
+        });
+
+    if transcript_exists {
+        "--resume"
+    } else {
+        "--session-id"
+    }
 }
 
 fn parse_session(path: &Path) -> Result<AgentSession, ClaudeError> {
@@ -509,6 +535,35 @@ mod tests {
         assert_eq!(
             command,
             "& 'C:\\Tools\\Claude Code\\claude.cmd' --name 'Auth refactor' --model 'sonnet' --resume 'session-1'"
+        );
+    }
+
+    #[test]
+    fn resumes_only_when_the_transcript_exists() {
+        let directory = test_directory("resume-existing");
+        let nested = directory.join("project");
+        fs::create_dir_all(&nested).unwrap();
+        fs::write(
+            nested.join("03788ec4-3e8c-4608-8ce5-427a71a05bba.jsonl"),
+            "",
+        )
+        .unwrap();
+
+        assert_eq!(
+            session_argument_flag(&directory, "03788ec4-3e8c-4608-8ce5-427a71a05bba"),
+            "--resume"
+        );
+
+        fs::remove_dir_all(directory).unwrap();
+    }
+
+    #[test]
+    fn reuses_the_session_id_when_no_transcript_exists() {
+        let directory = test_directory("resume-missing");
+
+        assert_eq!(
+            session_argument_flag(&directory, "03788ec4-3e8c-4608-8ce5-427a71a05bba"),
+            "--session-id"
         );
     }
 

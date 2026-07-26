@@ -70,6 +70,40 @@ export interface ModelProfileInput {
   isDefault: boolean;
 }
 
+export interface ClaudeProviderPreset {
+  provider: string;
+  name: string;
+  model: string;
+  baseUrl: string;
+}
+
+export const CLAUDE_PROVIDER_PRESETS: readonly ClaudeProviderPreset[] = [
+  {
+    provider: 'Anthropic',
+    name: 'Claude Sonnet',
+    model: 'sonnet',
+    baseUrl: '',
+  },
+  {
+    provider: 'DeepSeek',
+    name: 'DeepSeek V4 Pro',
+    model: 'deepseek-v4-pro[1m]',
+    baseUrl: 'https://api.deepseek.com/anthropic',
+  },
+  {
+    provider: 'MiniMax',
+    name: 'MiniMax M2.7',
+    model: 'MiniMax-M2.7',
+    baseUrl: 'https://api.minimaxi.com/anthropic',
+  },
+  {
+    provider: 'GLM',
+    name: 'GLM 5.2',
+    model: 'glm-5.2[1m]',
+    baseUrl: 'https://open.bigmodel.cn/api/anthropic',
+  },
+];
+
 export interface McpProfile {
   id: string;
   name: string;

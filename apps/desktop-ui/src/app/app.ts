@@ -1,7 +1,13 @@
-import { Component, computed, effect, inject, signal } from '@angular/core';
+import { Component, computed, effect, HostListener, inject, signal } from '@angular/core';
 
 import { McpProfileInput, ModelProfileInput } from './core/models/agent.models';
-import { AgentType, LayoutMode } from './core/models/workspace.models';
+import {
+  AgentType,
+  LayoutMode,
+  MAX_TERMINAL_GRID_DIMENSION,
+  MIN_TERMINAL_GRID_DIMENSION,
+  normalizeTerminalGridDimension,
+} from './core/models/workspace.models';
 import { AgentService } from './core/services/agent.service';
 import { AppStateService } from './core/services/app-state.service';
 import { DirectoryPickerService } from './core/services/directory-picker.service';
@@ -16,6 +22,11 @@ import { ModelSwitchDialogComponent } from './dialogs/model-switch-dialog';
 import { ResumeSessionValue, SessionCenterDialogComponent } from './dialogs/session-center-dialog';
 import { InspectorPanelComponent } from './inspector/inspector-panel';
 import { IconComponent } from './shared/icon/icon';
+import {
+  layoutTerminalCapacity,
+  resolveVisibleTerminalIds,
+  revealTerminalInLayout,
+} from './terminal/terminal-visibility';
 import { TerminalWorkbenchComponent } from './terminal/terminal-workbench';
 import { WorkspaceSidebarComponent } from './workspace/workspace-sidebar';
 
@@ -41,6 +52,7 @@ export class App {
   private readonly directoryPicker = inject(DirectoryPickerService);
   private readonly terminalGateway = inject(TerminalGatewayService);
   private readonly handledEventKeys = new Set<string>();
+  private readonly preferredTerminalIds = signal<Record<string, string[]>>({});
 
   protected readonly createWorkspaceOpen = signal(false);
   protected readonly claudeLaunchOpen = signal(false);
@@ -49,10 +61,37 @@ export class App {
   protected readonly modelSwitchOpen = signal(false);
   protected readonly agentMenuOpen = signal(false);
   protected readonly inspectorOpen = signal(true);
+  protected readonly workspaceMaximized = signal(false);
+  protected readonly terminalMaximized = signal(false);
   protected readonly launchingClaude = signal(false);
   protected readonly selectedTerminalDirectory = signal<string | null>(null);
   protected readonly toastMessage = signal<string | null>(null);
   protected readonly activeTerminalId = computed(() => this.state.activeTerminal()?.id ?? null);
+  protected readonly gridDimensionOptions = Array.from(
+    { length: MAX_TERMINAL_GRID_DIMENSION - MIN_TERMINAL_GRID_DIMENSION + 1 },
+    (_, index) => MIN_TERMINAL_GRID_DIMENSION + index,
+  );
+  protected readonly gridColumns = computed(() =>
+    normalizeTerminalGridDimension(this.state.activeWorkspace()?.gridColumns),
+  );
+  protected readonly gridRows = computed(() =>
+    normalizeTerminalGridDimension(this.state.activeWorkspace()?.gridRows),
+  );
+  protected readonly visibleTerminalIds = computed(() => {
+    const workspace = this.state.activeWorkspace();
+    if (!workspace) {
+      return [];
+    }
+    return resolveVisibleTerminalIds(
+      workspace.terminals,
+      this.activeTerminalId(),
+      this.preferredTerminalIds()[workspace.id] ?? [],
+      workspace.layout,
+      this.terminalMaximized(),
+      this.gridColumns(),
+      this.gridRows(),
+    );
+  });
 
   constructor() {
     void this.initialize();
@@ -114,6 +153,8 @@ export class App {
         command: launch.command,
         model: profile?.name ?? 'Claude Sonnet',
         workingDirectory,
+        profileId: value.profileId,
+        mcpProfileId: value.mcpProfileId,
       });
       this.claudeLaunchOpen.set(false);
       this.selectedTerminalDirectory.set(null);
@@ -165,6 +206,8 @@ export class App {
         model: profile?.name ?? value.session.modelName ?? 'Claude Sonnet',
         nativeSessionId: value.session.nativeSessionId,
         workingDirectory: value.session.projectPath ?? workspace.projectPath,
+        profileId: value.profileId,
+        mcpProfileId: value.mcpProfileId,
       });
       this.sessionCenterOpen.set(false);
       if (terminal) {
@@ -178,12 +221,99 @@ export class App {
   }
 
   protected closeTerminal(terminalId: string): void {
+    const workspace = this.state.activeWorkspace();
+    if (
+      this.terminalMaximized() &&
+      this.activeTerminalId() === terminalId &&
+      workspace?.terminals.length === 1
+    ) {
+      this.terminalMaximized.set(false);
+    }
     void this.terminalGateway.close(terminalId).catch(() => undefined);
     this.state.closeTerminal(terminalId);
   }
 
+  protected selectTerminal(terminalId: string): void {
+    const workspace = this.state.activeWorkspace();
+    if (!workspace) {
+      return;
+    }
+    if (!this.terminalMaximized()) {
+      const preferredIds = revealTerminalInLayout(
+        this.visibleTerminalIds(),
+        this.activeTerminalId(),
+        terminalId,
+        workspace.layout,
+        this.gridColumns(),
+        this.gridRows(),
+      );
+      this.preferredTerminalIds.update((items) => ({ ...items, [workspace.id]: preferredIds }));
+    }
+    this.state.selectTerminal(terminalId);
+    window.requestAnimationFrame(() => {
+      document
+        .getElementById(`terminal-tab-${terminalId}`)
+        ?.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+    });
+  }
+
+  protected selectTerminalFromPicker(event: Event): void {
+    const terminalId = (event.target as HTMLSelectElement).value;
+    if (terminalId) {
+      this.selectTerminal(terminalId);
+    }
+  }
+
+  protected isTerminalVisible(terminalId: string): boolean {
+    return this.visibleTerminalIds().includes(terminalId);
+  }
+
+  protected visibleTerminalLimit(): number {
+    return this.terminalMaximized()
+      ? 1
+      : layoutTerminalCapacity(
+          this.state.activeWorkspace()?.layout ?? 'single',
+          this.gridColumns(),
+          this.gridRows(),
+        );
+  }
+
+  protected toggleTerminalMaximize(terminalId: string): void {
+    const shouldRestore = this.terminalMaximized() && this.activeTerminalId() === terminalId;
+    this.selectTerminal(terminalId);
+    this.terminalMaximized.set(!shouldRestore);
+  }
+
+  protected toggleWorkspaceMaximize(): void {
+    this.workspaceMaximized.update((maximized) => !maximized);
+  }
+
+  @HostListener('window:keydown', ['$event'])
+  protected restoreMaximizedView(event: KeyboardEvent): void {
+    if (event.key !== 'Escape' || !event.shiftKey) {
+      return;
+    }
+    if (this.terminalMaximized()) {
+      event.preventDefault();
+      this.terminalMaximized.set(false);
+      return;
+    }
+    if (this.workspaceMaximized()) {
+      event.preventDefault();
+      this.workspaceMaximized.set(false);
+    }
+  }
+
   protected changeLayout(layout: LayoutMode): void {
     this.state.setLayout(layout);
+  }
+
+  protected changeGridDimension(axis: 'columns' | 'rows', event: Event): void {
+    const value = Number((event.target as HTMLSelectElement).value);
+    this.state.setGridDimensions(
+      axis === 'columns' ? value : this.gridColumns(),
+      axis === 'rows' ? value : this.gridRows(),
+    );
   }
 
   protected createWorkspace(value: { name: string; projectPath: string }): void {
@@ -192,10 +322,57 @@ export class App {
     this.showToast(`工作区 ${value.name} 已创建`);
   }
 
-  protected switchModels(profileId: string): void {
-    const switched = this.state.switchAllModels(profileId);
-    this.modelSwitchOpen.set(false);
-    this.showToast(`${switched} 个 Agent 已切换模型`);
+  protected async switchModels(profileId: string): Promise<void> {
+    if (this.launchingClaude()) {
+      return;
+    }
+
+    const profile = this.agents.modelProfiles().find((item) => item.id === profileId);
+    const terminals =
+      this.state
+        .activeWorkspace()
+        ?.terminals.filter((terminal) => terminal.agentType === 'claude') ?? [];
+    if (!profile || terminals.length === 0) {
+      this.modelSwitchOpen.set(false);
+      this.showToast(profile ? '当前 Workspace 没有 Claude Code 终端' : '模型 Profile 不存在');
+      return;
+    }
+
+    this.launchingClaude.set(true);
+    try {
+      const results = await Promise.allSettled(
+        terminals.map(async (terminal) => {
+          const launch = await this.agents.prepareLaunch({
+            terminalId: terminal.id,
+            sessionId: terminal.nativeSessionId,
+            profileId,
+            mcpProfileId: terminal.mcpProfileId,
+          });
+          await this.terminalGateway.close(terminal.id).catch(() => undefined);
+          if (
+            !this.state.restartTerminalWithProfile(
+              terminal.id,
+              launch.command,
+              profile.name,
+              profileId,
+              terminal.mcpProfileId,
+            )
+          ) {
+            throw new Error(`Claude 终端 ${terminal.name} 已不存在`);
+          }
+        }),
+      );
+      const switched = results.filter((result) => result.status === 'fulfilled').length;
+      const failed = results.length - switched;
+      this.modelSwitchOpen.set(false);
+      this.showToast(
+        failed > 0
+          ? `${switched} 个 Claude Code 终端已切换，${failed} 个失败`
+          : `${switched} 个 Claude Code 终端已切换到 ${profile.name}`,
+      );
+    } finally {
+      this.launchingClaude.set(false);
+    }
   }
 
   protected saveSnapshot(): void {

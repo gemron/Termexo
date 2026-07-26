@@ -16,13 +16,27 @@
   &.inspector-collapsed {
     grid-template-columns: 208px minmax(0, 1fr);
   }
+
+  &.workspace-maximized {
+    grid-template-columns: minmax(0, 1fr);
+
+    app-workspace-sidebar,
+    app-inspector-panel,
+    .statusbar {
+      display: none;
+    }
+
+    .workspace-main {
+      grid-template-rows: 52px 44px minmax(0, 1fr);
+    }
+  }
 }
 
 .workspace-main {
   display: grid;
   min-width: 0;
   min-height: 0;
-  grid-template-rows: 52px 38px minmax(0, 1fr) 22px;
+  grid-template-rows: 52px 44px minmax(0, 1fr) 22px;
   background: #151817;
 }
 
@@ -213,7 +227,8 @@
   height: 100%;
   flex: 1;
   overflow: auto hidden;
-  scrollbar-width: none;
+  scrollbar-color: #46524c #171b19;
+  scrollbar-width: thin;
 
   button {
     display: flex;
@@ -233,6 +248,12 @@
       color: var(--text);
       background: #222725;
       box-shadow: inset 0 -2px 0 var(--accent);
+    }
+
+    &.visible:not(.active) {
+      color: var(--text-secondary);
+      background: #1d231f;
+      box-shadow: inset 0 -2px 0 #365e4f;
     }
 
     &:hover {
@@ -277,8 +298,39 @@
   }
 }
 
+.terminal-picker {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 5px;
+  padding-left: 7px;
+  border-left: 1px solid var(--border);
+
+  span {
+    color: #6f7873;
+    font: 8px/1 var(--mono);
+    white-space: nowrap;
+  }
+
+  select {
+    width: 148px;
+    height: 27px;
+    border: 1px solid #343b37;
+    border-radius: 3px;
+    color: var(--text-secondary);
+    background: #171b19;
+    font-size: 9px;
+    outline: none;
+
+    &:focus {
+      border-color: #467565;
+    }
+  }
+}
+
 .layout-controls {
   display: flex;
+  align-items: center;
   gap: 2px;
   padding: 0 7px;
 
@@ -296,6 +348,46 @@
     &.active {
       color: var(--text);
       background: #2b312e;
+    }
+  }
+}
+
+.grid-dimensions {
+  display: flex;
+  height: 25px;
+  align-items: center;
+  gap: 3px;
+  margin-left: 3px;
+  padding-left: 6px;
+  border-left: 1px solid var(--border);
+  color: var(--text-muted);
+
+  label {
+    display: flex;
+    align-items: center;
+    gap: 3px;
+    font-size: 8px;
+    white-space: nowrap;
+  }
+
+  b {
+    color: #68716c;
+    font: 8px/1 var(--mono);
+  }
+
+  select {
+    width: 34px;
+    height: 23px;
+    padding: 0 2px;
+    border: 1px solid #343b37;
+    border-radius: 3px;
+    color: var(--text-secondary);
+    background: #171b19;
+    font: 9px/1 var(--mono);
+    outline: none;
+
+    &:focus {
+      border-color: #467565;
     }
   }
 }
@@ -368,5 +460,11 @@
 
   .tool-button span {
     display: none;
+  }
+}
+
+@media (max-width: 860px) {
+  .terminal-picker select {
+    width: 108px;
   }
 }

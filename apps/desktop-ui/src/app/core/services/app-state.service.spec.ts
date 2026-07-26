@@ -102,13 +102,56 @@ describe('AppStateService', () => {
     expect(repository.save).toHaveBeenCalled();
   });
 
-  it('keeps shell terminals unchanged during model switching', async () => {
+  it('persists normalized custom grid dimensions for the active workspace', async () => {
+    await service.initialize();
+
+    service.setGridDimensions(3, 8);
+
+    expect(service.activeWorkspace()).toEqual(
+      expect.objectContaining({
+        layout: 'grid',
+        gridColumns: 3,
+        gridRows: 6,
+      }),
+    );
+    expect(repository.save).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        layout: 'grid',
+        gridColumns: 3,
+        gridRows: 6,
+      }),
+    );
+  });
+
+  it('restarts a Claude terminal with a new profile without changing the CLI type', async () => {
     await service.initialize();
     const shell = service.createTerminal({ agentType: 'shell' });
+    const claude = service.createTerminal({
+      agentType: 'claude',
+      command: 'claude --model sonnet',
+      profileId: 'claude-default',
+    });
 
-    const switched = service.switchAllModels('gpt-codex');
+    const switched = service.restartTerminalWithProfile(
+      claude!.id,
+      "claude --model 'deepseek-v4-pro[1m]'",
+      'DeepSeek V4 Pro',
+      'deepseek',
+    );
 
-    expect(switched).toBeGreaterThan(0);
+    expect(switched).toBe(true);
+    expect(
+      service.activeWorkspace()?.terminals.find((terminal) => terminal.id === claude?.id),
+    ).toEqual(
+      expect.objectContaining({
+        agentType: 'claude',
+        command: "claude --model 'deepseek-v4-pro[1m]'",
+        model: 'DeepSeek V4 Pro',
+        profileId: 'deepseek',
+        runtimeRevision: 1,
+        status: 'STARTING',
+      }),
+    );
     expect(
       service.activeWorkspace()?.terminals.find((terminal) => terminal.id === shell?.id)?.model,
     ).toBe('Local');

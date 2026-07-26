@@ -7,7 +7,7 @@
 </p>
 
 <p align="center">
-  <img alt="Version 0.2.0" src="https://img.shields.io/badge/version-0.2.0-58c7a0">
+  <img alt="Version 0.2.2" src="https://img.shields.io/badge/version-0.2.2-58c7a0">
   <img alt="Windows" src="https://img.shields.io/badge/platform-Windows-0078D4?logo=windows">
   <img alt="Tauri 2" src="https://img.shields.io/badge/Tauri-2-24C8DB?logo=tauri&logoColor=white">
   <img alt="Angular 22" src="https://img.shields.io/badge/Angular-22-DD0031?logo=angular">
@@ -27,6 +27,16 @@ working context after restarting the application.
   <sub>Multiple workspaces, terminal layouts, session state, and the Inspector. This screenshot uses browser preview mode; the desktop runtime connects to real PTYs.</sub>
 </p>
 
+## V0.2.2 Updates
+
+- Keep any number of terminal tabs and choose which terminals are visible in the active layout.
+- Configure and persist grid layouts from `1–6 columns × 1–6 rows`; unused rows collapse automatically.
+- Maximize an individual terminal or the entire workspace, then restore with `Shift+Esc`.
+- Keep the Claude Code CLI while switching model profiles between Anthropic, DeepSeek,
+  MiniMax, GLM, or a custom Anthropic-compatible endpoint.
+- Batch-switch Claude Code terminals in the active workspace and restart them with their existing session IDs.
+- Use `--resume` when a local transcript exists and fall back to `--session-id` when it does not.
+
 ## Why Termexo
 
 AI coding tools usually run in isolated terminals and sessions. As the number of projects
@@ -43,17 +53,17 @@ a local control plane that is observable, recoverable, and extensible.
 
 ## Implemented Features
 
-| Capability               | Current implementation                                                                                                   |
-| ------------------------ | ------------------------------------------------------------------------------------------------------------------------ |
-| Workspace management     | Create, switch, and favorite workspaces; persist project paths, layouts, and terminal configuration                      |
-| Multi-terminal workbench | Single, column, row, and grid layouts; the desktop runtime starts real PowerShell/agent processes through `portable-pty` |
-| Claude Code detection    | Detect `claude.exe` / `claude.cmd`, version, and health on Windows                                                       |
-| Start Claude sessions    | Select a session name, model profile, and MCP profile before launch                                                      |
-| Session center           | Read-only Claude JSONL scanning, search, workspace filtering, and native `--resume`                                      |
-| Agent status tracking    | Isolated hooks per terminal for thinking, tool use, approval, user input, completion, and failure states                 |
-| Model and MCP profiles   | Manage models, endpoints, API key references, and MCP JSON configurations                                                |
-| Local data and secrets   | Store workspace/session/event data in SQLite and API keys in Windows Credential Manager                                  |
-| Browser preview          | Preview the complete UI without Rust and exercise layout flows through an interactive simulated terminal                 |
+| Capability               | Current implementation                                                                                             |
+| ------------------------ | ------------------------------------------------------------------------------------------------------------------ |
+| Workspace management     | Create, switch, and favorite workspaces; persist project paths, layouts, and terminal configuration                |
+| Multi-terminal workbench | Unlimited tabs, explicit pane selection, configurable 1–6 row/column grids, pane/workspace maximize, and real PTYs |
+| Claude Code detection    | Detect `claude.exe` / `claude.cmd`, version, and health on Windows                                                 |
+| Start Claude sessions    | Select a session name, model profile, and MCP profile before launch                                                |
+| Session center           | Read-only Claude JSONL scanning, search, workspace filtering, and native `--resume`                                |
+| Agent status tracking    | Isolated hooks per terminal for thinking, tool use, approval, user input, completion, and failure states           |
+| Model and MCP profiles   | Manage endpoints, keys, and MCP configuration; switch Claude CLI across Anthropic-compatible backends              |
+| Local data and secrets   | Store workspace/session/event data in SQLite and API keys in Windows Credential Manager                            |
+| Browser preview          | Preview the complete UI without Rust and exercise layout flows through an interactive simulated terminal           |
 
 ![Termexo model profiles](docs/images/termexo-model-profiles.png)
 
@@ -86,8 +96,8 @@ a local control plane that is observable, recoverable, and extensible.
 - Claude JSONL files are read-only. Termexo never edits, renames, or deletes them.
 - The Git and Tasks tabs in the Inspector currently use prototype data and are not wired
   to production backends.
-- Automatic permission approval, cross-agent session migration, and batch model-switch
-  transactions are outside the current release.
+- Automatic permission approval, cross-agent session migration, and cross-agent batch
+  model-switch transactions are outside the current release.
 
 See [Termexo.md](./Termexo.md) for the complete product plan and
 [V0.2 architecture](./docs/architecture/v0.2.md) for current technical boundaries.

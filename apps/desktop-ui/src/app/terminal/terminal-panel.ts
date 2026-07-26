@@ -60,8 +60,10 @@ export class TerminalPanelComponent implements AfterViewInit {
 
   readonly session = input.required<TerminalSession>();
   readonly active = input(false);
+  readonly maximized = input(false);
   readonly selected = output<string>();
   readonly closeRequested = output<string>();
+  readonly maximizeRequested = output<string>();
   readonly statusChanged = output<{ terminalId: string; status: TerminalStatus }>();
 
   protected readonly statusLabels = TERMINAL_STATUS_LABELS;

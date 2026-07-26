@@ -1,11 +1,21 @@
 @if (terminals().length > 0) {
-  <div class="terminal-grid" [attr.data-layout]="layout()">
-    @for (terminal of terminals(); track terminal.id) {
+  <div
+    class="terminal-grid"
+    [attr.data-layout]="layout()"
+    [attr.data-visible-count]="visibleTerminalIds().length"
+    [style.--terminal-columns]="renderedGridColumns()"
+    [style.--terminal-rows]="renderedGridRows()"
+  >
+    @for (terminal of terminals(); track terminal.id + ':' + (terminal.runtimeRevision ?? 0)) {
       <app-terminal-panel
+        [class.workbench-hidden]="!isVisible(terminal.id)"
+        [attr.aria-hidden]="!isVisible(terminal.id)"
         [session]="terminal"
         [active]="terminal.id === activeTerminalId()"
+        [maximized]="terminalMaximized() && terminal.id === activeTerminalId()"
         (selected)="terminalSelected.emit($event)"
         (closeRequested)="terminalClosed.emit($event)"
+        (maximizeRequested)="terminalMaximizeRequested.emit($event)"
         (statusChanged)="terminalStatusChanged.emit($event)"
       />
     }

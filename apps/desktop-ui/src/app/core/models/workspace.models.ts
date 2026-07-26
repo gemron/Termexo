@@ -14,6 +14,20 @@ export type TerminalStatus =
 
 export type LayoutMode = 'single' | 'columns' | 'rows' | 'grid';
 
+export const MIN_TERMINAL_GRID_DIMENSION = 1;
+export const MAX_TERMINAL_GRID_DIMENSION = 6;
+export const DEFAULT_TERMINAL_GRID_DIMENSION = 2;
+
+export function normalizeTerminalGridDimension(value: number | undefined): number {
+  if (!Number.isFinite(value)) {
+    return DEFAULT_TERMINAL_GRID_DIMENSION;
+  }
+  return Math.min(
+    MAX_TERMINAL_GRID_DIMENSION,
+    Math.max(MIN_TERMINAL_GRID_DIMENSION, Math.round(value!)),
+  );
+}
+
 export interface TerminalSession {
   id: string;
   name: string;
@@ -25,6 +39,9 @@ export interface TerminalSession {
   branch: string;
   command?: string;
   nativeSessionId?: string;
+  profileId?: string;
+  mcpProfileId?: string;
+  runtimeRevision?: number;
 }
 
 export interface Workspace {
@@ -36,6 +53,8 @@ export interface Workspace {
   favorite: boolean;
   lastOpenedAt: number;
   layout: LayoutMode;
+  gridColumns?: number;
+  gridRows?: number;
   terminals: TerminalSession[];
 }
 
@@ -47,14 +66,8 @@ export interface CreateTerminalInput {
   model?: string;
   nativeSessionId?: string;
   workingDirectory?: string;
-}
-
-export interface ModelProfile {
-  id: string;
-  name: string;
-  provider: string;
-  model: string;
-  tone: string;
+  profileId?: string;
+  mcpProfileId?: string;
 }
 
 export interface GitSummary {
@@ -92,27 +105,3 @@ export const AGENT_LABELS: Record<AgentType, string> = {
   gemini: 'Gemini CLI',
   shell: 'Shell',
 };
-
-export const MODEL_PROFILES: ModelProfile[] = [
-  {
-    id: 'claude-sonnet',
-    name: 'Claude Sonnet',
-    provider: 'Anthropic',
-    model: 'claude-sonnet-4-5',
-    tone: '#58c7a0',
-  },
-  {
-    id: 'gpt-codex',
-    name: 'GPT Codex',
-    provider: 'OpenAI',
-    model: 'gpt-5-codex',
-    tone: '#68a9e8',
-  },
-  {
-    id: 'gemini-pro',
-    name: 'Gemini Pro',
-    provider: 'Google',
-    model: 'gemini-2.5-pro',
-    tone: '#d6a34a',
-  },
-];

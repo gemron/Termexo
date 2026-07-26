@@ -11,8 +11,14 @@
     </div>
     <div class="terminal-meta">
       <span>{{ session().model }}</span>
-      <button type="button" title="放大终端" aria-label="放大终端">
-        <app-icon name="maximize" [size]="13" />
+      <button
+        type="button"
+        [title]="maximized() ? '恢复终端窗口（Shift+Esc）' : '最大化终端窗口'"
+        [attr.aria-label]="maximized() ? '恢复终端窗口' : '最大化终端窗口'"
+        [class.active]="maximized()"
+        (click)="$event.stopPropagation(); maximizeRequested.emit(session().id)"
+      >
+        <app-icon [name]="maximized() ? 'minimize' : 'maximize'" [size]="13" />
       </button>
       <button
         type="button"

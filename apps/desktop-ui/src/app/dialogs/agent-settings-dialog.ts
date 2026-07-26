@@ -3,6 +3,7 @@ import { FormsModule } from '@angular/forms';
 
 import {
   AgentInstallation,
+  CLAUDE_PROVIDER_PRESETS,
   McpProfile,
   McpProfileInput,
   ModelProfile,
@@ -110,6 +111,20 @@ type SettingsTab = 'diagnostics' | 'models' | 'mcp';
                 <div class="profile-editor">
                   <div class="two-columns">
                     <label><span>名称</span><input [(ngModel)]="modelName" /></label>
+                    <label>
+                      <span>模型供应商</span>
+                      <select
+                        [ngModel]="modelProvider"
+                        (ngModelChange)="selectProvider($event)"
+                      >
+                        @for (preset of providerPresets; track preset.provider) {
+                          <option [value]="preset.provider">{{ preset.provider }}</option>
+                        }
+                        @if (!isPresetProvider(modelProvider)) {
+                          <option [value]="modelProvider">{{ modelProvider }}</option>
+                        }
+                      </select>
+                    </label>
                     <label><span>模型</span><input [(ngModel)]="modelNameValue" /></label>
                   </div>
                   <label>
@@ -225,7 +240,9 @@ export class AgentSettingsDialogComponent {
   protected readonly modelId = signal('claude-default');
   protected readonly hasCredential = signal(false);
   protected readonly mcpId = signal('');
+  protected readonly providerPresets = CLAUDE_PROVIDER_PRESETS;
   protected modelName = 'Claude Sonnet';
+  protected modelProvider = 'Anthropic';
   protected modelNameValue = 'sonnet';
   protected baseUrl = '';
   protected apiKey = '';
@@ -253,6 +270,7 @@ export class AgentSettingsDialogComponent {
   protected editModel(profile: ModelProfile): void {
     this.modelId.set(profile.id);
     this.modelName = profile.name;
+    this.modelProvider = profile.provider;
     this.modelNameValue = profile.model;
     this.baseUrl = profile.baseUrl ?? '';
     this.apiKey = '';
@@ -263,9 +281,7 @@ export class AgentSettingsDialogComponent {
 
   protected newModel(): void {
     this.modelId.set('');
-    this.modelName = '';
-    this.modelNameValue = 'sonnet';
-    this.baseUrl = '';
+    this.selectProvider('Anthropic');
     this.apiKey = '';
     this.isDefault = false;
     this.clearCredential = false;
@@ -278,13 +294,28 @@ export class AgentSettingsDialogComponent {
     this.modelSaved.emit({
       id: profileId,
       name: this.modelName.trim(),
-      provider: 'Anthropic',
+      provider: this.modelProvider.trim(),
       model: this.modelNameValue.trim(),
       baseUrl: this.baseUrl.trim() || undefined,
       apiKey: this.apiKey || undefined,
       clearCredential: this.clearCredential,
       isDefault: this.isDefault,
     });
+  }
+
+  protected selectProvider(provider: string): void {
+    this.modelProvider = provider;
+    const preset = this.providerPresets.find((item) => item.provider === provider);
+    if (!preset) {
+      return;
+    }
+    this.modelName = preset.name;
+    this.modelNameValue = preset.model;
+    this.baseUrl = preset.baseUrl;
+  }
+
+  protected isPresetProvider(provider: string): boolean {
+    return this.providerPresets.some((item) => item.provider === provider);
   }
 
   protected editMcp(profile: McpProfile): void {

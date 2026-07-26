@@ -1,6 +1,6 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 
-import { ModelProfile } from '../core/models/agent.models';
+import { ModelProfile, ModelProfileInput } from '../core/models/agent.models';
 import { AgentSettingsDialogComponent } from './agent-settings-dialog';
 
 const CUSTOM_PROFILE: ModelProfile = {
@@ -64,6 +64,33 @@ describe('AgentSettingsDialogComponent', () => {
     expect(savedIds).toHaveLength(2);
     expect(savedIds[0]).toBeTruthy();
     expect(savedIds[1]).toBe(savedIds[0]);
+  });
+
+  it('fills Claude-compatible settings from a provider preset', async () => {
+    fixture.componentRef.setInput('modelProfiles', [CUSTOM_PROFILE]);
+    fixture.detectChanges();
+    await fixture.whenStable();
+
+    clickButton('模型 Profile');
+    clickButton('新建 Profile');
+    const provider = root.querySelector<HTMLSelectElement>('.profile-editor select');
+    expect(provider).toBeTruthy();
+    provider!.value = 'DeepSeek';
+    provider!.dispatchEvent(new Event('change'));
+    await fixture.whenStable();
+    fixture.detectChanges();
+
+    const inputs = root.querySelectorAll<HTMLInputElement>(
+      '.profile-editor input:not([type="checkbox"])',
+    );
+    expect(inputs[0].value).toBe('DeepSeek V4 Pro');
+    expect(inputs[1].value).toBe('deepseek-v4-pro[1m]');
+    expect(inputs[2].value).toBe('https://api.deepseek.com/anthropic');
+
+    const saved: ModelProfileInput[] = [];
+    component.modelSaved.subscribe((profile) => saved.push(profile));
+    clickButton('保存 Profile');
+    expect(saved[0]).toEqual(expect.objectContaining({ provider: 'DeepSeek' }));
   });
 
   function clickButton(label: string): void {

@@ -7,7 +7,7 @@
 </p>
 
 <p align="center">
-  <img alt="Version 0.2.0" src="https://img.shields.io/badge/version-0.2.0-58c7a0">
+  <img alt="Version 0.2.2" src="https://img.shields.io/badge/version-0.2.2-58c7a0">
   <img alt="Windows" src="https://img.shields.io/badge/platform-Windows-0078D4?logo=windows">
   <img alt="Tauri 2" src="https://img.shields.io/badge/Tauri-2-24C8DB?logo=tauri&logoColor=white">
   <img alt="Angular 22" src="https://img.shields.io/badge/Angular-22-DD0031?logo=angular">
@@ -26,6 +26,16 @@ Termexo 把 Workspace、终端、AI Agent 会话、模型配置和运行状态�
   <sub>多 Workspace、多终端布局、会话状态与 Inspector。截图使用浏览器预览模式；桌面模式接入真实 PTY。</sub>
 </p>
 
+## V0.2.2 更新
+
+- 支持不限数量的终端标签，通过终端选择器指定当前布局中显示的窗口。
+- 网格布局支持持久化的 `1–6 列 × 1–6 行` 自定义配置，并根据实际窗口数量自动收缩。
+- 支持单个终端最大化和整个工作区最大化，可使用 `Shift+Esc` 逐级恢复。
+- Claude Code CLI 保持不变，可通过模型 Profile 切换 Anthropic、DeepSeek、MiniMax、
+  GLM 或自定义 Anthropic 兼容 Endpoint。
+- 批量切换当前 Workspace 内的 Claude Code 后端模型，并在重启终端后继续使用原会话 ID。
+- 当本地会话记录存在时使用 `--resume`；记录缺失时改用 `--session-id`，避免启动失败。
+
 ## 为什么做 Termexo
 
 AI 编程工具通常以独立终端或独立会话运行。项目一多，开发者需要自己记住：
@@ -41,17 +51,17 @@ Termexo 以 **Workspace** 为组织单位，把这些信息集中到一个可观
 
 ## 已实现功能
 
-| 能力               | 当前实现                                                                               |
-| ------------------ | -------------------------------------------------------------------------------------- |
-| Workspace 管理     | 创建、切换、收藏 Workspace，并持久化项目路径、布局和终端配置                           |
-| 多终端工作台       | 单列、分栏、行布局和网格布局；桌面端通过 `portable-pty` 启动真实 PowerShell/Agent 进程 |
-| Claude Code 检测   | 在 Windows 上检测 `claude.exe` / `claude.cmd`、版本与健康状态                          |
-| 新建 Claude 会话   | 选择会话名称、模型 Profile 和 MCP Profile 后启动 Claude                                |
-| 历史会话中心       | 只读扫描 Claude JSONL，会话搜索、Workspace 过滤，并通过原生 `--resume` 恢复            |
-| Agent 状态识别     | 为每个终端生成隔离 Hooks 设置，识别思考、工具调用、权限确认、用户输入和完成状态        |
-| 模型与 MCP Profile | 管理模型、Endpoint、API Key 引用和 MCP JSON 配置                                       |
-| 本地数据与密钥     | Workspace、会话索引和事件保存到 SQLite；API Key 保存到 Windows Credential Manager      |
-| 浏览器预览         | 无需 Rust 即可预览完整 UI，并使用可交互的模拟终端验证布局与基础流程                    |
+| 能力               | 当前实现                                                                          |
+| ------------------ | --------------------------------------------------------------------------------- |
+| Workspace 管理     | 创建、切换、收藏 Workspace，并持久化项目路径、布局和终端配置                      |
+| 多终端工作台       | 不限终端数量、指定窗口显示、1–6 行列网格、终端/工作区最大化；桌面端启动真实 PTY   |
+| Claude Code 检测   | 在 Windows 上检测 `claude.exe` / `claude.cmd`、版本与健康状态                     |
+| 新建 Claude 会话   | 选择会话名称、模型 Profile 和 MCP Profile 后启动 Claude                           |
+| 历史会话中心       | 只读扫描 Claude JSONL，会话搜索、Workspace 过滤，并通过原生 `--resume` 恢复       |
+| Agent 状态识别     | 为每个终端生成隔离 Hooks 设置，识别思考、工具调用、权限确认、用户输入和完成状态   |
+| 模型与 MCP Profile | 管理模型、Endpoint、API Key 与 MCP 配置；Claude CLI 可切换 Anthropic 兼容后端     |
+| 本地数据与密钥     | Workspace、会话索引和事件保存到 SQLite；API Key 保存到 Windows Credential Manager |
+| 浏览器预览         | 无需 Rust 即可预览完整 UI，并使用可交互的模拟终端验证布局与基础流程               |
 
 ![Termexo 模型 Profile](docs/images/termexo-model-profiles.png)
 
@@ -75,7 +85,7 @@ Termexo 以 **Workspace** 为组织单位，把这些信息集中到一个可观
   历史 Claude 会话需要从会话中心显式恢复。
 - Claude 原始 JSONL 只读，Termexo 不修改、重命名或删除这些文件。
 - Inspector 中的 Git 与任务页当前使用原型数据，尚未连接真实后端。
-- 当前版本不包含自动权限批准、跨 Agent 会话迁移或批量模型切换事务。
+- 当前版本不包含自动权限批准、跨 Agent 会话迁移或跨 Agent 批量模型切换事务。
 
 完整产品规划见 [Termexo.md](./Termexo.md)，当前架构边界见
 [V0.2 架构说明](./docs/architecture/v0.2.md)。

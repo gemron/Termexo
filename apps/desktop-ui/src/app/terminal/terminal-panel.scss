@@ -131,6 +131,11 @@ header {
       color: #d9deda;
       background: #282d2a;
     }
+
+    &.active {
+      color: #9bd8c0;
+      background: #264137;
+    }
   }
 }
 

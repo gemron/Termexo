@@ -1,6 +1,6 @@
 {
   "name": "termexo",
-  "version": "0.2.1",
+  "version": "0.2.2",
   "private": true,
   "scripts": {
     "dev": "npm --prefix apps/desktop-ui start -- --host 127.0.0.1 --port 4200",

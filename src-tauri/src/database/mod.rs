@@ -13,6 +13,10 @@ use crate::hooks::AgentEvent;
 const INITIAL_MIGRATION: &str = include_str!("../../migrations/0001_initial.sql");
 const AGENT_MIGRATION: &str = include_str!("../../migrations/0002_agent_sessions.sql");
 
+fn default_grid_dimension() -> u8 {
+    2
+}
+
 #[derive(Debug, Error)]
 pub enum DatabaseError {
     #[error("database access failed: {0}")]
@@ -34,6 +38,10 @@ pub struct Workspace {
     pub favorite: bool,
     pub last_opened_at: i64,
     pub layout: String,
+    #[serde(default = "default_grid_dimension")]
+    pub grid_columns: u8,
+    #[serde(default = "default_grid_dimension")]
+    pub grid_rows: u8,
     pub terminals: Vec<TerminalSession>,
 }
 
@@ -498,6 +506,8 @@ mod tests {
             favorite: true,
             last_opened_at: 10,
             layout: "columns".into(),
+            grid_columns: 2,
+            grid_rows: 2,
             terminals: vec![],
         };
 
@@ -507,6 +517,27 @@ mod tests {
         assert_eq!(stored.len(), 1);
         assert_eq!(stored[0].name, workspace.name);
         assert_eq!(stored[0].layout, workspace.layout);
+    }
+
+    #[test]
+    fn restores_legacy_workspace_grid_defaults() {
+        let workspace: Workspace = serde_json::from_str(
+            r#"{
+                "id": "workspace-legacy",
+                "name": "Legacy",
+                "projectPath": "D:\\dev\\legacy",
+                "projectType": "Local project",
+                "activeBranch": "main",
+                "favorite": false,
+                "lastOpenedAt": 10,
+                "layout": "grid",
+                "terminals": []
+            }"#,
+        )
+        .unwrap();
+
+        assert_eq!(workspace.grid_columns, 2);
+        assert_eq!(workspace.grid_rows, 2);
     }
 
     #[test]

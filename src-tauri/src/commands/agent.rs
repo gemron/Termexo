@@ -7,7 +7,7 @@ use crate::agent::{
     AgentAdapter, AgentInstallation, AgentLaunchSpec, AgentSession, ClaudeCodeAdapter,
     ClaudeLaunchOptions,
 };
-use crate::config::{CredentialStore, LaunchEnvironmentStore};
+use crate::config::{CredentialStore, LaunchEnvironmentStore, ModelProfile};
 use crate::database::WorkspaceDatabase;
 use crate::hooks::HookEventStore;
 
@@ -98,11 +98,8 @@ pub fn prepare_claude_launch(
         }
         None => None,
     };
-    let mut environment = HashMap::new();
+    let mut environment = profile_environment(profile.as_ref());
     if let Some(profile) = profile.as_ref() {
-        if let Some(base_url) = profile.base_url.as_ref() {
-            environment.insert("ANTHROPIC_BASE_URL".into(), base_url.clone());
-        }
         if let Some(target) = profile.credential_target.as_deref() {
             let token = credentials.get(target).map_err(|error| error.to_string())?;
             environment.insert("ANTHROPIC_AUTH_TOKEN".into(), token);
@@ -121,4 +118,111 @@ pub fn prepare_claude_launch(
             mcp_config_path,
         })
         .map_err(|error| error.to_string())
+}
+
+fn profile_environment(profile: Option<&ModelProfile>) -> HashMap<String, String> {
+    let mut environment = HashMap::new();
+    let Some(profile) = profile else {
+        return environment;
+    };
+    let Some(base_url) = profile
+        .base_url
+        .as_deref()
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+    else {
+        return environment;
+    };
+
+    environment.insert("ANTHROPIC_BASE_URL".into(), base_url.into());
+    environment.insert("API_TIMEOUT_MS".into(), "3000000".into());
+    environment.insert(
+        "CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC".into(),
+        "1".into(),
+    );
+
+    let model = profile.model.trim();
+    if !model.is_empty() {
+        for key in [
+            "ANTHROPIC_MODEL",
+            "ANTHROPIC_DEFAULT_OPUS_MODEL",
+            "ANTHROPIC_DEFAULT_SONNET_MODEL",
+            "ANTHROPIC_DEFAULT_HAIKU_MODEL",
+            "CLAUDE_CODE_SUBAGENT_MODEL",
+        ] {
+            environment.insert(key.into(), model.into());
+        }
+        if model.contains("[1m]") {
+            environment.insert("CLAUDE_CODE_AUTO_COMPACT_WINDOW".into(), "1000000".into());
+        }
+    }
+
+    if profile.provider.eq_ignore_ascii_case("DeepSeek") {
+        environment.insert("CLAUDE_CODE_EFFORT_LEVEL".into(), "max".into());
+    }
+    environment
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn maps_anthropic_compatible_profile_to_claude_environment() {
+        let profile = ModelProfile {
+            id: "deepseek".into(),
+            name: "DeepSeek V4 Pro".into(),
+            provider: "DeepSeek".into(),
+            model: "deepseek-v4-pro[1m]".into(),
+            base_url: Some("https://api.deepseek.com/anthropic".into()),
+            credential_target: Some("profile:deepseek".into()),
+            is_default: false,
+            has_credential: true,
+        };
+
+        let environment = profile_environment(Some(&profile));
+
+        assert_eq!(
+            environment.get("ANTHROPIC_BASE_URL").map(String::as_str),
+            Some("https://api.deepseek.com/anthropic")
+        );
+        assert_eq!(
+            environment.get("ANTHROPIC_MODEL").map(String::as_str),
+            Some("deepseek-v4-pro[1m]")
+        );
+        assert_eq!(
+            environment
+                .get("ANTHROPIC_DEFAULT_SONNET_MODEL")
+                .map(String::as_str),
+            Some("deepseek-v4-pro[1m]")
+        );
+        assert_eq!(
+            environment
+                .get("CLAUDE_CODE_AUTO_COMPACT_WINDOW")
+                .map(String::as_str),
+            Some("1000000")
+        );
+        assert_eq!(
+            environment
+                .get("CLAUDE_CODE_EFFORT_LEVEL")
+                .map(String::as_str),
+            Some("max")
+        );
+    }
+
+    #[test]
+    fn leaves_official_anthropic_environment_untouched() {
+        let profile = ModelProfile {
+            id: "claude-default".into(),
+            name: "Claude Sonnet".into(),
+            provider: "Anthropic".into(),
+            model: "sonnet".into(),
+            base_url: None,
+            credential_target: None,
+            is_default: true,
+            has_credential: false,
+        };
+
+        assert!(profile_environment(Some(&profile)).is_empty());
+    }
 }

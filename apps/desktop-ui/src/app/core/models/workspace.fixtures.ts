@@ -15,6 +15,8 @@ export function createDefaultWorkspaces(): Workspace[] {
       favorite: true,
       lastOpenedAt: now,
       layout: 'columns',
+      gridColumns: 2,
+      gridRows: 2,
       terminals: [
         {
           id: crypto.randomUUID(),
@@ -51,6 +53,8 @@ export function createDefaultWorkspaces(): Workspace[] {
       favorite: true,
       lastOpenedAt: now - 3_600_000,
       layout: 'grid',
+      gridColumns: 2,
+      gridRows: 2,
       terminals: [],
     },
     {
@@ -62,6 +66,8 @@ export function createDefaultWorkspaces(): Workspace[] {
       favorite: false,
       lastOpenedAt: now - 86_400_000,
       layout: 'single',
+      gridColumns: 2,
+      gridRows: 2,
       terminals: [],
     },
   ];

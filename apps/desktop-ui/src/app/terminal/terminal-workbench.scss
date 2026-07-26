@@ -1,7 +1,9 @@
 :host {
   display: block;
+  height: 100%;
   min-width: 0;
   min-height: 0;
+  overflow: hidden;
 }
 
 .terminal-grid {
@@ -9,6 +11,11 @@
   height: 100%;
   min-height: 0;
   gap: 5px;
+  overflow: hidden;
+
+  app-terminal-panel.workbench-hidden {
+    display: none;
+  }
 
   &[data-layout='single'] {
     grid-template-columns: minmax(0, 1fr);
@@ -16,15 +23,22 @@
 
   &[data-layout='columns'] {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-template-rows: minmax(0, 1fr);
   }
 
   &[data-layout='rows'] {
+    grid-template-columns: minmax(0, 1fr);
     grid-template-rows: repeat(2, minmax(0, 1fr));
   }
 
   &[data-layout='grid'] {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    grid-template-rows: repeat(2, minmax(0, 1fr));
+    grid-template-columns: repeat(var(--terminal-columns, 2), minmax(0, 1fr));
+    grid-template-rows: repeat(var(--terminal-rows, 2), minmax(0, 1fr));
+  }
+
+  &[data-visible-count='1'] {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: minmax(0, 1fr);
   }
 }
 

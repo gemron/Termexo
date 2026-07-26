@@ -1,6 +1,6 @@
-import { Component, input, output, signal } from '@angular/core';
+import { Component, computed, input, output, signal } from '@angular/core';
 
-import { MODEL_PROFILES } from '../core/models/workspace.models';
+import { ModelProfile } from '../core/models/agent.models';
 import { IconComponent } from '../shared/icon/icon';
 
 @Component({
@@ -17,43 +17,52 @@ import { IconComponent } from '../shared/icon/icon';
       >
         <header>
           <div>
-            <h2 id="model-dialog-title">切换 Workspace 模型</h2>
-            <p>先预览兼容性，再执行批量切换。</p>
+            <h2 id="model-dialog-title">切换 Claude Code 后端模型</h2>
+            <p>CLI 客户端保持不变，通过 Profile 切换供应商、Endpoint 和模型。</p>
           </div>
           <button type="button" title="关闭" aria-label="关闭" (click)="cancelled.emit()">
             <app-icon name="x" [size]="15" />
           </button>
         </header>
         <div class="profile-list">
-          @for (profile of profiles; track profile.id) {
+          @for (profile of profiles(); track profile.id) {
             <button
               type="button"
               class="profile-option"
-              [class.selected]="profile.id === selectedProfileId()"
+              [class.selected]="profile.id === resolvedProfileId()"
               (click)="selectedProfileId.set(profile.id)"
             >
-              <i [style.background]="profile.tone"></i>
+              <i [style.background]="profileTone(profile.provider)"></i>
               <span
                 ><strong>{{ profile.name }}</strong
                 ><small>{{ profile.provider }} · {{ profile.model }}</small></span
               >
-              @if (profile.id === selectedProfileId()) {
+              @if (profile.id === resolvedProfileId()) {
                 <app-icon name="check" [size]="15" />
               }
             </button>
+          } @empty {
+            <div class="dialog-empty">
+              <strong>还没有模型 Profile</strong>
+              <span>请先在设置中配置 Anthropic、DeepSeek、MiniMax 或 GLM。</span>
+            </div>
           }
         </div>
         <div class="switch-plan">
           <div>
-            <strong>{{ agentCount() }}</strong
-            ><span>原生切换</span>
+            <strong>Claude Code</strong><span>CLI 保持不变</span>
           </div>
-          <div><strong>0</strong><span>重启恢复</span></div>
-          <div><strong>0</strong><span>上下文迁移</span></div>
+          <div><strong>{{ agentCount() }}</strong><span>终端重启应用参数</span></div>
+          <div><strong>自动</strong><span>按会话 ID 恢复上下文</span></div>
         </div>
         <footer>
           <button type="button" class="secondary" (click)="cancelled.emit()">取消</button>
-          <button type="button" class="primary" (click)="confirmed.emit(selectedProfileId())">
+          <button
+            type="button"
+            class="primary"
+            [disabled]="busy() || !resolvedProfileId()"
+            (click)="confirmed.emit(resolvedProfileId())"
+          >
             执行切换
           </button>
         </footer>
@@ -64,9 +73,26 @@ import { IconComponent } from '../shared/icon/icon';
 })
 export class ModelSwitchDialogComponent {
   readonly agentCount = input(0);
+  readonly profiles = input<ModelProfile[]>([]);
+  readonly busy = input(false);
   readonly confirmed = output<string>();
   readonly cancelled = output<void>();
-  readonly selectedProfileId = signal(MODEL_PROFILES[0]?.id ?? '');
+  readonly selectedProfileId = signal('');
+  protected readonly resolvedProfileId = computed(
+    () =>
+      this.selectedProfileId() ||
+      this.profiles().find((profile) => profile.isDefault)?.id ||
+      this.profiles()[0]?.id ||
+      '',
+  );
 
-  protected readonly profiles = MODEL_PROFILES;
+  protected profileTone(provider: string): string {
+    const tones: Record<string, string> = {
+      Anthropic: '#d97757',
+      DeepSeek: '#4d6bfe',
+      MiniMax: '#7f68dc',
+      GLM: '#58c7a0',
+    };
+    return tones[provider] ?? '#68a9e8';
+  }
 }

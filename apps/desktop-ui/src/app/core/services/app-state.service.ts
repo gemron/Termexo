@@ -6,8 +6,9 @@ import {
   AGENT_LABELS,
   AgentType,
   CreateTerminalInput,
+  DEFAULT_TERMINAL_GRID_DIMENSION,
   LayoutMode,
-  MODEL_PROFILES,
+  normalizeTerminalGridDimension,
   TerminalSession,
   TerminalStatus,
   Workspace,
@@ -42,6 +43,11 @@ export class AppStateService {
           terminal.agentType !== 'shell' &&
           !['STOPPED', 'FAILED', 'DISCONNECTED'].includes(terminal.status),
       ).length ?? 0,
+  );
+  readonly claudeTerminalCount = computed(
+    () =>
+      this.activeWorkspace()?.terminals.filter((terminal) => terminal.agentType === 'claude')
+        .length ?? 0,
   );
 
   async initialize(): Promise<void> {
@@ -92,6 +98,8 @@ export class AppStateService {
       favorite: false,
       lastOpenedAt: Date.now(),
       layout: 'single',
+      gridColumns: DEFAULT_TERMINAL_GRID_DIMENSION,
+      gridRows: DEFAULT_TERMINAL_GRID_DIMENSION,
       terminals: [],
     };
 
@@ -149,6 +157,15 @@ export class AppStateService {
     this.updateActiveWorkspace((workspace) => ({ ...workspace, layout }));
   }
 
+  setGridDimensions(columns: number, rows: number): void {
+    this.updateActiveWorkspace((workspace) => ({
+      ...workspace,
+      layout: 'grid',
+      gridColumns: normalizeTerminalGridDimension(columns),
+      gridRows: normalizeTerminalGridDimension(rows),
+    }));
+  }
+
   updateTerminalStatus(terminalId: string, status: TerminalStatus): void {
     this.updateTerminal(terminalId, (terminal) => ({ ...terminal, status }));
   }
@@ -178,21 +195,35 @@ export class AppStateService {
     void this.repository.save(updatedWorkspace);
   }
 
-  switchAllModels(profileId: string): number {
-    const profile = MODEL_PROFILES.find((item) => item.id === profileId);
+  restartTerminalWithProfile(
+    terminalId: string,
+    command: string,
+    model: string,
+    profileId: string,
+    mcpProfileId?: string,
+  ): boolean {
     const workspace = this.activeWorkspace();
-    if (!profile || !workspace) {
-      return 0;
+    const terminal = workspace?.terminals.find((item) => item.id === terminalId);
+    if (!workspace || terminal?.agentType !== 'claude') {
+      return false;
     }
 
     const terminals = workspace.terminals.map((terminal) =>
-      terminal.agentType === 'shell'
+      terminal.id !== terminalId
         ? terminal
-        : { ...terminal, model: profile.name, status: 'STARTING' as const },
+        : {
+            ...terminal,
+            command,
+            model,
+            profileId,
+            mcpProfileId,
+            status: 'STARTING' as const,
+            runtimeRevision: (terminal.runtimeRevision ?? 0) + 1,
+          },
     );
     this.replaceWorkspace({ ...workspace, terminals });
     void this.repository.save({ ...workspace, terminals });
-    return terminals.filter((terminal) => terminal.agentType !== 'shell').length;
+    return true;
   }
 
   private updateTerminal(
@@ -247,6 +278,9 @@ export class AppStateService {
       branch: workspace.activeBranch,
       command: input.command ?? this.defaultCommand(agentType),
       nativeSessionId: input.nativeSessionId,
+      profileId: input.profileId,
+      mcpProfileId: input.mcpProfileId,
+      runtimeRevision: 0,
     };
   }
 
