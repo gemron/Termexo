@@ -1,9 +1,9 @@
 <h1 align="center">Termexo</h1>
 
-<p align="center">面向 AI 编程终端的本地优先桌面工作台</p>
+<p align="center">A local-first desktop workbench for AI coding terminals</p>
 
 <p align="center">
-  <strong>简体中文</strong> · <a href="./README.en.md">English</a>
+  <strong>English</strong> · <a href="./README.cn.md">简体中文</a>
 </p>
 
 <p align="center">
@@ -13,93 +13,105 @@
   <img alt="Angular 22" src="https://img.shields.io/badge/Angular-22-DD0031?logo=angular">
 </p>
 
-Termexo 把 Workspace、终端、AI Agent 会话、模型配置和运行状态放进一个桌面工作台。
-它希望解决的不是“再做一个聊天窗口”，而是让开发者同时管理多个项目与多个 AI
-编程终端，并在应用重启后清楚地找回工作现场。
+Termexo brings workspaces, terminals, AI agent sessions, model profiles, and runtime state
+into one desktop workbench. It is not another chat window. Its goal is to help developers
+manage multiple projects and AI coding terminals at once, then return to a clearly defined
+working context after restarting the application.
 
-> 当前版本为 **V0.2 Claude Code 专用版**。Codex CLI、Gemini CLI、跨 Agent
-> 模型切换和会话迁移属于后续规划，尚未实现。
+> The current release is **V0.2, focused on Claude Code**. Codex CLI, Gemini CLI,
+> cross-agent model switching, and session migration are planned but not implemented.
 
-![Termexo 多终端工作台](docs/images/termexo-workbench.png)
-
-<p align="center">
-  <sub>多 Workspace、多终端布局、会话状态与 Inspector。截图使用浏览器预览模式；桌面模式接入真实 PTY。</sub>
-</p>
-
-## V0.2.2 更新
-
-- 支持不限数量的终端标签，通过终端选择器指定当前布局中显示的窗口。
-- 网格布局支持持久化的 `1–6 列 × 1–6 行` 自定义配置，并根据实际窗口数量自动收缩。
-- 支持单个终端最大化和整个工作区最大化，可使用 `Shift+Esc` 逐级恢复。
-- Claude Code CLI 保持不变，可通过模型 Profile 切换 Anthropic、DeepSeek、MiniMax、
-  GLM 或自定义 Anthropic 兼容 Endpoint。
-- 批量切换当前 Workspace 内的 Claude Code 后端模型，并在重启终端后继续使用原会话 ID。
-- 当本地会话记录存在时使用 `--resume`；记录缺失时改用 `--session-id`，避免启动失败。
-
-## 为什么做 Termexo
-
-AI 编程工具通常以独立终端或独立会话运行。项目一多，开发者需要自己记住：
-
-- 哪个终端属于哪个项目、分支和 Agent；
-- 哪些会话正在运行、等待输入或等待权限确认；
-- 某次 Claude 会话如何恢复；
-- 不同模型、Endpoint、API Key 和 MCP 配置应当如何组合；
-- 应用重启后哪些只是终端配置，哪些是真正可恢复的原生会话。
-
-Termexo 以 **Workspace** 为组织单位，把这些信息集中到一个可观察、可恢复、
-可扩展的本地控制面中。
-
-## 已实现功能
-
-| 能力               | 当前实现                                                                          |
-| ------------------ | --------------------------------------------------------------------------------- |
-| Workspace 管理     | 创建、切换、收藏 Workspace，并持久化项目路径、布局和终端配置                      |
-| 多终端工作台       | 不限终端数量、指定窗口显示、1–6 行列网格、终端/工作区最大化；桌面端启动真实 PTY   |
-| Claude Code 检测   | 在 Windows 上检测 `claude.exe` / `claude.cmd`、版本与健康状态                     |
-| 新建 Claude 会话   | 选择会话名称、模型 Profile 和 MCP Profile 后启动 Claude                           |
-| 历史会话中心       | 只读扫描 Claude JSONL，会话搜索、Workspace 过滤，并通过原生 `--resume` 恢复       |
-| Agent 状态识别     | 为每个终端生成隔离 Hooks 设置，识别思考、工具调用、权限确认、用户输入和完成状态   |
-| 模型与 MCP Profile | 管理模型、Endpoint、API Key 与 MCP 配置；Claude CLI 可切换 Anthropic 兼容后端     |
-| 本地数据与密钥     | Workspace、会话索引和事件保存到 SQLite；API Key 保存到 Windows Credential Manager |
-| 浏览器预览         | 无需 Rust 即可预览完整 UI，并使用可交互的模拟终端验证布局与基础流程               |
-
-![Termexo 模型 Profile](docs/images/termexo-model-profiles.png)
+![Termexo multi-terminal grid workbench](docs/images/termexo-workbench-v0.2.2.png)
 
 <p align="center">
-  <sub>模型、Endpoint 与凭据入口集中管理；已保存的密钥不会回传给前端。</sub>
+  <sub>Seven active agent terminals with a configurable grid, explicit pane selection, session state, and the Inspector.</sub>
 </p>
 
-## 设计目标
+## V0.2.2 Updates
 
-1. **本地优先**：项目路径、终端、会话索引和配置默认留在本机，不依赖 Termexo 云服务。
-2. **尊重 Agent 原生能力**：优先调用 Agent 自己的会话恢复与配置机制，不伪造对话恢复。
-3. **统一管理而非替代终端**：Termexo 提供工作台、状态和编排层，命令仍在 PTY 与原生 Agent 中运行。
-4. **状态可观察**：将不同 Agent 的事件映射为运行、思考、等待输入、等待确认、完成和失败等统一状态。
-5. **安全边界清晰**：密钥进入操作系统凭据存储，不写入 SQLite、快照、Hook payload 或日志。
-6. **面向多 Agent 扩展**：以后端 Adapter、PTY、Hooks、Snapshot 和 Router 等边界逐步接入更多 CLI。
+- Keep any number of terminal tabs and choose which terminals are visible in the active layout.
+- Configure and persist grid layouts from `1–6 columns × 1–6 rows`; unused rows collapse automatically.
+- Maximize an individual terminal or the entire workspace, then restore with `Shift+Esc`.
+- Keep the Claude Code CLI while switching model profiles between Anthropic, DeepSeek,
+  MiniMax, GLM, or a custom Anthropic-compatible endpoint.
+- Batch-switch Claude Code terminals in the active workspace and restart them with their existing session IDs.
+- Use `--resume` when a local transcript exists and fall back to `--session-id` when it does not.
 
-## 当前边界
+## Why Termexo
 
-- V0.2 仅完整接入 Claude Code；Codex 和 Gemini 终端目前只用于界面原型展示。
-- 应用退出后，已退出的操作系统进程不会被“伪恢复”。Termexo 只恢复终端配置，
-  历史 Claude 会话需要从会话中心显式恢复。
-- Claude 原始 JSONL 只读，Termexo 不修改、重命名或删除这些文件。
-- Inspector 中的 Git 与任务页当前使用原型数据，尚未连接真实后端。
-- 当前版本不包含自动权限批准、跨 Agent 会话迁移或跨 Agent 批量模型切换事务。
+AI coding tools usually run in isolated terminals and sessions. As the number of projects
+grows, developers have to remember:
 
-完整产品规划见 [Termexo.md](./Termexo.md)，当前架构边界见
-[V0.2 架构说明](./docs/architecture/v0.2.md)。
+- which terminal belongs to which project, branch, and agent;
+- which sessions are running, waiting for input, or waiting for approval;
+- how to resume a specific Claude session;
+- how model, endpoint, API key, and MCP configurations fit together;
+- which parts of a workspace can actually be restored after an application restart.
 
-## 快速开始
+Termexo uses the **Workspace** as its organizing unit and turns this scattered state into
+a local control plane that is observable, recoverable, and extensible.
 
-### 环境要求
+## Implemented Features
 
-- Windows 10/11；
-- Node.js `^22.22.3`、`^24.15.0` 或 `>=26.0.0`；
-- 桌面模式需要 Rust stable、Visual Studio C++ Build Tools 和 WebView2；
-- 使用 Claude 功能需要本机已安装 Claude Code。
+| Capability               | Current implementation                                                                                             |
+| ------------------------ | ------------------------------------------------------------------------------------------------------------------ |
+| Workspace management     | Create, switch, and favorite workspaces; persist project paths, layouts, and terminal configuration                |
+| Multi-terminal workbench | Unlimited tabs, explicit pane selection, configurable 1–6 row/column grids, pane/workspace maximize, and real PTYs |
+| Claude Code detection    | Detect `claude.exe` / `claude.cmd`, version, and health on Windows                                                 |
+| Start Claude sessions    | Select a session name, model profile, and MCP profile before launch                                                |
+| Session center           | Read-only Claude JSONL scanning, search, workspace filtering, and native `--resume`                                |
+| Agent status tracking    | Isolated hooks per terminal for thinking, tool use, approval, user input, completion, and failure states           |
+| Model and MCP profiles   | Manage endpoints, keys, and MCP configuration; switch Claude CLI across Anthropic-compatible backends              |
+| Local data and secrets   | Store workspace/session/event data in SQLite and API keys in Windows Credential Manager                            |
+| Browser preview          | Preview the complete UI without Rust and exercise layout flows through an interactive simulated terminal           |
 
-### 1. 获取代码与安装前端依赖
+![Termexo model profiles](docs/images/termexo-model-profiles.png)
+
+<p align="center">
+  <sub>Models, endpoints, and credential entry are managed in one place. Stored secrets are never returned to the frontend.</sub>
+</p>
+
+## Design Goals
+
+1. **Local first** — Project paths, terminals, session indexes, and configuration stay on
+   the local machine by default. Termexo does not require a Termexo cloud service.
+2. **Preserve native agent semantics** — Prefer native session and configuration
+   mechanisms instead of pretending that a terminated process is still alive.
+3. **Coordinate terminals, do not replace them** — Termexo provides the workbench,
+   state, and orchestration layer. Commands still run inside real PTYs and agents.
+4. **Make agent state observable** — Map agent-specific events into common running,
+   thinking, input, approval, completed, and failed states.
+5. **Keep security boundaries explicit** — Secrets belong in the operating-system
+   credential store, not in SQLite, snapshots, hook payloads, or logs.
+6. **Grow into a multi-agent architecture** — Evolve around adapters, PTY, hooks,
+   snapshots, and routing boundaries so more CLIs can be added without rebuilding the core.
+
+## Current Boundaries
+
+- V0.2 fully integrates Claude Code only. Codex and Gemini terminals currently appear as
+  UI prototypes.
+- When the app exits, terminated operating-system processes are not “fake restored.”
+  Termexo restores terminal configuration; historical Claude sessions must be resumed
+  explicitly from the session center.
+- Claude JSONL files are read-only. Termexo never edits, renames, or deletes them.
+- The Git and Tasks tabs in the Inspector currently use prototype data and are not wired
+  to production backends.
+- Automatic permission approval, cross-agent session migration, and cross-agent batch
+  model-switch transactions are outside the current release.
+
+See [Termexo.md](./Termexo.md) for the complete product plan and
+[V0.2 architecture](./docs/architecture/v0.2.md) for current technical boundaries.
+
+## Quick Start
+
+### Requirements
+
+- Windows 10/11;
+- Node.js `^22.22.3`, `^24.15.0`, or `>=26.0.0`;
+- Rust stable, Visual Studio C++ Build Tools, and WebView2 for the desktop runtime;
+- a local Claude Code installation for Claude integration.
+
+### 1. Clone and install frontend dependencies
 
 ```powershell
 git clone https://github.com/gemron/Termexo.git
@@ -107,29 +119,29 @@ cd Termexo
 npm --prefix apps/desktop-ui install
 ```
 
-### 2. 运行浏览器预览
+### 2. Run the browser preview
 
 ```powershell
 npm run dev
 ```
 
-打开 <http://127.0.0.1:4200>。浏览器模式使用模拟终端，支持 `help`、`status`、
-`git status` 和 `clear`，适合查看界面与开发前端。
+Open <http://127.0.0.1:4200>. Browser mode uses a simulated terminal with `help`,
+`status`, `git status`, and `clear`, making it suitable for UI development and review.
 
-### 3. 运行桌面应用
+### 3. Run the desktop application
 
 ```powershell
 npm run tauri:dev
 ```
 
-桌面模式使用真实 PTY。若 Claude Code 不在 PATH 中，可以显式指定：
+Desktop mode uses real PTYs. If Claude Code is not available on PATH, specify it:
 
 ```powershell
 $env:TERMEXO_CLAUDE_PATH = "C:\path\to\claude.exe"
 npm run tauri:dev
 ```
 
-## 工作方式
+## How It Works
 
 ```mermaid
 flowchart LR
@@ -153,51 +165,52 @@ flowchart LR
     IPC --> Vault
 ```
 
-- **Angular UI**：Workspace、终端布局、会话中心、设置和 Inspector。
-- **Tauri Commands**：前后端 IPC 边界，暴露最小化桌面能力。
-- **PTY Service**：创建、输入、调整尺寸和关闭真实终端进程。
-- **Claude Adapter**：安装检测、只读会话扫描和原生启动/恢复命令。
-- **Hooks Pipeline**：接收 Claude Hooks，去重并映射统一 Agent 状态。
-- **SQLite / Credential Manager**：分别保存结构化本地数据和敏感凭据。
+- **Angular UI** — workspaces, terminal layouts, session center, settings, and Inspector.
+- **Tauri Commands** — a minimal IPC boundary between the frontend and desktop core.
+- **PTY Service** — creates, writes to, resizes, and closes real terminal processes.
+- **Claude Adapter** — installation detection, read-only session scanning, and native launch/resume.
+- **Hooks Pipeline** — receives Claude hooks, deduplicates events, and maps common agent states.
+- **SQLite / Credential Manager** — stores structured local data and sensitive credentials separately.
 
-## 数据与安全
+## Data and Security
 
-| 数据                | 存储位置                         | 处理原则                          |
-| ------------------- | -------------------------------- | --------------------------------- |
-| Workspace、终端配置 | SQLite                           | 本地持久化                        |
-| Claude 会话索引     | SQLite                           | 从 Claude JSONL 只读解析后 Upsert |
-| Agent 事件          | JSONL spool + SQLite             | 按 `event_key` 去重               |
-| 模型与 MCP Profile  | SQLite                           | API Key 明文不进入数据库          |
-| API Key             | Windows Credential Manager       | 前端只能读取 `hasCredential`      |
-| Claude 原始会话     | `%USERPROFILE%\.claude\projects` | 只读，不回写                      |
+| Data                                  | Storage                          | Policy                                       |
+| ------------------------------------- | -------------------------------- | -------------------------------------------- |
+| Workspaces and terminal configuration | SQLite                           | Local persistence                            |
+| Claude session index                  | SQLite                           | Upserted from read-only Claude JSONL parsing |
+| Agent events                          | JSONL spool + SQLite             | Deduplicated by `event_key`                  |
+| Model and MCP profiles                | SQLite                           | Plaintext API keys never enter the database  |
+| API keys                              | Windows Credential Manager       | The frontend can read only `hasCredential`   |
+| Native Claude sessions                | `%USERPROFILE%\.claude\projects` | Read-only; never written back                |
 
-为兼容早期安装，数据库文件和部分 Tauri 内部标识仍沿用旧标识；这不影响产品名称
-与新的 `TERMEXO_*` 环境变量。
+For compatibility with early installations, the database filename and some internal Tauri
+identifiers still use a legacy name. This does not affect the Termexo product name or new
+`TERMEXO_*` environment variables.
 
-## 路线图
+## Roadmap
 
-| 版本 | 目标                                       | 状态     |
-| ---- | ------------------------------------------ | -------- |
-| V0.1 | Workspace、多终端、PTY、SQLite 基础        | 已完成   |
-| V0.2 | Claude Code 检测、会话恢复、Hooks、Profile | 当前版本 |
-| V0.3 | Codex CLI 与 Gemini CLI Adapter            | 规划中   |
-| V0.4 | 跨终端模型切换事务                         | 规划中   |
-| V0.5 | 会话摘要与跨 Agent 迁移                    | 规划中   |
-| V0.6 | 多 Agent 协作、任务编排与通知              | 规划中   |
-| V1.0 | 稳定发布、安全加固与完整恢复体验           | 规划中   |
+| Version | Goal                                                             | Status   |
+| ------- | ---------------------------------------------------------------- | -------- |
+| V0.1    | Workspace, multi-terminal, PTY, and SQLite foundation            | Complete |
+| V0.2    | Claude detection, session resume, hooks, and profiles            | Current  |
+| V0.3    | Codex CLI and Gemini CLI adapters                                | Planned  |
+| V0.4    | Cross-terminal model-switch transactions                         | Planned  |
+| V0.5    | Session summaries and cross-agent migration                      | Planned  |
+| V0.6    | Multi-agent collaboration, task orchestration, and notifications | Planned  |
+| V1.0    | Stable release, security hardening, and complete recovery UX     | Planned  |
 
-## 项目结构
+## Repository Layout
 
 ```text
 Termexo/
-├── apps/desktop-ui/       # Angular 桌面界面与浏览器预览
-├── src-tauri/             # Rust Core、PTY、Agent、Hooks、数据库与命令
-├── docs/architecture/     # 当前版本架构说明
-├── docs/images/           # README 截图
-└── Termexo.md             # 产品设计与长期路线图
+├── apps/desktop-ui/       # Angular desktop UI and browser preview
+├── src-tauri/             # Rust core, PTY, agents, hooks, database, and commands
+├── docs/architecture/     # Architecture notes for implemented versions
+├── docs/images/           # README screenshots
+└── Termexo.md             # Product design and long-term roadmap
 ```
 
-## 开发与验证
+## Development and Verification
 
 ```powershell
 npm run build
@@ -207,17 +220,19 @@ npm --prefix apps/desktop-ui run e2e:smoke
 npm run tauri:build
 ```
 
-本地开发服务运行后，可重新生成 README 截图：
+With the local development server running, regenerate the README screenshots with:
 
 ```powershell
 npm run capture:readme
 ```
 
-## 参与贡献
+## Contributing
 
-欢迎通过 [Issues](https://github.com/gemron/Termexo/issues) 报告问题、讨论设计或提出功能建议。
-提交代码前，请确认改动属于当前版本范围，并为行为变化补充相应测试。
+Use [Issues](https://github.com/gemron/Termexo/issues) to report bugs, discuss design
+decisions, or propose features. Before submitting code, make sure the change fits the
+current release scope and add tests for behavior changes.
 
-## 许可证
+## License
 
-仓库当前尚未声明开源许可证。在许可证补充前，请勿默认获得复制、修改或分发授权。
+This repository does not currently declare an open-source license. Until one is added,
+do not assume permission to copy, modify, or redistribute the project.
