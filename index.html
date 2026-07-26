@@ -1,0 +1,588 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta
+      name="description"
+      content="Termexo is a local-first AI development workspace for coding agents, models, terminals, and connected devices."
+    />
+    <meta name="theme-color" content="#0a0d0c" />
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content="Termexo — AI Workspace Control Plane" />
+    <meta
+      property="og:description"
+      content="One workspace for every coding agent, model, and terminal."
+    />
+    <meta
+      property="og:image"
+      content="https://www.termexo.com/assets/termexo-workbench-v0.2.2.png"
+    />
+    <meta property="og:url" content="https://www.termexo.com/" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <title>Termexo — AI Workspace Control Plane</title>
+    <link rel="canonical" href="https://www.termexo.com/" />
+    <link rel="icon" href="assets/favicon.svg" type="image/svg+xml" />
+    <link rel="stylesheet" href="styles.css" />
+    <script src="app.js" defer></script>
+  </head>
+  <body>
+    <a class="skip-link" href="#main" data-i18n="skip">Skip to content</a>
+
+    <header class="site-header" data-header>
+      <div class="shell header-inner">
+        <a class="brand" href="#top" aria-label="Termexo home">
+          <span class="brand-mark" aria-hidden="true">
+            <svg viewBox="0 0 24 24">
+              <path
+                d="M8 6.5 3.5 12 8 17.5M16 6.5l4.5 5.5-4.5 5.5M10 19l4-14"
+              />
+            </svg>
+          </span>
+          <span>Termexo</span>
+          <small>0.2.2</small>
+        </a>
+
+        <nav
+          id="siteNav"
+          class="nav-links"
+          aria-label="Main navigation"
+          data-nav
+        >
+          <a href="#workbench" data-i18n="navWorkbench">Workbench</a>
+          <a href="#capabilities" data-i18n="navCapabilities">Capabilities</a>
+          <a href="#roadmap" data-i18n="navRoadmap">Roadmap</a>
+          <a href="#principles" data-i18n="navPrinciples">Principles</a>
+        </nav>
+
+        <div class="header-actions">
+          <div class="language-switch" aria-label="Language">
+            <button type="button" data-lang="en" class="active">EN</button>
+            <span>/</span>
+            <button type="button" data-lang="zh">中文</button>
+          </div>
+          <a
+            class="github-link"
+            href="https://github.com/gemron/Termexo"
+            target="_blank"
+            rel="noreferrer"
+          >
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <path
+                d="M12 2a10 10 0 0 0-3.16 19.49c.5.09.68-.22.68-.48v-1.87c-2.78.6-3.37-1.18-3.37-1.18-.45-1.16-1.11-1.47-1.11-1.47-.91-.62.07-.61.07-.61 1 .07 1.53 1.03 1.53 1.03.9 1.53 2.35 1.09 2.92.83.09-.65.35-1.09.64-1.34-2.22-.25-4.56-1.11-4.56-4.94 0-1.09.39-1.98 1.03-2.68-.1-.25-.45-1.27.1-2.64 0 0 .84-.27 2.75 1.02A9.57 9.57 0 0 1 12 6.82a9.6 9.6 0 0 1 2.5.34c1.91-1.29 2.75-1.02 2.75-1.02.55 1.37.2 2.39.1 2.64.64.7 1.03 1.59 1.03 2.68 0 3.84-2.34 4.69-4.57 4.93.36.31.68.92.68 1.85V21c0 .27.18.58.69.48A10 10 0 0 0 12 2Z"
+              />
+            </svg>
+            <span data-i18n="github">GitHub</span>
+          </a>
+          <button
+            class="menu-toggle"
+            type="button"
+            aria-label="Toggle menu"
+            aria-expanded="false"
+            aria-controls="siteNav"
+            data-menu-toggle
+          >
+            <span></span><span></span>
+          </button>
+        </div>
+      </div>
+    </header>
+
+    <main id="main">
+      <section class="hero shell" id="top">
+        <div class="hero-copy reveal">
+          <div class="eyebrow">
+            <span class="live-dot"></span>
+            <span data-i18n="eyebrow"
+              >Local-first AI workspace control plane</span
+            >
+          </div>
+          <h1>
+            <span data-i18n="heroLine1">One workspace.</span>
+            <em data-i18n="heroLine2">Every agent.</em>
+          </h1>
+          <p class="hero-lead" data-i18n="heroLead">
+            Coordinate coding terminals, native agent sessions, model providers,
+            and recoverable project state from one focused desktop environment.
+          </p>
+          <div class="hero-actions">
+            <a
+              class="button primary"
+              href="https://github.com/gemron/Termexo/releases/latest"
+              target="_blank"
+              rel="noreferrer"
+            >
+              <span data-i18n="download">Download for Windows</span>
+              <svg viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M12 3v12m0 0 5-5m-5 5-5-5M4 20h16" />
+              </svg>
+            </a>
+            <a
+              class="button secondary"
+              href="https://github.com/gemron/Termexo"
+              target="_blank"
+              rel="noreferrer"
+            >
+              <span data-i18n="viewSource">View source</span>
+              <span aria-hidden="true">↗</span>
+            </a>
+          </div>
+          <div class="hero-meta" aria-label="Product information">
+            <span><i></i><b data-i18n="metaLocal">Local-first</b></span>
+            <span><i></i><b>Windows x64</b></span>
+            <span><i></i><b>Tauri 2 + Angular 22</b></span>
+          </div>
+        </div>
+
+        <div
+          class="hero-console reveal"
+          data-delay="1"
+          aria-label="Termexo runtime summary"
+        >
+          <div class="console-topbar">
+            <div class="traffic-lights"><i></i><i></i><i></i></div>
+            <span>termexo://workspace/mts-cloud</span>
+            <small>LIVE</small>
+          </div>
+          <div class="console-body">
+            <div class="console-sidebar">
+              <span class="console-label">WORKSPACES</span>
+              <div class="console-workspace active">
+                <i></i><span><b>MTS Cloud</b><small>main</small></span>
+              </div>
+              <div class="console-workspace">
+                <i></i><span><b>Device Health</b><small>develop</small></span>
+              </div>
+              <div class="console-workspace">
+                <i></i><span><b>Termexo</b><small>feature/runtime</small></span>
+              </div>
+            </div>
+            <div class="console-main">
+              <div class="console-tabs">
+                <span class="active"><i></i> Claude Code 1</span>
+                <span><i></i> Codex CLI 2</span>
+                <span><i></i> Shell 3</span>
+              </div>
+              <div class="terminal-card">
+                <div class="terminal-title">
+                  <span><i></i> Claude Code 1</span><small>Claude Sonnet</small>
+                </div>
+                <pre><span class="muted">$</span> termexo agent status
+
+<span class="green">●</span> session       <b>running</b>
+<span class="green">●</span> model         <b>claude-sonnet</b>
+<span class="green">●</span> workspace     <b>MTS Cloud</b>
+<span class="amber">◐</span> context       <b>restorable</b>
+
+<span class="prompt">agent main &gt;</span> <span class="cursor"></span></pre>
+              </div>
+              <div class="console-status">
+                <span><i></i> Desktop Core</span><span>7 agents active</span
+                ><span>main</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="signal-strip" aria-label="Supported tools">
+        <div class="signal-track">
+          <span>Claude Code</span><i></i><span>Codex CLI</span><i></i
+          ><span>Gemini CLI</span><i></i><span>DeepSeek</span><i></i
+          ><span>MiniMax</span><i></i><span>GLM</span><i></i><span>MCP</span
+          ><i></i><span>Native PTY</span>
+        </div>
+      </section>
+
+      <section class="section shell" id="workbench">
+        <div class="section-heading reveal">
+          <div>
+            <span class="section-index">01 / WORKBENCH</span>
+            <h2 data-i18n="workbenchTitle">See the whole development field.</h2>
+          </div>
+          <p data-i18n="workbenchLead">
+            Keep unlimited terminal tabs, choose exactly which panes are
+            visible, and move between projects without losing the state that
+            explains what each agent is doing.
+          </p>
+        </div>
+
+        <figure class="product-frame reveal">
+          <div class="frame-label">
+            <span><i></i> MTS Cloud / 7 agents</span>
+            <small>Configurable 3 × 3 grid</small>
+          </div>
+          <img
+            src="assets/termexo-workbench-v0.2.2.png"
+            alt="Termexo showing seven AI coding terminals in a configurable workspace grid"
+            width="1919"
+            height="1080"
+          />
+        </figure>
+
+        <div class="metrics-grid">
+          <article class="metric reveal">
+            <strong>∞</strong>
+            <span data-i18n="metricTabsTitle">Terminal tabs</span>
+            <p data-i18n="metricTabsBody">
+              Keep every session available; choose panes on demand.
+            </p>
+          </article>
+          <article class="metric reveal" data-delay="1">
+            <strong>6 × 6</strong>
+            <span data-i18n="metricGridTitle">Custom grid</span>
+            <p data-i18n="metricGridBody">
+              Persist row and column layouts per workspace.
+            </p>
+          </article>
+          <article class="metric reveal" data-delay="2">
+            <strong>1 → N</strong>
+            <span data-i18n="metricModelTitle">Model routing</span>
+            <p data-i18n="metricModelBody">
+              Keep the CLI and switch compatible providers.
+            </p>
+          </article>
+          <article class="metric reveal" data-delay="3">
+            <strong>0 cloud</strong>
+            <span data-i18n="metricLocalTitle">Required services</span>
+            <p data-i18n="metricLocalBody">
+              Workspaces and credentials stay local by default.
+            </p>
+          </article>
+        </div>
+      </section>
+
+      <section class="section capabilities-section" id="capabilities">
+        <div class="shell">
+          <div class="section-heading reveal">
+            <div>
+              <span class="section-index">02 / CONTROL PLANE</span>
+              <h2 data-i18n="capabilitiesTitle">More than terminal chrome.</h2>
+            </div>
+            <p data-i18n="capabilitiesLead">
+              Termexo adds the state, recovery, model configuration, and runtime
+              visibility needed to operate several coding agents as one
+              development system.
+            </p>
+          </div>
+
+          <div class="bento-grid">
+            <article class="bento bento-large reveal">
+              <span class="card-tag now" data-i18n="now">AVAILABLE NOW</span>
+              <div class="card-icon" aria-hidden="true">⌘</div>
+              <h3 data-i18n="featureWorkspaceTitle">Workspace identity</h3>
+              <p data-i18n="featureWorkspaceBody">
+                Name, color, order, project path, layout, terminals, branch, and
+                model state stay attached to one durable workspace.
+              </p>
+              <div class="workspace-stack" aria-hidden="true">
+                <span style="--tone: #58c7a0"
+                  ><i></i><b>MTS Cloud</b><small>main</small></span
+                >
+                <span style="--tone: #68a9e8"
+                  ><i></i><b>Device Health</b><small>develop</small></span
+                >
+                <span style="--tone: #a78bfa"
+                  ><i></i><b>Termexo</b><small>feature/runtime</small></span
+                >
+              </div>
+            </article>
+
+            <article class="bento reveal" data-delay="1">
+              <span class="card-tag now" data-i18n="now">AVAILABLE NOW</span>
+              <div class="card-icon orange" aria-hidden="true">↻</div>
+              <h3 data-i18n="featureSessionTitle">Native session recovery</h3>
+              <p data-i18n="featureSessionBody">
+                Resume real Claude Code sessions when transcripts exist, with an
+                explicit fallback when they do not.
+              </p>
+              <code>claude --resume 'session-id'</code>
+            </article>
+
+            <article class="bento reveal" data-delay="2">
+              <span class="card-tag now" data-i18n="now">AVAILABLE NOW</span>
+              <div class="card-icon blue" aria-hidden="true">⇄</div>
+              <h3 data-i18n="featureModelTitle">Provider profiles</h3>
+              <p data-i18n="featureModelBody">
+                Keep Claude Code while routing to Anthropic, DeepSeek, MiniMax,
+                GLM, or a compatible gateway.
+              </p>
+              <div class="provider-row" aria-hidden="true">
+                <i>A</i><i>D</i><i>M</i><i>G</i><i>+</i>
+              </div>
+            </article>
+
+            <article class="bento bento-wide reveal">
+              <span class="card-tag now" data-i18n="now">AVAILABLE NOW</span>
+              <div class="status-card">
+                <div>
+                  <span><i class="green-bg"></i>Claude Core</span><b>RUNNING</b>
+                </div>
+                <div>
+                  <span><i class="amber-bg"></i>Claude Review</span
+                  ><b>WAITING APPROVAL</b>
+                </div>
+                <div>
+                  <span><i class="blue-bg"></i>Codex Tests</span><b>THINKING</b>
+                </div>
+              </div>
+              <div>
+                <div class="card-icon" aria-hidden="true">◉</div>
+                <h3 data-i18n="featureStatusTitle">
+                  Agent state you can act on
+                </h3>
+                <p data-i18n="featureStatusBody">
+                  Normalize thinking, tool use, input, approval, completion, and
+                  failure into a workspace-wide operational view.
+                </p>
+              </div>
+            </article>
+
+            <article class="bento reveal" data-delay="1">
+              <span class="card-tag planned" data-i18n="roadmapTag"
+                >ROADMAP</span
+              >
+              <div class="card-icon violet" aria-hidden="true">◔</div>
+              <h3 data-i18n="featureQuotaTitle">Provider Plan visibility</h3>
+              <p data-i18n="featureQuotaBody">
+                Track quota, reset windows, thresholds, and provider
+                availability before model routing decisions.
+              </p>
+              <div class="quota-bars" aria-hidden="true">
+                <span
+                  ><b>Anthropic</b><i><em style="width: 72%"></em></i
+                  ><small>72%</small></span
+                >
+                <span
+                  ><b>DeepSeek</b><i><em style="width: 46%"></em></i
+                  ><small>46%</small></span
+                >
+                <span
+                  ><b>MiniMax</b><i><em style="width: 84%"></em></i
+                  ><small>84%</small></span
+                >
+              </div>
+            </article>
+
+            <article class="bento reveal" data-delay="2">
+              <span class="card-tag planned" data-i18n="roadmapTag"
+                >ROADMAP</span
+              >
+              <div class="card-icon cyan" aria-hidden="true">⌁</div>
+              <h3 data-i18n="featureRemoteTitle">Connected workspaces</h3>
+              <p data-i18n="featureRemoteBody">
+                Securely share workspace state and reach authorized terminals
+                from trusted computers and phones.
+              </p>
+              <div class="device-map" aria-hidden="true">
+                <span class="device desktop">▱</span><i></i
+                ><span class="hub">T</span><i></i
+                ><span class="device phone">▯</span>
+              </div>
+            </article>
+          </div>
+        </div>
+      </section>
+
+      <section class="section model-section shell">
+        <div class="model-copy reveal">
+          <span class="section-index">MODEL ROUTING</span>
+          <h2 data-i18n="modelTitle">Change the model, not the workflow.</h2>
+          <p data-i18n="modelLead">
+            Keep the CLI your team already understands. Termexo turns endpoint,
+            model, API key, and MCP settings into explicit profiles that can be
+            switched and recovered.
+          </p>
+          <ul>
+            <li data-i18n="modelPoint1">Compatible provider profiles</li>
+            <li data-i18n="modelPoint2">
+              Credentials in Windows Credential Manager
+            </li>
+            <li data-i18n="modelPoint3">
+              Batch switch with session-aware restart
+            </li>
+          </ul>
+        </div>
+        <figure class="settings-frame reveal" data-delay="1">
+          <img
+            src="assets/termexo-model-profiles.png"
+            alt="Termexo model profile settings"
+            width="1440"
+            height="900"
+          />
+          <figcaption>
+            <span><i></i> Credentials stay outside workspace snapshots</span>
+          </figcaption>
+        </figure>
+      </section>
+
+      <section class="section roadmap-section" id="roadmap">
+        <div class="shell">
+          <div class="section-heading reveal">
+            <div>
+              <span class="section-index">03 / ROADMAP</span>
+              <h2 data-i18n="roadmapTitle">
+                From local control to trusted access.
+              </h2>
+            </div>
+            <p data-i18n="roadmapLead">
+              The roadmap expands the same local-first workspace model without
+              presenting planned capabilities as already shipped.
+            </p>
+          </div>
+
+          <div class="roadmap-list">
+            <article class="roadmap-item current reveal">
+              <div><span>V0.2</span><b data-i18n="current">CURRENT</b></div>
+              <h3 data-i18n="roadmap02Title">Claude Code desktop workbench</h3>
+              <p data-i18n="roadmap02Body">
+                PTY terminals, workspace layouts, native resume, hooks,
+                profiles, and local persistence.
+              </p>
+            </article>
+            <article class="roadmap-item reveal" data-delay="1">
+              <div><span>V0.3–0.4</span><b data-i18n="planned">PLANNED</b></div>
+              <h3 data-i18n="roadmap04Title">
+                Multi-agent and provider control
+              </h3>
+              <p data-i18n="roadmap04Body">
+                Codex and Gemini adapters, model transactions, rollback, and
+                live provider Plan quota monitoring.
+              </p>
+            </article>
+            <article class="roadmap-item reveal" data-delay="2">
+              <div><span>V0.5–0.6</span><b data-i18n="planned">PLANNED</b></div>
+              <h3 data-i18n="roadmap06Title">Context and orchestration</h3>
+              <p data-i18n="roadmap06Body">
+                Session summaries, cross-agent migration, task routing,
+                collaboration, and notifications.
+              </p>
+            </article>
+            <article class="roadmap-item reveal" data-delay="3">
+              <div><span>V0.7</span><b data-i18n="planned">PLANNED</b></div>
+              <h3 data-i18n="roadmap07Title">
+                Workspace sharing and remote access
+              </h3>
+              <p data-i18n="roadmap07Body">
+                Trusted devices, encrypted remote terminals, mobile approvals,
+                granular roles, and audit logs.
+              </p>
+            </article>
+          </div>
+        </div>
+      </section>
+
+      <section class="section principles-section shell" id="principles">
+        <div class="principles-copy reveal">
+          <span class="section-index">04 / PRINCIPLES</span>
+          <h2 data-i18n="principlesTitle">
+            Your machine remains the authority.
+          </h2>
+          <p data-i18n="principlesLead">
+            Remote capability should extend local ownership, never erase it.
+            Termexo is designed around explicit trust boundaries from the start.
+          </p>
+        </div>
+        <div class="principles-list">
+          <article class="reveal">
+            <span>01</span>
+            <div>
+              <h3 data-i18n="principle1Title">Local by default</h3>
+              <p data-i18n="principle1Body">
+                Project paths, session indexes, terminal state, and
+                configuration remain on the machine unless you explicitly share
+                them.
+              </p>
+            </div>
+          </article>
+          <article class="reveal" data-delay="1">
+            <span>02</span>
+            <div>
+              <h3 data-i18n="principle2Title">Native agent semantics</h3>
+              <p data-i18n="principle2Body">
+                Use each CLI's real resume and configuration mechanisms instead
+                of inventing a fake universal session.
+              </p>
+            </div>
+          </article>
+          <article class="reveal" data-delay="2">
+            <span>03</span>
+            <div>
+              <h3 data-i18n="principle3Title">Revocable remote trust</h3>
+              <p data-i18n="principle3Body">
+                Planned remote access uses paired devices, short-lived tokens,
+                encryption, clear roles, and immediate revocation.
+              </p>
+            </div>
+          </article>
+        </div>
+      </section>
+
+      <section class="cta-section shell reveal">
+        <div>
+          <span class="section-index">BUILD WITH US</span>
+          <h2 data-i18n="ctaTitle">Bring every coding agent into focus.</h2>
+          <p data-i18n="ctaLead">
+            Termexo is early, local-first, and being built in public. Try the
+            Windows release or follow the roadmap on GitHub.
+          </p>
+        </div>
+        <div class="cta-actions">
+          <a
+            class="button primary"
+            href="https://github.com/gemron/Termexo/releases/latest"
+            target="_blank"
+            rel="noreferrer"
+            data-i18n="getRelease"
+            >Get the latest release</a
+          >
+          <a
+            class="button secondary"
+            href="https://github.com/gemron/Termexo"
+            target="_blank"
+            rel="noreferrer"
+            data-i18n="starGithub"
+            >Explore on GitHub</a
+          >
+        </div>
+      </section>
+    </main>
+
+    <footer class="site-footer">
+      <div class="shell footer-inner">
+        <a class="brand" href="#top">
+          <span class="brand-mark" aria-hidden="true">
+            <svg viewBox="0 0 24 24">
+              <path
+                d="M8 6.5 3.5 12 8 17.5M16 6.5l4.5 5.5-4.5 5.5M10 19l4-14"
+              />
+            </svg>
+          </span>
+          <span>Termexo</span>
+        </a>
+        <p data-i18n="footerTagline">AI Workspace Control Plane</p>
+        <div>
+          <a
+            href="https://github.com/gemron/Termexo"
+            target="_blank"
+            rel="noreferrer"
+            >GitHub</a
+          >
+          <a
+            href="https://github.com/gemron/Termexo/releases"
+            target="_blank"
+            rel="noreferrer"
+            >Releases</a
+          >
+          <a
+            href="https://github.com/gemron/Termexo/issues"
+            target="_blank"
+            rel="noreferrer"
+            >Issues</a
+          >
+        </div>
+        <small>© <span data-year></span> Termexo</small>
+      </div>
+    </footer>
+  </body>
+</html>
