@@ -71,6 +71,7 @@ export class App {
   protected readonly workspaceMaximized = signal(false);
   protected readonly terminalMaximized = signal(false);
   protected readonly launchingClaude = signal(false);
+  protected readonly launchingCodex = signal(false);
   protected readonly selectedTerminalDirectory = signal<string | null>(null);
   protected readonly toastMessage = signal<string | null>(null);
   protected readonly activeTerminalId = computed(() => this.state.activeTerminal()?.id ?? null);
@@ -82,16 +83,16 @@ export class App {
   protected readonly workspaceThemeColor = computed(() =>
     normalizeWorkspaceThemeColor(this.state.activeWorkspace()?.themeColor),
   );
-  protected readonly gridDimensionOptions = Array.from(
-    { length: MAX_TERMINAL_GRID_DIMENSION - MIN_TERMINAL_GRID_DIMENSION + 1 },
-    (_, index) => MIN_TERMINAL_GRID_DIMENSION + index,
-  );
+  protected readonly minGridDimension = MIN_TERMINAL_GRID_DIMENSION;
+  protected readonly maxGridDimension = MAX_TERMINAL_GRID_DIMENSION;
   protected readonly gridColumns = computed(() =>
     normalizeTerminalGridDimension(this.state.activeWorkspace()?.gridColumns),
   );
   protected readonly gridRows = computed(() =>
     normalizeTerminalGridDimension(this.state.activeWorkspace()?.gridRows),
   );
+  protected readonly gridCapacity = computed(() => this.gridColumns() * this.gridRows());
+  protected readonly gridCells = computed(() => Array.from({ length: this.gridCapacity() }));
   protected readonly visibleTerminalIds = computed(() => {
     const workspace = this.state.activeWorkspace();
     if (!workspace) {
@@ -142,6 +143,47 @@ export class App {
 
     this.selectedTerminalDirectory.set(workingDirectory);
     this.claudeLaunchOpen.set(true);
+  }
+
+  protected async launchCodex(): Promise<void> {
+    this.agentMenuOpen.set(false);
+    if (this.launchingCodex()) {
+      return;
+    }
+
+    if (!this.agents.codexInstallation()) {
+      await this.agents.detectCodex();
+    }
+    const installation = this.agents.codexInstallation();
+    if (!installation?.healthy) {
+      this.showToast(installation?.diagnostic ?? '未检测到 Codex CLI');
+      return;
+    }
+
+    const workingDirectory = await this.selectTerminalDirectory();
+    if (!workingDirectory) {
+      return;
+    }
+
+    const terminalId = crypto.randomUUID();
+    this.launchingCodex.set(true);
+    try {
+      const launch = await this.agents.prepareCodexLaunch({});
+      const terminal = this.state.createTerminal({
+        id: terminalId,
+        agentType: 'codex',
+        command: launch.command,
+        model: 'Codex 默认模型',
+        workingDirectory,
+      });
+      if (terminal) {
+        this.showToast(`${terminal.name} 已启动`);
+      }
+    } catch (error) {
+      this.showToast(this.errorMessage(error));
+    } finally {
+      this.launchingCodex.set(false);
+    }
   }
 
   protected async launchClaude(value: ClaudeLaunchDialogValue): Promise<void> {
@@ -197,32 +239,42 @@ export class App {
     await this.agents.refreshSessions(projectPath);
   }
 
-  protected async resumeClaude(value: ResumeSessionValue): Promise<void> {
+  protected async resumeAgent(value: ResumeSessionValue): Promise<void> {
     const workspace = this.state.activeWorkspace();
-    if (!workspace || this.launchingClaude()) {
+    const isCodex = value.session.agentType === 'codex';
+    if (!workspace || (isCodex && this.launchingCodex()) || (!isCodex && this.launchingClaude())) {
       return;
     }
 
     const terminalId = crypto.randomUUID();
-    this.launchingClaude.set(true);
+    (isCodex ? this.launchingCodex : this.launchingClaude).set(true);
     try {
-      const launch = await this.agents.prepareLaunch({
-        terminalId,
-        sessionId: value.session.nativeSessionId,
-        profileId: value.profileId,
-        mcpProfileId: value.mcpProfileId,
-      });
-      const profile = this.agents.modelProfiles().find((item) => item.id === value.profileId);
+      const launch = isCodex
+        ? await this.agents.prepareCodexLaunch({
+            sessionId: value.session.nativeSessionId,
+          })
+        : await this.agents.prepareLaunch({
+            terminalId,
+            sessionId: value.session.nativeSessionId,
+            profileId: value.profileId,
+            mcpProfileId: value.mcpProfileId,
+          });
+      const profile = isCodex
+        ? undefined
+        : this.agents.modelProfiles().find((item) => item.id === value.profileId);
       const terminal = this.state.createTerminal({
         id: terminalId,
-        agentType: 'claude',
+        agentType: value.session.agentType,
         name: value.session.title,
         command: launch.command,
-        model: profile?.name ?? value.session.modelName ?? 'Claude Sonnet',
+        model:
+          profile?.name ??
+          value.session.modelName ??
+          (isCodex ? 'Codex 默认模型' : 'Claude Sonnet'),
         nativeSessionId: value.session.nativeSessionId,
         workingDirectory: value.session.projectPath ?? workspace.projectPath,
-        profileId: value.profileId,
-        mcpProfileId: value.mcpProfileId,
+        profileId: isCodex ? undefined : value.profileId,
+        mcpProfileId: isCodex ? undefined : value.mcpProfileId,
       });
       this.sessionCenterOpen.set(false);
       if (terminal) {
@@ -231,7 +283,7 @@ export class App {
     } catch (error) {
       this.showToast(this.errorMessage(error));
     } finally {
-      this.launchingClaude.set(false);
+      (isCodex ? this.launchingCodex : this.launchingClaude).set(false);
     }
   }
 
@@ -323,12 +375,16 @@ export class App {
     this.state.setLayout(layout);
   }
 
-  protected changeGridDimension(axis: 'columns' | 'rows', event: Event): void {
-    const value = Number((event.target as HTMLSelectElement).value);
+  protected adjustGridDimension(axis: 'columns' | 'rows', delta: -1 | 1): void {
+    const value = (axis === 'columns' ? this.gridColumns() : this.gridRows()) + delta;
     this.state.setGridDimensions(
-      axis === 'columns' ? value : this.gridColumns(),
-      axis === 'rows' ? value : this.gridRows(),
+      axis === 'columns' ? normalizeTerminalGridDimension(value) : this.gridColumns(),
+      axis === 'rows' ? normalizeTerminalGridDimension(value) : this.gridRows(),
     );
+  }
+
+  protected swapGridDimensions(): void {
+    this.state.setGridDimensions(this.gridRows(), this.gridColumns());
   }
 
   protected createWorkspace(value: { name: string; projectPath: string }): void {

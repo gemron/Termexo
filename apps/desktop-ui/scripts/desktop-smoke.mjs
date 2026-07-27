@@ -9,7 +9,11 @@ if (process.platform !== 'win32') {
 }
 
 const repositoryRoot = resolve('../..');
-const executablePath = resolve(repositoryRoot, 'src-tauri', 'target', 'release', 'termexo.exe');
+const targetDirectory = resolve(
+  repositoryRoot,
+  process.env.CARGO_TARGET_DIR ?? resolve(repositoryRoot, '.tooling', 'tauri-target'),
+);
+const executablePath = resolve(targetDirectory, 'release', 'termexo.exe');
 const debugPort = Number(
   process.env.TERMEXO_DESKTOP_DEBUG_PORT ?? process.env.AGENTDOCK_DESKTOP_DEBUG_PORT ?? 9224,
 );
@@ -28,11 +32,7 @@ let browser;
 try {
   await waitForDebugEndpoint(debugUrl, child);
   browser = await chromium.connectOverCDP(debugUrl);
-  const pages = browser.contexts().flatMap((context) => context.pages());
-  const page = pages.find((candidate) => candidate.url().startsWith('http://tauri.localhost'));
-  if (!page) {
-    throw new Error('Termexo WebView did not expose an application page.');
-  }
+  const page = await waitForApplicationPage(browser);
 
   const errors = [];
   page.on('console', (message) => {
@@ -48,45 +48,41 @@ try {
   await page.getByText('Termexo', { exact: true }).first().waitFor();
   const toolbar = page.getByRole('toolbar', { name: '工作区工具' });
   await toolbar.waitFor();
-  const backendInstallation = await page.evaluate(() =>
-    window.__TAURI_INTERNALS__.invoke('detect_claude'),
+  const [backendInstallation, codexInstallation, codexSessions] = await page.evaluate(() =>
+    Promise.all([
+      window.__TAURI_INTERNALS__.invoke('detect_claude'),
+      window.__TAURI_INTERNALS__.invoke('detect_codex'),
+      window.__TAURI_INTERNALS__.invoke('scan_codex_sessions', { projectPath: null }),
+    ]),
   );
   if (!backendInstallation.healthy) {
     throw new Error(`Claude backend detection failed: ${backendInstallation.diagnostic}`);
   }
-
-  await toolbar.getByRole('button', { name: 'Agent', exact: true }).click();
-  await page.getByRole('button', { name: /Claude Code/ }).click();
-  const launchDialog = page.getByRole('dialog', { name: '新建 Claude 会话' });
-  await launchDialog.waitFor();
-  await launchDialog.getByText('Claude Code 可用', { exact: true }).waitFor();
-  const diagnostic = await launchDialog.locator('.installation-line').innerText();
-  if (!diagnostic.includes('Claude Code 可用')) {
-    throw new Error(`Claude detection failed in the desktop runtime: ${diagnostic}`);
+  if (!codexInstallation.healthy) {
+    throw new Error(`Codex backend detection failed: ${codexInstallation.diagnostic}`);
   }
-  if (!(await launchDialog.getByRole('button', { name: '启动会话' }).isEnabled())) {
-    throw new Error('Claude launch remained disabled after successful desktop detection.');
+  if (codexSessions.length === 0) {
+    throw new Error('Codex session scan did not find any local rollouts.');
   }
-  await launchDialog.getByRole('button', { name: '关闭' }).click();
-
-  const initialTerminalCount = await page.locator('.terminal-panel').count();
-  await toolbar.getByRole('button', { name: '终端', exact: true }).click();
-  const shellPanel = page.locator('.terminal-panel').last();
-  await shellPanel.getByText('运行中', { exact: true }).waitFor();
-  await shellPanel.getByRole('button', { name: '关闭终端' }).click();
-  await page.waitForFunction(
-    (expectedCount) => document.querySelectorAll('.terminal-panel').length === expectedCount,
-    initialTerminalCount,
+  const codexResumeLaunch = await page.evaluate(
+    (sessionId) =>
+      window.__TAURI_INTERNALS__.invoke('prepare_codex_launch', {
+        request: { sessionId, model: null },
+      }),
+    codexSessions[0].nativeSessionId,
   );
+  if (!codexResumeLaunch.command.includes(' resume ')) {
+    throw new Error('Codex resume launch command was not prepared correctly.');
+  }
 
   await toolbar.getByRole('button', { name: '恢复', exact: true }).click();
-  const sessionDialog = page.getByRole('dialog', { name: 'Claude 会话中心' });
+  const sessionDialog = page.getByRole('dialog', { name: 'Agent 会话中心' });
   await sessionDialog.waitFor();
-  const connectionStatus = await sessionDialog.locator('.installation-badge').innerText();
-  if (connectionStatus.includes('未连接')) {
-    throw new Error('Session center did not receive the desktop Claude installation state.');
+  const connectionStatuses = await sessionDialog.locator('.agent-health').allInnerTexts();
+  if (connectionStatuses.some((status) => status.includes('未连接'))) {
+    throw new Error('Session center did not receive all desktop Agent installation states.');
   }
-  await sessionDialog.getByRole('button', { name: '关闭' }).click();
+  await sessionDialog.locator('.session-footer').getByRole('button', { name: '关闭' }).click();
 
   await page.getByRole('button', { name: '设置', exact: true }).click();
   const settingsDialog = page.getByRole('dialog', { name: 'Claude Code 设置' });
@@ -99,10 +95,13 @@ try {
 
   console.log(
     JSON.stringify({
-      claudeDiagnostic: diagnostic.replace(/\s+/g, ' ').trim(),
+      claudeDiagnostic: backendInstallation.diagnostic,
+      codexDiagnostic: codexInstallation.diagnostic,
+      codexSessionCount: codexSessions.length,
+      codexVersion: codexInstallation.version,
+      codexExecutablePath: codexResumeLaunch.executablePath,
       executablePath: backendInstallation.executablePath,
-      terminalStatus: 'RUNNING',
-      sessionConnection: connectionStatus.trim(),
+      sessionConnections: connectionStatuses.map((status) => status.trim()),
     }),
   );
 } finally {
@@ -129,6 +128,26 @@ async function waitForDebugEndpoint(url, process) {
     await new Promise((resolveDelay) => setTimeout(resolveDelay, 250));
   }
   throw new Error(`Timed out waiting for Termexo WebView2 at ${url}.`);
+}
+
+async function waitForApplicationPage(browser) {
+  let observedUrls = [];
+  for (let attempt = 0; attempt < 60; attempt += 1) {
+    const pages = browser.contexts().flatMap((context) => context.pages());
+    observedUrls = pages.map((candidate) => candidate.url());
+    const page = pages.find((candidate) =>
+      ['http://tauri.localhost', 'https://tauri.localhost', 'tauri://localhost'].some((origin) =>
+        candidate.url().startsWith(origin),
+      ),
+    );
+    if (page) {
+      return page;
+    }
+    await new Promise((resolveDelay) => setTimeout(resolveDelay, 250));
+  }
+  throw new Error(
+    `Termexo WebView did not expose an application page (${observedUrls.join(', ')})`,
+  );
 }
 
 async function stopChildProcess(process) {

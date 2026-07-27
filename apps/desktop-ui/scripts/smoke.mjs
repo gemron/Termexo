@@ -28,6 +28,11 @@ try {
     throw new Error(`unexpected document title: ${await page.title()}`);
   }
   await page.getByText('Termexo', { exact: true }).first().waitFor();
+  const brandLogo = page.locator('.brand-mark img');
+  await brandLogo.waitFor();
+  if (!(await brandLogo.evaluate((image) => image.complete && image.naturalWidth > 0))) {
+    throw new Error('Termexo brand mark did not load');
+  }
 
   const terminalBox = await page.locator('.xterm-screen').first().boundingBox();
   if (!terminalBox || terminalBox.width < 100 || terminalBox.height < 100) {
@@ -36,13 +41,11 @@ try {
 
   const initialTerminalCount = await page.locator('.terminal-panel').count();
   const toolbar = page.getByRole('toolbar', { name: '工作区工具' });
+  page.once('dialog', (dialog) => dialog.accept(dialog.defaultValue()));
   await toolbar.getByRole('button', { name: '终端', exact: true }).click();
-  await page.getByText(/Shell 3 已创建/).waitFor();
-  await page
-    .locator('.terminal-panel')
-    .filter({ hasText: 'Shell 3' })
-    .getByText('运行中', { exact: true })
-    .waitFor();
+  const createdTerminal = page.locator('.terminal-panel').nth(initialTerminalCount);
+  await createdTerminal.waitFor();
+  await createdTerminal.getByText('运行中', { exact: true }).waitFor();
 
   const updatedTerminalCount = await page.locator('.terminal-panel').count();
   if (updatedTerminalCount !== initialTerminalCount + 1) {
@@ -50,6 +53,7 @@ try {
   }
 
   await toolbar.getByRole('button', { name: 'Agent', exact: true }).click();
+  page.once('dialog', (dialog) => dialog.accept(dialog.defaultValue()));
   await page.getByRole('button', { name: /Claude Code/ }).click();
   const launchDialog = page.getByRole('dialog', { name: '新建 Claude 会话' });
   await launchDialog.waitFor();
@@ -65,10 +69,23 @@ try {
     throw new Error('terminal layout did not switch to grid');
   }
 
+  const gridDimensions = page.locator('.grid-dimensions');
+  const columnOutput = gridDimensions.getByLabel('当前网格列数');
+  const rowOutput = gridDimensions.getByLabel('当前网格行数');
+  const initialColumns = Number(await columnOutput.textContent());
+  const initialRows = Number(await rowOutput.textContent());
+  await gridDimensions.getByRole('button', { name: '增加网格列数' }).click();
+  await columnOutput.filter({ hasText: String(initialColumns + 1) }).waitFor();
+  await gridDimensions.getByRole('button', { name: '交换网格行列数' }).click();
+  await columnOutput.filter({ hasText: String(initialRows) }).waitFor();
+  await rowOutput.filter({ hasText: String(initialColumns + 1) }).waitFor();
+  await gridDimensions.getByRole('button', { name: '交换网格行列数' }).click();
+  await gridDimensions.getByRole('button', { name: '减少网格列数' }).click();
+
   await toolbar.getByRole('button', { name: '恢复', exact: true }).click();
-  const sessionDialog = page.getByRole('dialog', { name: 'Claude 会话中心' });
+  const sessionDialog = page.getByRole('dialog', { name: 'Agent 会话中心' });
   await sessionDialog.waitFor();
-  await sessionDialog.getByText('没有匹配的 Claude 会话').waitFor();
+  await sessionDialog.getByText('当前工作区没有本地会话').waitFor();
 
   const desktopDialogBox = await sessionDialog.boundingBox();
   if (
@@ -86,7 +103,7 @@ try {
     fullPage: true,
   });
 
-  await sessionDialog.getByRole('button', { name: '关闭' }).click();
+  await sessionDialog.locator('.session-footer').getByRole('button', { name: '关闭' }).click();
   await page.setViewportSize({ width: 1024, height: 720 });
   await page.getByRole('button', { name: '设置', exact: true }).click();
   const settingsDialog = page.getByRole('dialog', { name: 'Claude Code 设置' });

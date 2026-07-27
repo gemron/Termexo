@@ -44,10 +44,14 @@ pub fn run() {
         })
         .invoke_handler(tauri::generate_handler![
             commands::agent::detect_claude,
+            commands::agent::detect_codex,
             commands::agent::scan_claude_sessions,
+            commands::agent::scan_codex_sessions,
             commands::agent::list_agent_sessions,
             commands::agent::build_claude_launch_command,
+            commands::agent::build_codex_launch_command,
             commands::agent::prepare_claude_launch,
+            commands::agent::prepare_codex_launch,
             commands::config::list_model_profiles,
             commands::config::save_model_profile,
             commands::config::delete_model_profile,

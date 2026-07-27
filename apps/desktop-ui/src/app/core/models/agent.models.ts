@@ -1,7 +1,9 @@
 import { TerminalStatus } from './workspace.models';
 
+export type NativeAgentType = 'claude' | 'codex';
+
 export interface AgentInstallation {
-  agentType: 'claude';
+  agentType: NativeAgentType;
   installed: boolean;
   executablePath?: string;
   version?: string;
@@ -11,7 +13,7 @@ export interface AgentInstallation {
 
 export interface AgentSession {
   id: string;
-  agentType: 'claude';
+  agentType: NativeAgentType;
   nativeSessionId: string;
   projectPath?: string;
   modelName?: string;
@@ -27,7 +29,7 @@ export interface AgentSession {
 
 export interface AgentEvent {
   eventKey: string;
-  agentType: 'claude';
+  agentType: NativeAgentType;
   nativeSessionId?: string;
   terminalId: string;
   eventType: string;
@@ -46,6 +48,11 @@ export interface ClaudeLaunchRequest {
   name?: string;
   profileId?: string;
   mcpProfileId?: string;
+}
+
+export interface CodexLaunchRequest {
+  sessionId?: string;
+  model?: string;
 }
 
 export interface ModelProfile {

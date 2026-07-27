@@ -22,7 +22,7 @@
     <meta name="twitter:card" content="summary_large_image" />
     <title>Termexo — AI Workspace Control Plane</title>
     <link rel="canonical" href="https://www.termexo.com/" />
-    <link rel="icon" href="assets/favicon.svg" type="image/svg+xml" />
+    <link rel="icon" href="assets/termexo-mark.svg" type="image/svg+xml" />
     <link rel="stylesheet" href="styles.css" />
     <script src="app.js" defer></script>
   </head>
@@ -33,14 +33,10 @@
       <div class="shell header-inner">
         <a class="brand" href="#top" aria-label="Termexo home">
           <span class="brand-mark" aria-hidden="true">
-            <svg viewBox="0 0 24 24">
-              <path
-                d="M8 6.5 3.5 12 8 17.5M16 6.5l4.5 5.5-4.5 5.5M10 19l4-14"
-              />
-            </svg>
+            <img src="assets/termexo-mark.svg" alt="" />
           </span>
           <span>Termexo</span>
-          <small>0.2.2</small>
+          <small>0.3.0</small>
         </a>
 
         <nav
@@ -293,10 +289,10 @@
               <div class="card-icon orange" aria-hidden="true">↻</div>
               <h3 data-i18n="featureSessionTitle">Native session recovery</h3>
               <p data-i18n="featureSessionBody">
-                Resume real Claude Code sessions when transcripts exist, with an
-                explicit fallback when they do not.
+                Discover and resume native Claude Code and Codex CLI sessions
+                from one read-only session center.
               </p>
-              <code>claude --resume 'session-id'</code>
+              <code>claude --resume · codex resume</code>
             </article>
 
             <article class="bento reveal" data-delay="2">
@@ -433,15 +429,15 @@
 
           <div class="roadmap-list">
             <article class="roadmap-item current reveal">
-              <div><span>V0.2</span><b data-i18n="current">CURRENT</b></div>
-              <h3 data-i18n="roadmap02Title">Claude Code desktop workbench</h3>
+              <div><span>V0.3</span><b data-i18n="current">CURRENT</b></div>
+              <h3 data-i18n="roadmap02Title">Multi-Agent session workbench</h3>
               <p data-i18n="roadmap02Body">
-                PTY terminals, workspace layouts, native resume, hooks,
-                profiles, and local persistence.
+                Claude and Codex detection, native session discovery and resume,
+                configurable grids, profiles, and local persistence.
               </p>
             </article>
             <article class="roadmap-item reveal" data-delay="1">
-              <div><span>V0.3–0.4</span><b data-i18n="planned">PLANNED</b></div>
+              <div><span>V0.4</span><b data-i18n="planned">PLANNED</b></div>
               <h3 data-i18n="roadmap04Title">
                 Multi-agent and provider control
               </h3>
@@ -552,11 +548,7 @@
       <div class="shell footer-inner">
         <a class="brand" href="#top">
           <span class="brand-mark" aria-hidden="true">
-            <svg viewBox="0 0 24 24">
-              <path
-                d="M8 6.5 3.5 12 8 17.5M16 6.5l4.5 5.5-4.5 5.5M10 19l4-14"
-              />
-            </svg>
+            <img src="assets/termexo-mark.svg" alt="" />
           </span>
           <span>Termexo</span>
         </a>

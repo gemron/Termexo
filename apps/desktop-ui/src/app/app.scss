@@ -358,39 +358,99 @@
   display: flex;
   height: 25px;
   align-items: center;
-  gap: 3px;
+  gap: 5px;
   margin-left: 3px;
   padding-left: 6px;
   border-left: 1px solid var(--border);
   color: var(--text-muted);
 
-  label {
+  .grid-preview {
+    display: grid;
+    width: 24px;
+    height: 20px;
+    grid-template-columns: repeat(var(--preview-columns), minmax(0, 1fr));
+    grid-template-rows: repeat(var(--preview-rows), minmax(0, 1fr));
+    gap: 1px;
+    padding: 2px;
+    border: 1px solid #3b4540;
+    border-radius: 3px;
+    background: #141816;
+
+    i {
+      min-width: 1px;
+      min-height: 1px;
+      border-radius: 1px;
+      background: #303834;
+
+      &.occupied {
+        background: var(--accent);
+        box-shadow: 0 0 3px color-mix(in srgb, var(--accent) 45%, transparent);
+      }
+    }
+  }
+
+  .dimension-stepper {
     display: flex;
     align-items: center;
-    gap: 3px;
+    gap: 1px;
+    padding: 1px;
+    border: 1px solid #343b37;
+    border-radius: 4px;
+    background: #171b19;
+  }
+
+  .dimension-axis {
+    padding: 0 3px 0 4px;
+    color: #78817c;
     font-size: 8px;
     white-space: nowrap;
   }
 
-  b {
-    color: #68716c;
-    font: 8px/1 var(--mono);
+  .dimension-stepper button,
+  .dimension-swap {
+    display: grid;
+    width: 20px;
+    height: 20px;
+    place-items: center;
+    padding: 0;
+    border: 0;
+    border-radius: 3px;
+    color: #8d9792;
+    font: 12px/1 var(--mono);
+    background: transparent;
+
+    &:hover:not(:disabled) {
+      color: var(--text);
+      background: #303733;
+    }
+
+    &:disabled {
+      cursor: default;
+      opacity: 0.28;
+    }
   }
 
-  select {
-    width: 34px;
-    height: 23px;
-    padding: 0 2px;
-    border: 1px solid #343b37;
-    border-radius: 3px;
-    color: var(--text-secondary);
-    background: #171b19;
+  output {
+    min-width: 17px;
+    color: #d0ddd7;
     font: 9px/1 var(--mono);
-    outline: none;
+    text-align: center;
+  }
 
-    &:focus {
-      border-color: #467565;
-    }
+  .dimension-swap {
+    width: 18px;
+    color: #68716c;
+    font-size: 9px;
+  }
+
+  .grid-capacity {
+    padding: 4px 5px;
+    border: 1px solid #35443e;
+    border-radius: 3px;
+    color: #88ad9e;
+    font: 8px/1 var(--mono);
+    white-space: nowrap;
+    background: #1c2823;
   }
 }
 
@@ -463,10 +523,21 @@
   .tool-button span {
     display: none;
   }
+
+  .grid-dimensions {
+    .grid-preview,
+    .grid-capacity {
+      display: none;
+    }
+  }
 }
 
 @media (max-width: 860px) {
   .terminal-picker select {
     width: 108px;
+  }
+
+  .grid-dimensions .dimension-axis {
+    display: none;
   }
 }

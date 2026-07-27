@@ -1,7 +1,33 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024">
-  <rect width="1024" height="1024" rx="224" fill="#171a19"/>
-  <rect x="124" y="124" width="776" height="776" rx="168" fill="#202825" stroke="#58c7a0" stroke-width="34"/>
-  <path d="M352 322 224 512l128 190" fill="none" stroke="#58c7a0" stroke-linecap="round" stroke-linejoin="round" stroke-width="66"/>
-  <path d="m672 322 128 190-128 190" fill="none" stroke="#68a9e8" stroke-linecap="round" stroke-linejoin="round" stroke-width="66"/>
-  <path d="M446 344 578 680" fill="none" stroke="#e2e5e3" stroke-linecap="round" stroke-width="58"/>
+  <defs>
+    <linearGradient
+      id="circuit"
+      x1="190"
+      y1="210"
+      x2="830"
+      y2="810"
+      gradientUnits="userSpaceOnUse"
+    >
+      <stop offset="0" stop-color="#58d3aa"/>
+      <stop offset=".52" stop-color="#66c9bd"/>
+      <stop offset="1" stop-color="#68a9e8"/>
+    </linearGradient>
+  </defs>
+
+  <rect width="1024" height="1024" rx="224" fill="#0d1311"/>
+
+  <!-- Three Agent nodes routed into one local terminal control plane. -->
+  <g fill="none" stroke="url(#circuit)" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M244 292h536M512 292v198" stroke-width="36"/>
+    <circle cx="244" cy="292" r="58" fill="#0d1311" stroke-width="34"/>
+    <circle cx="512" cy="292" r="58" fill="#0d1311" stroke-width="34"/>
+    <circle cx="780" cy="292" r="58" fill="#0d1311" stroke-width="34"/>
+    <rect x="336" y="472" width="352" height="326" rx="82" fill="#0d1311" stroke-width="38"/>
+  </g>
+
+  <!-- A single command prompt keeps the mark unmistakably terminal-focused. -->
+  <g fill="none" stroke="#edf7f3" stroke-linecap="round" stroke-linejoin="round">
+    <path d="m420 584 74 60-74 60" stroke-width="34"/>
+    <path d="M526 704h84" stroke-width="34"/>
+  </g>
 </svg>

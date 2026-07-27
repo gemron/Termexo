@@ -17,8 +17,9 @@ Termexo 是一个面向开发者和企业研发团队的本地优先 AI 开发�
 * **多 Agent 与模型控制面**：Agent 编排、模型路由、供应商 Plan 余量、告警与耗尽降级。
 * **连接式 Workspace**：细粒度共享、可信设备、远程电脑、手机访问和操作审计。
 
-当前 V0.2 以本地 Claude Code 桌面工作台为主；多 Agent、Plan 余量监控和远程协作属于
-后续版本规划。所有远程能力都必须建立在本地所有权、明确授权、端到端加密和可撤销访问之上。
+当前 V0.3 已形成 Claude Code 与 Codex CLI 共用的本地多 Agent 会话工作台；Gemini
+Adapter、Plan 余量监控和远程协作属于后续版本规划。所有远程能力都必须建立在本地所有权、
+明确授权、端到端加密和可撤销访问之上。
 
 Termexo 计划统一管理：
 
@@ -1421,6 +1422,16 @@ Model：Claude Sonnet
 * Adapter SDK
 * 会话中心
 * Agent 状态统一展示
+
+当前开发进度：
+
+* [x] Codex CLI 安装检测与版本读取
+* [x] Codex CLI 托管 PTY 启动
+* [x] Codex 原生 rollout 会话只读扫描与 UUID 恢复
+* [x] Claude / Codex 统一会话中心
+* [ ] Codex Hooks 与统一运行状态事件
+* [ ] Gemini CLI Adapter
+* [ ] Generic CLI Adapter 与 Adapter SDK
 
 交付标准：
 

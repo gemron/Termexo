@@ -149,23 +149,16 @@ img {
 }
 
 .brand-mark {
-  display: grid;
   width: 30px;
   height: 30px;
-  place-items: center;
-  border: 1px solid rgb(88 199 160 / 38%);
-  border-radius: 7px;
-  color: var(--green);
-  background: rgb(88 199 160 / 9%);
+  flex: 0 0 30px;
 }
 
-.brand-mark svg {
-  width: 18px;
-  fill: none;
-  stroke: currentColor;
-  stroke-linecap: round;
-  stroke-linejoin: round;
-  stroke-width: 1.8;
+.brand-mark img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  filter: drop-shadow(0 0 8px rgb(88 211 170 / 16%));
 }
 
 .nav-links {

@@ -27,14 +27,16 @@
 }
 
 .brand-mark {
-  display: grid;
-  width: 26px;
-  height: 26px;
-  place-items: center;
-  border: 1px solid #3c806b;
-  border-radius: 5px;
-  color: var(--accent);
-  background: #143229;
+  width: 28px;
+  height: 28px;
+  flex: 0 0 28px;
+
+  img {
+    display: block;
+    width: 100%;
+    height: 100%;
+    filter: drop-shadow(0 0 7px rgb(88 199 160 / 16%));
+  }
 }
 
 .version {

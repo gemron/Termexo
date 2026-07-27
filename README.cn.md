@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="apps/desktop-ui/public/termexo-mark.svg" width="104" alt="Termexo 标志">
+</p>
+
 <h1 align="center">Termexo</h1>
 
 <p align="center">面向 Agent、模型与多设备连接的本地优先 AI 开发工作空间</p>
@@ -7,7 +11,7 @@
 </p>
 
 <p align="center">
-  <img alt="Version 0.2.2" src="https://img.shields.io/badge/version-0.2.2-58c7a0">
+  <img alt="Version 0.3.0" src="https://img.shields.io/badge/version-0.3.0-58c7a0">
   <img alt="Windows" src="https://img.shields.io/badge/platform-Windows-0078D4?logo=windows">
   <img alt="Tauri 2" src="https://img.shields.io/badge/Tauri-2-24C8DB?logo=tauri&logoColor=white">
   <img alt="Angular 22" src="https://img.shields.io/badge/Angular-22-DD0031?logo=angular">
@@ -21,8 +25,9 @@ Termexo 是一个本地优先的 AI 开发工作空间与控制平面。它把�
 逐步扩展多 Agent 编排、供应商 Plan 余量实时查看、安全的 Workspace 共享，以及从可信
 电脑和手机访问工作空间。项目数据与凭据仍由明确的设备、权限和加密边界保护。
 
-> 当前版本为 **V0.2 Claude Code 专用版**。Codex CLI、Gemini CLI、跨 Agent
-> 模型切换和会话迁移属于后续规划，尚未实现。
+> 最新正式版本为 **V0.3 多 Agent 会话工作台**。Claude Code 与 Codex CLI
+> 现在可以在同一个桌面 Workspace 中完成检测、启动、会话发现和恢复；Gemini CLI、
+> 跨 Agent 模型切换和会话迁移仍在规划中。
 
 ![Termexo 多终端网格工作台](docs/images/termexo-workbench-v0.2.2.png)
 
@@ -30,7 +35,7 @@ Termexo 是一个本地优先的 AI 开发工作空间与控制平面。它把�
   <sub>7 个 Agent 终端、自定义网格、指定窗口显示、会话状态与 Inspector。</sub>
 </p>
 
-## V0.2.2 更新
+## V0.3.0 更新
 
 - 支持不限数量的终端标签，通过终端选择器指定当前布局中显示的窗口。
 - 网格布局支持持久化的 `1–6 列 × 1–6 行` 自定义配置，并根据实际窗口数量自动收缩。
@@ -39,6 +44,15 @@ Termexo 是一个本地优先的 AI 开发工作空间与控制平面。它把�
   GLM 或自定义 Anthropic 兼容 Endpoint。
 - 批量切换当前 Workspace 内的 Claude Code 后端模型，并在重启终端后继续使用原会话 ID。
 - 当本地会话记录存在时使用 `--resume`；记录缺失时改用 `--session-id`，避免启动失败。
+
+- 原生检测 Codex CLI 可执行文件与安装版本，检测过程不弹出系统控制台。
+- 通过统一托管 PTY 在指定工作目录中启动 Codex。
+- 只读扫描 `CODEX_HOME/sessions` 中的 Codex rollout 元数据，不修改原生 JSONL。
+- 使用原生 UUID 和 `codex resume` 恢复 Codex 会话。
+- 在 Agent 会话中心统一展示 Claude 与 Codex 会话，并保留各 Agent 独立的恢复参数。
+- 支持按 Agent、健康状态、Workspace 和范围搜索筛选会话，并容忍部分扫描失败。
+- 行列设置增加步进控制、可视化预览、行列互换与实时容量提示。
+- 桌面应用、安装包和网站统一使用新的简约科技线条品牌标识。
 
 ## 为什么做 Termexo
 
@@ -86,10 +100,11 @@ Termexo 以 **Workspace** 为组织单位，把这些信息集中到一个可观
 
 ## 当前边界
 
-- V0.2 仅完整接入 Claude Code；Codex 和 Gemini 终端目前只用于界面原型展示。
+- Claude Code 仍是能力最完整的 Adapter。Codex 已支持原生检测、启动、本地会话发现和恢复，
+  但 Codex Hooks 与统一运行事件尚未实现；Gemini 仍为界面原型。
 - 应用退出后，已退出的操作系统进程不会被“伪恢复”。Termexo 只恢复终端配置，
   历史 Claude 会话需要从会话中心显式恢复。
-- Claude 原始 JSONL 只读，Termexo 不修改、重命名或删除这些文件。
+- Claude 与 Codex 原始 JSONL 均只读，Termexo 不修改、重命名或删除这些文件。
 - Inspector 中的 Git 与任务页当前使用原型数据，尚未连接真实后端。
 - 当前版本不包含自动权限批准、跨 Agent 会话迁移或跨 Agent 批量模型切换事务。
 
@@ -182,16 +197,16 @@ flowchart LR
 
 ## 路线图
 
-| 版本 | 目标                                       | 状态     |
-| ---- | ------------------------------------------ | -------- |
-| V0.1 | Workspace、多终端、PTY、SQLite 基础        | 已完成   |
-| V0.2 | Claude Code 检测、会话恢复、Hooks、Profile | 当前版本 |
-| V0.3 | Codex CLI 与 Gemini CLI Adapter            | 规划中   |
-| V0.4 | 模型切换、供应商 Plan 余量监控与回滚       | 规划中   |
-| V0.5 | 会话摘要与跨 Agent 迁移                    | 规划中   |
-| V0.6 | 多 Agent 协作、任务编排与通知              | 规划中   |
-| V0.7 | Workspace 共享、远程电脑与手机访问         | 规划中   |
-| V1.0 | 稳定发布、安全加固与完整恢复体验           | 规划中   |
+| 版本 | 目标                                             | 状态     |
+| ---- | ------------------------------------------------ | -------- |
+| V0.1 | Workspace、多终端、PTY、SQLite 基础              | 已完成   |
+| V0.2 | Claude Code 检测、会话恢复、Hooks、Profile       | 已完成   |
+| V0.3 | Codex CLI Adapter 与 Claude/Codex 统一会话中心   | 当前版本 |
+| V0.4 | Gemini Adapter、模型切换、Plan 余量监控与失败回滚 | 规划中   |
+| V0.5 | 会话摘要与跨 Agent 迁移                          | 规划中   |
+| V0.6 | 多 Agent 协作、任务编排与通知                    | 规划中   |
+| V0.7 | Workspace 共享、远程电脑与手机访问               | 规划中   |
+| V1.0 | 稳定发布、安全加固与完整恢复体验                 | 规划中   |
 
 ## 项目结构
 

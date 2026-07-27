@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="apps/desktop-ui/public/termexo-mark.svg" width="104" alt="Termexo logo">
+</p>
+
 <h1 align="center">Termexo</h1>
 
 <p align="center">A local-first AI development workspace for agents, models, and connected devices</p>
@@ -7,7 +11,7 @@
 </p>
 
 <p align="center">
-  <img alt="Version 0.2.2" src="https://img.shields.io/badge/version-0.2.2-58c7a0">
+  <img alt="Version 0.3.0" src="https://img.shields.io/badge/version-0.3.0-58c7a0">
   <img alt="Windows" src="https://img.shields.io/badge/platform-Windows-0078D4?logo=windows">
   <img alt="Tauri 2" src="https://img.shields.io/badge/Tauri-2-24C8DB?logo=tauri&logoColor=white">
   <img alt="Angular 22" src="https://img.shields.io/badge/Angular-22-DD0031?logo=angular">
@@ -23,8 +27,9 @@ quota visibility, secure workspace sharing, and access from trusted computers an
 Local project data and credentials remain protected by explicit device, permission, and
 encryption boundaries.
 
-> The current release is **V0.2, focused on Claude Code**. Codex CLI, Gemini CLI,
-> cross-agent model switching, and session migration are planned but not implemented.
+> The latest published release is **V0.3, the multi-agent session workbench**. Claude Code
+> and Codex CLI can now be detected, launched, discovered, and resumed from one desktop
+> workspace. Gemini CLI, cross-agent model switching, and session migration remain planned.
 
 ![Termexo multi-terminal grid workbench](docs/images/termexo-workbench-v0.2.2.png)
 
@@ -32,7 +37,7 @@ encryption boundaries.
   <sub>Seven active agent terminals with a configurable grid, explicit pane selection, session state, and the Inspector.</sub>
 </p>
 
-## V0.2.2 Updates
+## V0.3.0 Updates
 
 - Keep any number of terminal tabs and choose which terminals are visible in the active layout.
 - Configure and persist grid layouts from `1–6 columns × 1–6 rows`; unused rows collapse automatically.
@@ -41,6 +46,15 @@ encryption boundaries.
   MiniMax, GLM, or a custom Anthropic-compatible endpoint.
 - Batch-switch Claude Code terminals in the active workspace and restart them with their existing session IDs.
 - Use `--resume` when a local transcript exists and fall back to `--session-id` when it does not.
+
+- Detect the native Codex CLI executable and report its installed version without opening a console window.
+- Start Codex in a selected workspace directory through the same managed PTY used by other terminals.
+- Read Codex rollout metadata from `CODEX_HOME/sessions` without modifying native JSONL files.
+- Resume a Codex session by its native UUID using `codex resume`.
+- Show Claude and Codex sessions together in the Agent session center while preserving Agent-specific resume options.
+- Search and filter sessions by agent, health, workspace, and scope, with partial-scan error handling.
+- Adjust grid rows and columns with steppers, a visual preview, dimension swapping, and live capacity feedback.
+- Use the new compact circuit-line identity across the desktop app, installers, and website.
 
 ## Why Termexo
 
@@ -95,12 +109,13 @@ a local control plane that is observable, recoverable, and extensible.
 
 ## Current Boundaries
 
-- V0.2 fully integrates Claude Code only. Codex and Gemini terminals currently appear as
-  UI prototypes.
+- Claude Code remains the most complete Adapter. Codex now supports native detection,
+  launch, local session discovery, and resume; Codex hooks and unified runtime events are
+  not implemented yet. Gemini remains a UI prototype.
 - When the app exits, terminated operating-system processes are not “fake restored.”
   Termexo restores terminal configuration; historical Claude sessions must be resumed
   explicitly from the session center.
-- Claude JSONL files are read-only. Termexo never edits, renames, or deletes them.
+- Claude and Codex JSONL files are read-only. Termexo never edits, renames, or deletes them.
 - The Git and Tasks tabs in the Inspector currently use prototype data and are not wired
   to production backends.
 - Automatic permission approval, cross-agent session migration, and cross-agent batch
@@ -199,9 +214,9 @@ identifiers still use a legacy name. This does not affect the Termexo product na
 | Version | Goal                                                             | Status   |
 | ------- | ---------------------------------------------------------------- | -------- |
 | V0.1    | Workspace, multi-terminal, PTY, and SQLite foundation            | Complete |
-| V0.2    | Claude detection, session resume, hooks, and profiles            | Current  |
-| V0.3    | Codex CLI and Gemini CLI adapters                                | Planned  |
-| V0.4    | Model switching, provider plan quota monitoring, and rollback    | Planned  |
+| V0.2    | Claude detection, session resume, hooks, and profiles            | Complete |
+| V0.3    | Codex CLI adapter and unified Claude/Codex session center        | Current  |
+| V0.4    | Gemini adapter, model switching, Plan quota monitoring, rollback | Planned  |
 | V0.5    | Session summaries and cross-agent migration                      | Planned  |
 | V0.6    | Multi-agent collaboration, task orchestration, and notifications | Planned  |
 | V0.7    | Workspace sharing, remote computers, and mobile access           | Planned  |

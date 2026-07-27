@@ -7,6 +7,7 @@ import {
   AgentLaunchSpec,
   AgentSession,
   ClaudeLaunchRequest,
+  CodexLaunchRequest,
   McpProfile,
   McpProfileInput,
   ModelProfile,
@@ -24,9 +25,17 @@ const BROWSER_INSTALLATION: AgentInstallation = {
   diagnostic: '浏览器预览不连接本机 Claude Code，请运行桌面端。',
 };
 
+const BROWSER_CODEX_INSTALLATION: AgentInstallation = {
+  agentType: 'codex',
+  installed: false,
+  healthy: false,
+  diagnostic: '浏览器预览不连接本机 Codex CLI，请运行桌面端。',
+};
+
 @Injectable({ providedIn: 'root' })
 export class AgentService {
   private readonly installationState = signal<AgentInstallation | null>(null);
+  private readonly codexInstallationState = signal<AgentInstallation | null>(null);
   private readonly sessionItems = signal<AgentSession[]>([]);
   private readonly eventItems = signal<AgentEvent[]>([]);
   private readonly modelProfileItems = signal<ModelProfile[]>([]);
@@ -34,9 +43,11 @@ export class AgentService {
   private readonly busyState = signal(false);
   private readonly errorState = signal<string | null>(null);
   private initialized = false;
+  private pendingOperations = 0;
   private pollingHandle: number | null = null;
 
   readonly installation = this.installationState.asReadonly();
+  readonly codexInstallation = this.codexInstallationState.asReadonly();
   readonly sessions = this.sessionItems.asReadonly();
   readonly events = this.eventItems.asReadonly();
   readonly modelProfiles = this.modelProfileItems.asReadonly();
@@ -52,6 +63,7 @@ export class AgentService {
 
     if (!isTauriRuntime()) {
       this.installationState.set(BROWSER_INSTALLATION);
+      this.codexInstallationState.set(BROWSER_CODEX_INSTALLATION);
       this.modelProfileItems.set([
         {
           id: 'claude-default',
@@ -65,7 +77,12 @@ export class AgentService {
       return;
     }
 
-    await Promise.all([this.detectClaude(), this.loadProfiles(), this.loadSessions()]);
+    await Promise.all([
+      this.detectClaude(),
+      this.detectCodex(),
+      this.loadProfiles(),
+      this.loadSessions(),
+    ]);
     await this.syncEvents();
     this.pollingHandle = window.setInterval(() => {
       void this.syncEvents();
@@ -82,16 +99,51 @@ export class AgentService {
     });
   }
 
+  async detectCodex(): Promise<void> {
+    if (!isTauriRuntime()) {
+      this.codexInstallationState.set(BROWSER_CODEX_INSTALLATION);
+      return;
+    }
+    await this.run(async () => {
+      this.codexInstallationState.set(await invoke<AgentInstallation>('detect_codex'));
+    });
+  }
+
   async refreshSessions(projectPath?: string): Promise<void> {
     if (!isTauriRuntime()) {
       this.sessionItems.set([]);
       return;
     }
     await this.run(async () => {
-      const sessions = await invoke<AgentSession[]>('scan_claude_sessions', {
-        projectPath: projectPath || null,
-      });
-      this.sessionItems.set(sessions);
+      const results = await Promise.allSettled([
+        invoke<AgentSession[]>('scan_claude_sessions', {
+          projectPath: projectPath || null,
+        }),
+        invoke<AgentSession[]>('scan_codex_sessions', {
+          projectPath: projectPath || null,
+        }),
+      ]);
+
+      const sessions = results.flatMap((result) =>
+        result.status === 'fulfilled' ? result.value : [],
+      );
+      const failures = results.filter(
+        (result): result is PromiseRejectedResult => result.status === 'rejected',
+      );
+      if (failures.length === results.length) {
+        throw new Error(
+          `会话扫描失败：${failures.map((failure) => this.errorMessage(failure.reason)).join('；')}`,
+        );
+      }
+
+      this.sessionItems.set(sessions.sort((left, right) => right.lastUsedAt - left.lastUsedAt));
+      if (failures.length > 0) {
+        this.errorState.set(
+          `部分 Agent 会话扫描失败：${failures
+            .map((failure) => this.errorMessage(failure.reason))
+            .join('；')}`,
+        );
+      }
     });
   }
 
@@ -103,6 +155,18 @@ export class AgentService {
       };
     }
     return invoke<AgentLaunchSpec>('prepare_claude_launch', { request });
+  }
+
+  async prepareCodexLaunch(request: CodexLaunchRequest): Promise<AgentLaunchSpec> {
+    if (!isTauriRuntime()) {
+      return {
+        command: `codex${request.sessionId ? ` resume '${request.sessionId}'` : ''}${
+          request.model ? ` --model '${request.model}'` : ''
+        }`,
+        executablePath: 'codex',
+      };
+    }
+    return invoke<AgentLaunchSpec>('prepare_codex_launch', { request });
   }
 
   async saveModelProfile(input: ModelProfileInput): Promise<void> {
@@ -178,15 +242,21 @@ export class AgentService {
   }
 
   private async run(action: () => Promise<void>): Promise<void> {
+    this.pendingOperations += 1;
     this.busyState.set(true);
     this.errorState.set(null);
     try {
       await action();
     } catch (error) {
-      this.errorState.set(error instanceof Error ? error.message : String(error));
+      this.errorState.set(this.errorMessage(error));
     } finally {
-      this.busyState.set(false);
+      this.pendingOperations = Math.max(0, this.pendingOperations - 1);
+      this.busyState.set(this.pendingOperations > 0);
     }
+  }
+
+  private errorMessage(error: unknown): string {
+    return error instanceof Error ? error.message : String(error);
   }
 
   private upsertModelProfile(profile: ModelProfile): void {

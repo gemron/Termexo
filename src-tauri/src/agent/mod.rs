@@ -1,8 +1,10 @@
 mod claude;
+mod codex;
 
 use serde::{Deserialize, Serialize};
 
 pub use claude::ClaudeCodeAdapter;
+pub use codex::CodexCliAdapter;
 
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -43,6 +45,13 @@ pub struct ClaudeLaunchOptions {
     pub mcp_config_path: Option<String>,
 }
 
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CodexLaunchOptions {
+    pub session_id: Option<String>,
+    pub model: Option<String>,
+}
+
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct AgentLaunchSpec {
@@ -52,11 +61,12 @@ pub struct AgentLaunchSpec {
 
 pub trait AgentAdapter {
     type Error;
+    type LaunchOptions;
 
     fn detect(&self) -> Result<AgentInstallation, Self::Error>;
     fn list_sessions(&self, project_path: Option<&str>) -> Result<Vec<AgentSession>, Self::Error>;
     fn build_launch_command(
         &self,
-        options: &ClaudeLaunchOptions,
+        options: &Self::LaunchOptions,
     ) -> Result<AgentLaunchSpec, Self::Error>;
 }

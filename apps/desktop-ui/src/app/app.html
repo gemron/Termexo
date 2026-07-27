@@ -50,9 +50,16 @@
                 <span data-tone="green"><app-icon name="bot" [size]="14" /></span>
                 <div><strong>Claude Code</strong><small>Claude Sonnet</small></div>
               </button>
-              <button type="button" (click)="createTerminal('codex')">
+              <button type="button" (click)="launchCodex()">
                 <span data-tone="blue"><app-icon name="bot" [size]="14" /></span>
-                <div><strong>Codex CLI</strong><small>GPT Codex</small></div>
+                <div>
+                  <strong>Codex CLI</strong>
+                  <small>{{
+                    agents.codexInstallation()?.healthy
+                      ? (agents.codexInstallation()?.version ?? '已连接')
+                      : '未检测到'
+                  }}</small>
+                </div>
               </button>
               <button type="button" (click)="createTerminal('gemini')">
                 <span data-tone="amber"><app-icon name="sparkles" [size]="14" /></span>
@@ -196,31 +203,78 @@
         </button>
         @if (state.activeWorkspace()?.layout === 'grid') {
           <div class="grid-dimensions" aria-label="自定义网格行列数">
-            <label title="列数">
-              <span>列</span>
-              <select
-                aria-label="网格列数"
-                [value]="gridColumns()"
-                (change)="changeGridDimension('columns', $event)"
+            <span
+              class="grid-preview"
+              aria-hidden="true"
+              [style.--preview-columns]="gridColumns()"
+              [style.--preview-rows]="gridRows()"
+              [title]="gridColumns() + ' 列 × ' + gridRows() + ' 行'"
+            >
+              @for (_ of gridCells(); track $index) {
+                <i [class.occupied]="$index < visibleTerminalIds().length"></i>
+              }
+            </span>
+
+            <div class="dimension-stepper" role="group" aria-label="调整网格列数">
+              <span class="dimension-axis">列</span>
+              <button
+                type="button"
+                aria-label="减少网格列数"
+                title="减少列数"
+                [disabled]="gridColumns() <= minGridDimension"
+                (click)="adjustGridDimension('columns', -1)"
               >
-                @for (dimension of gridDimensionOptions; track dimension) {
-                  <option [value]="dimension">{{ dimension }}</option>
-                }
-              </select>
-            </label>
-            <b aria-hidden="true">×</b>
-            <label title="行数">
-              <span>行</span>
-              <select
-                aria-label="网格行数"
-                [value]="gridRows()"
-                (change)="changeGridDimension('rows', $event)"
+                −
+              </button>
+              <output aria-label="当前网格列数">{{ gridColumns() }}</output>
+              <button
+                type="button"
+                aria-label="增加网格列数"
+                title="增加列数"
+                [disabled]="gridColumns() >= maxGridDimension"
+                (click)="adjustGridDimension('columns', 1)"
               >
-                @for (dimension of gridDimensionOptions; track dimension) {
-                  <option [value]="dimension">{{ dimension }}</option>
-                }
-              </select>
-            </label>
+                +
+              </button>
+            </div>
+
+            <button
+              type="button"
+              class="dimension-swap"
+              aria-label="交换网格行列数"
+              title="交换行列数"
+              [disabled]="gridColumns() === gridRows()"
+              (click)="swapGridDimensions()"
+            >
+              ×
+            </button>
+
+            <div class="dimension-stepper" role="group" aria-label="调整网格行数">
+              <span class="dimension-axis">行</span>
+              <button
+                type="button"
+                aria-label="减少网格行数"
+                title="减少行数"
+                [disabled]="gridRows() <= minGridDimension"
+                (click)="adjustGridDimension('rows', -1)"
+              >
+                −
+              </button>
+              <output aria-label="当前网格行数">{{ gridRows() }}</output>
+              <button
+                type="button"
+                aria-label="增加网格行数"
+                title="增加行数"
+                [disabled]="gridRows() >= maxGridDimension"
+                (click)="adjustGridDimension('rows', 1)"
+              >
+                +
+              </button>
+            </div>
+
+            <span class="grid-capacity" title="当前网格最多同时显示的窗口数量">
+              {{ gridCapacity() }} 格
+            </span>
           </div>
         }
       </div>
@@ -292,13 +346,15 @@
 @if (sessionCenterOpen()) {
   <app-session-center-dialog
     [installation]="agents.installation()"
+    [codexInstallation]="agents.codexInstallation()"
     [sessions]="agents.sessions()"
     [profiles]="agents.modelProfiles()"
     [mcpProfiles]="agents.mcpProfiles()"
     [projectPath]="state.activeWorkspace()?.projectPath ?? ''"
-    [busy]="agents.busy() || launchingClaude()"
+    [busy]="agents.busy() || launchingClaude() || launchingCodex()"
+    [error]="agents.error()"
     (refreshed)="refreshSessions($event)"
-    (resumed)="resumeClaude($event)"
+    (resumed)="resumeAgent($event)"
     (cancelled)="sessionCenterOpen.set(false)"
   />
 }

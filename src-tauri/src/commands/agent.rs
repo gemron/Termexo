@@ -5,7 +5,7 @@ use tauri::State;
 
 use crate::agent::{
     AgentAdapter, AgentInstallation, AgentLaunchSpec, AgentSession, ClaudeCodeAdapter,
-    ClaudeLaunchOptions,
+    ClaudeLaunchOptions, CodexCliAdapter, CodexLaunchOptions,
 };
 use crate::config::{CredentialStore, LaunchEnvironmentStore, ModelProfile};
 use crate::database::WorkspaceDatabase;
@@ -23,11 +23,36 @@ pub async fn detect_claude() -> Result<AgentInstallation, String> {
 }
 
 #[tauri::command]
+pub async fn detect_codex() -> Result<AgentInstallation, String> {
+    tauri::async_runtime::spawn_blocking(|| {
+        CodexCliAdapter::new()
+            .detect()
+            .map_err(|error| error.to_string())
+    })
+    .await
+    .map_err(|error| error.to_string())?
+}
+
+#[tauri::command]
 pub fn scan_claude_sessions(
     project_path: Option<String>,
     database: State<'_, WorkspaceDatabase>,
 ) -> Result<Vec<AgentSession>, String> {
     let sessions = ClaudeCodeAdapter::new()
+        .list_sessions(project_path.as_deref())
+        .map_err(|error| error.to_string())?;
+    database
+        .save_agent_sessions(&sessions)
+        .map_err(|error| error.to_string())?;
+    Ok(sessions)
+}
+
+#[tauri::command]
+pub fn scan_codex_sessions(
+    project_path: Option<String>,
+    database: State<'_, WorkspaceDatabase>,
+) -> Result<Vec<AgentSession>, String> {
+    let sessions = CodexCliAdapter::new()
         .list_sessions(project_path.as_deref())
         .map_err(|error| error.to_string())?;
     database
@@ -54,6 +79,13 @@ pub fn build_claude_launch_command(
         .map_err(|error| error.to_string())
 }
 
+#[tauri::command]
+pub fn build_codex_launch_command(options: CodexLaunchOptions) -> Result<AgentLaunchSpec, String> {
+    CodexCliAdapter::new()
+        .build_launch_command(&options)
+        .map_err(|error| error.to_string())
+}
+
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct PrepareClaudeLaunchRequest {
@@ -62,6 +94,13 @@ pub struct PrepareClaudeLaunchRequest {
     pub name: Option<String>,
     pub profile_id: Option<String>,
     pub mcp_profile_id: Option<String>,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PrepareCodexLaunchRequest {
+    pub session_id: Option<String>,
+    pub model: Option<String>,
 }
 
 #[tauri::command]
@@ -116,6 +155,16 @@ pub fn prepare_claude_launch(
             model: profile.map(|profile| profile.model),
             settings_path: Some(runtime.settings_path),
             mcp_config_path,
+        })
+        .map_err(|error| error.to_string())
+}
+
+#[tauri::command]
+pub fn prepare_codex_launch(request: PrepareCodexLaunchRequest) -> Result<AgentLaunchSpec, String> {
+    CodexCliAdapter::new()
+        .build_launch_command(&CodexLaunchOptions {
+            session_id: request.session_id,
+            model: request.model,
         })
         .map_err(|error| error.to_string())
 }

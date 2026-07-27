@@ -154,6 +154,7 @@ impl ClaudeCodeAdapter {
 
 impl AgentAdapter for ClaudeCodeAdapter {
     type Error = ClaudeError;
+    type LaunchOptions = ClaudeLaunchOptions;
 
     fn detect(&self) -> Result<AgentInstallation, Self::Error> {
         let Some(executable) = self.find_executable() else {
