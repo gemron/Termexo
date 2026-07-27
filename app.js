@@ -35,7 +35,7 @@ const translations = {
       "Name, color, order, project path, layout, terminals, branch, and model state stay attached to one durable workspace.",
     featureSessionTitle: "Native session recovery",
     featureSessionBody:
-      "Resume real Claude Code sessions when transcripts exist, with an explicit fallback when they do not.",
+      "Discover and resume native Claude Code and Codex CLI sessions from one read-only session center.",
     featureModelTitle: "Provider profiles",
     featureModelBody:
       "Keep Claude Code while routing to Anthropic, DeepSeek, MiniMax, GLM, or a compatible gateway.",
@@ -59,9 +59,9 @@ const translations = {
       "The roadmap expands the same local-first workspace model without presenting planned capabilities as already shipped.",
     current: "CURRENT",
     planned: "PLANNED",
-    roadmap02Title: "Claude Code desktop workbench",
+    roadmap02Title: "Multi-Agent session workbench",
     roadmap02Body:
-      "PTY terminals, workspace layouts, native resume, hooks, profiles, and local persistence.",
+      "Claude and Codex detection, native session discovery and resume, configurable grids, profiles, and local persistence.",
     roadmap04Title: "Multi-agent and provider control",
     roadmap04Body:
       "Codex and Gemini adapters, model transactions, rollback, and live provider Plan quota monitoring.",
@@ -126,7 +126,7 @@ const translations = {
       "名称、颜色、顺序、项目路径、布局、终端、分支和模型状态都归属于一个持久工作空间。",
     featureSessionTitle: "原生会话恢复",
     featureSessionBody:
-      "存在本地记录时恢复真实 Claude Code 会话；记录缺失时提供明确的降级方案。",
+      "在统一的只读会话中心发现并恢复 Claude Code 与 Codex CLI 原生会话。",
     featureModelTitle: "供应商 Profile",
     featureModelBody:
       "保留 Claude Code，通过 Profile 路由到 Anthropic、DeepSeek、MiniMax、GLM 或兼容网关。",
@@ -150,9 +150,9 @@ const translations = {
       "路线图沿用同一个本地优先工作空间模型，并明确区分当前能力和后续规划。",
     current: "当前版本",
     planned: "规划中",
-    roadmap02Title: "Claude Code 桌面工作台",
+    roadmap02Title: "多 Agent 会话工作台",
     roadmap02Body:
-      "PTY 终端、工作空间布局、原生恢复、Hooks、Profile 和本地持久化。",
+      "Claude 与 Codex 检测、原生会话发现和恢复、自定义网格、Profile 与本地持久化。",
     roadmap04Title: "多 Agent 与供应商控制",
     roadmap04Body:
       "Codex、Gemini Adapter，模型切换事务、回滚和供应商 Plan 余量实时监控。",
