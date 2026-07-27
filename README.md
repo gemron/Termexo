@@ -1,6 +1,6 @@
 <h1 align="center">Termexo</h1>
 
-<p align="center">A local-first desktop workbench for AI coding terminals</p>
+<p align="center">A local-first AI development workspace for agents, models, and connected devices</p>
 
 <p align="center">
   <strong>English</strong> · <a href="./README.cn.md">简体中文</a>
@@ -13,10 +13,15 @@
   <img alt="Angular 22" src="https://img.shields.io/badge/Angular-22-DD0031?logo=angular">
 </p>
 
-Termexo brings workspaces, terminals, AI agent sessions, model profiles, and runtime state
-into one desktop workbench. It is not another chat window. Its goal is to help developers
-manage multiple projects and AI coding terminals at once, then return to a clearly defined
-working context after restarting the application.
+Termexo is a local-first AI development workspace and control plane. It brings projects,
+terminals, native agent sessions, model/provider profiles, and runtime state into one
+recoverable desktop environment instead of another isolated chat window.
+
+The current desktop release focuses on coordinating local AI coding terminals. The roadmap
+extends the same Workspace model into multi-agent orchestration, real-time provider Plan
+quota visibility, secure workspace sharing, and access from trusted computers and phones.
+Local project data and credentials remain protected by explicit device, permission, and
+encryption boundaries.
 
 > The current release is **V0.2, focused on Claude Code**. Codex CLI, Gemini CLI,
 > cross-agent model switching, and session migration are planned but not implemented.
@@ -55,7 +60,7 @@ a local control plane that is observable, recoverable, and extensible.
 
 | Capability               | Current implementation                                                                                             |
 | ------------------------ | ------------------------------------------------------------------------------------------------------------------ |
-| Workspace management     | Create, switch, and favorite workspaces; persist project paths, layouts, and terminal configuration                |
+| Workspace management     | Create, rename, theme, manually reorder, and switch workspaces; persist paths, layouts, and terminal configuration |
 | Multi-terminal workbench | Unlimited tabs, explicit pane selection, configurable 1–6 row/column grids, pane/workspace maximize, and real PTYs |
 | Claude Code detection    | Detect `claude.exe` / `claude.cmd`, version, and health on Windows                                                 |
 | Start Claude sessions    | Select a session name, model profile, and MCP profile before launch                                                |
@@ -85,6 +90,8 @@ a local control plane that is observable, recoverable, and extensible.
    credential store, not in SQLite, snapshots, hook payloads, or logs.
 6. **Grow into a multi-agent architecture** — Evolve around adapters, PTY, hooks,
    snapshots, and routing boundaries so more CLIs can be added without rebuilding the core.
+7. **Extend workspaces across trusted devices** — Add sharing, remote access, mobile
+   approvals, and collaboration without weakening local ownership or security boundaries.
 
 ## Current Boundaries
 
@@ -194,9 +201,10 @@ identifiers still use a legacy name. This does not affect the Termexo product na
 | V0.1    | Workspace, multi-terminal, PTY, and SQLite foundation            | Complete |
 | V0.2    | Claude detection, session resume, hooks, and profiles            | Current  |
 | V0.3    | Codex CLI and Gemini CLI adapters                                | Planned  |
-| V0.4    | Cross-terminal model-switch transactions                         | Planned  |
+| V0.4    | Model switching, provider plan quota monitoring, and rollback    | Planned  |
 | V0.5    | Session summaries and cross-agent migration                      | Planned  |
 | V0.6    | Multi-agent collaboration, task orchestration, and notifications | Planned  |
+| V0.7    | Workspace sharing, remote computers, and mobile access           | Planned  |
 | V1.0    | Stable release, security hardening, and complete recovery UX     | Planned  |
 
 ## Repository Layout

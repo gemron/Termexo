@@ -17,6 +17,10 @@ fn default_grid_dimension() -> u8 {
     2
 }
 
+fn default_workspace_theme_color() -> String {
+    "#58c7a0".to_string()
+}
+
 #[derive(Debug, Error)]
 pub enum DatabaseError {
     #[error("database access failed: {0}")]
@@ -32,6 +36,10 @@ pub enum DatabaseError {
 pub struct Workspace {
     pub id: String,
     pub name: String,
+    #[serde(default = "default_workspace_theme_color")]
+    pub theme_color: String,
+    #[serde(default)]
+    pub sort_order: u32,
     pub project_path: String,
     pub project_type: String,
     pub active_branch: String,
@@ -83,16 +91,18 @@ impl WorkspaceDatabase {
         let mut statement = connection.prepare(
             "SELECT layout_json
              FROM workspaces
-             ORDER BY last_opened_at DESC",
+             ORDER BY created_at ASC",
         )?;
         let snapshots = statement
             .query_map([], |row| row.get::<_, String>(0))?
             .collect::<Result<Vec<_>, _>>()?;
 
-        snapshots
+        let mut workspaces = snapshots
             .into_iter()
             .map(|snapshot| serde_json::from_str(&snapshot).map_err(DatabaseError::from))
-            .collect()
+            .collect::<Result<Vec<Workspace>, DatabaseError>>()?;
+        workspaces.sort_by_key(|workspace| workspace.sort_order);
+        Ok(workspaces)
     }
 
     pub fn save(&self, workspace: &Workspace) -> Result<(), DatabaseError> {
@@ -500,6 +510,8 @@ mod tests {
         let workspace = Workspace {
             id: "workspace-1".into(),
             name: "Termexo".into(),
+            theme_color: "#58c7a0".into(),
+            sort_order: 1,
             project_path: "D:\\dev\\termexo".into(),
             project_type: "Angular + Rust".into(),
             active_branch: "main".into(),
@@ -511,12 +523,20 @@ mod tests {
             terminals: vec![],
         };
 
+        let mut first_workspace = workspace.clone();
+        first_workspace.id = "workspace-2".into();
+        first_workspace.name = "Pinned first".into();
+        first_workspace.sort_order = 0;
+        first_workspace.last_opened_at = 1;
+
         database.save(&workspace).unwrap();
+        database.save(&first_workspace).unwrap();
         let stored = database.list().unwrap();
 
-        assert_eq!(stored.len(), 1);
-        assert_eq!(stored[0].name, workspace.name);
-        assert_eq!(stored[0].layout, workspace.layout);
+        assert_eq!(stored.len(), 2);
+        assert_eq!(stored[0].name, first_workspace.name);
+        assert_eq!(stored[1].name, workspace.name);
+        assert_eq!(stored[1].layout, workspace.layout);
     }
 
     #[test]
@@ -538,6 +558,8 @@ mod tests {
 
         assert_eq!(workspace.grid_columns, 2);
         assert_eq!(workspace.grid_rows, 2);
+        assert_eq!(workspace.theme_color, "#58c7a0");
+        assert_eq!(workspace.sort_order, 0);
     }
 
     #[test]

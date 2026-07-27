@@ -1,6 +1,7 @@
 {
   "name": "termexo",
   "version": "0.2.2",
+  "description": "Local-first workspace for AI coding agents, models, and terminals",
   "private": true,
   "scripts": {
     "dev": "npm --prefix apps/desktop-ui start -- --host 127.0.0.1 --port 4200",

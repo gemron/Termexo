@@ -118,10 +118,12 @@ nav {
 }
 
 .workspace-item {
+  --workspace-color: var(--accent);
+
   display: grid;
   width: 100%;
   min-width: 0;
-  grid-template-columns: 27px minmax(0, 1fr) 22px;
+  grid-template-columns: 27px minmax(0, 1fr) 64px;
   align-items: center;
   gap: 5px;
   padding: 7px 6px;
@@ -136,12 +138,13 @@ nav {
   }
 
   &.active {
-    border-color: #34443f;
+    border-color: color-mix(in srgb, var(--workspace-color) 48%, var(--border));
     color: var(--text);
-    background: #202825;
+    background: color-mix(in srgb, var(--workspace-color) 10%, var(--surface-1));
+    box-shadow: inset 2px 0 0 var(--workspace-color);
 
     .workspace-glyph {
-      color: var(--accent);
+      color: var(--workspace-color);
     }
   }
 }
@@ -177,18 +180,74 @@ nav {
   }
 }
 
-.favorite {
+.workspace-actions {
+  display: flex;
+  align-items: center;
+}
+
+.workspace-order-actions {
   display: grid;
-  height: 22px;
-  place-items: center;
+  width: 20px;
+  height: 24px;
+  grid-template-rows: repeat(2, 12px);
   color: transparent;
 
-  &.selected {
-    color: var(--warning);
+  .workspace-item:hover &,
+  .workspace-item.active & {
+    color: #7f8783;
+  }
+}
+
+.workspace-order-action {
+  display: grid;
+  place-items: center;
+  border-radius: 2px;
+
+  &:hover,
+  &:focus-visible {
+    color: var(--workspace-color);
+    background: color-mix(in srgb, var(--workspace-color) 12%, transparent);
+    outline: 0;
+  }
+
+  &.disabled {
+    cursor: default;
+    opacity: 0.2;
+
+    &:hover {
+      color: inherit;
+      background: transparent;
+    }
+  }
+}
+
+.workspace-action {
+  display: grid;
+  width: 22px;
+  height: 22px;
+  place-items: center;
+  border-radius: 3px;
+  color: transparent;
+
+  &:hover,
+  &:focus-visible {
+    color: var(--text-secondary);
+    background: color-mix(in srgb, var(--workspace-color) 10%, transparent);
+    outline: 0;
   }
 
   .workspace-item:hover & {
     color: #757b80;
+  }
+}
+
+.favorite.selected {
+  color: var(--warning);
+}
+
+.edit {
+  .workspace-item.active & {
+    color: color-mix(in srgb, var(--workspace-color) 72%, var(--text));
   }
 }
 

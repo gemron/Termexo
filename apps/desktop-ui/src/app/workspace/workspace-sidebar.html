@@ -29,6 +29,7 @@
           type="button"
           class="workspace-item"
           [class.active]="workspace.id === activeWorkspaceId()"
+          [style.--workspace-color]="workspaceColor(workspace)"
           (click)="workspaceSelected.emit(workspace.id)"
         >
           <span class="workspace-glyph">
@@ -38,16 +39,69 @@
             <strong>{{ workspace.name }}</strong>
             <small>{{ workspace.activeBranch }}</small>
           </span>
-          <span
-            class="favorite"
-            [class.selected]="workspace.favorite"
-            role="button"
-            tabindex="0"
-            [attr.aria-label]="workspace.favorite ? '取消收藏' : '收藏'"
-            (click)="$event.stopPropagation(); favoriteToggled.emit(workspace.id)"
-            (keydown.enter)="$event.stopPropagation(); favoriteToggled.emit(workspace.id)"
-          >
-            <app-icon name="star" [size]="13" />
+          <span class="workspace-actions">
+            <span class="workspace-order-actions" aria-label="调整工作区顺序">
+              <span
+                class="workspace-order-action"
+                [class.disabled]="$first"
+                role="button"
+                [attr.tabindex]="$first ? -1 : 0"
+                [attr.aria-disabled]="$first"
+                title="上移工作区"
+                aria-label="上移工作区"
+                (click)="
+                  $event.stopPropagation();
+                  moveRequested.emit({ workspaceId: workspace.id, direction: -1 })
+                "
+                (keydown.enter)="
+                  $event.stopPropagation();
+                  moveRequested.emit({ workspaceId: workspace.id, direction: -1 })
+                "
+              >
+                <app-icon name="arrow-up" [size]="10" />
+              </span>
+              <span
+                class="workspace-order-action"
+                [class.disabled]="$last"
+                role="button"
+                [attr.tabindex]="$last ? -1 : 0"
+                [attr.aria-disabled]="$last"
+                title="下移工作区"
+                aria-label="下移工作区"
+                (click)="
+                  $event.stopPropagation();
+                  moveRequested.emit({ workspaceId: workspace.id, direction: 1 })
+                "
+                (keydown.enter)="
+                  $event.stopPropagation();
+                  moveRequested.emit({ workspaceId: workspace.id, direction: 1 })
+                "
+              >
+                <app-icon name="arrow-down" [size]="10" />
+              </span>
+            </span>
+            <span
+              class="workspace-action edit"
+              role="button"
+              tabindex="0"
+              title="编辑工作区"
+              aria-label="编辑工作区"
+              (click)="$event.stopPropagation(); editRequested.emit(workspace.id)"
+              (keydown.enter)="$event.stopPropagation(); editRequested.emit(workspace.id)"
+            >
+              <app-icon name="edit" [size]="12" />
+            </span>
+            <span
+              class="workspace-action favorite"
+              [class.selected]="workspace.favorite"
+              role="button"
+              tabindex="0"
+              [attr.aria-label]="workspace.favorite ? '取消收藏' : '收藏'"
+              (click)="$event.stopPropagation(); favoriteToggled.emit(workspace.id)"
+              (keydown.enter)="$event.stopPropagation(); favoriteToggled.emit(workspace.id)"
+            >
+              <app-icon name="star" [size]="13" />
+            </span>
           </span>
         </button>
       }

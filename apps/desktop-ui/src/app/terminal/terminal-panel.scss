@@ -15,8 +15,36 @@
   background: #101312;
 
   &.active {
-    border-color: #467565;
-    box-shadow: inset 0 2px 0 #3fa27f;
+    border-color: color-mix(in srgb, var(--accent) 58%, var(--border));
+    box-shadow:
+      inset 0 2px 0 var(--accent),
+      0 0 0 1px color-mix(in srgb, var(--accent) 9%, transparent),
+      0 0 18px color-mix(in srgb, var(--accent) 13%, transparent);
+
+    header {
+      border-bottom-color: color-mix(in srgb, var(--accent) 32%, var(--border));
+      background:
+        linear-gradient(
+          90deg,
+          color-mix(in srgb, var(--accent) 18%, transparent),
+          rgb(25 29 27 / 96%) 48%
+        ),
+        #191d1b;
+    }
+
+    .terminal-identity {
+      strong {
+        font-weight: 700;
+        letter-spacing: 0.01em;
+        animation: active-terminal-title-color 10s ease-in-out infinite;
+      }
+
+      .agent-icon {
+        box-shadow:
+          0 0 0 1px color-mix(in srgb, var(--accent) 36%, transparent),
+          0 0 10px color-mix(in srgb, var(--accent) 17%, transparent);
+      }
+    }
   }
 }
 
@@ -162,5 +190,31 @@ footer {
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+  }
+}
+
+@keyframes active-terminal-title-color {
+  0%,
+  100% {
+    color: color-mix(in srgb, var(--accent) 72%, white);
+    text-shadow: 0 0 9px color-mix(in srgb, var(--accent) 20%, transparent);
+  }
+
+  34% {
+    color: color-mix(in srgb, var(--accent) 54%, #acd8f4);
+    text-shadow: 0 0 9px color-mix(in srgb, var(--accent) 16%, #68a9e8 5%);
+  }
+
+  67% {
+    color: color-mix(in srgb, var(--accent) 54%, #ead19a);
+    text-shadow: 0 0 9px color-mix(in srgb, var(--accent) 16%, #d6a34a 5%);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .terminal-panel.active .terminal-identity strong {
+    color: color-mix(in srgb, var(--accent) 72%, white);
+    text-shadow: none;
+    animation: none;
   }
 }

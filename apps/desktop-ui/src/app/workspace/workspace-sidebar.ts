@@ -1,6 +1,6 @@
 import { Component, input, output } from '@angular/core';
 
-import { Workspace } from '../core/models/workspace.models';
+import { normalizeWorkspaceThemeColor, Workspace } from '../core/models/workspace.models';
 import { IconComponent } from '../shared/icon/icon';
 
 @Component({
@@ -15,6 +15,12 @@ export class WorkspaceSidebarComponent {
 
   readonly workspaceSelected = output<string>();
   readonly favoriteToggled = output<string>();
+  readonly editRequested = output<string>();
+  readonly moveRequested = output<{ workspaceId: string; direction: -1 | 1 }>();
   readonly createRequested = output<void>();
   readonly settingsRequested = output<void>();
+
+  protected workspaceColor(workspace: Workspace): string {
+    return normalizeWorkspaceThemeColor(workspace.themeColor);
+  }
 }

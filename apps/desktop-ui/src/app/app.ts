@@ -7,6 +7,7 @@ import {
   MAX_TERMINAL_GRID_DIMENSION,
   MIN_TERMINAL_GRID_DIMENSION,
   normalizeTerminalGridDimension,
+  normalizeWorkspaceThemeColor,
 } from './core/models/workspace.models';
 import { AgentService } from './core/services/agent.service';
 import { AppStateService } from './core/services/app-state.service';
@@ -18,6 +19,10 @@ import {
   ClaudeLaunchDialogValue,
 } from './dialogs/claude-launch-dialog';
 import { CreateWorkspaceDialogComponent } from './dialogs/create-workspace-dialog';
+import {
+  EditWorkspaceDialogComponent,
+  WorkspaceAppearanceValue,
+} from './dialogs/edit-workspace-dialog';
 import { ModelSwitchDialogComponent } from './dialogs/model-switch-dialog';
 import { ResumeSessionValue, SessionCenterDialogComponent } from './dialogs/session-center-dialog';
 import { InspectorPanelComponent } from './inspector/inspector-panel';
@@ -36,6 +41,7 @@ import { WorkspaceSidebarComponent } from './workspace/workspace-sidebar';
     AgentSettingsDialogComponent,
     ClaudeLaunchDialogComponent,
     CreateWorkspaceDialogComponent,
+    EditWorkspaceDialogComponent,
     IconComponent,
     InspectorPanelComponent,
     ModelSwitchDialogComponent,
@@ -55,6 +61,7 @@ export class App {
   private readonly preferredTerminalIds = signal<Record<string, string[]>>({});
 
   protected readonly createWorkspaceOpen = signal(false);
+  protected readonly editingWorkspaceId = signal<string | null>(null);
   protected readonly claudeLaunchOpen = signal(false);
   protected readonly sessionCenterOpen = signal(false);
   protected readonly settingsOpen = signal(false);
@@ -67,6 +74,14 @@ export class App {
   protected readonly selectedTerminalDirectory = signal<string | null>(null);
   protected readonly toastMessage = signal<string | null>(null);
   protected readonly activeTerminalId = computed(() => this.state.activeTerminal()?.id ?? null);
+  protected readonly editingWorkspace = computed(
+    () =>
+      this.state.workspaces().find((workspace) => workspace.id === this.editingWorkspaceId()) ??
+      null,
+  );
+  protected readonly workspaceThemeColor = computed(() =>
+    normalizeWorkspaceThemeColor(this.state.activeWorkspace()?.themeColor),
+  );
   protected readonly gridDimensionOptions = Array.from(
     { length: MAX_TERMINAL_GRID_DIMENSION - MIN_TERMINAL_GRID_DIMENSION + 1 },
     (_, index) => MIN_TERMINAL_GRID_DIMENSION + index,
@@ -320,6 +335,17 @@ export class App {
     this.state.createWorkspace(value.name, value.projectPath);
     this.createWorkspaceOpen.set(false);
     this.showToast(`工作区 ${value.name} 已创建`);
+  }
+
+  protected openWorkspaceEditor(workspaceId: string): void {
+    this.editingWorkspaceId.set(workspaceId);
+  }
+
+  protected saveWorkspaceAppearance(value: WorkspaceAppearanceValue): void {
+    if (this.state.updateWorkspaceAppearance(value.workspaceId, value.name, value.themeColor)) {
+      this.editingWorkspaceId.set(null);
+      this.showToast(`工作区 ${value.name} 已更新`);
+    }
   }
 
   protected async switchModels(profileId: string): Promise<void> {

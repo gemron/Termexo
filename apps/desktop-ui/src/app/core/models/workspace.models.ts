@@ -17,6 +17,16 @@ export type LayoutMode = 'single' | 'columns' | 'rows' | 'grid';
 export const MIN_TERMINAL_GRID_DIMENSION = 1;
 export const MAX_TERMINAL_GRID_DIMENSION = 6;
 export const DEFAULT_TERMINAL_GRID_DIMENSION = 2;
+export const DEFAULT_WORKSPACE_THEME_COLOR = '#58c7a0';
+
+export const WORKSPACE_THEME_PRESETS = [
+  { name: '翡翠', color: '#58c7a0' },
+  { name: '海蓝', color: '#68a9e8' },
+  { name: '紫罗兰', color: '#a78bfa' },
+  { name: '暖橙', color: '#e4a35a' },
+  { name: '玫红', color: '#ef7890' },
+  { name: '青色', color: '#52c7d9' },
+] as const;
 
 export function normalizeTerminalGridDimension(value: number | undefined): number {
   if (!Number.isFinite(value)) {
@@ -26,6 +36,13 @@ export function normalizeTerminalGridDimension(value: number | undefined): numbe
     MAX_TERMINAL_GRID_DIMENSION,
     Math.max(MIN_TERMINAL_GRID_DIMENSION, Math.round(value!)),
   );
+}
+
+export function normalizeWorkspaceThemeColor(value: string | undefined): string {
+  const normalized = value?.trim();
+  return normalized && /^#[0-9a-f]{6}$/i.test(normalized)
+    ? normalized.toLowerCase()
+    : DEFAULT_WORKSPACE_THEME_COLOR;
 }
 
 export interface TerminalSession {
@@ -47,6 +64,8 @@ export interface TerminalSession {
 export interface Workspace {
   id: string;
   name: string;
+  themeColor?: string;
+  sortOrder?: number;
   projectPath: string;
   projectType: string;
   activeBranch: string;

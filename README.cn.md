@@ -1,6 +1,6 @@
 <h1 align="center">Termexo</h1>
 
-<p align="center">面向 AI 编程终端的本地优先桌面工作台</p>
+<p align="center">面向 Agent、模型与多设备连接的本地优先 AI 开发工作空间</p>
 
 <p align="center">
   <a href="./README.md">English</a> · <strong>简体中文</strong>
@@ -13,9 +13,13 @@
   <img alt="Angular 22" src="https://img.shields.io/badge/Angular-22-DD0031?logo=angular">
 </p>
 
-Termexo 把 Workspace、终端、AI Agent 会话、模型配置和运行状态放进一个桌面工作台。
-它希望解决的不是“再做一个聊天窗口”，而是让开发者同时管理多个项目与多个 AI
-编程终端，并在应用重启后清楚地找回工作现场。
+Termexo 是一个本地优先的 AI 开发工作空间与控制平面。它把项目、终端、Agent
+原生会话、模型/供应商配置和运行状态集中到一个可恢复的桌面环境中，而不是再做一个
+彼此隔离的聊天窗口。
+
+当前桌面版本重点统一管理本机 AI 编程终端；后续路线图会沿用同一个 Workspace 模型，
+逐步扩展多 Agent 编排、供应商 Plan 余量实时查看、安全的 Workspace 共享，以及从可信
+电脑和手机访问工作空间。项目数据与凭据仍由明确的设备、权限和加密边界保护。
 
 > 当前版本为 **V0.2 Claude Code 专用版**。Codex CLI、Gemini CLI、跨 Agent
 > 模型切换和会话迁移属于后续规划，尚未实现。
@@ -53,7 +57,7 @@ Termexo 以 **Workspace** 为组织单位，把这些信息集中到一个可观
 
 | 能力               | 当前实现                                                                          |
 | ------------------ | --------------------------------------------------------------------------------- |
-| Workspace 管理     | 创建、切换、收藏 Workspace，并持久化项目路径、布局和终端配置                      |
+| Workspace 管理     | 创建、改名、换色、手动排序和切换 Workspace，并持久化项目路径、布局与终端配置      |
 | 多终端工作台       | 不限终端数量、指定窗口显示、1–6 行列网格、终端/工作区最大化；桌面端启动真实 PTY   |
 | Claude Code 检测   | 在 Windows 上检测 `claude.exe` / `claude.cmd`、版本与健康状态                     |
 | 新建 Claude 会话   | 选择会话名称、模型 Profile 和 MCP Profile 后启动 Claude                           |
@@ -77,6 +81,8 @@ Termexo 以 **Workspace** 为组织单位，把这些信息集中到一个可观
 4. **状态可观察**：将不同 Agent 的事件映射为运行、思考、等待输入、等待确认、完成和失败等统一状态。
 5. **安全边界清晰**：密钥进入操作系统凭据存储，不写入 SQLite、快照、Hook payload 或日志。
 6. **面向多 Agent 扩展**：以后端 Adapter、PTY、Hooks、Snapshot 和 Router 等边界逐步接入更多 CLI。
+7. **安全延伸到可信设备**：在不削弱本地所有权和安全边界的前提下，增加共享、远程访问、
+   手机审批与协作能力。
 
 ## 当前边界
 
@@ -181,9 +187,10 @@ flowchart LR
 | V0.1 | Workspace、多终端、PTY、SQLite 基础        | 已完成   |
 | V0.2 | Claude Code 检测、会话恢复、Hooks、Profile | 当前版本 |
 | V0.3 | Codex CLI 与 Gemini CLI Adapter            | 规划中   |
-| V0.4 | 跨终端模型切换事务                         | 规划中   |
+| V0.4 | 模型切换、供应商 Plan 余量监控与回滚       | 规划中   |
 | V0.5 | 会话摘要与跨 Agent 迁移                    | 规划中   |
 | V0.6 | 多 Agent 协作、任务编排与通知              | 规划中   |
+| V0.7 | Workspace 共享、远程电脑与手机访问         | 规划中   |
 | V1.0 | 稳定发布、安全加固与完整恢复体验           | 规划中   |
 
 ## 项目结构

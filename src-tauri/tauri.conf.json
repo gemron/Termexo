@@ -31,7 +31,8 @@
     "active": true,
     "targets": "all",
     "category": "DeveloperTool",
-    "shortDescription": "Local-first AI coding workspace",
+    "shortDescription": "Local-first workspace for AI coding agents, models, and terminals",
+    "longDescription": "Coordinate AI coding terminals, native agent sessions, model providers, and recoverable project workspaces from one local-first desktop control plane.",
     "icon": [
       "icons/32x32.png",
       "icons/128x128.png",

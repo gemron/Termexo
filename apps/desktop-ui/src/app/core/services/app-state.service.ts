@@ -7,8 +7,10 @@ import {
   AgentType,
   CreateTerminalInput,
   DEFAULT_TERMINAL_GRID_DIMENSION,
+  DEFAULT_WORKSPACE_THEME_COLOR,
   LayoutMode,
   normalizeTerminalGridDimension,
+  normalizeWorkspaceThemeColor,
   TerminalSession,
   TerminalStatus,
   Workspace,
@@ -57,12 +59,13 @@ export class AppStateService {
         ? this.restartRestoredTerminals(storedWorkspaces)
         : createDefaultWorkspaces();
 
-    this.workspaceItems.set(this.sortWorkspaces(initialWorkspaces));
-    const firstWorkspace = initialWorkspaces[0];
+    const orderedWorkspaces = this.normalizeWorkspaceOrder(initialWorkspaces);
+    this.workspaceItems.set(orderedWorkspaces);
+    const firstWorkspace = orderedWorkspaces[0];
     this.activeWorkspaceId.set(firstWorkspace?.id ?? null);
     this.activeTerminalId.set(firstWorkspace?.terminals[0]?.id ?? null);
 
-    await this.repository.saveAll(initialWorkspaces);
+    await this.repository.saveAll(orderedWorkspaces);
   }
 
   selectWorkspace(workspaceId: string): void {
@@ -92,6 +95,8 @@ export class AppStateService {
     const workspace: Workspace = {
       id: crypto.randomUUID(),
       name: normalizedName,
+      themeColor: DEFAULT_WORKSPACE_THEME_COLOR,
+      sortOrder: this.workspaceItems().length,
       projectPath: normalizedPath,
       projectType: 'Local project',
       activeBranch: 'main',
@@ -103,7 +108,7 @@ export class AppStateService {
       terminals: [],
     };
 
-    this.workspaceItems.update((items) => this.sortWorkspaces([...items, workspace]));
+    this.workspaceItems.update((items) => [...items, workspace]);
     this.activeWorkspaceId.set(workspace.id);
     this.activeTerminalId.set(null);
     void this.repository.save(workspace);
@@ -118,6 +123,41 @@ export class AppStateService {
     const updatedWorkspace = { ...workspace, favorite: !workspace.favorite };
     this.replaceWorkspace(updatedWorkspace);
     void this.repository.save(updatedWorkspace);
+  }
+
+  moveWorkspace(workspaceId: string, direction: -1 | 1): boolean {
+    const workspaces = [...this.workspaceItems()];
+    const currentIndex = workspaces.findIndex((workspace) => workspace.id === workspaceId);
+    const targetIndex = currentIndex + direction;
+    if (currentIndex < 0 || targetIndex < 0 || targetIndex >= workspaces.length) {
+      return false;
+    }
+
+    [workspaces[currentIndex], workspaces[targetIndex]] = [
+      workspaces[targetIndex],
+      workspaces[currentIndex],
+    ];
+    const orderedWorkspaces = this.normalizeWorkspaceOrder(workspaces);
+    this.workspaceItems.set(orderedWorkspaces);
+    void this.repository.saveAll(orderedWorkspaces);
+    return true;
+  }
+
+  updateWorkspaceAppearance(workspaceId: string, name: string, themeColor: string): boolean {
+    const workspace = this.workspaceItems().find((item) => item.id === workspaceId);
+    const normalizedName = name.trim();
+    if (!workspace || !normalizedName) {
+      return false;
+    }
+
+    const updatedWorkspace = {
+      ...workspace,
+      name: normalizedName,
+      themeColor: normalizeWorkspaceThemeColor(themeColor),
+    };
+    this.replaceWorkspace(updatedWorkspace);
+    void this.repository.save(updatedWorkspace);
+    return true;
   }
 
   createTerminal(input: CreateTerminalInput): TerminalSession | null {
@@ -251,7 +291,7 @@ export class AppStateService {
 
   private replaceWorkspace(workspace: Workspace): void {
     this.workspaceItems.update((items) =>
-      this.sortWorkspaces(items.map((item) => (item.id === workspace.id ? workspace : item))),
+      items.map((item) => (item.id === workspace.id ? workspace : item)),
     );
   }
 
@@ -288,11 +328,11 @@ export class AppStateService {
     return agentType === 'shell' ? '' : agentType;
   }
 
-  private sortWorkspaces(workspaces: Workspace[]): Workspace[] {
-    return [...workspaces].sort(
-      (left, right) =>
-        Number(right.favorite) - Number(left.favorite) || right.lastOpenedAt - left.lastOpenedAt,
-    );
+  private normalizeWorkspaceOrder(workspaces: Workspace[]): Workspace[] {
+    return workspaces.map((workspace, sortOrder) => ({
+      ...workspace,
+      sortOrder,
+    }));
   }
 
   private restartRestoredTerminals(workspaces: Workspace[]): Workspace[] {

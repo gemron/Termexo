@@ -1,5 +1,6 @@
 <main
   class="app-shell"
+  [style.--accent]="workspaceThemeColor()"
   [class.inspector-collapsed]="!inspectorOpen()"
   [class.workspace-maximized]="workspaceMaximized()"
 >
@@ -8,6 +9,8 @@
     [activeWorkspaceId]="state.activeWorkspace()?.id ?? null"
     (workspaceSelected)="state.selectWorkspace($event)"
     (favoriteToggled)="state.toggleFavorite($event)"
+    (editRequested)="openWorkspaceEditor($event)"
+    (moveRequested)="state.moveWorkspace($event.workspaceId, $event.direction)"
     (createRequested)="createWorkspaceOpen.set(true)"
     (settingsRequested)="settingsOpen.set(true)"
   />
@@ -264,6 +267,14 @@
   <app-create-workspace-dialog
     (created)="createWorkspace($event)"
     (cancelled)="createWorkspaceOpen.set(false)"
+  />
+}
+
+@if (editingWorkspace(); as workspace) {
+  <app-edit-workspace-dialog
+    [workspace]="workspace"
+    (saved)="saveWorkspaceAppearance($event)"
+    (cancelled)="editingWorkspaceId.set(null)"
   />
 }
 

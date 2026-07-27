@@ -123,6 +123,56 @@ describe('AppStateService', () => {
     );
   });
 
+  it('renames a workspace and persists its normalized theme color', async () => {
+    await service.initialize();
+    const workspaceId = service.activeWorkspace()!.id;
+
+    const updated = service.updateWorkspaceAppearance(workspaceId, '  Termexo Cloud  ', '#A78BFA');
+
+    expect(updated).toBe(true);
+    expect(service.activeWorkspace()).toEqual(
+      expect.objectContaining({
+        name: 'Termexo Cloud',
+        themeColor: '#a78bfa',
+      }),
+    );
+    expect(repository.save).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        id: workspaceId,
+        name: 'Termexo Cloud',
+        themeColor: '#a78bfa',
+      }),
+    );
+  });
+
+  it('keeps the workspace order stable when selecting another workspace', async () => {
+    await service.initialize();
+    const workspaceIds = service.workspaces().map((workspace) => workspace.id);
+
+    service.selectWorkspace(workspaceIds.at(-1)!);
+
+    expect(service.workspaces().map((workspace) => workspace.id)).toEqual(workspaceIds);
+  });
+
+  it('moves a workspace manually and persists the new order', async () => {
+    await service.initialize();
+    repository.saveAll.mockClear();
+    const workspaceIds = service.workspaces().map((workspace) => workspace.id);
+
+    const moved = service.moveWorkspace(workspaceIds[2], -1);
+
+    expect(moved).toBe(true);
+    expect(service.workspaces().map((workspace) => workspace.id)).toEqual([
+      workspaceIds[0],
+      workspaceIds[2],
+      workspaceIds[1],
+    ]);
+    expect(service.workspaces().map((workspace) => workspace.sortOrder)).toEqual([0, 1, 2]);
+    expect(repository.saveAll).toHaveBeenCalledWith(
+      service.workspaces().map((workspace) => expect.objectContaining({ id: workspace.id })),
+    );
+  });
+
   it('restarts a Claude terminal with a new profile without changing the CLI type', async () => {
     await service.initialize();
     const shell = service.createTerminal({ agentType: 'shell' });

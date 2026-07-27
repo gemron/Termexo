@@ -9,6 +9,8 @@ export function createDefaultWorkspaces(): Workspace[] {
     {
       id: crypto.randomUUID(),
       name: 'Termexo',
+      themeColor: '#58c7a0',
+      sortOrder: 0,
       projectPath: DEFAULT_PROJECT_PATH,
       projectType: 'Angular + Rust',
       activeBranch: 'feature/terminal-runtime',
@@ -47,6 +49,8 @@ export function createDefaultWorkspaces(): Workspace[] {
     {
       id: crypto.randomUUID(),
       name: 'MTS Cloud',
+      themeColor: '#a78bfa',
+      sortOrder: 1,
       projectPath: 'D:\\dev\\mts-cloud',
       projectType: 'Angular + Java',
       activeBranch: 'main',
@@ -60,6 +64,8 @@ export function createDefaultWorkspaces(): Workspace[] {
     {
       id: crypto.randomUUID(),
       name: 'Device Health',
+      themeColor: '#68a9e8',
+      sortOrder: 2,
       projectPath: 'D:\\dev\\device-health',
       projectType: 'Spring Boot',
       activeBranch: 'develop',

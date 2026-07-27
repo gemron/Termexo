@@ -8,6 +8,8 @@ import {
   viewChild,
 } from '@angular/core';
 import {
+  ArrowDown,
+  ArrowUp,
   Bot,
   Boxes,
   Check,
@@ -25,6 +27,7 @@ import {
   Minimize2,
   MoreHorizontal,
   PanelRightClose,
+  Pencil,
   Play,
   Plus,
   Radio,
@@ -45,6 +48,8 @@ import {
 } from 'lucide';
 
 const ICONS: Record<string, IconNode> = {
+  'arrow-down': ArrowDown,
+  'arrow-up': ArrowUp,
   bot: Bot,
   boxes: Boxes,
   check: Check,
@@ -62,6 +67,7 @@ const ICONS: Record<string, IconNode> = {
   minimize: Minimize2,
   more: MoreHorizontal,
   'panel-close': PanelRightClose,
+  edit: Pencil,
   play: Play,
   plus: Plus,
   radio: Radio,
@@ -82,10 +88,12 @@ const ICONS: Record<string, IconNode> = {
 
 @Component({
   selector: 'app-icon',
-  template: '<svg #svg aria-hidden="true"></svg>',
+  template: '<svg #svg aria-hidden="true" style="display: block; width: 100%; height: 100%"></svg>',
   host: {
     '[style.width.px]': 'size()',
     '[style.height.px]': 'size()',
+    style:
+      'display: inline-flex; flex: 0 0 auto; align-items: center; justify-content: center; line-height: 0; vertical-align: middle;',
   },
 })
 export class IconComponent implements AfterViewInit {

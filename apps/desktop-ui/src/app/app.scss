@@ -62,8 +62,10 @@
   }
 
   strong {
+    color: color-mix(in srgb, var(--accent) 76%, var(--text));
     font-size: 12px;
     font-weight: 610;
+    text-shadow: 0 0 10px color-mix(in srgb, var(--accent) 18%, transparent);
   }
 
   span {
