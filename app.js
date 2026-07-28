@@ -64,7 +64,7 @@ const translations = {
       "Claude and Codex detection, native session discovery and resume, configurable grids, profiles, and local persistence.",
     roadmap04Title: "Multi-agent and provider control",
     roadmap04Body:
-      "Codex and Gemini adapters, model transactions, rollback, and live provider Plan quota monitoring.",
+      "Gemini and generic CLI adapters, one-click CLI lifecycle, internal-network and npm proxy profiles, multiple Claude, Codex, and provider accounts with scoped switching, rollback, and live Plan quota monitoring.",
     roadmap06Title: "Context and orchestration",
     roadmap06Body:
       "Session summaries, cross-agent migration, task routing, collaboration, and notifications.",
@@ -155,7 +155,7 @@ const translations = {
       "Claude 与 Codex 检测、原生会话发现和恢复、自定义网格、Profile 与本地持久化。",
     roadmap04Title: "多 Agent 与供应商控制",
     roadmap04Body:
-      "Codex、Gemini Adapter，模型切换事务、回滚和供应商 Plan 余量实时监控。",
+      "Gemini 与通用 CLI Adapter、CLI 一键安装升级、内网和 npm 代理 Profile、多个 Claude、Codex 和第三方供应商账号的分范围管理切换、失败回滚与 Plan 余量实时监控。",
     roadmap06Title: "上下文与任务编排",
     roadmap06Body: "会话摘要、跨 Agent 迁移、任务路由、协作和通知。",
     roadmap07Title: "Workspace 共享与远程访问",
