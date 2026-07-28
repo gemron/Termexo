@@ -11,7 +11,7 @@
 </p>
 
 <p align="center">
-  <img alt="Version 0.3.0" src="https://img.shields.io/badge/version-0.3.0-58c7a0">
+  <img alt="Version 0.3.1" src="https://img.shields.io/badge/version-0.3.1-58c7a0">
   <img alt="Windows" src="https://img.shields.io/badge/platform-Windows-0078D4?logo=windows">
   <img alt="Tauri 2" src="https://img.shields.io/badge/Tauri-2-24C8DB?logo=tauri&logoColor=white">
   <img alt="Angular 22" src="https://img.shields.io/badge/Angular-22-DD0031?logo=angular">
@@ -27,15 +27,24 @@ quota visibility, secure workspace sharing, and access from trusted computers an
 Local project data and credentials remain protected by explicit device, permission, and
 encryption boundaries.
 
-> The latest published release is **V0.3, the multi-agent session workbench**. Claude Code
-> and Codex CLI can now be detected, launched, discovered, and resumed from one desktop
-> workspace. Gemini CLI, cross-agent model switching, and session migration remain planned.
+> The latest published release is **V0.3.1, the refined multi-agent session workbench**.
+> It adds the DaisyUI/Lucide visual system, polished workspace and dialog interactions,
+> scoped network/npm profiles, and managed Claude Code/Codex CLI installation and upgrades.
 
-![Termexo multi-terminal grid workbench](docs/images/termexo-workbench-v0.2.2.png)
+![Termexo multi-terminal grid workbench](docs/images/termexo-workbench-v0.3.1.png)
 
 <p align="center">
-  <sub>Seven active agent terminals with a configurable grid, explicit pane selection, session state, and the Inspector.</sub>
+  <sub>Four active Claude Code and Codex terminals in a configurable 2 × 2 grid with explicit pane selection and the Inspector.</sub>
 </p>
+
+## V0.3.1 Updates
+
+- Adopt DaisyUI themes and Lucide icons across the desktop UI, with a cleaner Chinese font stack.
+- Refine workspace menus, active-terminal emphasis, toolbar alignment, dialogs, and toast messages.
+- Keep workspace selection order stable while allowing manual reordering, renaming, and per-workspace theme colors.
+- Manage global or workspace-scoped HTTP/HTTPS/SOCKS and npm profiles with secure credential storage and connectivity tests.
+- Preview, confirm, install, or upgrade official Claude Code and Codex npm packages, then verify CLI health.
+- Expand browser and desktop smoke coverage for menus, dialogs, responsive layouts, network profiles, and CLI lifecycle operations.
 
 ## V0.3.0 Updates
 
@@ -55,6 +64,16 @@ encryption boundaries.
 - Search and filter sessions by agent, health, workspace, and scope, with partial-scan error handling.
 - Adjust grid rows and columns with steppers, a visual preview, dimension swapping, and live capacity feedback.
 - Use the new compact circuit-line identity across the desktop app, installers, and website.
+
+## V0.4 Development
+
+- Create global or workspace-scoped network profiles for HTTP, HTTPS, SOCKS, and `NO_PROXY`.
+- Manage npm registry, proxy, `https-proxy`, `strict-ssl`, and enterprise CA settings without rewriting the user's global npm configuration.
+- Keep proxy passwords in the operating-system credential store and reject credentials embedded directly in proxy URLs.
+- Test DNS/TCP reachability and apply the effective workspace-over-global profile to Claude and Codex launch environments.
+- Preview and confirm one-click Claude Code/Codex installation or upgrades from their official npm packages, with exact version or dist-tag selection.
+- Apply the effective network profile to npm, preflight the registry, prevent overlapping mutations, enforce a timeout, and verify CLI health after completion.
+- Multi-account switching, automatic rollback, system-proxy discovery, and Plan quota monitoring remain planned.
 
 ## Why Termexo
 
@@ -78,9 +97,11 @@ a local control plane that is observable, recoverable, and extensible.
 | Multi-terminal workbench | Unlimited tabs, explicit pane selection, configurable 1–6 row/column grids, pane/workspace maximize, and real PTYs |
 | Claude Code detection    | Detect `claude.exe` / `claude.cmd`, version, and health on Windows                                                 |
 | Start Claude sessions    | Select a session name, model profile, and MCP profile before launch                                                |
-| Session center           | Read-only Claude JSONL scanning, search, workspace filtering, and native `--resume`                                |
+| Session center           | Read-only Claude/Codex session discovery, search, workspace filtering, and native resume                           |
 | Agent status tracking    | Isolated hooks per terminal for thinking, tool use, approval, user input, completion, and failure states           |
 | Model and MCP profiles   | Manage endpoints, keys, and MCP configuration; switch Claude CLI across Anthropic-compatible backends              |
+| Network and npm profiles | Scope HTTP/HTTPS/SOCKS and npm settings globally or per workspace, test reachability, and inject them at launch    |
+| Managed CLI lifecycle    | Preview, confirm, install, or upgrade official Claude Code and Codex npm packages, then verify the result           |
 | Local data and secrets   | Store workspace/session/event data in SQLite and API keys in Windows Credential Manager                            |
 | Browser preview          | Preview the complete UI without Rust and exercise layout flows through an interactive simulated terminal           |
 
@@ -216,7 +237,7 @@ identifiers still use a legacy name. This does not affect the Termexo product na
 | V0.1    | Workspace, multi-terminal, PTY, and SQLite foundation            | Complete |
 | V0.2    | Claude detection, session resume, hooks, and profiles            | Complete |
 | V0.3    | Codex CLI adapter and unified Claude/Codex session center        | Current  |
-| V0.4    | Gemini adapter, model switching, Plan quota monitoring, rollback | Planned  |
+| V0.4    | Gemini, CLI/network lifecycle, multi-account/provider and Plan control | In progress |
 | V0.5    | Session summaries and cross-agent migration                      | Planned  |
 | V0.6    | Multi-agent collaboration, task orchestration, and notifications | Planned  |
 | V0.7    | Workspace sharing, remote computers, and mobile access           | Planned  |

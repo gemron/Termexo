@@ -54,8 +54,8 @@
   h2 {
     margin: 14px 0 5px;
     color: var(--text-secondary);
-    font-size: 14px;
-    font-weight: 560;
+    font-size: 15px;
+    font-weight: 650;
   }
 
   p {
@@ -69,11 +69,12 @@
     align-items: center;
     gap: 7px;
     padding: 0 12px;
-    border: 1px solid #417763;
-    border-radius: 4px;
-    color: #d9e9e2;
-    background: #265c49;
-    font-size: 11px;
+    border: 1px solid color-mix(in oklab, var(--color-primary) 72%, black);
+    border-radius: var(--radius-field);
+    color: var(--color-primary-content);
+    background: var(--color-primary);
+    font-size: 12px;
+    font-weight: 600;
   }
 }
 
@@ -82,10 +83,10 @@
   width: 45px;
   height: 45px;
   place-items: center;
-  border: 1px solid #39413d;
-  border-radius: 6px;
-  color: #6f7b75;
-  background: #1b201e;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-box);
+  color: var(--text-muted);
+  background: var(--surface-raised);
 }
 
 @media (max-width: 920px) {

@@ -5,7 +5,8 @@
   display: grid;
   place-items: center;
   padding: 18px;
-  background: rgb(5 7 6 / 76%);
+  background: color-mix(in oklab, var(--color-base-100) 76%, transparent);
+  backdrop-filter: blur(10px) saturate(115%);
 }
 
 .agent-dialog {
@@ -14,11 +15,13 @@
   max-height: min(720px, calc(100vh - 36px));
   grid-template-rows: 68px auto minmax(0, 1fr);
   overflow: hidden;
-  border: 1px solid #414945;
-  border-radius: 6px;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-box);
   color: var(--text);
-  background: #202522;
-  box-shadow: 0 20px 70px rgb(0 0 0 / 48%);
+  background: var(--surface-raised);
+  box-shadow:
+    0 24px 76px rgb(0 0 0 / 52%),
+    inset 0 1px 0 color-mix(in oklab, white 4%, transparent);
 
   &.compact {
     width: min(520px, 100%);
@@ -38,13 +41,13 @@
       height: 28px;
       place-items: center;
       border: 0;
-      border-radius: 3px;
+      border-radius: var(--radius-field);
       color: var(--text-muted);
       background: transparent;
 
       &:hover {
         color: var(--text);
-        background: #2d3430;
+        background: var(--surface-2);
       }
     }
   }
@@ -70,9 +73,9 @@
     height: 32px;
     flex: 0 0 auto;
     place-items: center;
-    border-radius: 4px;
-    color: #7fd0b1;
-    background: #274339;
+    border-radius: var(--radius-field);
+    color: var(--color-primary);
+    background: var(--primary-soft);
   }
 
   h2,
@@ -84,15 +87,16 @@
   }
 
   h2 {
-    font-size: 14px;
-    font-weight: 620;
+    font-size: 15px;
+    font-weight: 680;
+    letter-spacing: 0.01em;
   }
 
   p {
     max-width: 620px;
     margin-top: 5px;
     color: var(--text-muted);
-    font: 9px/1 var(--mono);
+    font: 10px/1.35 var(--sans);
   }
 }
 
@@ -104,15 +108,15 @@
   gap: 8px;
   padding: 0 17px;
   border-bottom: 1px solid var(--border);
-  color: #91cbb5;
-  background: #19231f;
-  font-size: 9px;
+  color: var(--color-success);
+  background: var(--success-soft);
+  font-size: 10px;
 
   i {
     width: 7px;
     height: 7px;
     border-radius: 50%;
-    background: #60c99f;
+    background: var(--color-success);
   }
 
   code {
@@ -121,11 +125,11 @@
   }
 
   &.unavailable {
-    color: #d5a76e;
-    background: #262219;
+    color: var(--color-warning);
+    background: var(--warning-soft);
 
     i {
-      background: #d6a34a;
+      background: var(--color-warning);
     }
   }
 }
@@ -149,7 +153,8 @@
 
   > span {
     color: var(--text-secondary);
-    font-size: 9px;
+    font-size: 11px;
+    font-weight: 560;
   }
 }
 
@@ -158,14 +163,15 @@ select,
 textarea {
   min-width: 0;
   border: 1px solid var(--border-strong);
-  border-radius: 4px;
+  border-radius: var(--radius-field);
   outline: 0;
   color: var(--text);
-  background: #151917;
-  font: 10px/1 var(--mono);
+  background: var(--surface-inset);
+  font: 12px/1.4 var(--sans);
 
   &:focus {
-    border-color: #4a8872;
+    border-color: var(--color-primary);
+    box-shadow: 0 0 0 3px color-mix(in oklab, var(--color-primary) 11%, transparent);
   }
 }
 
@@ -192,26 +198,27 @@ textarea {
   justify-content: center;
   gap: 6px;
   padding: 0 13px;
-  border-radius: 4px;
-  font-size: 10px;
+  border-radius: var(--radius-field);
+  font-size: 11px;
+  font-weight: 600;
 }
 
 .primary {
-  border: 1px solid #4b8f76;
-  color: #eff8f4;
-  background: #2e735b;
+  border: 1px solid color-mix(in oklab, var(--color-primary) 76%, black);
+  color: var(--color-primary-content);
+  background: var(--color-primary);
 }
 
 .secondary {
   border: 1px solid var(--border-strong);
   color: var(--text-secondary);
-  background: #292f2c;
+  background: var(--surface-2);
 }
 
 .danger {
-  border: 1px solid #70423e;
-  color: #e5aaa3;
-  background: #352422;
+  border: 1px solid color-mix(in oklab, var(--color-error) 54%, var(--border));
+  color: var(--color-error);
+  background: var(--error-soft);
 }
 
 button:disabled {
@@ -235,9 +242,9 @@ button:disabled {
   gap: 7px;
   padding: 0 9px;
   border: 1px solid var(--border-strong);
-  border-radius: 4px;
+  border-radius: var(--radius-field);
   color: var(--text-muted);
-  background: #151917;
+  background: var(--surface-inset);
 
   input {
     width: 100%;
@@ -253,7 +260,7 @@ button:disabled {
   align-items: center;
   gap: 6px;
   color: var(--text-secondary);
-  font-size: 9px;
+  font-size: 10px;
 
   input {
     width: 13px;
@@ -267,9 +274,9 @@ button:disabled {
   height: 30px;
   place-items: center;
   border: 1px solid var(--border-strong);
-  border-radius: 4px;
+  border-radius: var(--radius-field);
   color: var(--text-secondary);
-  background: #292f2c;
+  background: var(--surface-2);
 }
 
 .resume-options {
@@ -279,7 +286,7 @@ button:disabled {
   gap: 10px;
   padding: 9px 14px;
   border-bottom: 1px solid var(--border);
-  background: #1b201d;
+  background: var(--surface-1);
 }
 
 .installation-badge {
@@ -288,21 +295,21 @@ button:disabled {
   align-items: center;
   justify-content: flex-end;
   gap: 6px;
-  color: #91cbb5;
-  font: 9px/1 var(--mono);
+  color: var(--color-success);
+  font: 10px/1 var(--mono);
 
   i {
     width: 6px;
     height: 6px;
     border-radius: 50%;
-    background: #60c99f;
+    background: var(--color-success);
   }
 
   &.unavailable {
-    color: #d5a76e;
+    color: var(--color-warning);
 
     i {
-      background: #d6a34a;
+      background: var(--color-warning);
     }
   }
 }
@@ -322,7 +329,7 @@ button:disabled {
   border-bottom: 1px solid var(--border);
 
   &:hover {
-    background: #252b28;
+    background: var(--surface-2);
   }
 
   time {
@@ -336,14 +343,14 @@ button:disabled {
   width: 30px;
   height: 30px;
   place-items: center;
-  border-radius: 4px;
-  color: #78c7a9;
-  background: #264137;
+  border-radius: var(--radius-selector);
+  color: var(--color-primary);
+  background: var(--primary-soft);
 }
 
 .session-agent[data-agent='codex'] {
-  color: #78aee8;
-  background: #1d2b37;
+  color: var(--color-info);
+  background: var(--info-soft);
 }
 
 .session-copy {
@@ -358,14 +365,14 @@ button:disabled {
   }
 
   strong {
-    font-size: 10px;
-    font-weight: 580;
+    font-size: 11px;
+    font-weight: 620;
   }
 
   small {
     margin-top: 4px;
     color: var(--text-muted);
-    font: 8px/1 var(--mono);
+    font: 9px/1.25 var(--mono);
   }
 
   div {
@@ -373,16 +380,16 @@ button:disabled {
     gap: 9px;
     margin-top: 6px;
     color: var(--text-secondary);
-    font-size: 8px;
+    font-size: 9px;
   }
 }
 
 .resume-button {
   height: 27px;
   padding: 0 9px;
-  border: 1px solid #477461;
-  color: #cce9de;
-  background: #263c33;
+  border: 1px solid color-mix(in oklab, var(--color-primary) 52%, var(--border));
+  color: var(--color-primary-content);
+  background: var(--color-primary);
 }
 
 .dialog-empty {
@@ -418,7 +425,7 @@ button:disabled {
   gap: 8px;
   padding: 10px 14px;
   border-bottom: 1px solid var(--border);
-  background: #181d1a;
+  background: var(--surface-inset);
 }
 
 .agent-health {
@@ -428,9 +435,9 @@ button:disabled {
   align-items: center;
   gap: 9px;
   padding: 8px 10px;
-  border: 1px solid #335345;
-  border-radius: 5px;
-  background: #1f2a25;
+  border: 1px solid color-mix(in oklab, var(--color-success) 32%, var(--border));
+  border-radius: var(--radius-field);
+  background: var(--success-soft);
 
   strong,
   small {
@@ -442,27 +449,27 @@ button:disabled {
 
   strong {
     color: var(--text-primary);
-    font-size: 10px;
+    font-size: 11px;
   }
 
   small {
     margin-top: 3px;
-    color: #91cbb5;
-    font-size: 8px;
+    color: var(--color-success);
+    font-size: 9px;
   }
 
   code {
-    color: #9fd4bf;
-    font: 8px/1 var(--mono);
+    color: var(--color-success);
+    font: 9px/1 var(--mono);
   }
 
   &.unavailable {
-    border-color: #5d4930;
-    background: #29241c;
+    border-color: color-mix(in oklab, var(--color-warning) 42%, var(--border));
+    background: var(--warning-soft);
 
     small,
     code {
-      color: #d5a76e;
+      color: var(--color-warning);
     }
   }
 }
@@ -472,14 +479,14 @@ button:disabled {
   width: 30px;
   height: 30px;
   place-items: center;
-  border-radius: 4px;
-  color: #78c7a9;
-  background: #264137;
+  border-radius: var(--radius-selector);
+  color: var(--color-success);
+  background: var(--success-soft);
 }
 
 .agent-health[data-agent='codex'] .agent-health-icon {
-  color: #78aee8;
-  background: #1d2b37;
+  color: var(--color-info);
+  background: var(--info-soft);
 }
 
 .dialog-search {
@@ -499,7 +506,7 @@ button:disabled {
 
   &:hover {
     color: var(--text-primary);
-    background: #2b312e;
+    background: var(--surface-2);
   }
 }
 
@@ -510,11 +517,11 @@ button:disabled {
   gap: 7px;
   padding: 0 9px;
   border: 1px solid var(--border-strong);
-  border-radius: 4px;
+  border-radius: var(--radius-field);
   color: var(--text-secondary);
-  font-size: 9px;
+  font-size: 10px;
   white-space: nowrap;
-  background: #202522;
+  background: var(--surface-raised);
 
   input {
     width: 13px;
@@ -554,19 +561,19 @@ button:disabled {
       padding: 2px 4px;
       border-radius: 8px;
       color: var(--text-muted);
-      font: 8px/1 var(--mono);
+      font: 9px/1 var(--mono);
       text-align: center;
-      background: #292f2c;
+      background: var(--surface-2);
     }
 
     &.active {
-      border-color: #426e5c;
-      color: #d8eee5;
-      background: #263b33;
+      border-color: color-mix(in oklab, var(--color-primary) 52%, var(--border));
+      color: var(--color-primary);
+      background: var(--primary-soft);
 
       span {
-        color: #b8ddce;
-        background: #365647;
+        color: var(--color-primary);
+        background: color-mix(in oklab, var(--color-primary) 20%, var(--surface-2));
       }
     }
   }
@@ -574,7 +581,7 @@ button:disabled {
 
 .session-result-count {
   color: var(--text-muted);
-  font: 8px/1 var(--mono);
+  font: 9px/1 var(--mono);
   white-space: nowrap;
 }
 
@@ -584,17 +591,17 @@ button:disabled {
   align-items: center;
   gap: 8px;
   padding: 8px 14px;
-  border-bottom: 1px solid #65413b;
-  color: #e6aaa2;
-  font-size: 9px;
-  background: #352522;
+  border-bottom: 1px solid color-mix(in oklab, var(--color-error) 42%, var(--border));
+  color: var(--color-error);
+  font-size: 10px;
+  background: var(--error-soft);
 
   button {
     height: 24px;
     padding: 0 8px;
-    border: 1px solid #7e5148;
-    color: #f0c1bb;
-    background: #4b302b;
+    border: 1px solid color-mix(in oklab, var(--color-error) 48%, var(--border));
+    color: var(--color-error);
+    background: color-mix(in oklab, var(--color-error) 18%, var(--surface-2));
   }
 }
 
@@ -616,13 +623,13 @@ button:disabled {
 
   strong {
     color: var(--text-primary);
-    font-size: 10px;
+    font-size: 11px;
   }
 
   small {
     margin-top: 4px;
     color: var(--text-muted);
-    font-size: 8px;
+    font-size: 9px;
   }
 }
 
@@ -633,9 +640,9 @@ button:disabled {
   gap: 8px;
   padding: 7px 14px;
   border-bottom: 1px solid var(--border);
-  color: #8eaccd;
-  font-size: 9px;
-  background: #192128;
+  color: var(--color-info);
+  font-size: 10px;
+  background: var(--info-soft);
 }
 
 .session-list {
@@ -675,7 +682,7 @@ button:disabled {
     background 120ms ease;
 
   &:hover {
-    border-left-color: #49715f;
+    border-left-color: var(--color-primary);
   }
 }
 
@@ -696,15 +703,15 @@ button:disabled {
 .agent-tag {
   flex: 0 0 auto;
   padding: 2px 5px;
-  border-radius: 3px;
-  color: #91cbb5;
-  font: 8px/1 var(--mono);
-  background: #263b33;
+  border-radius: var(--radius-selector);
+  color: var(--color-primary);
+  font: 9px/1 var(--mono);
+  background: var(--primary-soft);
 }
 
 .agent-tag[data-agent='codex'] {
-  color: #91b7e0;
-  background: #243342;
+  color: var(--color-info);
+  background: var(--info-soft);
 }
 
 .session-id {
@@ -730,7 +737,7 @@ button:disabled {
 
   span {
     color: var(--text-muted);
-    font-size: 8px;
+    font-size: 9px;
   }
 }
 
@@ -755,10 +762,11 @@ button:disabled {
     border-bottom: 2px solid transparent;
     color: var(--text-muted);
     background: transparent;
-    font-size: 9px;
+    font-size: 10px;
+    font-weight: 580;
 
     &.active {
-      border-bottom-color: #62b492;
+      border-bottom-color: var(--color-primary);
       color: var(--text);
     }
   }
@@ -779,18 +787,18 @@ button:disabled {
   align-items: center;
   gap: 11px;
   padding: 13px;
-  border: 1px solid #365c4c;
-  border-radius: 5px;
-  background: #1a2923;
+  border: 1px solid color-mix(in oklab, var(--color-success) 42%, var(--border));
+  border-radius: var(--radius-box);
+  background: var(--success-soft);
 
   > span {
     display: grid;
     width: 38px;
     height: 38px;
     place-items: center;
-    border-radius: 4px;
-    color: #7fd0b1;
-    background: #274339;
+    border-radius: var(--radius-selector);
+    color: var(--color-success);
+    background: var(--success-soft);
   }
 
   strong,
@@ -809,13 +817,13 @@ button:disabled {
   }
 
   code {
-    color: #93ccb6;
+    color: var(--color-success);
     font: 10px/1 var(--mono);
   }
 
   &.unavailable {
-    border-color: #654c30;
-    background: #292219;
+    border-color: color-mix(in oklab, var(--color-warning) 42%, var(--border));
+    background: var(--warning-soft);
   }
 }
 
@@ -833,7 +841,7 @@ button:disabled {
 
   dt {
     color: var(--text-muted);
-    font-size: 9px;
+    font-size: 10px;
   }
 
   dd {
@@ -842,7 +850,7 @@ button:disabled {
     color: var(--text-secondary);
     text-overflow: ellipsis;
     white-space: nowrap;
-    font: 9px/1 var(--mono);
+    font: 10px/1 var(--mono);
   }
 }
 
@@ -855,20 +863,20 @@ button:disabled {
 .profile-nav {
   padding: 8px;
   border-right: 1px solid var(--border);
-  background: #1b201d;
+  background: var(--surface-1);
 
   button {
     width: 100%;
     padding: 9px;
     border: 0;
-    border-radius: 3px;
+    border-radius: var(--radius-field);
     color: var(--text-secondary);
     text-align: left;
     background: transparent;
 
     &:hover,
     &.active {
-      background: #29302c;
+      background: var(--surface-2);
     }
 
     strong,
@@ -877,14 +885,14 @@ button:disabled {
     }
 
     strong {
-      font-size: 10px;
-      font-weight: 570;
+      font-size: 11px;
+      font-weight: 620;
     }
 
     small {
       margin-top: 4px;
       color: var(--text-muted);
-      font: 8px/1 var(--mono);
+      font: 9px/1.25 var(--mono);
     }
   }
 
@@ -894,7 +902,7 @@ button:disabled {
     gap: 6px;
     margin-top: 6px;
     border-top: 1px solid var(--border);
-    color: #88c8af;
+    color: var(--color-primary);
   }
 }
 
@@ -918,6 +926,8 @@ button:disabled {
 
 .json-field textarea {
   height: 240px;
+  font-family: var(--mono);
+  font-variant-ligatures: none;
 }
 
 .editor-actions {

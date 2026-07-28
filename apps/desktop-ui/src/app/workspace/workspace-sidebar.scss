@@ -21,8 +21,9 @@
   border-bottom: 1px solid var(--border);
 
   strong {
-    font-size: 14px;
-    font-weight: 650;
+    font-size: 15px;
+    font-weight: 700;
+    letter-spacing: 0.01em;
   }
 }
 
@@ -59,12 +60,13 @@
   gap: 7px;
   padding: 0 9px;
   border: 1px solid var(--border);
-  border-radius: 4px;
+  border-radius: var(--radius-field);
   color: var(--text-muted);
   background: var(--surface-1);
 
   &:focus-within {
-    border-color: #477969;
+    border-color: var(--color-primary);
+    box-shadow: 0 0 0 3px color-mix(in oklab, var(--color-primary) 11%, transparent);
   }
 
   input {
@@ -77,7 +79,7 @@
     font: 12px/1 var(--sans);
 
     &::placeholder {
-      color: #71777d;
+      color: var(--text-muted);
     }
   }
 }
@@ -88,7 +90,7 @@
   height: 30px;
   place-items: center;
   border: 1px solid var(--border);
-  border-radius: 4px;
+  border-radius: var(--radius-field);
   color: var(--text-secondary);
   background: var(--surface-1);
 
@@ -109,34 +111,52 @@ nav {
   margin: 0;
   padding: 6px 7px 8px;
   color: var(--text-muted);
-  font-size: 10px;
+  font-size: 11px;
   font-weight: 650;
-  text-transform: uppercase;
+  letter-spacing: 0.04em;
 }
 
 .workspace-list {
   display: grid;
-  gap: 2px;
+  gap: 3px;
+  width: 100%;
+  margin: 0;
+  padding: 0;
+  list-style: none;
 }
 
-.workspace-item {
+.workspace-entry {
   --workspace-color: var(--accent);
 
+  position: relative;
+  min-width: 0;
+  list-style: none;
+}
+
+.workspace-list .workspace-item {
   display: grid;
   width: 100%;
   min-width: 0;
-  grid-template-columns: 27px minmax(0, 1fr) 64px;
+  min-height: 44px;
+  grid-template-columns: 27px minmax(0, 1fr);
   align-items: center;
-  gap: 5px;
-  padding: 7px 6px;
+  justify-content: stretch;
+  gap: 7px;
+  padding: 7px 72px 7px 7px;
   border: 1px solid transparent;
-  border-radius: 4px;
+  border-radius: var(--radius-field);
   color: var(--text-secondary);
   text-align: left;
   background: transparent;
+  transition:
+    color 140ms ease,
+    border-color 140ms ease,
+    background-color 140ms ease,
+    box-shadow 160ms ease;
 
   &:hover {
-    background: var(--surface-1);
+    color: var(--text);
+    background: var(--surface-raised);
   }
 
   &.active {
@@ -156,7 +176,7 @@ nav {
   width: 27px;
   height: 27px;
   place-items: center;
-  color: #858b91;
+  color: var(--text-muted);
 }
 
 .workspace-copy {
@@ -172,19 +192,34 @@ nav {
 
   strong {
     font-size: 12px;
-    font-weight: 560;
+    font-weight: 620;
   }
 
   small {
     margin-top: 3px;
     color: var(--text-muted);
-    font: 10px/1.2 var(--mono);
+    font: 10px/1.3 var(--mono);
   }
 }
 
 .workspace-actions {
+  position: absolute;
+  z-index: 2;
+  top: 50%;
+  right: 6px;
   display: flex;
   align-items: center;
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(-50%);
+  transition: opacity 140ms ease;
+}
+
+.workspace-entry:hover .workspace-actions,
+.workspace-entry:focus-within .workspace-actions,
+.workspace-item.active + .workspace-actions {
+  opacity: 1;
+  pointer-events: auto;
 }
 
 .workspace-order-actions {
@@ -192,18 +227,17 @@ nav {
   width: 20px;
   height: 24px;
   grid-template-rows: repeat(2, 12px);
-  color: transparent;
-
-  .workspace-item:hover &,
-  .workspace-item.active & {
-    color: #7f8783;
-  }
+  color: var(--text-muted);
 }
 
 .workspace-order-action {
   display: grid;
+  padding: 0;
+  border: 0;
   place-items: center;
   border-radius: 2px;
+  color: inherit;
+  background: transparent;
 
   &:hover,
   &:focus-visible {
@@ -212,7 +246,7 @@ nav {
     outline: 0;
   }
 
-  &.disabled {
+  &:disabled {
     cursor: default;
     opacity: 0.2;
 
@@ -227,19 +261,18 @@ nav {
   display: grid;
   width: 22px;
   height: 22px;
+  padding: 0;
   place-items: center;
+  border: 0;
   border-radius: 3px;
-  color: transparent;
+  color: var(--text-muted);
+  background: transparent;
 
   &:hover,
   &:focus-visible {
     color: var(--text-secondary);
     background: color-mix(in srgb, var(--workspace-color) 10%, transparent);
     outline: 0;
-  }
-
-  .workspace-item:hover & {
-    color: #757b80;
   }
 }
 
@@ -248,7 +281,7 @@ nav {
 }
 
 .edit {
-  .workspace-item.active & {
+  .workspace-item.active + .workspace-actions & {
     color: color-mix(in srgb, var(--workspace-color) 72%, var(--text));
   }
 }
@@ -269,7 +302,7 @@ footer {
   border: 0;
   color: var(--text-muted);
   background: transparent;
-  font-size: 11px;
+  font-size: 12px;
 
   &:hover {
     color: var(--text);
@@ -281,13 +314,13 @@ footer {
   align-items: center;
   gap: 6px;
   color: var(--text-muted);
-  font-size: 10px;
+  font-size: 11px;
 
   i {
     width: 6px;
     height: 6px;
     border-radius: 50%;
     background: var(--accent);
-    box-shadow: 0 0 0 2px #254a3d;
+    box-shadow: 0 0 0 2px var(--primary-soft);
   }
 }

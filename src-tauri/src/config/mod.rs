@@ -58,6 +58,60 @@ pub struct McpProfileInput {
     pub config_json: String,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct NetworkProfile {
+    pub id: String,
+    pub name: String,
+    pub scope: String,
+    pub workspace_id: Option<String>,
+    pub enabled: bool,
+    pub is_default: bool,
+    pub http_proxy: Option<String>,
+    pub https_proxy: Option<String>,
+    pub all_proxy: Option<String>,
+    pub no_proxy: Option<String>,
+    pub npm_registry: Option<String>,
+    pub npm_proxy: Option<String>,
+    pub npm_https_proxy: Option<String>,
+    pub npm_strict_ssl: bool,
+    pub npm_ca_path: Option<String>,
+    pub proxy_username: Option<String>,
+    pub credential_target: Option<String>,
+    pub has_credential: bool,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct NetworkProfileInput {
+    pub id: String,
+    pub name: String,
+    pub scope: String,
+    pub workspace_id: Option<String>,
+    #[serde(default = "default_true")]
+    pub enabled: bool,
+    #[serde(default)]
+    pub is_default: bool,
+    pub http_proxy: Option<String>,
+    pub https_proxy: Option<String>,
+    pub all_proxy: Option<String>,
+    pub no_proxy: Option<String>,
+    pub npm_registry: Option<String>,
+    pub npm_proxy: Option<String>,
+    pub npm_https_proxy: Option<String>,
+    #[serde(default = "default_true")]
+    pub npm_strict_ssl: bool,
+    pub npm_ca_path: Option<String>,
+    pub proxy_username: Option<String>,
+    pub proxy_password: Option<String>,
+    #[serde(default)]
+    pub clear_credential: bool,
+}
+
+fn default_true() -> bool {
+    true
+}
+
 #[derive(Default)]
 pub struct CredentialStore;
 

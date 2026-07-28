@@ -1,10 +1,17 @@
-<aside class="inspector">
-  <div class="tab-list" role="tablist" aria-label="检查器">
-    <button type="button" [class.active]="tab() === 'agents'" (click)="tab.set('agents')">
+<aside class="inspector bg-base-200">
+  <div class="tab-list tabs tabs-border" role="tablist" aria-label="检查器">
+    <button
+      type="button"
+      class="tab"
+      [class.active]="tab() === 'agents'"
+      (click)="tab.set('agents')"
+    >
       Agent
     </button>
-    <button type="button" [class.active]="tab() === 'git'" (click)="tab.set('git')">Git</button>
-    <button type="button" [class.active]="tab() === 'tasks'" (click)="tab.set('tasks')">
+    <button type="button" class="tab" [class.active]="tab() === 'git'" (click)="tab.set('git')">
+      Git
+    </button>
+    <button type="button" class="tab" [class.active]="tab() === 'tasks'" (click)="tab.set('tasks')">
       任务
     </button>
   </div>
@@ -19,7 +26,10 @@
           </header>
           <div class="agent-list">
             @for (terminal of workspace()?.terminals ?? []; track terminal.id) {
-              <article class="agent-row" [class.selected]="terminal.id === activeTerminal()?.id">
+              <article
+                class="agent-row card"
+                [class.selected]="terminal.id === activeTerminal()?.id"
+              >
                 <span class="agent-avatar" [attr.data-agent]="terminal.agentType">
                   <app-icon
                     [name]="terminal.agentType === 'shell' ? 'terminal' : 'bot'"
@@ -30,7 +40,7 @@
                   <strong>{{ terminal.name }}</strong>
                   <small>{{ terminal.model }}</small>
                 </span>
-                <span class="state" [attr.data-status]="terminal.status">
+                <span class="state badge badge-sm" [attr.data-status]="terminal.status">
                   <i></i>{{ statusLabels[terminal.status] }}
                 </span>
               </article>
@@ -112,7 +122,7 @@
               ><span>删除</span>
             </div>
           </div>
-          <button type="button" class="wide-action">
+          <button type="button" class="wide-action btn btn-outline btn-sm">
             <app-icon name="diff" [size]="14" />查看 Git Diff
           </button>
         </section>
@@ -131,7 +141,11 @@
                   ><small>{{ task.status }}</small>
                 </div>
                 <span>{{ task.progress }}%</span>
-                <progress max="100" [value]="task.progress"></progress>
+                <progress
+                  class="progress progress-primary"
+                  max="100"
+                  [value]="task.progress"
+                ></progress>
               </article>
             }
           </div>

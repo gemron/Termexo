@@ -30,4 +30,20 @@ describe('IconComponent', () => {
     expect(svg.style.width).toBe('100%');
     expect(svg.style.height).toBe('100%');
   });
+
+  it('updates the rendered Lucide icon when its inputs change', () => {
+    const svg = (fixture.nativeElement as HTMLElement).querySelector('svg')!;
+    const gridMarkup = svg.innerHTML;
+
+    fixture.componentRef.setInput('name', 'maximize');
+    fixture.componentRef.setInput('size', 18);
+    fixture.componentRef.setInput('strokeWidth', 2.25);
+    fixture.detectChanges();
+
+    expect(svg.innerHTML).not.toBe(gridMarkup);
+    expect(svg.getAttribute('width')).toBe('18');
+    expect(svg.getAttribute('height')).toBe('18');
+    expect(svg.getAttribute('stroke-width')).toBe('2.25');
+    expect((fixture.nativeElement as HTMLElement).style.width).toBe('18px');
+  });
 });

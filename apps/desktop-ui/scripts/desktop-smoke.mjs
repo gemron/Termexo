@@ -1,5 +1,6 @@
 import { spawn } from 'node:child_process';
 import { once } from 'node:events';
+import { createServer } from 'node:net';
 import { resolve } from 'node:path';
 
 import { chromium } from 'playwright-core';
@@ -29,10 +30,13 @@ const child = spawn(executablePath, [], {
 });
 
 let browser;
+let page;
+let proxyServer;
+let temporaryNetworkProfileId;
 try {
   await waitForDebugEndpoint(debugUrl, child);
   browser = await chromium.connectOverCDP(debugUrl);
-  const page = await waitForApplicationPage(browser);
+  page = await waitForApplicationPage(browser);
 
   const errors = [];
   page.on('console', (message) => {
@@ -67,7 +71,12 @@ try {
   const codexResumeLaunch = await page.evaluate(
     (sessionId) =>
       window.__TAURI_INTERNALS__.invoke('prepare_codex_launch', {
-        request: { sessionId, model: null },
+        request: {
+          terminalId: 'desktop-smoke-codex-resume',
+          workspaceId: null,
+          sessionId,
+          model: null,
+        },
       }),
     codexSessions[0].nativeSessionId,
   );
@@ -85,9 +94,88 @@ try {
   await sessionDialog.locator('.session-footer').getByRole('button', { name: '关闭' }).click();
 
   await page.getByRole('button', { name: '设置', exact: true }).click();
-  const settingsDialog = page.getByRole('dialog', { name: 'Claude Code 设置' });
+  const settingsDialog = page.getByRole('dialog', { name: 'Agent 与开发环境设置' });
   await settingsDialog.waitFor();
   await settingsDialog.getByText('Windows Credential Manager', { exact: true }).waitFor();
+
+  proxyServer = createServer((socket) => socket.end());
+  await new Promise((resolveListen, rejectListen) => {
+    proxyServer.once('error', rejectListen);
+    proxyServer.listen(0, '127.0.0.1', resolveListen);
+  });
+  const proxyAddress = proxyServer.address();
+  if (!proxyAddress || typeof proxyAddress === 'string') {
+    throw new Error('Desktop smoke proxy did not expose a TCP address.');
+  }
+  const proxyUrl = `http://127.0.0.1:${proxyAddress.port}`;
+  const temporaryNetworkProfileName = `Desktop smoke proxy ${Date.now()}`;
+
+  await settingsDialog.getByRole('button', { name: '网络与 npm', exact: true }).click();
+  await settingsDialog.getByRole('button', { name: '新建代理 Profile', exact: true }).click();
+  await settingsDialog.getByLabel('名称', { exact: true }).fill(temporaryNetworkProfileName);
+  await settingsDialog.getByLabel('HTTPS_PROXY', { exact: true }).fill(proxyUrl);
+  await settingsDialog.getByLabel('registry', { exact: true }).fill('https://registry.npmjs.org/');
+  await settingsDialog.getByRole('button', { name: '保存代理 Profile', exact: true }).click();
+  await settingsDialog.getByText(temporaryNetworkProfileName, { exact: true }).waitFor();
+
+  const storedNetworkProfiles = await page.evaluate(() =>
+    window.__TAURI_INTERNALS__.invoke('list_network_profiles'),
+  );
+  const storedNetworkProfile = storedNetworkProfiles.find(
+    (profile) => profile.name === temporaryNetworkProfileName,
+  );
+  if (!storedNetworkProfile) {
+    throw new Error('Network profile was not persisted by the settings workflow.');
+  }
+  temporaryNetworkProfileId = storedNetworkProfile.id;
+
+  await settingsDialog.getByRole('button', { name: '测试连接', exact: true }).click();
+  await settingsDialog.getByText('TCP 连通性测试通过', { exact: true }).waitFor();
+
+  const cliPlans = await page.evaluate(
+    (workspaceId) =>
+      Promise.all(
+        ['claude', 'codex'].map((agentType) =>
+          window.__TAURI_INTERNALS__.invoke('preview_cli_operation', {
+            request: {
+              agentType,
+              targetVersion: 'latest',
+              workspaceId,
+              confirmed: false,
+            },
+          }),
+        ),
+      ),
+    storedNetworkProfile.workspaceId,
+  );
+  if (
+    cliPlans.some(
+      (plan) =>
+        !plan.ready ||
+        !plan.npmPath ||
+        !plan.npmVersion ||
+        plan.networkProfileId !== temporaryNetworkProfileId,
+    )
+  ) {
+    throw new Error('CLI operation preview did not resolve npm and the workspace network profile.');
+  }
+  if (
+    cliPlans[0].packageSpec !== '@anthropic-ai/claude-code@latest' ||
+    cliPlans[1].packageSpec !== '@openai/codex@latest'
+  ) {
+    throw new Error('CLI operation preview did not use the official packages.');
+  }
+
+  await settingsDialog.getByRole('button', { name: 'CLI 安装与升级', exact: true }).click();
+  await settingsDialog.getByRole('button', { name: '生成安装计划', exact: true }).click();
+  await settingsDialog.getByText('@anthropic-ai/claude-code@latest', { exact: true }).waitFor();
+  const desktopExecuteCliButton = settingsDialog.getByRole('button', {
+    name: '确认并升级',
+    exact: true,
+  });
+  if (!(await desktopExecuteCliButton.isDisabled())) {
+    throw new Error('Desktop CLI mutation became available before explicit confirmation.');
+  }
 
   if (errors.length > 0) {
     throw new Error(`desktop runtime errors:\n${errors.join('\n')}`);
@@ -102,10 +190,35 @@ try {
       codexExecutablePath: codexResumeLaunch.executablePath,
       executablePath: backendInstallation.executablePath,
       sessionConnections: connectionStatuses.map((status) => status.trim()),
+      networkProfileTest: {
+        id: temporaryNetworkProfileId,
+        target: proxyUrl,
+        persisted: true,
+        connectivity: 'passed',
+      },
+      cliManagement: {
+        officialPackages: cliPlans.map((plan) => plan.packageSpec),
+        npmVersion: cliPlans[0].npmVersion,
+        workspaceProxyApplied: cliPlans.every(
+          (plan) => plan.networkProfileId === temporaryNetworkProfileId,
+        ),
+        mutationRequiresConfirmation: true,
+      },
     }),
   );
 } finally {
   try {
+    if (page && temporaryNetworkProfileId) {
+      await page
+        .evaluate(
+          (profileId) => window.__TAURI_INTERNALS__.invoke('delete_network_profile', { profileId }),
+          temporaryNetworkProfileId,
+        )
+        .catch(() => undefined);
+    }
+    if (proxyServer) {
+      await new Promise((resolveClose) => proxyServer.close(resolveClose));
+    }
     await browser?.close();
   } finally {
     await stopChildProcess(child);

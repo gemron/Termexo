@@ -1,11 +1,11 @@
-<section class="terminal-panel" [class.active]="active()" (mousedown)="focus()">
+<section class="terminal-panel card bg-base-200" [class.active]="active()" (mousedown)="focus()">
   <header>
     <div class="terminal-identity">
       <span class="agent-icon" [attr.data-agent]="session().agentType">
         <app-icon [name]="session().agentType === 'shell' ? 'terminal' : 'bot'" [size]="14" />
       </span>
       <strong>{{ session().name }}</strong>
-      <span class="status" [attr.data-status]="session().status">
+      <span class="status badge badge-sm" [attr.data-status]="session().status">
         <i></i>{{ statusLabels[session().status] }}
       </span>
     </div>
@@ -13,6 +13,7 @@
       <span>{{ session().model }}</span>
       <button
         type="button"
+        class="btn btn-square btn-ghost btn-xs"
         [title]="maximized() ? '恢复终端窗口（Shift+Esc）' : '最大化终端窗口'"
         [attr.aria-label]="maximized() ? '恢复终端窗口' : '最大化终端窗口'"
         [class.active]="maximized()"
@@ -22,6 +23,7 @@
       </button>
       <button
         type="button"
+        class="btn btn-square btn-ghost btn-xs"
         title="关闭终端"
         aria-label="关闭终端"
         (click)="$event.stopPropagation(); closeRequested.emit(session().id)"

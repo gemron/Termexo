@@ -1,6 +1,14 @@
 import { Component, computed, effect, HostListener, inject, signal } from '@angular/core';
 
-import { McpProfileInput, ModelProfileInput } from './core/models/agent.models';
+import {
+  CliOperationPlan,
+  CliOperationRequest,
+  CliOperationResult,
+  McpProfileInput,
+  ModelProfileInput,
+  NetworkProfileInput,
+  NetworkTestResult,
+} from './core/models/agent.models';
 import {
   AgentType,
   LayoutMode,
@@ -51,6 +59,11 @@ import { WorkspaceSidebarComponent } from './workspace/workspace-sidebar';
   ],
   templateUrl: './app.html',
   styleUrl: './app.scss',
+  host: {
+    'data-theme': 'termexo',
+    '[style.--color-primary]': 'workspaceThemeColor()',
+    '[style.--color-accent]': 'workspaceThemeColor()',
+  },
 })
 export class App {
   protected readonly state = inject(AppStateService);
@@ -74,6 +87,9 @@ export class App {
   protected readonly launchingCodex = signal(false);
   protected readonly selectedTerminalDirectory = signal<string | null>(null);
   protected readonly toastMessage = signal<string | null>(null);
+  protected readonly networkTestResult = signal<NetworkTestResult | null>(null);
+  protected readonly cliOperationPlan = signal<CliOperationPlan | null>(null);
+  protected readonly cliOperationResult = signal<CliOperationResult | null>(null);
   protected readonly activeTerminalId = computed(() => this.state.activeTerminal()?.id ?? null);
   protected readonly editingWorkspace = computed(
     () =>
@@ -168,7 +184,10 @@ export class App {
     const terminalId = crypto.randomUUID();
     this.launchingCodex.set(true);
     try {
-      const launch = await this.agents.prepareCodexLaunch({});
+      const launch = await this.agents.prepareCodexLaunch({
+        terminalId,
+        workspaceId: this.state.activeWorkspace()?.id,
+      });
       const terminal = this.state.createTerminal({
         id: terminalId,
         agentType: 'codex',
@@ -198,6 +217,7 @@ export class App {
     try {
       const launch = await this.agents.prepareLaunch({
         terminalId,
+        workspaceId: workspace.id,
         name: value.name || undefined,
         profileId: value.profileId,
         mcpProfileId: value.mcpProfileId,
@@ -251,10 +271,13 @@ export class App {
     try {
       const launch = isCodex
         ? await this.agents.prepareCodexLaunch({
+            terminalId,
+            workspaceId: workspace.id,
             sessionId: value.session.nativeSessionId,
           })
         : await this.agents.prepareLaunch({
             terminalId,
+            workspaceId: workspace.id,
             sessionId: value.session.nativeSessionId,
             profileId: value.profileId,
             mcpProfileId: value.mcpProfileId,
@@ -409,11 +432,10 @@ export class App {
       return;
     }
 
+    const workspace = this.state.activeWorkspace();
     const profile = this.agents.modelProfiles().find((item) => item.id === profileId);
     const terminals =
-      this.state
-        .activeWorkspace()
-        ?.terminals.filter((terminal) => terminal.agentType === 'claude') ?? [];
+      workspace?.terminals.filter((terminal) => terminal.agentType === 'claude') ?? [];
     if (!profile || terminals.length === 0) {
       this.modelSwitchOpen.set(false);
       this.showToast(profile ? '当前 Workspace 没有 Claude Code 终端' : '模型 Profile 不存在');
@@ -426,6 +448,7 @@ export class App {
         terminals.map(async (terminal) => {
           const launch = await this.agents.prepareLaunch({
             terminalId: terminal.id,
+            workspaceId: workspace?.id,
             sessionId: terminal.nativeSessionId,
             profileId,
             mcpProfileId: terminal.mcpProfileId,
@@ -496,6 +519,69 @@ export class App {
     try {
       await this.agents.deleteMcpProfile(profileId);
       this.showToast('MCP Profile 已删除');
+    } catch (error) {
+      this.showToast(this.errorMessage(error));
+    }
+  }
+
+  protected async saveNetworkProfile(input: NetworkProfileInput): Promise<void> {
+    try {
+      await this.agents.saveNetworkProfile(input);
+      this.networkTestResult.set(null);
+      this.showToast('网络代理 Profile 已保存');
+    } catch (error) {
+      this.showToast(this.errorMessage(error));
+    }
+  }
+
+  protected async deleteNetworkProfile(profileId: string): Promise<void> {
+    try {
+      await this.agents.deleteNetworkProfile(profileId);
+      this.networkTestResult.set(null);
+      this.showToast('网络代理 Profile 已删除');
+    } catch (error) {
+      this.showToast(this.errorMessage(error));
+    }
+  }
+
+  protected async testNetworkProfile(profileId: string): Promise<void> {
+    this.networkTestResult.set(null);
+    try {
+      const result = await this.agents.testNetworkProfile(profileId);
+      this.networkTestResult.set(result);
+      this.showToast(result.message);
+    } catch (error) {
+      const message = this.errorMessage(error);
+      this.networkTestResult.set({
+        profileId,
+        healthy: false,
+        target: 'connection',
+        message,
+        latencyMs: 0,
+      });
+      this.showToast(message);
+    }
+  }
+
+  protected async previewCliOperation(request: CliOperationRequest): Promise<void> {
+    this.cliOperationPlan.set(null);
+    this.cliOperationResult.set(null);
+    try {
+      const plan = await this.agents.previewCliOperation(request);
+      this.cliOperationPlan.set(plan);
+      this.showToast(plan.diagnostic);
+    } catch (error) {
+      this.showToast(this.errorMessage(error));
+    }
+  }
+
+  protected async executeCliOperation(request: CliOperationRequest): Promise<void> {
+    this.cliOperationResult.set(null);
+    try {
+      const result = await this.agents.executeCliOperation(request);
+      this.cliOperationPlan.set(result.plan);
+      this.cliOperationResult.set(result);
+      this.showToast(result.diagnostic);
     } catch (error) {
       this.showToast(this.errorMessage(error));
     }

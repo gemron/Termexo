@@ -7,9 +7,9 @@ import { IconComponent } from '../shared/icon/icon';
   selector: 'app-model-switch-dialog',
   imports: [IconComponent],
   template: `
-    <div class="backdrop" (mousedown)="cancelled.emit()">
+    <div class="backdrop modal modal-open" (mousedown)="cancelled.emit()">
       <section
-        class="dialog model-dialog"
+        class="dialog model-dialog modal-box"
         role="dialog"
         aria-modal="true"
         aria-labelledby="model-dialog-title"
@@ -20,7 +20,13 @@ import { IconComponent } from '../shared/icon/icon';
             <h2 id="model-dialog-title">切换 Claude Code 后端模型</h2>
             <p>CLI 客户端保持不变，通过 Profile 切换供应商、Endpoint 和模型。</p>
           </div>
-          <button type="button" title="关闭" aria-label="关闭" (click)="cancelled.emit()">
+          <button
+            type="button"
+            class="btn btn-square btn-ghost btn-sm"
+            title="关闭"
+            aria-label="关闭"
+            (click)="cancelled.emit()"
+          >
             <app-icon name="x" [size]="15" />
           </button>
         </header>
@@ -28,7 +34,7 @@ import { IconComponent } from '../shared/icon/icon';
           @for (profile of profiles(); track profile.id) {
             <button
               type="button"
-              class="profile-option"
+              class="profile-option card"
               [class.selected]="profile.id === resolvedProfileId()"
               (click)="selectedProfileId.set(profile.id)"
             >
@@ -49,17 +55,20 @@ import { IconComponent } from '../shared/icon/icon';
           }
         </div>
         <div class="switch-plan">
+          <div><strong>Claude Code</strong><span>CLI 保持不变</span></div>
           <div>
-            <strong>Claude Code</strong><span>CLI 保持不变</span>
+            <strong>{{ agentCount() }}</strong
+            ><span>终端重启应用参数</span>
           </div>
-          <div><strong>{{ agentCount() }}</strong><span>终端重启应用参数</span></div>
           <div><strong>自动</strong><span>按会话 ID 恢复上下文</span></div>
         </div>
         <footer>
-          <button type="button" class="secondary" (click)="cancelled.emit()">取消</button>
+          <button type="button" class="secondary btn btn-ghost btn-sm" (click)="cancelled.emit()">
+            取消
+          </button>
           <button
             type="button"
-            class="primary"
+            class="primary btn btn-primary btn-sm"
             [disabled]="busy() || !resolvedProfileId()"
             (click)="confirmed.emit(resolvedProfileId())"
           >

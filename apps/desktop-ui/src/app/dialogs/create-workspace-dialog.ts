@@ -7,9 +7,9 @@ import { IconComponent } from '../shared/icon/icon';
   selector: 'app-create-workspace-dialog',
   imports: [FormsModule, IconComponent],
   template: `
-    <div class="backdrop" (mousedown)="cancelled.emit()">
+    <div class="backdrop modal modal-open" (mousedown)="cancelled.emit()">
       <section
-        class="dialog"
+        class="dialog modal-box"
         role="dialog"
         aria-modal="true"
         aria-labelledby="workspace-dialog-title"
@@ -20,7 +20,13 @@ import { IconComponent } from '../shared/icon/icon';
             <h2 id="workspace-dialog-title">新建工作区</h2>
             <p>关联一个本地项目目录。</p>
           </div>
-          <button type="button" title="关闭" aria-label="关闭" (click)="cancelled.emit()">
+          <button
+            type="button"
+            class="btn btn-square btn-ghost btn-sm"
+            title="关闭"
+            aria-label="关闭"
+            (click)="cancelled.emit()"
+          >
             <app-icon name="x" [size]="15" />
           </button>
         </header>
@@ -28,6 +34,7 @@ import { IconComponent } from '../shared/icon/icon';
           <span>名称</span>
           <input
             type="text"
+            class="input input-bordered input-sm"
             placeholder="例如：MTS Cloud"
             [ngModel]="name()"
             (ngModelChange)="name.set($event)"
@@ -38,14 +45,22 @@ import { IconComponent } from '../shared/icon/icon';
           <span>项目目录</span>
           <input
             type="text"
+            class="input input-bordered input-sm"
             placeholder="D:\\dev\\project"
             [ngModel]="projectPath()"
             (ngModelChange)="projectPath.set($event)"
           />
         </label>
         <footer>
-          <button type="button" class="secondary" (click)="cancelled.emit()">取消</button>
-          <button type="button" class="primary" [disabled]="!isValid()" (click)="submit()">
+          <button type="button" class="secondary btn btn-ghost btn-sm" (click)="cancelled.emit()">
+            取消
+          </button>
+          <button
+            type="button"
+            class="primary btn btn-primary btn-sm"
+            [disabled]="!isValid()"
+            (click)="submit()"
+          >
             创建工作区
           </button>
         </footer>

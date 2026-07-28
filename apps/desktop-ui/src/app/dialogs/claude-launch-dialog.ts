@@ -14,9 +14,9 @@ export interface ClaudeLaunchDialogValue {
   selector: 'app-claude-launch-dialog',
   imports: [FormsModule, IconComponent],
   template: `
-    <div class="backdrop" (mousedown)="cancelled.emit()">
+    <div class="backdrop modal modal-open" (mousedown)="cancelled.emit()">
       <section
-        class="agent-dialog compact"
+        class="agent-dialog compact modal-box"
         role="dialog"
         aria-modal="true"
         aria-labelledby="claude-launch-title"
@@ -30,7 +30,13 @@ export interface ClaudeLaunchDialogValue {
               <p>{{ workingDirectory() }}</p>
             </div>
           </div>
-          <button type="button" title="关闭" aria-label="关闭" (click)="cancelled.emit()">
+          <button
+            type="button"
+            class="btn btn-square btn-ghost btn-sm"
+            title="关闭"
+            aria-label="关闭"
+            (click)="cancelled.emit()"
+          >
             <app-icon name="x" [size]="15" />
           </button>
         </header>
@@ -46,6 +52,7 @@ export interface ClaudeLaunchDialogValue {
             <span>会话名称</span>
             <input
               type="text"
+              class="input input-bordered input-sm"
               placeholder="例如：auth-refactor"
               [ngModel]="name()"
               (ngModelChange)="name.set($event)"
@@ -54,7 +61,11 @@ export interface ClaudeLaunchDialogValue {
           </label>
           <label>
             <span>模型 Profile</span>
-            <select [ngModel]="resolvedProfileId()" (ngModelChange)="profileId.set($event)">
+            <select
+              class="select select-bordered select-sm"
+              [ngModel]="resolvedProfileId()"
+              (ngModelChange)="profileId.set($event)"
+            >
               @for (profile of profiles(); track profile.id) {
                 <option [value]="profile.id">{{ profile.name }} · {{ profile.model }}</option>
               }
@@ -62,7 +73,11 @@ export interface ClaudeLaunchDialogValue {
           </label>
           <label>
             <span>MCP Profile</span>
-            <select [ngModel]="mcpProfileId()" (ngModelChange)="mcpProfileId.set($event)">
+            <select
+              class="select select-bordered select-sm"
+              [ngModel]="mcpProfileId()"
+              (ngModelChange)="mcpProfileId.set($event)"
+            >
               <option value="">使用 Claude 默认配置</option>
               @for (profile of mcpProfiles(); track profile.id) {
                 <option [value]="profile.id">{{ profile.name }}</option>
@@ -72,8 +87,15 @@ export interface ClaudeLaunchDialogValue {
         </div>
 
         <footer>
-          <button type="button" class="secondary" (click)="cancelled.emit()">取消</button>
-          <button type="button" class="primary" [disabled]="!canLaunch()" (click)="submit()">
+          <button type="button" class="secondary btn btn-ghost btn-sm" (click)="cancelled.emit()">
+            取消
+          </button>
+          <button
+            type="button"
+            class="primary btn btn-primary btn-sm"
+            [disabled]="!canLaunch()"
+            (click)="submit()"
+          >
             <app-icon name="play" [size]="13" />启动会话
           </button>
         </footer>

@@ -42,8 +42,44 @@ export interface AgentLaunchSpec {
   executablePath: string;
 }
 
+export interface CliOperationRequest {
+  agentType: NativeAgentType;
+  targetVersion?: string;
+  workspaceId?: string;
+  confirmed?: boolean;
+}
+
+export interface CliOperationPlan {
+  agentType: NativeAgentType;
+  displayName: string;
+  packageName: string;
+  targetVersion: string;
+  packageSpec: string;
+  action: 'install' | 'upgrade';
+  currentVersion?: string;
+  npmPath?: string;
+  npmVersion?: string;
+  commandPreview: string;
+  networkProfileId?: string;
+  networkProfileName?: string;
+  npmRegistry?: string;
+  ready: boolean;
+  diagnostic: string;
+}
+
+export interface CliOperationResult {
+  success: boolean;
+  plan: CliOperationPlan;
+  installation: AgentInstallation;
+  stdout: string;
+  stderr: string;
+  durationMs: number;
+  diagnostic: string;
+}
+
 export interface ClaudeLaunchRequest {
   terminalId: string;
+  workspaceId?: string;
   sessionId?: string;
   name?: string;
   profileId?: string;
@@ -51,6 +87,8 @@ export interface ClaudeLaunchRequest {
 }
 
 export interface CodexLaunchRequest {
+  terminalId: string;
+  workspaceId?: string;
   sessionId?: string;
   model?: string;
 }
@@ -121,6 +159,58 @@ export interface McpProfileInput {
   id: string;
   name: string;
   configJson: string;
+}
+
+export type NetworkProfileScope = 'global' | 'workspace';
+
+export interface NetworkProfile {
+  id: string;
+  name: string;
+  scope: NetworkProfileScope;
+  workspaceId?: string;
+  enabled: boolean;
+  isDefault: boolean;
+  httpProxy?: string;
+  httpsProxy?: string;
+  allProxy?: string;
+  noProxy?: string;
+  npmRegistry?: string;
+  npmProxy?: string;
+  npmHttpsProxy?: string;
+  npmStrictSsl: boolean;
+  npmCaPath?: string;
+  proxyUsername?: string;
+  credentialTarget?: string;
+  hasCredential: boolean;
+}
+
+export interface NetworkProfileInput {
+  id: string;
+  name: string;
+  scope: NetworkProfileScope;
+  workspaceId?: string;
+  enabled: boolean;
+  isDefault: boolean;
+  httpProxy?: string;
+  httpsProxy?: string;
+  allProxy?: string;
+  noProxy?: string;
+  npmRegistry?: string;
+  npmProxy?: string;
+  npmHttpsProxy?: string;
+  npmStrictSsl: boolean;
+  npmCaPath?: string;
+  proxyUsername?: string;
+  proxyPassword?: string;
+  clearCredential?: boolean;
+}
+
+export interface NetworkTestResult {
+  profileId: string;
+  healthy: boolean;
+  target: string;
+  message: string;
+  latencyMs: number;
 }
 
 export const EVENT_STATUS: Readonly<Record<string, TerminalStatus>> = {

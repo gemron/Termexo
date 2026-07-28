@@ -2,6 +2,7 @@ import {
   AfterViewInit,
   Component,
   ElementRef,
+  effect,
   inject,
   input,
   Renderer2,
@@ -10,44 +11,63 @@ import {
 import {
   ArrowDown,
   ArrowUp,
+  Activity,
   Bot,
   Boxes,
   Check,
   ChevronDown,
   Columns2,
   Command,
+  Cloud,
+  CircleGauge,
+  Download,
+  ExternalLink,
   FileDiff,
   FolderGit2,
   Grid2x2,
+  KeyRound,
+  Laptop,
+  Link2,
   History,
   LayoutPanelTop,
   ListTodo,
   Maximize2,
   MessageSquareText,
+  MonitorSmartphone,
   Minimize2,
   MoreHorizontal,
   PanelRightClose,
+  Package,
+  Palette,
   Pencil,
   Play,
   Plus,
   Radio,
   RefreshCw,
+  RotateCcw,
   Rows2,
   Save,
   Search,
+  Server,
   Settings,
   ShieldCheck,
+  SlidersHorizontal,
+  Smartphone,
   Sparkles,
   Square,
   Star,
   Terminal,
   Trash2,
+  Users,
+  Wifi,
+  Wrench,
   X,
   Zap,
   type IconNode,
 } from 'lucide';
 
 const ICONS: Record<string, IconNode> = {
+  activity: Activity,
   'arrow-down': ArrowDown,
   'arrow-up': ArrowUp,
   bot: Bot,
@@ -56,32 +76,49 @@ const ICONS: Record<string, IconNode> = {
   'chevron-down': ChevronDown,
   columns: Columns2,
   command: Command,
+  cloud: Cloud,
+  gauge: CircleGauge,
+  download: Download,
+  external: ExternalLink,
   diff: FileDiff,
   folder: FolderGit2,
   grid: Grid2x2,
+  key: KeyRound,
+  laptop: Laptop,
+  link: Link2,
   history: History,
   layout: LayoutPanelTop,
   task: ListTodo,
   maximize: Maximize2,
   message: MessageSquareText,
+  devices: MonitorSmartphone,
   minimize: Minimize2,
   more: MoreHorizontal,
   'panel-close': PanelRightClose,
+  package: Package,
+  palette: Palette,
   edit: Pencil,
   play: Play,
   plus: Plus,
   radio: Radio,
   refresh: RefreshCw,
+  rollback: RotateCcw,
   rows: Rows2,
   save: Save,
   search: Search,
+  server: Server,
   settings: Settings,
   shield: ShieldCheck,
+  sliders: SlidersHorizontal,
+  smartphone: Smartphone,
   sparkles: Sparkles,
   square: Square,
   star: Star,
   terminal: Terminal,
   trash: Trash2,
+  users: Users,
+  wifi: Wifi,
+  wrench: Wrench,
   x: X,
   zap: Zap,
 };
@@ -102,17 +139,37 @@ export class IconComponent implements AfterViewInit {
 
   readonly name = input.required<string>();
   readonly size = input(16);
+  readonly strokeWidth = input(1.8);
+  private viewReady = false;
+
+  constructor() {
+    effect(() => {
+      const name = this.name();
+      const size = this.size();
+      const strokeWidth = this.strokeWidth();
+      if (this.viewReady) {
+        this.renderIcon(name, size, strokeWidth);
+      }
+    });
+  }
 
   ngAfterViewInit(): void {
-    const svg = this.svg().nativeElement;
-    const iconNode = ICONS[this.name()] ?? Square;
+    this.viewReady = true;
+    this.renderIcon(this.name(), this.size(), this.strokeWidth());
+  }
 
+  private renderIcon(name: string, size: number, strokeWidth: number): void {
+    const svg = this.svg().nativeElement;
+    const iconNode = ICONS[name] ?? Square;
+    while (svg.firstChild) {
+      this.renderer.removeChild(svg, svg.firstChild);
+    }
     this.renderer.setAttribute(svg, 'viewBox', '0 0 24 24');
-    this.renderer.setAttribute(svg, 'width', String(this.size()));
-    this.renderer.setAttribute(svg, 'height', String(this.size()));
+    this.renderer.setAttribute(svg, 'width', String(size));
+    this.renderer.setAttribute(svg, 'height', String(size));
     this.renderer.setAttribute(svg, 'fill', 'none');
     this.renderer.setAttribute(svg, 'stroke', 'currentColor');
-    this.renderer.setAttribute(svg, 'stroke-width', '2');
+    this.renderer.setAttribute(svg, 'stroke-width', String(strokeWidth));
     this.renderer.setAttribute(svg, 'stroke-linecap', 'round');
     this.renderer.setAttribute(svg, 'stroke-linejoin', 'round');
 

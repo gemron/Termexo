@@ -9,16 +9,17 @@
 
   > span {
     color: var(--text-secondary);
-    font-size: 10px;
+    font-size: 11px;
+    font-weight: 560;
   }
 
   code {
     overflow: hidden;
     padding: 9px 10px;
     border: 1px solid var(--border);
-    border-radius: 4px;
+    border-radius: var(--radius-field);
     color: var(--text-muted);
-    background: #171b19;
+    background: var(--surface-inset);
     font: 10px/1.3 var(--mono);
     text-overflow: ellipsis;
     white-space: nowrap;
@@ -34,7 +35,8 @@ fieldset {
   legend {
     margin-bottom: 8px;
     color: var(--text-secondary);
-    font-size: 10px;
+    font-size: 11px;
+    font-weight: 560;
   }
 }
 
@@ -55,10 +57,10 @@ fieldset {
   gap: 7px;
   padding: 0 8px;
   border: 1px solid var(--border);
-  border-radius: 4px;
+  border-radius: var(--radius-field);
   color: var(--text-secondary);
   text-align: left;
-  background: #191e1b;
+  background: var(--surface-inset);
 
   > i {
     width: 12px;
@@ -70,7 +72,7 @@ fieldset {
 
   > span {
     overflow: hidden;
-    font-size: 10px;
+    font-size: 11px;
     text-overflow: ellipsis;
     white-space: nowrap;
   }
@@ -83,7 +85,7 @@ fieldset {
   &.selected {
     border-color: color-mix(in srgb, var(--swatch-color) 55%, var(--border));
     color: var(--text);
-    background: color-mix(in srgb, var(--swatch-color) 10%, #191e1b);
+    background: color-mix(in srgb, var(--swatch-color) 10%, var(--surface-inset));
   }
 }
 
@@ -96,7 +98,7 @@ fieldset {
 
   > label {
     color: var(--text-secondary);
-    font-size: 10px;
+    font-size: 11px;
   }
 
   > input {
@@ -104,8 +106,8 @@ fieldset {
     height: 25px;
     padding: 2px;
     border: 1px solid var(--border-strong);
-    border-radius: 4px;
-    background: #151917;
+    border-radius: var(--radius-field);
+    background: var(--surface-inset);
   }
 
   > code {
@@ -125,10 +127,10 @@ fieldset {
   overflow: hidden;
   padding: 0 9px;
   border: 1px solid color-mix(in srgb, var(--preview-color) 48%, var(--border));
-  border-radius: 4px;
+  border-radius: var(--radius-field);
   color: color-mix(in srgb, var(--preview-color) 78%, white);
-  background: color-mix(in srgb, var(--preview-color) 10%, #171b19);
-  font-size: 10px;
+  background: color-mix(in srgb, var(--preview-color) 10%, var(--surface-inset));
+  font-size: 11px;
   text-overflow: ellipsis;
   white-space: nowrap;
 

@@ -32,9 +32,9 @@ const AGENT_FILTERS: readonly {
   selector: 'app-session-center-dialog',
   imports: [DatePipe, FormsModule, IconComponent],
   template: `
-    <div class="backdrop" (mousedown)="cancelled.emit()">
+    <div class="backdrop modal modal-open" (mousedown)="cancelled.emit()">
       <section
-        class="agent-dialog session-center"
+        class="agent-dialog session-center modal-box"
         role="dialog"
         aria-modal="true"
         aria-labelledby="session-center-title"
@@ -51,14 +51,20 @@ const AGENT_FILTERS: readonly {
               </p>
             </div>
           </div>
-          <button type="button" title="关闭" aria-label="关闭" (click)="cancelled.emit()">
+          <button
+            type="button"
+            class="btn btn-square btn-ghost btn-sm"
+            title="关闭"
+            aria-label="关闭"
+            (click)="cancelled.emit()"
+          >
             <app-icon name="x" [size]="15" />
           </button>
         </header>
 
         <div class="agent-health-strip" aria-label="Agent 连接状态">
           <article
-            class="agent-health"
+            class="agent-health card"
             data-agent="claude"
             [class.unavailable]="!installation()?.healthy"
           >
@@ -70,7 +76,7 @@ const AGENT_FILTERS: readonly {
             <code>{{ installation()?.version ?? '未连接' }}</code>
           </article>
           <article
-            class="agent-health"
+            class="agent-health card"
             data-agent="codex"
             [class.unavailable]="!codexInstallation()?.healthy"
           >
@@ -84,7 +90,7 @@ const AGENT_FILTERS: readonly {
         </div>
 
         <div class="session-toolbar">
-          <label class="dialog-search">
+          <label class="dialog-search input input-bordered input-sm">
             <app-icon name="search" [size]="14" />
             <input
               type="search"
@@ -115,7 +121,7 @@ const AGENT_FILTERS: readonly {
           </label>
           <button
             type="button"
-            class="icon-action"
+            class="icon-action btn btn-square btn-ghost btn-sm"
             [class.spinning]="busy()"
             title="重新扫描本机会话"
             aria-label="重新扫描本机会话"
@@ -127,11 +133,12 @@ const AGENT_FILTERS: readonly {
         </div>
 
         <div class="session-filter-bar">
-          <nav class="session-agent-filter" role="tablist" aria-label="按 Agent 筛选">
+          <nav class="session-agent-filter tabs tabs-box" role="tablist" aria-label="按 Agent 筛选">
             @for (filter of agentFilters; track filter.value) {
               <button
                 type="button"
                 role="tab"
+                class="tab"
                 [class.active]="agentFilter() === filter.value"
                 [attr.aria-selected]="agentFilter() === filter.value"
                 (click)="agentFilter.set(filter.value)"
@@ -147,7 +154,7 @@ const AGENT_FILTERS: readonly {
         </div>
 
         @if (error()) {
-          <div class="session-error" role="alert">
+          <div class="session-error alert alert-error" role="alert">
             <app-icon name="shield" [size]="14" />
             <span>{{ error() }}</span>
             <button type="button" [disabled]="busy()" (click)="refresh()">重试</button>
@@ -199,7 +206,7 @@ const AGENT_FILTERS: readonly {
             </div>
           } @else {
             @for (session of filteredSessions(); track session.id) {
-              <article class="session-row" [attr.data-agent]="session.agentType">
+              <article class="session-row card" [attr.data-agent]="session.agentType">
                 <span class="session-agent" [attr.data-agent]="session.agentType">
                   <app-icon name="bot" [size]="15" />
                 </span>
@@ -228,7 +235,7 @@ const AGENT_FILTERS: readonly {
                 </time>
                 <button
                   type="button"
-                  class="resume-button"
+                  class="resume-button btn btn-primary btn-sm"
                   [disabled]="busy() || !installationFor(session)?.healthy"
                   [title]="
                     installationFor(session)?.healthy
@@ -256,7 +263,9 @@ const AGENT_FILTERS: readonly {
 
         <footer class="session-footer">
           <span>原生会话文件保持只读，Termexo 不会修改或删除它们。</span>
-          <button type="button" class="secondary" (click)="cancelled.emit()">关闭</button>
+          <button type="button" class="secondary btn btn-ghost btn-sm" (click)="cancelled.emit()">
+            关闭
+          </button>
         </footer>
       </section>
     </div>

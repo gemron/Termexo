@@ -46,12 +46,12 @@ try {
   await page.waitForTimeout(200);
 
   await page.screenshot({
-    path: resolve(imageDirectory, 'termexo-workbench.png'),
+    path: resolve(imageDirectory, 'termexo-workbench-v0.3.1.png'),
     fullPage: true,
   });
 
   await page.getByRole('button', { name: '设置', exact: true }).click();
-  const settingsDialog = page.getByRole('dialog', { name: 'Claude Code 设置' });
+  const settingsDialog = page.getByRole('dialog', { name: 'Agent 与开发环境设置' });
   await settingsDialog.waitFor();
   await settingsDialog.getByRole('button', { name: '模型 Profile' }).click();
   await page.screenshot({
@@ -66,7 +66,7 @@ try {
   console.log(
     JSON.stringify({
       screenshots: [
-        resolve(imageDirectory, 'termexo-workbench.png'),
+        resolve(imageDirectory, 'termexo-workbench-v0.3.1.png'),
         resolve(imageDirectory, 'termexo-model-profiles.png'),
       ],
     }),

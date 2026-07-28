@@ -1,6 +1,5 @@
 <main
-  class="app-shell"
-  [style.--accent]="workspaceThemeColor()"
+  class="app-shell bg-base-100 text-base-content"
   [class.inspector-collapsed]="!inspectorOpen()"
   [class.workspace-maximized]="workspaceMaximized()"
 >
@@ -16,16 +15,16 @@
   />
 
   <section class="workspace-main">
-    <header class="topbar">
+    <header class="topbar navbar">
       <div class="workspace-title">
         <strong>{{ state.activeWorkspace()?.name ?? '加载中' }}</strong>
         <span>{{ state.activeWorkspace()?.projectPath ?? '' }}</span>
       </div>
 
-      <div class="toolbar" role="toolbar" aria-label="工作区工具">
+      <div class="toolbar join" role="toolbar" aria-label="工作区工具">
         <button
           type="button"
-          class="tool-button"
+          class="tool-button btn btn-ghost btn-sm join-item"
           title="新建 Shell 终端"
           (click)="createTerminal('shell')"
         >
@@ -36,7 +35,7 @@
         <div class="menu-anchor">
           <button
             type="button"
-            class="tool-button"
+            class="tool-button btn btn-ghost btn-sm join-item"
             [class.active]="agentMenuOpen()"
             (click)="agentMenuOpen.set(!agentMenuOpen())"
           >
@@ -45,7 +44,7 @@
             <app-icon name="chevron-down" [size]="12" />
           </button>
           @if (agentMenuOpen()) {
-            <div class="agent-menu">
+            <div class="agent-menu menu rounded-box bg-base-200 shadow-xl">
               <button type="button" (click)="openClaudeLaunch()">
                 <span data-tone="green"><app-icon name="bot" [size]="14" /></span>
                 <div><strong>Claude Code</strong><small>Claude Sonnet</small></div>
@@ -70,13 +69,18 @@
         </div>
 
         <span class="tool-divider"></span>
-        <button type="button" class="tool-button" title="恢复会话" (click)="openSessionCenter()">
+        <button
+          type="button"
+          class="tool-button btn btn-ghost btn-sm join-item"
+          title="恢复会话"
+          (click)="openSessionCenter()"
+        >
           <app-icon name="play" [size]="14" />
           <span>恢复</span>
         </button>
         <button
           type="button"
-          class="tool-button"
+          class="tool-button btn btn-ghost btn-sm join-item"
           title="批量切换模型"
           (click)="modelSwitchOpen.set(true)"
         >
@@ -85,7 +89,7 @@
         </button>
         <button
           type="button"
-          class="tool-button"
+          class="tool-button btn btn-ghost btn-sm join-item"
           title="保存 Workspace 快照"
           (click)="saveSnapshot()"
         >
@@ -94,9 +98,10 @@
         </button>
       </div>
 
-      <div class="window-tools">
+      <div class="window-tools join">
         <button
           type="button"
+          class="btn btn-square btn-ghost btn-sm join-item"
           title="任务看板"
           aria-label="任务看板"
           (click)="showPlaceholder('任务看板')"
@@ -105,6 +110,7 @@
         </button>
         <button
           type="button"
+          class="btn btn-square btn-ghost btn-sm join-item"
           [title]="workspaceMaximized() ? '恢复工作区（Shift+Esc）' : '最大化工作区'"
           [attr.aria-label]="workspaceMaximized() ? '恢复工作区' : '最大化工作区'"
           [class.active]="workspaceMaximized()"
@@ -114,6 +120,7 @@
         </button>
         <button
           type="button"
+          class="btn btn-square btn-ghost btn-sm join-item"
           title="切换检查器"
           aria-label="切换检查器"
           [class.active]="inspectorOpen()"
@@ -125,12 +132,13 @@
     </header>
 
     <div class="terminal-tabs">
-      <div class="tab-strip" role="tablist" aria-label="终端标签">
+      <div class="tab-strip tabs tabs-border" role="tablist" aria-label="终端标签">
         @for (terminal of state.activeWorkspace()?.terminals ?? []; track terminal.id) {
           <button
             [id]="'terminal-tab-' + terminal.id"
             type="button"
             role="tab"
+            class="tab"
             [class.active]="terminal.id === activeTerminalId()"
             [class.visible]="isTerminalVisible(terminal.id)"
             [attr.aria-selected]="terminal.id === activeTerminalId()"
@@ -144,7 +152,7 @@
         }
         <button
           type="button"
-          class="add-tab"
+          class="add-tab tab"
           title="新建终端"
           aria-label="新建终端"
           (click)="createTerminal('shell')"
@@ -156,6 +164,7 @@
       <label class="terminal-picker">
         <span>{{ visibleTerminalIds().length }}/{{ visibleTerminalLimit() }}</span>
         <select
+          class="select select-bordered select-xs"
           aria-label="选择要显示的终端"
           [value]="activeTerminalId() ?? ''"
           (change)="selectTerminalFromPicker($event)"
@@ -168,9 +177,10 @@
         </select>
       </label>
 
-      <div class="layout-controls" aria-label="终端布局">
+      <div class="layout-controls join" aria-label="终端布局">
         <button
           type="button"
+          class="btn btn-square btn-ghost btn-xs join-item"
           title="单终端"
           [class.active]="state.activeWorkspace()?.layout === 'single'"
           (click)="changeLayout('single')"
@@ -179,6 +189,7 @@
         </button>
         <button
           type="button"
+          class="btn btn-square btn-ghost btn-xs join-item"
           title="左右分屏"
           [class.active]="state.activeWorkspace()?.layout === 'columns'"
           (click)="changeLayout('columns')"
@@ -187,6 +198,7 @@
         </button>
         <button
           type="button"
+          class="btn btn-square btn-ghost btn-xs join-item"
           title="上下分屏"
           [class.active]="state.activeWorkspace()?.layout === 'rows'"
           (click)="changeLayout('rows')"
@@ -195,6 +207,7 @@
         </button>
         <button
           type="button"
+          class="btn btn-square btn-ghost btn-xs join-item"
           title="网格布局"
           [class.active]="state.activeWorkspace()?.layout === 'grid'"
           (click)="changeLayout('grid')"
@@ -362,14 +375,32 @@
 @if (settingsOpen()) {
   <app-agent-settings-dialog
     [installation]="agents.installation()"
+    [codexInstallation]="agents.codexInstallation()"
     [modelProfiles]="agents.modelProfiles()"
     [mcpProfiles]="agents.mcpProfiles()"
+    [networkProfiles]="agents.networkProfiles()"
+    [activeWorkspaceId]="state.activeWorkspace()?.id ?? ''"
+    [activeWorkspaceName]="state.activeWorkspace()?.name ?? '当前 Workspace'"
+    [networkTestResult]="networkTestResult()"
+    [cliPlan]="cliOperationPlan()"
+    [cliResult]="cliOperationResult()"
+    [busy]="agents.busy()"
     (detectRequested)="agents.detectClaude()"
+    (cliPreviewRequested)="previewCliOperation($event)"
+    (cliExecuteRequested)="executeCliOperation($event)"
     (modelSaved)="saveModelProfile($event)"
     (deleteModelRequested)="deleteModelProfile($event)"
     (mcpSaved)="saveMcpProfile($event)"
     (deleteMcpRequested)="deleteMcpProfile($event)"
-    (cancelled)="settingsOpen.set(false)"
+    (networkSaved)="saveNetworkProfile($event)"
+    (deleteNetworkRequested)="deleteNetworkProfile($event)"
+    (networkTestRequested)="testNetworkProfile($event)"
+    (cancelled)="
+      settingsOpen.set(false);
+      networkTestResult.set(null);
+      cliOperationPlan.set(null);
+      cliOperationResult.set(null)
+    "
   />
 }
 
@@ -384,8 +415,10 @@
 }
 
 @if (toastMessage(); as message) {
-  <div class="toast" role="status">
-    <app-icon name="check" [size]="14" />
-    {{ message }}
+  <div class="app-toast-region toast toast-end toast-bottom" aria-live="polite">
+    <div class="app-toast alert shadow-xl" role="status">
+      <span class="app-toast-icon"><app-icon name="check" [size]="15" /></span>
+      <span>{{ message }}</span>
+    </div>
   </div>
 }

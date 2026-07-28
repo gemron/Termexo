@@ -1,14 +1,17 @@
 mod agent;
+mod cli;
 mod commands;
 mod config;
 mod database;
 mod hooks;
+mod network;
 mod pty;
 
 use std::fs;
 
 use tauri::Manager;
 
+use crate::cli::CliOperationManager;
 use crate::config::{CredentialStore, LaunchEnvironmentStore};
 use crate::database::WorkspaceDatabase;
 use crate::hooks::HookEventStore;
@@ -37,6 +40,7 @@ pub fn run() {
             let hooks = HookEventStore::new(&app_data_dir)?;
             app.manage(database);
             app.manage(CredentialStore);
+            app.manage(CliOperationManager::default());
             app.manage(LaunchEnvironmentStore::default());
             app.manage(hooks);
             app.manage(PtyManager::default());
@@ -52,12 +56,18 @@ pub fn run() {
             commands::agent::build_codex_launch_command,
             commands::agent::prepare_claude_launch,
             commands::agent::prepare_codex_launch,
+            commands::cli::preview_cli_operation,
+            commands::cli::execute_cli_operation,
             commands::config::list_model_profiles,
             commands::config::save_model_profile,
             commands::config::delete_model_profile,
             commands::config::list_mcp_profiles,
             commands::config::save_mcp_profile,
             commands::config::delete_mcp_profile,
+            commands::config::list_network_profiles,
+            commands::config::save_network_profile,
+            commands::config::delete_network_profile,
+            commands::config::test_network_profile,
             commands::config::validate_claude_profile,
             commands::hooks::prepare_claude_runtime,
             commands::hooks::sync_agent_events,

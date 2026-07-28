@@ -775,7 +775,9 @@ img {
 }
 
 .product-frame img {
+  display: block;
   width: 100%;
+  height: auto;
 }
 
 .metrics-grid {
@@ -1187,7 +1189,9 @@ img {
 }
 
 .settings-frame img {
+  display: block;
   width: 100%;
+  height: auto;
 }
 
 .settings-frame figcaption {

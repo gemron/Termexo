@@ -18,9 +18,9 @@ export interface WorkspaceAppearanceValue {
   selector: 'app-edit-workspace-dialog',
   imports: [FormsModule, IconComponent],
   template: `
-    <div class="backdrop" (mousedown)="cancelled.emit()">
+    <div class="backdrop modal modal-open" (mousedown)="cancelled.emit()">
       <section
-        class="dialog workspace-dialog"
+        class="dialog workspace-dialog modal-box"
         role="dialog"
         aria-modal="true"
         aria-labelledby="edit-workspace-dialog-title"
@@ -31,7 +31,13 @@ export interface WorkspaceAppearanceValue {
             <h2 id="edit-workspace-dialog-title">编辑工作区</h2>
             <p>修改工作区名称和独立主题颜色。</p>
           </div>
-          <button type="button" title="关闭" aria-label="关闭" (click)="cancelled.emit()">
+          <button
+            type="button"
+            class="btn btn-square btn-ghost btn-sm"
+            title="关闭"
+            aria-label="关闭"
+            (click)="cancelled.emit()"
+          >
             <app-icon name="x" [size]="15" />
           </button>
         </header>
@@ -40,6 +46,7 @@ export interface WorkspaceAppearanceValue {
           <span>工作区名称</span>
           <input
             type="text"
+            class="input input-bordered input-sm"
             [ngModel]="name()"
             (ngModelChange)="name.set($event)"
             (keydown.enter)="submit()"
@@ -91,8 +98,15 @@ export interface WorkspaceAppearanceValue {
         </div>
 
         <footer>
-          <button type="button" class="secondary" (click)="cancelled.emit()">取消</button>
-          <button type="button" class="primary" [disabled]="!isValid()" (click)="submit()">
+          <button type="button" class="secondary btn btn-ghost btn-sm" (click)="cancelled.emit()">
+            取消
+          </button>
+          <button
+            type="button"
+            class="primary btn btn-primary btn-sm"
+            [disabled]="!isValid()"
+            (click)="submit()"
+          >
             保存修改
           </button>
         </footer>

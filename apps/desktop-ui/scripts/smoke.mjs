@@ -15,6 +15,39 @@ const browser = await chromium.launch({
 try {
   const page = await browser.newPage({ viewport: { width: 1440, height: 900 } });
   const errors = [];
+  const assertWithinViewport = async (locator, label) => {
+    await locator.waitFor();
+    await page.waitForTimeout(180);
+    const [box, viewport, visualStyle] = await Promise.all([
+      locator.boundingBox(),
+      page.viewportSize(),
+      locator.evaluate((element) => {
+        const style = getComputedStyle(element);
+        return {
+          backgroundColor: style.backgroundColor,
+          opacity: Number(style.opacity),
+        };
+      }),
+    ]);
+    if (
+      !box ||
+      !viewport ||
+      box.x < 0 ||
+      box.y < 0 ||
+      box.x + box.width > viewport.width ||
+      box.y + box.height > viewport.height
+    ) {
+      throw new Error(`${label} is outside the viewport`);
+    }
+    if (
+      visualStyle.opacity < 0.99 ||
+      visualStyle.backgroundColor === 'transparent' ||
+      visualStyle.backgroundColor === 'rgba(0, 0, 0, 0)'
+    ) {
+      throw new Error(`${label} has a transparent or incomplete visual surface`);
+    }
+    return box;
+  };
   page.on('console', (message) => {
     if (message.type() === 'error') {
       errors.push(message.text());
@@ -33,11 +66,54 @@ try {
   if (!(await brandLogo.evaluate((image) => image.complete && image.naturalWidth > 0))) {
     throw new Error('Termexo brand mark did not load');
   }
+  const uiIntegration = await page.evaluate(() => {
+    const shell = document.querySelector('.app-shell');
+    const themeRoot = document.querySelector('app-root');
+    const lucideIcons = [...document.querySelectorAll('app-icon svg')];
+    const shellStyle = themeRoot ? getComputedStyle(themeRoot) : null;
+    const bodyStyle = getComputedStyle(document.body);
+    return {
+      theme: themeRoot?.getAttribute('data-theme'),
+      primaryColor: shellStyle?.getPropertyValue('--color-primary').trim() ?? '',
+      radiusBox: shellStyle?.getPropertyValue('--radius-box').trim() ?? '',
+      fontFamily: bodyStyle.fontFamily,
+      fontSize: Number.parseFloat(bodyStyle.fontSize),
+      daisyButtonCount: document.querySelectorAll('.btn').length,
+      renderedLucideCount: lucideIcons.filter((icon) => icon.childElementCount > 0).length,
+    };
+  });
+  if (
+    uiIntegration.theme !== 'termexo' ||
+    !uiIntegration.primaryColor ||
+    !uiIntegration.radiusBox ||
+    !uiIntegration.fontFamily.includes('Microsoft YaHei UI') ||
+    uiIntegration.fontSize < 13 ||
+    uiIntegration.daisyButtonCount === 0 ||
+    uiIntegration.renderedLucideCount === 0
+  ) {
+    throw new Error(
+      `DaisyUI or Lucide integration is incomplete: ${JSON.stringify(uiIntegration)}`,
+    );
+  }
 
   const terminalBox = await page.locator('.xterm-screen').first().boundingBox();
   if (!terminalBox || terminalBox.width < 100 || terminalBox.height < 100) {
     throw new Error('xterm canvas did not render at a usable size');
   }
+
+  await page.getByRole('button', { name: '新建工作区', exact: true }).click();
+  const createWorkspaceDialog = page.getByRole('dialog', { name: '新建工作区' });
+  await createWorkspaceDialog.waitFor();
+  await assertWithinViewport(createWorkspaceDialog, 'create workspace dialog');
+  await createWorkspaceDialog.getByRole('button', { name: '关闭', exact: true }).click();
+
+  const firstWorkspaceEntry = page.locator('.workspace-entry').first();
+  await firstWorkspaceEntry.hover();
+  await firstWorkspaceEntry.getByRole('button', { name: '编辑工作区', exact: true }).click();
+  const editWorkspaceDialog = page.getByRole('dialog', { name: '编辑工作区' });
+  await editWorkspaceDialog.waitFor();
+  await assertWithinViewport(editWorkspaceDialog, 'edit workspace dialog');
+  await editWorkspaceDialog.getByRole('button', { name: '关闭', exact: true }).click();
 
   const initialTerminalCount = await page.locator('.terminal-panel').count();
   const toolbar = page.getByRole('toolbar', { name: '工作区工具' });
@@ -52,7 +128,54 @@ try {
     throw new Error('creating a Shell did not add a terminal panel');
   }
 
+  const workspaceEntries = page.locator('.workspace-entry');
+  if ((await workspaceEntries.count()) === 0) {
+    throw new Error('workspace menu did not render any entries');
+  }
+  const firstWorkspaceMenuEntry = workspaceEntries.first();
+  if ((await firstWorkspaceMenuEntry.locator('button button').count()) !== 0) {
+    throw new Error('workspace menu contains nested interactive buttons');
+  }
+  await firstWorkspaceMenuEntry.hover();
+  const workspaceActions = firstWorkspaceMenuEntry.locator('.workspace-actions');
+  const [workspaceEntryBox, workspaceActionsBox, workspaceActionsOpacity] = await Promise.all([
+    firstWorkspaceMenuEntry.boundingBox(),
+    workspaceActions.boundingBox(),
+    workspaceActions.evaluate((element) => getComputedStyle(element).opacity),
+  ]);
+  if (
+    !workspaceEntryBox ||
+    !workspaceActionsBox ||
+    Number(workspaceActionsOpacity) < 0.99 ||
+    workspaceActionsBox.x + workspaceActionsBox.width >
+      workspaceEntryBox.x + workspaceEntryBox.width + 1
+  ) {
+    throw new Error('workspace menu actions are hidden or overflow their entry');
+  }
+
+  const toast = page.locator('.app-toast-region > .app-toast.alert');
+  await toast.waitFor();
+  const toastBox = await toast.boundingBox();
+  if (
+    !toastBox ||
+    toastBox.width > 430 ||
+    toastBox.height < 40 ||
+    toastBox.x < 0 ||
+    toastBox.y < 0 ||
+    toastBox.x + toastBox.width > 1440 ||
+    toastBox.y + toastBox.height > 900
+  ) {
+    throw new Error('application toast is incorrectly sized or outside the viewport');
+  }
+  await page.screenshot({
+    path: join(tmpdir(), 'termexo-workspace-menu.png'),
+    fullPage: true,
+  });
+
   await toolbar.getByRole('button', { name: 'Agent', exact: true }).click();
+  const agentMenu = page.locator('.agent-menu');
+  await agentMenu.waitFor();
+  await assertWithinViewport(agentMenu, 'Agent menu');
   page.once('dialog', (dialog) => dialog.accept(dialog.defaultValue()));
   await page.getByRole('button', { name: /Claude Code/ }).click();
   const launchDialog = page.getByRole('dialog', { name: '新建 Claude 会话' });
@@ -61,6 +184,14 @@ try {
     throw new Error('Claude launch must be disabled in browser preview mode');
   }
   await launchDialog.getByRole('button', { name: '关闭' }).click();
+
+  await toolbar.getByRole('button', { name: '切换模型', exact: true }).click();
+  const modelSwitchDialog = page.getByRole('dialog', {
+    name: '切换 Claude Code 后端模型',
+  });
+  await modelSwitchDialog.waitFor();
+  await assertWithinViewport(modelSwitchDialog, 'model switch dialog');
+  await modelSwitchDialog.getByRole('button', { name: '关闭', exact: true }).click();
 
   await page.getByTitle('网格布局').click();
   await page.locator('.terminal-grid[data-layout="grid"]').waitFor();
@@ -98,6 +229,7 @@ try {
     throw new Error('session center is outside the desktop viewport');
   }
 
+  await page.waitForTimeout(220);
   await page.screenshot({
     path: join(tmpdir(), 'termexo-desktop.png'),
     fullPage: true,
@@ -106,7 +238,7 @@ try {
   await sessionDialog.locator('.session-footer').getByRole('button', { name: '关闭' }).click();
   await page.setViewportSize({ width: 1024, height: 720 });
   await page.getByRole('button', { name: '设置', exact: true }).click();
-  const settingsDialog = page.getByRole('dialog', { name: 'Claude Code 设置' });
+  const settingsDialog = page.getByRole('dialog', { name: 'Agent 与开发环境设置' });
   await settingsDialog.waitFor();
   await settingsDialog.getByRole('button', { name: '模型 Profile' }).click();
   await settingsDialog.getByRole('button', { name: /新建 Profile/ }).click();
@@ -127,6 +259,38 @@ try {
     throw new Error('saving a new model profile twice created duplicate profiles');
   }
 
+  await settingsDialog.getByRole('button', { name: '网络与 npm', exact: true }).click();
+  await settingsDialog.getByRole('button', { name: '新建代理 Profile', exact: true }).click();
+  await settingsDialog.getByLabel('名称', { exact: true }).fill('Smoke Network');
+  await settingsDialog
+    .getByLabel('HTTPS_PROXY', { exact: true })
+    .fill('http://proxy.internal:8080');
+  await settingsDialog
+    .getByLabel('registry', { exact: true })
+    .fill('https://registry.internal.example/');
+  await settingsDialog.getByRole('button', { name: '保存代理 Profile', exact: true }).click();
+  await settingsDialog
+    .locator('.profile-nav button')
+    .filter({ hasText: 'Smoke Network' })
+    .waitFor();
+  await settingsDialog.getByRole('button', { name: '测试连接', exact: true }).click();
+  await settingsDialog
+    .getByText('浏览器预览已验证 Profile 交互；桌面端会执行真实 TCP 连通性测试。', {
+      exact: true,
+    })
+    .waitFor();
+
+  await settingsDialog.getByRole('button', { name: 'CLI 安装与升级', exact: true }).click();
+  await settingsDialog.getByLabel('CLI 目标版本', { exact: true }).fill('latest');
+  await settingsDialog.getByRole('button', { name: '生成安装计划', exact: true }).click();
+  await settingsDialog.getByText('@anthropic-ai/claude-code@latest', { exact: true }).waitFor();
+  const executeCliButton = settingsDialog.getByRole('button', { name: '确认并安装', exact: true });
+  if (!(await executeCliButton.isDisabled())) {
+    throw new Error('CLI mutation became available before explicit confirmation');
+  }
+  await settingsDialog.locator('.cli-confirmation input').check();
+  await executeCliButton.click({ trial: true });
+
   const compactDialogBox = await settingsDialog.boundingBox();
   if (
     !compactDialogBox ||
@@ -145,6 +309,7 @@ try {
     throw new Error('page has horizontal overflow at the compact viewport');
   }
 
+  await page.waitForTimeout(220);
   await page.screenshot({
     path: join(tmpdir(), 'termexo-compact.png'),
     fullPage: true,
@@ -158,7 +323,11 @@ try {
     JSON.stringify({
       terminalPanels: updatedTerminalCount,
       terminalCanvas: terminalBox,
-      screenshots: [join(tmpdir(), 'termexo-desktop.png'), join(tmpdir(), 'termexo-compact.png')],
+      screenshots: [
+        join(tmpdir(), 'termexo-workspace-menu.png'),
+        join(tmpdir(), 'termexo-desktop.png'),
+        join(tmpdir(), 'termexo-compact.png'),
+      ],
     }),
   );
 } finally {

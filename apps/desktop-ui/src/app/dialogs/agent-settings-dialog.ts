@@ -4,22 +4,30 @@ import { FormsModule } from '@angular/forms';
 import {
   AgentInstallation,
   CLAUDE_PROVIDER_PRESETS,
+  CliOperationPlan,
+  CliOperationRequest,
+  CliOperationResult,
   McpProfile,
   McpProfileInput,
   ModelProfile,
   ModelProfileInput,
+  NetworkProfile,
+  NetworkProfileInput,
+  NetworkProfileScope,
+  NetworkTestResult,
+  NativeAgentType,
 } from '../core/models/agent.models';
 import { IconComponent } from '../shared/icon/icon';
 
-type SettingsTab = 'diagnostics' | 'models' | 'mcp';
+type SettingsTab = 'diagnostics' | 'cli' | 'models' | 'mcp' | 'network';
 
 @Component({
   selector: 'app-agent-settings-dialog',
   imports: [FormsModule, IconComponent],
   template: `
-    <div class="backdrop" (mousedown)="cancelled.emit()">
+    <div class="backdrop modal modal-open" (mousedown)="cancelled.emit()">
       <section
-        class="agent-dialog settings-dialog"
+        class="agent-dialog settings-dialog modal-box"
         role="dialog"
         aria-modal="true"
         aria-labelledby="agent-settings-title"
@@ -29,36 +37,69 @@ type SettingsTab = 'diagnostics' | 'models' | 'mcp';
           <div class="dialog-title">
             <span class="title-icon"><app-icon name="settings" [size]="17" /></span>
             <div>
-              <h2 id="agent-settings-title">Claude Code 设置</h2>
-              <p>本地运行配置与安全凭据</p>
+              <h2 id="agent-settings-title">Agent 与开发环境设置</h2>
+              <p>Agent、模型、MCP、网络与安全凭据</p>
             </div>
           </div>
-          <button type="button" title="关闭" aria-label="关闭" (click)="cancelled.emit()">
+          <button
+            type="button"
+            class="btn btn-square btn-ghost btn-sm"
+            title="关闭"
+            aria-label="关闭"
+            (click)="cancelled.emit()"
+          >
             <app-icon name="x" [size]="15" />
           </button>
         </header>
 
-        <nav class="settings-tabs" aria-label="设置分类">
+        <nav class="settings-tabs tabs tabs-border" aria-label="设置分类">
           <button
             type="button"
+            class="tab"
             [class.active]="tab() === 'diagnostics'"
             (click)="selectTab('diagnostics')"
           >
             诊断
           </button>
-          <button type="button" [class.active]="tab() === 'models'" (click)="selectTab('models')">
+          <button
+            type="button"
+            class="tab"
+            [class.active]="tab() === 'cli'"
+            (click)="selectTab('cli')"
+          >
+            CLI 安装与升级
+          </button>
+          <button
+            type="button"
+            class="tab"
+            [class.active]="tab() === 'models'"
+            (click)="selectTab('models')"
+          >
             模型 Profile
           </button>
-          <button type="button" [class.active]="tab() === 'mcp'" (click)="selectTab('mcp')">
+          <button
+            type="button"
+            class="tab"
+            [class.active]="tab() === 'mcp'"
+            (click)="selectTab('mcp')"
+          >
             MCP Profile
+          </button>
+          <button
+            type="button"
+            class="tab"
+            [class.active]="tab() === 'network'"
+            (click)="selectTab('network')"
+          >
+            网络与 npm
           </button>
         </nav>
 
         <div class="settings-body">
           @switch (tab()) {
             @case ('diagnostics') {
-              <section class="diagnostic-panel">
-                <div class="diagnostic-status" [class.unavailable]="!installation()?.healthy">
+              <section class="diagnostic-panel card">
+                <div class="diagnostic-status alert" [class.unavailable]="!installation()?.healthy">
                   <span><app-icon name="shield" [size]="18" /></span>
                   <div>
                     <strong>{{
@@ -84,11 +125,151 @@ type SettingsTab = 'diagnostics' | 'models' | 'mcp';
                 </dl>
                 <button
                   type="button"
-                  class="secondary inline-command"
+                  class="secondary inline-command btn btn-outline btn-sm"
                   (click)="detectRequested.emit()"
                 >
                   <app-icon name="refresh" [size]="13" />重新检测
                 </button>
+              </section>
+            }
+            @case ('cli') {
+              <section class="cli-manager">
+                <div class="cli-manager-intro">
+                  <div>
+                    <strong>托管 Agent CLI</strong>
+                    <span>安装前预览官方包、目标版本、npm 与当前生效代理，确认后才会执行。</span>
+                  </div>
+                  <span class="scope-chip">WORKSPACE</span>
+                </div>
+
+                <div class="cli-agent-selector" role="group" aria-label="选择 Agent CLI">
+                  <button
+                    type="button"
+                    [class.active]="cliAgentType === 'claude'"
+                    (click)="selectCliAgent('claude')"
+                  >
+                    <span><app-icon name="bot" [size]="16" /></span>
+                    <strong>Claude Code</strong>
+                    <small>{{
+                      installation()?.healthy ? (installation()?.version ?? '已安装') : '未检测到'
+                    }}</small>
+                  </button>
+                  <button
+                    type="button"
+                    [class.active]="cliAgentType === 'codex'"
+                    (click)="selectCliAgent('codex')"
+                  >
+                    <span><app-icon name="terminal" [size]="16" /></span>
+                    <strong>Codex CLI</strong>
+                    <small>{{
+                      codexInstallation()?.healthy
+                        ? (codexInstallation()?.version ?? '已安装')
+                        : '未检测到'
+                    }}</small>
+                  </button>
+                </div>
+
+                <div class="cli-version-row">
+                  <label>
+                    <span>目标版本或 dist-tag</span>
+                    <input
+                      aria-label="CLI 目标版本"
+                      placeholder="latest、next 或 0.145.0"
+                      [(ngModel)]="cliTargetVersion"
+                      (ngModelChange)="cliConfirmed = false"
+                    />
+                  </label>
+                  <button
+                    type="button"
+                    class="secondary"
+                    [disabled]="busy() || !cliTargetVersion.trim()"
+                    (click)="previewCli()"
+                  >
+                    <app-icon name="refresh" [size]="13" />生成安装计划
+                  </button>
+                </div>
+
+                @if (cliPlanMatches()) {
+                  <div class="cli-plan" [class.unavailable]="!cliPlan()?.ready">
+                    <div class="cli-plan-heading">
+                      <span><app-icon name="shield" [size]="17" /></span>
+                      <div>
+                        <strong>
+                          {{ cliPlan()?.action === 'install' ? '准备安装' : '准备升级' }}
+                          {{ cliPlan()?.displayName }}
+                        </strong>
+                        <small>{{ cliPlan()?.diagnostic }}</small>
+                      </div>
+                      <code>{{ cliPlan()?.targetVersion }}</code>
+                    </div>
+                    <dl>
+                      <div>
+                        <dt>官方 npm 包</dt>
+                        <dd>{{ cliPlan()?.packageSpec }}</dd>
+                      </div>
+                      <div>
+                        <dt>当前版本</dt>
+                        <dd>{{ cliPlan()?.currentVersion ?? '未安装' }}</dd>
+                      </div>
+                      <div>
+                        <dt>npm</dt>
+                        <dd>
+                          {{ cliPlan()?.npmVersion ?? '不可用' }} ·
+                          {{ cliPlan()?.npmPath ?? '未找到' }}
+                        </dd>
+                      </div>
+                      <div>
+                        <dt>生效代理</dt>
+                        <dd>{{ cliPlan()?.networkProfileName ?? '直连（未选择代理）' }}</dd>
+                      </div>
+                      <div>
+                        <dt>registry</dt>
+                        <dd>{{ cliPlan()?.npmRegistry ?? 'npm 默认 registry' }}</dd>
+                      </div>
+                    </dl>
+                    <code class="cli-command-preview">{{ cliPlan()?.commandPreview }}</code>
+
+                    <label class="checkbox-control cli-confirmation">
+                      <input
+                        type="checkbox"
+                        [(ngModel)]="cliConfirmed"
+                        [disabled]="busy() || !cliPlan()?.ready"
+                      />
+                      <span>我已确认安装源、目标版本和生效网络配置</span>
+                    </label>
+                    <div class="cli-actions">
+                      <span>失败时会重新检测原 CLI，并保留完整诊断。</span>
+                      <button
+                        type="button"
+                        class="primary"
+                        [disabled]="busy() || !cliConfirmed || !cliPlan()?.ready"
+                        (click)="executeCli()"
+                      >
+                        {{ cliPlan()?.action === 'install' ? '确认并安装' : '确认并升级' }}
+                      </button>
+                    </div>
+                  </div>
+                } @else {
+                  <div class="cli-empty-state">
+                    <app-icon name="terminal" [size]="18" />
+                    <span>选择 CLI 和目标版本，然后生成安装计划。</span>
+                  </div>
+                }
+
+                @if (cliResult(); as result) {
+                  <div class="cli-result" [class.unavailable]="!result.success">
+                    <app-icon [name]="result.success ? 'check' : 'shield'" [size]="15" />
+                    <span>
+                      <strong>{{ result.diagnostic }}</strong>
+                      <small>
+                        {{ result.installation.diagnostic }} · {{ result.durationMs }} ms
+                      </small>
+                      @if (result.stderr) {
+                        <code>{{ result.stderr }}</code>
+                      }
+                    </span>
+                  </div>
+                }
               </section>
             }
             @case ('models') {
@@ -113,10 +294,7 @@ type SettingsTab = 'diagnostics' | 'models' | 'mcp';
                     <label><span>名称</span><input [(ngModel)]="modelName" /></label>
                     <label>
                       <span>模型供应商</span>
-                      <select
-                        [ngModel]="modelProvider"
-                        (ngModelChange)="selectProvider($event)"
-                      >
+                      <select [ngModel]="modelProvider" (ngModelChange)="selectProvider($event)">
                         @for (preset of providerPresets; track preset.provider) {
                           <option [value]="preset.provider">{{ preset.provider }}</option>
                         }
@@ -218,6 +396,191 @@ type SettingsTab = 'diagnostics' | 'models' | 'mcp';
                 </div>
               </div>
             }
+            @case ('network') {
+              <div class="settings-split network-settings">
+                <div class="profile-nav">
+                  @for (profile of networkProfiles(); track profile.id) {
+                    <button
+                      type="button"
+                      [class.active]="profile.id === networkId()"
+                      (click)="editNetwork(profile)"
+                    >
+                      <strong>{{ profile.name }}</strong>
+                      <small>
+                        {{ profile.scope === 'global' ? '全局' : 'Workspace' }}
+                        · {{ profile.enabled ? '已启用' : '已停用' }}
+                      </small>
+                    </button>
+                  }
+                  <button type="button" class="new-profile" (click)="newNetwork()">
+                    <app-icon name="plus" [size]="13" />新建代理 Profile
+                  </button>
+                </div>
+                <div class="profile-editor network-editor">
+                  <div class="network-intro">
+                    <div>
+                      <strong>开发网络与 npm 代理</strong>
+                      <span
+                        >仅向托管 Agent 和后续 CLI 安装流程注入，不修改系统或全局 npm 配置。</span
+                      >
+                    </div>
+                    <span class="scope-chip">{{
+                      networkScope === 'global' ? 'GLOBAL' : 'WORKSPACE'
+                    }}</span>
+                  </div>
+
+                  <div class="two-columns">
+                    <label><span>名称</span><input [(ngModel)]="networkName" /></label>
+                    <label>
+                      <span>作用域</span>
+                      <select [(ngModel)]="networkScope" (ngModelChange)="changeNetworkScope()">
+                        <option value="workspace">当前 Workspace</option>
+                        <option value="global">全局默认</option>
+                      </select>
+                    </label>
+                  </div>
+                  @if (networkScope === 'workspace') {
+                    <p class="workspace-binding">绑定：{{ networkWorkspaceLabel() }}</p>
+                  }
+
+                  <div class="network-section">
+                    <h3>系统与 Agent 代理</h3>
+                    <div class="two-columns">
+                      <label>
+                        <span>HTTP_PROXY</span>
+                        <input placeholder="http://proxy.internal:8080" [(ngModel)]="httpProxy" />
+                      </label>
+                      <label>
+                        <span>HTTPS_PROXY</span>
+                        <input placeholder="http://proxy.internal:8080" [(ngModel)]="httpsProxy" />
+                      </label>
+                      <label>
+                        <span>ALL_PROXY / SOCKS</span>
+                        <input placeholder="socks5://127.0.0.1:1080" [(ngModel)]="allProxy" />
+                      </label>
+                      <label>
+                        <span>NO_PROXY</span>
+                        <input placeholder="localhost,.internal.example" [(ngModel)]="noProxy" />
+                      </label>
+                    </div>
+                  </div>
+
+                  <div class="network-section">
+                    <h3>npm</h3>
+                    <label>
+                      <span>registry</span>
+                      <input placeholder="https://registry.npmjs.org/" [(ngModel)]="npmRegistry" />
+                    </label>
+                    <div class="two-columns">
+                      <label>
+                        <span>proxy</span>
+                        <input placeholder="http://proxy.internal:8080" [(ngModel)]="npmProxy" />
+                      </label>
+                      <label>
+                        <span>https-proxy</span>
+                        <input
+                          placeholder="http://proxy.internal:8080"
+                          [(ngModel)]="npmHttpsProxy"
+                        />
+                      </label>
+                    </div>
+                    <label>
+                      <span>企业 CA 文件</span>
+                      <input placeholder="C:\\certs\\internal-ca.pem" [(ngModel)]="npmCaPath" />
+                    </label>
+                  </div>
+
+                  <div class="network-section">
+                    <h3>代理凭据</h3>
+                    <div class="two-columns">
+                      <label><span>用户名</span><input [(ngModel)]="proxyUsername" /></label>
+                      <label>
+                        <span>密码</span>
+                        <input
+                          type="password"
+                          [placeholder]="
+                            hasNetworkCredential()
+                              ? '已安全保存，留空表示不修改'
+                              : '可选，保存到系统凭据库'
+                          "
+                          [(ngModel)]="proxyPassword"
+                        />
+                      </label>
+                    </div>
+                    @if (hasNetworkCredential()) {
+                      <label class="checkbox-control editor-checkbox">
+                        <input type="checkbox" [(ngModel)]="clearNetworkCredential" />
+                        <span>清除已保存的代理密码</span>
+                      </label>
+                    }
+                  </div>
+
+                  <div class="network-options">
+                    <label class="checkbox-control">
+                      <input type="checkbox" [(ngModel)]="networkEnabled" />
+                      <span>启用此 Profile</span>
+                    </label>
+                    <label class="checkbox-control">
+                      <input type="checkbox" [(ngModel)]="networkDefault" />
+                      <span>设为此作用域默认</span>
+                    </label>
+                    <label class="checkbox-control">
+                      <input type="checkbox" [(ngModel)]="npmStrictSsl" />
+                      <span>npm strict-ssl</span>
+                    </label>
+                  </div>
+
+                  @if (networkTestResult() && networkTestResult()?.profileId === networkId()) {
+                    <div
+                      class="network-test-result"
+                      [class.unavailable]="!networkTestResult()?.healthy"
+                    >
+                      <app-icon
+                        [name]="networkTestResult()?.healthy ? 'check' : 'shield'"
+                        [size]="14"
+                      />
+                      <span>
+                        <strong>{{ networkTestResult()?.message }}</strong>
+                        <small>
+                          {{ networkTestResult()?.target }} ·
+                          {{ networkTestResult()?.latencyMs }} ms
+                        </small>
+                      </span>
+                    </div>
+                  }
+
+                  <div class="editor-actions network-actions">
+                    @if (networkId()) {
+                      <button
+                        type="button"
+                        class="danger"
+                        [disabled]="busy()"
+                        (click)="deleteNetworkRequested.emit(networkId())"
+                      >
+                        <app-icon name="trash" [size]="13" />删除
+                      </button>
+                    }
+                    <span></span>
+                    <button
+                      type="button"
+                      class="secondary"
+                      [disabled]="busy() || !networkId()"
+                      (click)="networkTestRequested.emit(networkId())"
+                    >
+                      <app-icon name="radio" [size]="13" />测试连接
+                    </button>
+                    <button
+                      type="button"
+                      class="primary"
+                      [disabled]="busy() || !canSaveNetwork()"
+                      (click)="saveNetwork()"
+                    >
+                      保存代理 Profile
+                    </button>
+                  </div>
+                </div>
+              </div>
+            }
           }
         </div>
       </section>
@@ -227,20 +590,38 @@ type SettingsTab = 'diagnostics' | 'models' | 'mcp';
 })
 export class AgentSettingsDialogComponent {
   readonly installation = input<AgentInstallation | null>(null);
+  readonly codexInstallation = input<AgentInstallation | null>(null);
   readonly modelProfiles = input<ModelProfile[]>([]);
   readonly mcpProfiles = input<McpProfile[]>([]);
+  readonly networkProfiles = input<NetworkProfile[]>([]);
+  readonly activeWorkspaceId = input('');
+  readonly activeWorkspaceName = input('当前 Workspace');
+  readonly networkTestResult = input<NetworkTestResult | null>(null);
+  readonly cliPlan = input<CliOperationPlan | null>(null);
+  readonly cliResult = input<CliOperationResult | null>(null);
+  readonly busy = input(false);
   readonly cancelled = output<void>();
   readonly detectRequested = output<void>();
+  readonly cliPreviewRequested = output<CliOperationRequest>();
+  readonly cliExecuteRequested = output<CliOperationRequest>();
   readonly modelSaved = output<ModelProfileInput>();
   readonly deleteModelRequested = output<string>();
   readonly mcpSaved = output<McpProfileInput>();
   readonly deleteMcpRequested = output<string>();
+  readonly networkSaved = output<NetworkProfileInput>();
+  readonly deleteNetworkRequested = output<string>();
+  readonly networkTestRequested = output<string>();
 
   protected readonly tab = signal<SettingsTab>('diagnostics');
   protected readonly modelId = signal('claude-default');
   protected readonly hasCredential = signal(false);
   protected readonly mcpId = signal('');
+  protected readonly networkId = signal('');
+  protected readonly hasNetworkCredential = signal(false);
   protected readonly providerPresets = CLAUDE_PROVIDER_PRESETS;
+  protected cliAgentType: NativeAgentType = 'claude';
+  protected cliTargetVersion = 'latest';
+  protected cliConfirmed = false;
   protected modelName = 'Claude Sonnet';
   protected modelProvider = 'Anthropic';
   protected modelNameValue = 'sonnet';
@@ -250,12 +631,31 @@ export class AgentSettingsDialogComponent {
   protected clearCredential = false;
   protected mcpName = '';
   protected mcpConfig = '{\n  "mcpServers": {}\n}';
+  protected networkName = '当前 Workspace 代理';
+  protected networkScope: NetworkProfileScope = 'workspace';
+  protected networkWorkspaceId = '';
+  protected networkEnabled = true;
+  protected networkDefault = true;
+  protected httpProxy = '';
+  protected httpsProxy = '';
+  protected allProxy = '';
+  protected noProxy = 'localhost,127.0.0.1,::1';
+  protected npmRegistry = '';
+  protected npmProxy = '';
+  protected npmHttpsProxy = '';
+  protected npmStrictSsl = true;
+  protected npmCaPath = '';
+  protected proxyUsername = '';
+  protected proxyPassword = '';
+  protected clearNetworkCredential = false;
   private modelProfilesInitialized = false;
   private mcpProfilesInitialized = false;
+  private networkProfilesInitialized = false;
 
   constructor() {
     effect(() => this.syncModelProfileEditor(this.modelProfiles()));
     effect(() => this.syncMcpProfileEditor(this.mcpProfiles()));
+    effect(() => this.syncNetworkProfileEditor(this.networkProfiles()));
   }
 
   protected selectTab(tab: SettingsTab): void {
@@ -264,7 +664,42 @@ export class AgentSettingsDialogComponent {
       this.syncModelProfileEditor(this.modelProfiles());
     } else if (tab === 'mcp') {
       this.syncMcpProfileEditor(this.mcpProfiles());
+    } else if (tab === 'network') {
+      this.syncNetworkProfileEditor(this.networkProfiles());
     }
+  }
+
+  protected selectCliAgent(agentType: NativeAgentType): void {
+    this.cliAgentType = agentType;
+    this.cliConfirmed = false;
+  }
+
+  protected previewCli(): void {
+    this.cliConfirmed = false;
+    this.cliPreviewRequested.emit(this.cliRequest());
+  }
+
+  protected executeCli(): void {
+    if (this.cliConfirmed && this.cliPlanMatches()) {
+      this.cliExecuteRequested.emit({ ...this.cliRequest(), confirmed: true });
+      this.cliConfirmed = false;
+    }
+  }
+
+  protected cliPlanMatches(): boolean {
+    const plan = this.cliPlan();
+    return (
+      plan?.agentType === this.cliAgentType &&
+      plan.targetVersion === (this.cliTargetVersion.trim() || 'latest')
+    );
+  }
+
+  private cliRequest(): CliOperationRequest {
+    return {
+      agentType: this.cliAgentType,
+      targetVersion: this.cliTargetVersion.trim() || 'latest',
+      workspaceId: this.activeWorkspaceId() || undefined,
+    };
   }
 
   protected editModel(profile: ModelProfile): void {
@@ -340,6 +775,107 @@ export class AgentSettingsDialogComponent {
     });
   }
 
+  protected editNetwork(profile: NetworkProfile): void {
+    this.networkId.set(profile.id);
+    this.networkName = profile.name;
+    this.networkScope = profile.scope;
+    this.networkWorkspaceId = profile.workspaceId ?? '';
+    this.networkEnabled = profile.enabled;
+    this.networkDefault = profile.isDefault;
+    this.httpProxy = profile.httpProxy ?? '';
+    this.httpsProxy = profile.httpsProxy ?? '';
+    this.allProxy = profile.allProxy ?? '';
+    this.noProxy = profile.noProxy ?? '';
+    this.npmRegistry = profile.npmRegistry ?? '';
+    this.npmProxy = profile.npmProxy ?? '';
+    this.npmHttpsProxy = profile.npmHttpsProxy ?? '';
+    this.npmStrictSsl = profile.npmStrictSsl;
+    this.npmCaPath = profile.npmCaPath ?? '';
+    this.proxyUsername = profile.proxyUsername ?? '';
+    this.proxyPassword = '';
+    this.clearNetworkCredential = false;
+    this.hasNetworkCredential.set(profile.hasCredential);
+  }
+
+  protected newNetwork(): void {
+    this.networkId.set('');
+    this.networkName = this.activeWorkspaceId() ? '当前 Workspace 代理' : '全局开发代理';
+    this.networkScope = this.activeWorkspaceId() ? 'workspace' : 'global';
+    this.networkWorkspaceId = this.activeWorkspaceId();
+    this.networkEnabled = true;
+    this.networkDefault = true;
+    this.httpProxy = '';
+    this.httpsProxy = '';
+    this.allProxy = '';
+    this.noProxy = 'localhost,127.0.0.1,::1';
+    this.npmRegistry = '';
+    this.npmProxy = '';
+    this.npmHttpsProxy = '';
+    this.npmStrictSsl = true;
+    this.npmCaPath = '';
+    this.proxyUsername = '';
+    this.proxyPassword = '';
+    this.clearNetworkCredential = false;
+    this.hasNetworkCredential.set(false);
+  }
+
+  protected changeNetworkScope(): void {
+    if (this.networkScope === 'workspace' && !this.networkWorkspaceId) {
+      this.networkWorkspaceId = this.activeWorkspaceId();
+    }
+  }
+
+  protected networkWorkspaceLabel(): string {
+    if (!this.networkWorkspaceId) {
+      return '未选择 Workspace';
+    }
+    return this.networkWorkspaceId === this.activeWorkspaceId()
+      ? this.activeWorkspaceName()
+      : this.networkWorkspaceId;
+  }
+
+  protected canSaveNetwork(): boolean {
+    return Boolean(
+      this.networkName.trim() &&
+      (this.networkScope === 'global' ||
+        this.networkWorkspaceId.trim() ||
+        this.activeWorkspaceId().trim()),
+    );
+  }
+
+  protected saveNetwork(): void {
+    const profileId = this.networkId() || crypto.randomUUID();
+    this.networkId.set(profileId);
+    if (this.proxyPassword && !this.clearNetworkCredential) {
+      this.hasNetworkCredential.set(true);
+    } else if (this.clearNetworkCredential || !this.proxyUsername.trim()) {
+      this.hasNetworkCredential.set(false);
+    }
+    this.networkSaved.emit({
+      id: profileId,
+      name: this.networkName.trim(),
+      scope: this.networkScope,
+      workspaceId:
+        this.networkScope === 'workspace'
+          ? this.networkWorkspaceId || this.activeWorkspaceId()
+          : undefined,
+      enabled: this.networkEnabled,
+      isDefault: this.networkDefault,
+      httpProxy: this.httpProxy.trim() || undefined,
+      httpsProxy: this.httpsProxy.trim() || undefined,
+      allProxy: this.allProxy.trim() || undefined,
+      noProxy: this.noProxy.trim() || undefined,
+      npmRegistry: this.npmRegistry.trim() || undefined,
+      npmProxy: this.npmProxy.trim() || undefined,
+      npmHttpsProxy: this.npmHttpsProxy.trim() || undefined,
+      npmStrictSsl: this.npmStrictSsl,
+      npmCaPath: this.npmCaPath.trim() || undefined,
+      proxyUsername: this.proxyUsername.trim() || undefined,
+      proxyPassword: this.proxyPassword || undefined,
+      clearCredential: this.clearNetworkCredential,
+    });
+  }
+
   private syncModelProfileEditor(profiles: ModelProfile[]): void {
     const selectedId = untracked(this.modelId);
     const selectedProfile = profiles.find((profile) => profile.id === selectedId);
@@ -366,6 +902,29 @@ export class AgentSettingsDialogComponent {
       const fallback = selectedProfile ?? profiles[0];
       fallback ? this.editMcp(fallback) : this.newMcp();
       this.mcpProfilesInitialized = true;
+    }
+  }
+
+  private syncNetworkProfileEditor(profiles: NetworkProfile[]): void {
+    const selectedId = untracked(this.networkId);
+    const selectedProfile = profiles.find((profile) => profile.id === selectedId);
+    if (
+      !this.networkProfilesInitialized ||
+      (!selectedId && profiles.length > 0) ||
+      (selectedId && !selectedProfile)
+    ) {
+      const fallback =
+        selectedProfile ??
+        profiles.find(
+          (profile) =>
+            profile.scope === 'workspace' &&
+            profile.workspaceId === this.activeWorkspaceId() &&
+            profile.isDefault,
+        ) ??
+        profiles.find((profile) => profile.scope === 'global' && profile.isDefault) ??
+        profiles[0];
+      fallback ? this.editNetwork(fallback) : this.newNetwork();
+      this.networkProfilesInitialized = true;
     }
   }
 }

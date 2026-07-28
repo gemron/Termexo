@@ -17,7 +17,8 @@ Termexo 是一个面向开发者和企业研发团队的本地优先 AI 开发�
 * **多 Agent 与模型控制面**：Agent 编排、模型路由、供应商 Plan 余量、告警与耗尽降级。
 * **连接式 Workspace**：细粒度共享、可信设备、远程电脑、手机访问和操作审计。
 
-当前 V0.3 已形成 Claude Code 与 Codex CLI 共用的本地多 Agent 会话工作台；Gemini
+当前 V0.3.1 已形成 Claude Code 与 Codex CLI 共用的本地多 Agent 会话工作台，并完成
+界面主题升级、网络/npm Profile 和 CLI 安装升级管理；Gemini
 Adapter、Plan 余量监控和远程协作属于后续版本规划。所有远程能力都必须建立在本地所有权、
 明确授权、端到端加密和可撤销访问之上。
 
@@ -1446,6 +1447,23 @@ Model：Claude Sonnet
 
 增加：
 
+* 支持的 Agent CLI 一键安装
+* CLI 版本检查、一键升级与升级结果验证
+* 安装源、目标版本和升级策略可见且可确认
+* 安装或升级失败时提供明确诊断，不破坏现有可用 CLI
+* 为内网开发环境创建全局或 Workspace 级 HTTP、HTTPS 与 SOCKS 代理 Profile
+* 支持系统代理以及 `HTTP_PROXY`、`HTTPS_PROXY`、`ALL_PROXY`、`NO_PROXY` 等标准环境变量
+* 管理 npm registry、`proxy`、`https-proxy`、`strict-ssl` 和企业 CA 证书配置
+* 启动 Agent、安装或升级 CLI 时按作用域注入代理，不默认改写用户的全局 npm 配置
+* 提供代理、registry、DNS、TLS 和目标服务连通性测试及明确诊断
+* 代理账号凭据进入操作系统安全存储，不写入日志、快照或可导出的普通配置
+* 代理应用失败时回退到原网络配置，并明确显示当前生效的代理 Profile
+* 同时管理多个 Claude Code 登录账号与多个 Codex 登录账号
+* 为每个第三方模型供应商保存多个独立账号和凭据配置
+* 在全局、Workspace 或单个终端范围选择默认账号并快速切换
+* 始终明确显示当前 Agent、供应商和正在使用的账号，不静默切换
+* 切换前检查会话与账号兼容性，失败时恢复原账号和运行配置
+* 账号凭据进入操作系统安全存储，界面、数据库、日志和快照不回显明文
 * Provider 管理
 * Model Profile
 * 密钥存储
@@ -1460,6 +1478,21 @@ Model：Claude Sonnet
 * 多账号、多时间窗口和余量告警
 * 模型切换前的配额可用性检查
 
+当前开发进度：
+
+* [x] 全局与 Workspace 网络代理 Profile 的创建、编辑、删除和 SQLite 持久化
+* [x] HTTP、HTTPS、SOCKS、`NO_PROXY` 与 npm registry/proxy/SSL/CA 配置
+* [x] 代理密码进入操作系统安全存储，拒绝 URL 内嵌明文凭据
+* [x] Workspace Profile 优先、全局 Profile 回退，并注入 Claude/Codex 启动环境
+* [x] DNS 解析与 TCP 连通性测试、错误诊断和桌面端功能测试
+* [x] Claude Code 与 Codex 官方 npm 包安装/升级计划预览
+* [x] 精确版本或 dist-tag 选择、安装源、npm 与生效代理可见并明确确认
+* [x] 安装前 registry 解析、禁止并发操作、超时终止与安装后健康验证
+* [x] CLI 安装/升级复用 Workspace 优先、全局回退的代理与 npm 配置
+* [ ] 系统代理自动发现与导入
+* [ ] CLI 安装失败后的原版本自动回滚
+* [ ] 多账号切换和 Plan 余量监控
+
 交付标准：
 
 ```text
@@ -1467,6 +1500,8 @@ Model：Claude Sonnet
 不会因为部分失败破坏原有会话
 可以查看每个供应商和账号的 Plan 剩余额度与重置时间
 无法获取官方数据时明确显示估算或不可用
+可以为内网 Workspace 配置代理与 npm registry，并在启动 Agent 前验证连通性
+代理密码不进入 SQLite、日志、快照或前端回传数据
 ```
 
 ---

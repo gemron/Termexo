@@ -3,9 +3,11 @@ use tauri::State;
 
 use crate::agent::{AgentAdapter, AgentLaunchSpec, ClaudeCodeAdapter, ClaudeLaunchOptions};
 use crate::config::{
-    CredentialStore, McpProfile, McpProfileInput, ModelProfile, ModelProfileInput,
+    CredentialStore, McpProfile, McpProfileInput, ModelProfile, ModelProfileInput, NetworkProfile,
+    NetworkProfileInput,
 };
 use crate::database::WorkspaceDatabase;
+use crate::network::{self, NetworkTestResult};
 
 #[tauri::command]
 pub fn list_model_profiles(
@@ -121,6 +123,126 @@ pub fn delete_mcp_profile(
     database
         .delete_mcp_profile(&profile_id)
         .map_err(|error| error.to_string())
+}
+
+#[tauri::command]
+pub fn list_network_profiles(
+    database: State<'_, WorkspaceDatabase>,
+) -> Result<Vec<NetworkProfile>, String> {
+    database
+        .list_network_profiles()
+        .map_err(|error| error.to_string())
+}
+
+#[tauri::command]
+pub fn save_network_profile(
+    input: NetworkProfileInput,
+    database: State<'_, WorkspaceDatabase>,
+    credentials: State<'_, CredentialStore>,
+) -> Result<NetworkProfile, String> {
+    let existing = database
+        .find_network_profile(&input.id)
+        .map_err(|error| error.to_string())?;
+    let proxy_username = optional_trim(input.proxy_username);
+    let credential_target = if input.clear_credential || proxy_username.is_none() {
+        if let Some(target) = existing
+            .as_ref()
+            .and_then(|profile| profile.credential_target.as_deref())
+        {
+            credentials.delete(target);
+        }
+        None
+    } else {
+        match input.proxy_password.as_deref().map(str::trim) {
+            Some(password) if !password.is_empty() => {
+                let target = format!("network-profile:{}", input.id);
+                credentials
+                    .set(&target, password)
+                    .map_err(|error| error.to_string())?;
+                Some(target)
+            }
+            _ => existing.and_then(|profile| profile.credential_target),
+        }
+    };
+    let scope = input.scope.trim().to_owned();
+    let profile = NetworkProfile {
+        id: input.id,
+        name: input.name.trim().to_owned(),
+        workspace_id: (scope == "workspace")
+            .then(|| optional_trim(input.workspace_id))
+            .flatten(),
+        scope,
+        enabled: input.enabled,
+        is_default: input.is_default,
+        http_proxy: optional_trim(input.http_proxy),
+        https_proxy: optional_trim(input.https_proxy),
+        all_proxy: optional_trim(input.all_proxy),
+        no_proxy: optional_trim(input.no_proxy),
+        npm_registry: optional_trim(input.npm_registry),
+        npm_proxy: optional_trim(input.npm_proxy),
+        npm_https_proxy: optional_trim(input.npm_https_proxy),
+        npm_strict_ssl: input.npm_strict_ssl,
+        npm_ca_path: optional_trim(input.npm_ca_path),
+        proxy_username,
+        has_credential: credential_target.is_some(),
+        credential_target,
+    };
+    network::validate_profile(&profile)?;
+    if profile.has_credential && profile.proxy_username.is_none() {
+        return Err("代理密码存在时必须填写用户名".into());
+    }
+    database
+        .save_network_profile(&profile)
+        .map_err(|error| error.to_string())?;
+    Ok(profile)
+}
+
+#[tauri::command]
+pub fn delete_network_profile(
+    profile_id: String,
+    database: State<'_, WorkspaceDatabase>,
+    credentials: State<'_, CredentialStore>,
+) -> Result<(), String> {
+    if let Some(profile) = database
+        .find_network_profile(&profile_id)
+        .map_err(|error| error.to_string())?
+    {
+        if let Some(target) = profile.credential_target {
+            credentials.delete(&target);
+        }
+    }
+    database
+        .delete_network_profile(&profile_id)
+        .map_err(|error| error.to_string())
+}
+
+#[tauri::command]
+pub async fn test_network_profile(
+    profile_id: String,
+    database: State<'_, WorkspaceDatabase>,
+    credentials: State<'_, CredentialStore>,
+) -> Result<NetworkTestResult, String> {
+    let profile = database
+        .find_network_profile(&profile_id)
+        .map_err(|error| error.to_string())?
+        .ok_or_else(|| "代理 Profile 不存在".to_owned())?;
+    let password = profile
+        .credential_target
+        .as_deref()
+        .map(|target| credentials.get(target))
+        .transpose()
+        .map_err(|error| error.to_string())?;
+    tauri::async_runtime::spawn_blocking(move || {
+        network::test_profile(&profile, password.as_deref())
+    })
+    .await
+    .map_err(|error| error.to_string())?
+}
+
+fn optional_trim(value: Option<String>) -> Option<String> {
+    value
+        .map(|value| value.trim().to_owned())
+        .filter(|value| !value.is_empty())
 }
 
 #[derive(Debug, Deserialize)]

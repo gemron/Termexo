@@ -1,6 +1,6 @@
 [package]
 name = "termexo"
-version = "0.3.0"
+version = "0.3.1"
 description = "Local-first AI coding workspace"
 authors = ["Termexo contributors"]
 edition = "2021"
@@ -24,3 +24,4 @@ tauri-plugin-dialog = "2.7.2"
 thiserror = "2.0"
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+url = "2.5"

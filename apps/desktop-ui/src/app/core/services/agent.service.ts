@@ -7,11 +7,17 @@ import {
   AgentLaunchSpec,
   AgentSession,
   ClaudeLaunchRequest,
+  CliOperationPlan,
+  CliOperationRequest,
+  CliOperationResult,
   CodexLaunchRequest,
   McpProfile,
   McpProfileInput,
   ModelProfile,
   ModelProfileInput,
+  NetworkProfile,
+  NetworkProfileInput,
+  NetworkTestResult,
 } from '../models/agent.models';
 import { isTauriRuntime } from './tauri-runtime';
 
@@ -40,6 +46,7 @@ export class AgentService {
   private readonly eventItems = signal<AgentEvent[]>([]);
   private readonly modelProfileItems = signal<ModelProfile[]>([]);
   private readonly mcpProfileItems = signal<McpProfile[]>([]);
+  private readonly networkProfileItems = signal<NetworkProfile[]>([]);
   private readonly busyState = signal(false);
   private readonly errorState = signal<string | null>(null);
   private initialized = false;
@@ -52,6 +59,7 @@ export class AgentService {
   readonly events = this.eventItems.asReadonly();
   readonly modelProfiles = this.modelProfileItems.asReadonly();
   readonly mcpProfiles = this.mcpProfileItems.asReadonly();
+  readonly networkProfiles = this.networkProfileItems.asReadonly();
   readonly busy = this.busyState.asReadonly();
   readonly error = this.errorState.asReadonly();
 
@@ -169,6 +177,69 @@ export class AgentService {
     return invoke<AgentLaunchSpec>('prepare_codex_launch', { request });
   }
 
+  async previewCliOperation(request: CliOperationRequest): Promise<CliOperationPlan> {
+    if (!isTauriRuntime()) {
+      const installation =
+        request.agentType === 'claude' ? this.installationState() : this.codexInstallationState();
+      const packageName =
+        request.agentType === 'claude' ? '@anthropic-ai/claude-code' : '@openai/codex';
+      const targetVersion = request.targetVersion?.trim() || 'latest';
+      return {
+        agentType: request.agentType,
+        displayName: request.agentType === 'claude' ? 'Claude Code' : 'Codex CLI',
+        packageName,
+        targetVersion,
+        packageSpec: `${packageName}@${targetVersion}`,
+        action: installation?.installed ? 'upgrade' : 'install',
+        currentVersion: installation?.version,
+        npmPath: 'browser-preview/npm',
+        npmVersion: 'preview',
+        commandPreview: `npm install --global ${packageName}@${targetVersion} --no-fund --no-audit`,
+        networkProfileId: this.networkProfileItems().find(
+          (profile) =>
+            profile.enabled &&
+            profile.isDefault &&
+            (profile.workspaceId === request.workspaceId || profile.scope === 'global'),
+        )?.id,
+        ready: true,
+        diagnostic: '浏览器预览已生成安装计划；桌面端会执行真实 npm 检测与版本验证。',
+      };
+    }
+    return this.runValue(() => invoke<CliOperationPlan>('preview_cli_operation', { request }));
+  }
+
+  async executeCliOperation(request: CliOperationRequest): Promise<CliOperationResult> {
+    if (!isTauriRuntime()) {
+      const plan = await this.previewCliOperation(request);
+      const installation: AgentInstallation = {
+        agentType: request.agentType,
+        installed: false,
+        healthy: false,
+        diagnostic: '浏览器预览不会修改本机 CLI，请在桌面端执行。',
+      };
+      return {
+        success: false,
+        plan,
+        installation,
+        stdout: '',
+        stderr: '',
+        durationMs: 0,
+        diagnostic: installation.diagnostic,
+      };
+    }
+    const result = await this.runValue(() =>
+      invoke<CliOperationResult>('execute_cli_operation', {
+        request: { ...request, confirmed: true },
+      }),
+    );
+    if (result.installation.agentType === 'claude') {
+      this.installationState.set(result.installation);
+    } else {
+      this.codexInstallationState.set(result.installation);
+    }
+    return result;
+  }
+
   async saveModelProfile(input: ModelProfileInput): Promise<void> {
     if (!isTauriRuntime()) {
       const { apiKey, clearCredential, ...profile } = input;
@@ -205,17 +276,56 @@ export class AgentService {
     this.mcpProfileItems.update((items) => items.filter((item) => item.id !== profileId));
   }
 
+  async saveNetworkProfile(input: NetworkProfileInput): Promise<void> {
+    if (!isTauriRuntime()) {
+      const existing = this.networkProfileItems().find((profile) => profile.id === input.id);
+      const { proxyPassword, clearCredential, ...profile } = input;
+      this.upsertNetworkProfile({
+        ...profile,
+        hasCredential:
+          !profile.proxyUsername || clearCredential
+            ? false
+            : Boolean(proxyPassword) || Boolean(existing?.hasCredential),
+      });
+      return;
+    }
+    const profile = await invoke<NetworkProfile>('save_network_profile', { input });
+    this.upsertNetworkProfile(profile);
+  }
+
+  async deleteNetworkProfile(profileId: string): Promise<void> {
+    if (isTauriRuntime()) {
+      await invoke('delete_network_profile', { profileId });
+    }
+    this.networkProfileItems.update((items) => items.filter((item) => item.id !== profileId));
+  }
+
+  async testNetworkProfile(profileId: string): Promise<NetworkTestResult> {
+    if (!isTauriRuntime()) {
+      return {
+        profileId,
+        healthy: true,
+        target: 'browser-preview',
+        message: '浏览器预览已验证 Profile 交互；桌面端会执行真实 TCP 连通性测试。',
+        latencyMs: 0,
+      };
+    }
+    return invoke<NetworkTestResult>('test_network_profile', { profileId });
+  }
+
   private async loadProfiles(): Promise<void> {
     if (!isTauriRuntime()) {
       return;
     }
     await this.run(async () => {
-      const [modelProfiles, mcpProfiles] = await Promise.all([
+      const [modelProfiles, mcpProfiles, networkProfiles] = await Promise.all([
         invoke<ModelProfile[]>('list_model_profiles'),
         invoke<McpProfile[]>('list_mcp_profiles'),
+        invoke<NetworkProfile[]>('list_network_profiles'),
       ]);
       this.modelProfileItems.set(modelProfiles);
       this.mcpProfileItems.set(mcpProfiles);
+      this.networkProfileItems.set(networkProfiles);
     });
   }
 
@@ -255,6 +365,21 @@ export class AgentService {
     }
   }
 
+  private async runValue<T>(action: () => Promise<T>): Promise<T> {
+    this.pendingOperations += 1;
+    this.busyState.set(true);
+    this.errorState.set(null);
+    try {
+      return await action();
+    } catch (error) {
+      this.errorState.set(this.errorMessage(error));
+      throw error;
+    } finally {
+      this.pendingOperations = Math.max(0, this.pendingOperations - 1);
+      this.busyState.set(this.pendingOperations > 0);
+    }
+  }
+
   private errorMessage(error: unknown): string {
     return error instanceof Error ? error.message : String(error);
   }
@@ -268,6 +393,13 @@ export class AgentService {
 
   private upsertMcpProfile(profile: McpProfile): void {
     this.mcpProfileItems.update((items) => [
+      ...items.filter((item) => item.id !== profile.id),
+      profile,
+    ]);
+  }
+
+  private upsertNetworkProfile(profile: NetworkProfile): void {
+    this.networkProfileItems.update((items) => [
       ...items.filter((item) => item.id !== profile.id),
       profile,
     ]);

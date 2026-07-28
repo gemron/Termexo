@@ -10,6 +10,7 @@ use crate::agent::{
 use crate::config::{CredentialStore, LaunchEnvironmentStore, ModelProfile};
 use crate::database::WorkspaceDatabase;
 use crate::hooks::HookEventStore;
+use crate::network;
 
 #[tauri::command]
 pub async fn detect_claude() -> Result<AgentInstallation, String> {
@@ -90,6 +91,7 @@ pub fn build_codex_launch_command(options: CodexLaunchOptions) -> Result<AgentLa
 #[serde(rename_all = "camelCase")]
 pub struct PrepareClaudeLaunchRequest {
     pub terminal_id: String,
+    pub workspace_id: Option<String>,
     pub session_id: Option<String>,
     pub name: Option<String>,
     pub profile_id: Option<String>,
@@ -99,6 +101,8 @@ pub struct PrepareClaudeLaunchRequest {
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct PrepareCodexLaunchRequest {
+    pub terminal_id: String,
+    pub workspace_id: Option<String>,
     pub session_id: Option<String>,
     pub model: Option<String>,
 }
@@ -144,6 +148,11 @@ pub fn prepare_claude_launch(
             environment.insert("ANTHROPIC_AUTH_TOKEN".into(), token);
         }
     }
+    environment.extend(network_environment(
+        &database,
+        &credentials,
+        request.workspace_id.as_deref(),
+    )?);
     launch_environment
         .put(request.terminal_id, environment)
         .map_err(|error| error.to_string())?;
@@ -160,13 +169,43 @@ pub fn prepare_claude_launch(
 }
 
 #[tauri::command]
-pub fn prepare_codex_launch(request: PrepareCodexLaunchRequest) -> Result<AgentLaunchSpec, String> {
+pub fn prepare_codex_launch(
+    request: PrepareCodexLaunchRequest,
+    database: State<'_, WorkspaceDatabase>,
+    credentials: State<'_, CredentialStore>,
+    launch_environment: State<'_, LaunchEnvironmentStore>,
+) -> Result<AgentLaunchSpec, String> {
+    let environment =
+        network_environment(&database, &credentials, request.workspace_id.as_deref())?;
+    launch_environment
+        .put(request.terminal_id, environment)
+        .map_err(|error| error.to_string())?;
     CodexCliAdapter::new()
         .build_launch_command(&CodexLaunchOptions {
             session_id: request.session_id,
             model: request.model,
         })
         .map_err(|error| error.to_string())
+}
+
+fn network_environment(
+    database: &WorkspaceDatabase,
+    credentials: &CredentialStore,
+    workspace_id: Option<&str>,
+) -> Result<HashMap<String, String>, String> {
+    let Some(profile) = database
+        .find_effective_network_profile(workspace_id)
+        .map_err(|error| error.to_string())?
+    else {
+        return Ok(HashMap::new());
+    };
+    let password = profile
+        .credential_target
+        .as_deref()
+        .map(|target| credentials.get(target))
+        .transpose()
+        .map_err(|error| error.to_string())?;
+    network::profile_environment(&profile, password.as_deref())
 }
 
 fn profile_environment(profile: Option<&ModelProfile>) -> HashMap<String, String> {

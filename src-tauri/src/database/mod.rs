@@ -7,11 +7,12 @@ use serde_json::Value;
 use thiserror::Error;
 
 use crate::agent::AgentSession;
-use crate::config::{McpProfile, ModelProfile};
+use crate::config::{McpProfile, ModelProfile, NetworkProfile};
 use crate::hooks::AgentEvent;
 
 const INITIAL_MIGRATION: &str = include_str!("../../migrations/0001_initial.sql");
 const AGENT_MIGRATION: &str = include_str!("../../migrations/0002_agent_sessions.sql");
+const NETWORK_MIGRATION: &str = include_str!("../../migrations/0003_network_profiles.sql");
 
 fn default_grid_dimension() -> u8 {
     2
@@ -77,6 +78,7 @@ impl WorkspaceDatabase {
         let connection = Connection::open(path)?;
         connection.execute_batch(INITIAL_MIGRATION)?;
         connection.execute_batch(AGENT_MIGRATION)?;
+        connection.execute_batch(NETWORK_MIGRATION)?;
         ensure_default_profile(&connection)?;
         Ok(Self {
             connection: Mutex::new(connection),
@@ -450,6 +452,162 @@ impl WorkspaceDatabase {
         connection.execute("DELETE FROM mcp_profiles WHERE id = ?1", [profile_id])?;
         Ok(())
     }
+
+    pub fn list_network_profiles(&self) -> Result<Vec<NetworkProfile>, DatabaseError> {
+        let connection = self
+            .connection
+            .lock()
+            .map_err(|_| DatabaseError::LockPoisoned)?;
+        let mut statement = connection.prepare(
+            "SELECT
+                 id, name, scope, workspace_id, enabled, is_default,
+                 http_proxy, https_proxy, all_proxy, no_proxy,
+                 npm_registry, npm_proxy, npm_https_proxy, npm_strict_ssl,
+                 npm_ca_path, proxy_username, credential_target
+             FROM network_profiles
+             ORDER BY is_default DESC, scope, name",
+        )?;
+        let rows = statement.query_map([], network_profile_from_row)?;
+        rows.collect::<Result<Vec<_>, _>>()
+            .map_err(DatabaseError::from)
+    }
+
+    pub fn find_network_profile(
+        &self,
+        profile_id: &str,
+    ) -> Result<Option<NetworkProfile>, DatabaseError> {
+        let connection = self
+            .connection
+            .lock()
+            .map_err(|_| DatabaseError::LockPoisoned)?;
+        let mut statement = connection.prepare(
+            "SELECT
+                 id, name, scope, workspace_id, enabled, is_default,
+                 http_proxy, https_proxy, all_proxy, no_proxy,
+                 npm_registry, npm_proxy, npm_https_proxy, npm_strict_ssl,
+                 npm_ca_path, proxy_username, credential_target
+             FROM network_profiles
+             WHERE id = ?1",
+        )?;
+        let mut rows = statement.query_map([profile_id], network_profile_from_row)?;
+        rows.next().transpose().map_err(DatabaseError::from)
+    }
+
+    pub fn find_effective_network_profile(
+        &self,
+        workspace_id: Option<&str>,
+    ) -> Result<Option<NetworkProfile>, DatabaseError> {
+        let connection = self
+            .connection
+            .lock()
+            .map_err(|_| DatabaseError::LockPoisoned)?;
+        let mut statement = connection.prepare(
+            "SELECT
+                 id, name, scope, workspace_id, enabled, is_default,
+                 http_proxy, https_proxy, all_proxy, no_proxy,
+                 npm_registry, npm_proxy, npm_https_proxy, npm_strict_ssl,
+                 npm_ca_path, proxy_username, credential_target
+             FROM network_profiles
+             WHERE enabled = 1
+               AND is_default = 1
+               AND (
+                   scope = 'global'
+                   OR (scope = 'workspace' AND workspace_id = ?1)
+               )
+             ORDER BY
+                 CASE
+                     WHEN scope = 'workspace' AND workspace_id = ?1 THEN 0
+                     ELSE 1
+                 END,
+                 name
+             LIMIT 1",
+        )?;
+        let mut rows = statement.query_map([workspace_id], network_profile_from_row)?;
+        rows.next().transpose().map_err(DatabaseError::from)
+    }
+
+    pub fn save_network_profile(&self, profile: &NetworkProfile) -> Result<(), DatabaseError> {
+        let connection = self
+            .connection
+            .lock()
+            .map_err(|_| DatabaseError::LockPoisoned)?;
+        let now = unix_timestamp_millis();
+        if profile.is_default {
+            if profile.scope == "workspace" {
+                connection.execute(
+                    "UPDATE network_profiles
+                     SET is_default = 0
+                     WHERE scope = 'workspace' AND workspace_id = ?1",
+                    [profile.workspace_id.as_deref()],
+                )?;
+            } else {
+                connection.execute(
+                    "UPDATE network_profiles SET is_default = 0 WHERE scope = 'global'",
+                    [],
+                )?;
+            }
+        }
+        connection.execute(
+            "INSERT INTO network_profiles (
+                 id, name, scope, workspace_id, enabled, is_default,
+                 http_proxy, https_proxy, all_proxy, no_proxy,
+                 npm_registry, npm_proxy, npm_https_proxy, npm_strict_ssl,
+                 npm_ca_path, proxy_username, credential_target, created_at, updated_at
+             )
+             VALUES (
+                 ?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10,
+                 ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18, ?18
+             )
+             ON CONFLICT(id) DO UPDATE SET
+                 name = excluded.name,
+                 scope = excluded.scope,
+                 workspace_id = excluded.workspace_id,
+                 enabled = excluded.enabled,
+                 is_default = excluded.is_default,
+                 http_proxy = excluded.http_proxy,
+                 https_proxy = excluded.https_proxy,
+                 all_proxy = excluded.all_proxy,
+                 no_proxy = excluded.no_proxy,
+                 npm_registry = excluded.npm_registry,
+                 npm_proxy = excluded.npm_proxy,
+                 npm_https_proxy = excluded.npm_https_proxy,
+                 npm_strict_ssl = excluded.npm_strict_ssl,
+                 npm_ca_path = excluded.npm_ca_path,
+                 proxy_username = excluded.proxy_username,
+                 credential_target = excluded.credential_target,
+                 updated_at = excluded.updated_at",
+            params![
+                profile.id,
+                profile.name,
+                profile.scope,
+                profile.workspace_id,
+                profile.enabled,
+                profile.is_default,
+                profile.http_proxy,
+                profile.https_proxy,
+                profile.all_proxy,
+                profile.no_proxy,
+                profile.npm_registry,
+                profile.npm_proxy,
+                profile.npm_https_proxy,
+                profile.npm_strict_ssl,
+                profile.npm_ca_path,
+                profile.proxy_username,
+                profile.credential_target,
+                now,
+            ],
+        )?;
+        Ok(())
+    }
+
+    pub fn delete_network_profile(&self, profile_id: &str) -> Result<(), DatabaseError> {
+        let connection = self
+            .connection
+            .lock()
+            .map_err(|_| DatabaseError::LockPoisoned)?;
+        connection.execute("DELETE FROM network_profiles WHERE id = ?1", [profile_id])?;
+        Ok(())
+    }
 }
 
 fn ensure_default_profile(connection: &Connection) -> Result<(), DatabaseError> {
@@ -482,6 +640,30 @@ fn model_profile_from_row(row: &rusqlite::Row<'_>) -> rusqlite::Result<ModelProf
     })
 }
 
+fn network_profile_from_row(row: &rusqlite::Row<'_>) -> rusqlite::Result<NetworkProfile> {
+    let credential_target: Option<String> = row.get(16)?;
+    Ok(NetworkProfile {
+        id: row.get(0)?,
+        name: row.get(1)?,
+        scope: row.get(2)?,
+        workspace_id: row.get(3)?,
+        enabled: row.get(4)?,
+        is_default: row.get(5)?,
+        http_proxy: row.get(6)?,
+        https_proxy: row.get(7)?,
+        all_proxy: row.get(8)?,
+        no_proxy: row.get(9)?,
+        npm_registry: row.get(10)?,
+        npm_proxy: row.get(11)?,
+        npm_https_proxy: row.get(12)?,
+        npm_strict_ssl: row.get(13)?,
+        npm_ca_path: row.get(14)?,
+        proxy_username: row.get(15)?,
+        has_credential: credential_target.is_some(),
+        credential_target,
+    })
+}
+
 fn unix_timestamp_millis() -> i64 {
     use std::time::{SystemTime, UNIX_EPOCH};
 
@@ -504,7 +686,9 @@ mod tests {
             .connection
             .lock()
             .unwrap()
-            .execute_batch(&format!("{INITIAL_MIGRATION}\n{AGENT_MIGRATION}"))
+            .execute_batch(&format!(
+                "{INITIAL_MIGRATION}\n{AGENT_MIGRATION}\n{NETWORK_MIGRATION}"
+            ))
             .unwrap();
 
         let workspace = Workspace {
@@ -571,7 +755,9 @@ mod tests {
             .connection
             .lock()
             .unwrap()
-            .execute_batch(&format!("{INITIAL_MIGRATION}\n{AGENT_MIGRATION}"))
+            .execute_batch(&format!(
+                "{INITIAL_MIGRATION}\n{AGENT_MIGRATION}\n{NETWORK_MIGRATION}"
+            ))
             .unwrap();
         let session = AgentSession {
             id: "claude:session-1".into(),
@@ -610,7 +796,9 @@ mod tests {
             .connection
             .lock()
             .unwrap()
-            .execute_batch(&format!("{INITIAL_MIGRATION}\n{AGENT_MIGRATION}"))
+            .execute_batch(&format!(
+                "{INITIAL_MIGRATION}\n{AGENT_MIGRATION}\n{NETWORK_MIGRATION}"
+            ))
             .unwrap();
         let model = ModelProfile {
             id: "profile-1".into(),
@@ -640,5 +828,66 @@ mod tests {
                 .unwrap()
                 .has_credential
         );
+    }
+
+    #[test]
+    fn resolves_workspace_network_profile_before_global_default() {
+        let database = WorkspaceDatabase {
+            connection: Mutex::new(Connection::open_in_memory().unwrap()),
+        };
+        database
+            .connection
+            .lock()
+            .unwrap()
+            .execute_batch(&format!(
+                "{INITIAL_MIGRATION}\n{AGENT_MIGRATION}\n{NETWORK_MIGRATION}"
+            ))
+            .unwrap();
+        let global = test_network_profile("global", "global", None);
+        let workspace = test_network_profile("workspace", "workspace", Some("workspace-1"));
+
+        database.save_network_profile(&global).unwrap();
+        database.save_network_profile(&workspace).unwrap();
+
+        assert_eq!(
+            database
+                .find_effective_network_profile(Some("workspace-1"))
+                .unwrap()
+                .unwrap()
+                .id,
+            "workspace"
+        );
+        assert_eq!(
+            database
+                .find_effective_network_profile(Some("workspace-2"))
+                .unwrap()
+                .unwrap()
+                .id,
+            "global"
+        );
+        assert_eq!(database.list_network_profiles().unwrap().len(), 2);
+    }
+
+    fn test_network_profile(id: &str, scope: &str, workspace_id: Option<&str>) -> NetworkProfile {
+        NetworkProfile {
+            id: id.into(),
+            name: id.into(),
+            scope: scope.into(),
+            workspace_id: workspace_id.map(str::to_owned),
+            enabled: true,
+            is_default: true,
+            http_proxy: None,
+            https_proxy: Some("http://127.0.0.1:8080".into()),
+            all_proxy: None,
+            no_proxy: Some("localhost".into()),
+            npm_registry: Some("https://registry.npmjs.org/".into()),
+            npm_proxy: None,
+            npm_https_proxy: None,
+            npm_strict_ssl: true,
+            npm_ca_path: None,
+            proxy_username: None,
+            credential_target: None,
+            has_credential: false,
+        }
     }
 }

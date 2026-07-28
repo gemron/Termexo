@@ -1,4 +1,4 @@
-<aside class="workspace-sidebar">
+<aside class="workspace-sidebar bg-base-200">
   <header class="brand-row">
     <div class="brand-mark" aria-hidden="true">
       <img src="termexo-mark.svg" alt="" />
@@ -8,12 +8,12 @@
   </header>
 
   <div class="sidebar-tools">
-    <label class="search-field">
+    <label class="search-field input input-bordered input-sm">
       <app-icon name="search" [size]="14" />
       <input type="search" aria-label="搜索工作区" placeholder="搜索工作区" />
     </label>
     <button
-      class="icon-button"
+      class="icon-button btn btn-square btn-ghost btn-sm"
       type="button"
       title="新建工作区"
       aria-label="新建工作区"
@@ -25,93 +25,76 @@
 
   <nav aria-label="工作区">
     <p class="section-label">工作区</p>
-    <div class="workspace-list">
+    <ul class="workspace-list menu menu-sm">
       @for (workspace of workspaces(); track workspace.id) {
-        <button
-          type="button"
-          class="workspace-item"
-          [class.active]="workspace.id === activeWorkspaceId()"
-          [style.--workspace-color]="workspaceColor(workspace)"
-          (click)="workspaceSelected.emit(workspace.id)"
-        >
-          <span class="workspace-glyph">
-            <app-icon name="folder" [size]="15" />
-          </span>
-          <span class="workspace-copy">
-            <strong>{{ workspace.name }}</strong>
-            <small>{{ workspace.activeBranch }}</small>
-          </span>
+        <li class="workspace-entry" [style.--workspace-color]="workspaceColor(workspace)">
+          <button
+            type="button"
+            class="workspace-item"
+            [class.active]="workspace.id === activeWorkspaceId()"
+            (click)="workspaceSelected.emit(workspace.id)"
+          >
+            <span class="workspace-glyph">
+              <app-icon name="folder" [size]="15" />
+            </span>
+            <span class="workspace-copy">
+              <strong>{{ workspace.name }}</strong>
+              <small>{{ workspace.activeBranch }}</small>
+            </span>
+          </button>
           <span class="workspace-actions">
             <span class="workspace-order-actions" aria-label="调整工作区顺序">
-              <span
+              <button
+                type="button"
                 class="workspace-order-action"
-                [class.disabled]="$first"
-                role="button"
-                [attr.tabindex]="$first ? -1 : 0"
-                [attr.aria-disabled]="$first"
+                [disabled]="$first"
                 title="上移工作区"
                 aria-label="上移工作区"
-                (click)="
-                  $event.stopPropagation();
-                  moveRequested.emit({ workspaceId: workspace.id, direction: -1 })
-                "
-                (keydown.enter)="
-                  $event.stopPropagation();
-                  moveRequested.emit({ workspaceId: workspace.id, direction: -1 })
-                "
+                (click)="moveRequested.emit({ workspaceId: workspace.id, direction: -1 })"
               >
                 <app-icon name="arrow-up" [size]="10" />
-              </span>
-              <span
+              </button>
+              <button
+                type="button"
                 class="workspace-order-action"
-                [class.disabled]="$last"
-                role="button"
-                [attr.tabindex]="$last ? -1 : 0"
-                [attr.aria-disabled]="$last"
+                [disabled]="$last"
                 title="下移工作区"
                 aria-label="下移工作区"
-                (click)="
-                  $event.stopPropagation();
-                  moveRequested.emit({ workspaceId: workspace.id, direction: 1 })
-                "
-                (keydown.enter)="
-                  $event.stopPropagation();
-                  moveRequested.emit({ workspaceId: workspace.id, direction: 1 })
-                "
+                (click)="moveRequested.emit({ workspaceId: workspace.id, direction: 1 })"
               >
                 <app-icon name="arrow-down" [size]="10" />
-              </span>
+              </button>
             </span>
-            <span
+            <button
+              type="button"
               class="workspace-action edit"
-              role="button"
-              tabindex="0"
               title="编辑工作区"
               aria-label="编辑工作区"
-              (click)="$event.stopPropagation(); editRequested.emit(workspace.id)"
-              (keydown.enter)="$event.stopPropagation(); editRequested.emit(workspace.id)"
+              (click)="editRequested.emit(workspace.id)"
             >
               <app-icon name="edit" [size]="12" />
-            </span>
-            <span
+            </button>
+            <button
+              type="button"
               class="workspace-action favorite"
               [class.selected]="workspace.favorite"
-              role="button"
-              tabindex="0"
               [attr.aria-label]="workspace.favorite ? '取消收藏' : '收藏'"
-              (click)="$event.stopPropagation(); favoriteToggled.emit(workspace.id)"
-              (keydown.enter)="$event.stopPropagation(); favoriteToggled.emit(workspace.id)"
+              (click)="favoriteToggled.emit(workspace.id)"
             >
               <app-icon name="star" [size]="13" />
-            </span>
+            </button>
           </span>
-        </button>
+        </li>
       }
-    </div>
+    </ul>
   </nav>
 
   <footer>
-    <button type="button" class="footer-action" (click)="settingsRequested.emit()">
+    <button
+      type="button"
+      class="footer-action btn btn-ghost btn-sm"
+      (click)="settingsRequested.emit()"
+    >
       <app-icon name="settings" [size]="15" />
       <span>设置</span>
     </button>
