@@ -2,6 +2,9 @@ import { Injectable, signal } from '@angular/core';
 import { invoke } from '@tauri-apps/api/core';
 
 import {
+  AccountLoginRequest,
+  AccountProfile,
+  AccountProfileInput,
   AgentEvent,
   AgentInstallation,
   AgentLaunchSpec,
@@ -47,6 +50,7 @@ export class AgentService {
   private readonly modelProfileItems = signal<ModelProfile[]>([]);
   private readonly mcpProfileItems = signal<McpProfile[]>([]);
   private readonly networkProfileItems = signal<NetworkProfile[]>([]);
+  private readonly accountProfileItems = signal<AccountProfile[]>([]);
   private readonly busyState = signal(false);
   private readonly errorState = signal<string | null>(null);
   private initialized = false;
@@ -60,6 +64,7 @@ export class AgentService {
   readonly modelProfiles = this.modelProfileItems.asReadonly();
   readonly mcpProfiles = this.mcpProfileItems.asReadonly();
   readonly networkProfiles = this.networkProfileItems.asReadonly();
+  readonly accountProfiles = this.accountProfileItems.asReadonly();
   readonly busy = this.busyState.asReadonly();
   readonly error = this.errorState.asReadonly();
 
@@ -82,6 +87,26 @@ export class AgentService {
           hasCredential: false,
         },
       ]);
+      this.accountProfileItems.set([
+        {
+          id: 'claude-system',
+          name: '系统 Claude 账号',
+          agentType: 'claude',
+          isDefault: true,
+          isSystem: true,
+          authenticated: true,
+          diagnostic: '浏览器预览账号',
+        },
+        {
+          id: 'codex-system',
+          name: '系统 ChatGPT 账号',
+          agentType: 'codex',
+          isDefault: true,
+          isSystem: true,
+          authenticated: true,
+          diagnostic: '浏览器预览账号',
+        },
+      ]);
       return;
     }
 
@@ -91,6 +116,7 @@ export class AgentService {
       this.loadProfiles(),
       this.loadSessions(),
     ]);
+    void this.refreshAccountStatuses();
     await this.syncEvents();
     this.pollingHandle = window.setInterval(() => {
       void this.syncEvents();
@@ -175,6 +201,19 @@ export class AgentService {
       };
     }
     return invoke<AgentLaunchSpec>('prepare_codex_launch', { request });
+  }
+
+  async prepareAccountLogin(request: AccountLoginRequest): Promise<AgentLaunchSpec> {
+    if (!isTauriRuntime()) {
+      const profile = this.accountProfileItems().find(
+        (candidate) => candidate.id === request.accountProfileId,
+      );
+      return {
+        command: profile?.agentType === 'codex' ? 'codex login' : 'claude auth login',
+        executablePath: profile?.agentType === 'codex' ? 'codex' : 'claude',
+      };
+    }
+    return invoke<AgentLaunchSpec>('prepare_account_login', { request });
   }
 
   async previewCliOperation(request: CliOperationRequest): Promise<CliOperationPlan> {
@@ -313,19 +352,58 @@ export class AgentService {
     return invoke<NetworkTestResult>('test_network_profile', { profileId });
   }
 
+  async saveAccountProfile(input: AccountProfileInput): Promise<void> {
+    if (!isTauriRuntime()) {
+      const existing = this.accountProfileItems().find((profile) => profile.id === input.id);
+      this.upsertAccountProfile({
+        ...input,
+        isSystem: existing?.isSystem ?? false,
+        authenticated: existing?.authenticated ?? false,
+        diagnostic: existing?.diagnostic ?? '尚未登录',
+      });
+      return;
+    }
+    const profile = await invoke<AccountProfile>('save_account_profile', { input });
+    if (profile.isDefault) {
+      this.accountProfileItems.update((items) =>
+        items.map((item) =>
+          item.agentType === profile.agentType ? { ...item, isDefault: false } : item,
+        ),
+      );
+    }
+    this.upsertAccountProfile(profile);
+  }
+
+  async refreshAccountProfile(profileId: string): Promise<void> {
+    if (!isTauriRuntime()) {
+      return;
+    }
+    const profile = await invoke<AccountProfile>('refresh_account_profile', { profileId });
+    this.upsertAccountProfile(profile);
+  }
+
+  async deleteAccountProfile(profileId: string): Promise<void> {
+    if (isTauriRuntime()) {
+      await invoke('delete_account_profile', { profileId });
+    }
+    this.accountProfileItems.update((items) => items.filter((item) => item.id !== profileId));
+  }
+
   private async loadProfiles(): Promise<void> {
     if (!isTauriRuntime()) {
       return;
     }
     await this.run(async () => {
-      const [modelProfiles, mcpProfiles, networkProfiles] = await Promise.all([
+      const [modelProfiles, mcpProfiles, networkProfiles, accountProfiles] = await Promise.all([
         invoke<ModelProfile[]>('list_model_profiles'),
         invoke<McpProfile[]>('list_mcp_profiles'),
         invoke<NetworkProfile[]>('list_network_profiles'),
+        invoke<AccountProfile[]>('list_account_profiles'),
       ]);
       this.modelProfileItems.set(modelProfiles);
       this.mcpProfileItems.set(mcpProfiles);
       this.networkProfileItems.set(networkProfiles);
+      this.accountProfileItems.set(accountProfiles);
     });
   }
 
@@ -333,6 +411,11 @@ export class AgentService {
     await this.run(async () => {
       this.sessionItems.set(await invoke<AgentSession[]>('list_agent_sessions'));
     });
+  }
+
+  private async refreshAccountStatuses(): Promise<void> {
+    const profileIds = this.accountProfileItems().map((profile) => profile.id);
+    await Promise.allSettled(profileIds.map((profileId) => this.refreshAccountProfile(profileId)));
   }
 
   private async syncEvents(): Promise<void> {
@@ -400,6 +483,13 @@ export class AgentService {
 
   private upsertNetworkProfile(profile: NetworkProfile): void {
     this.networkProfileItems.update((items) => [
+      ...items.filter((item) => item.id !== profile.id),
+      profile,
+    ]);
+  }
+
+  private upsertAccountProfile(profile: AccountProfile): void {
+    this.accountProfileItems.update((items) => [
       ...items.filter((item) => item.id !== profile.id),
       profile,
     ]);

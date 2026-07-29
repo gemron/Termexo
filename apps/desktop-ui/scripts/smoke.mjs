@@ -172,10 +172,47 @@ try {
     fullPage: true,
   });
 
+  const workspaceSidebar = page.locator('app-workspace-sidebar');
+  const workspaceResizeHandle = page.getByRole('separator', {
+    name: '调整工作区侧栏宽度',
+  });
+  const initialWorkspaceSidebarBox = await workspaceSidebar.boundingBox();
+  const workspaceResizeBox = await workspaceResizeHandle.boundingBox();
+  if (!initialWorkspaceSidebarBox || !workspaceResizeBox) {
+    throw new Error('workspace sidebar resize handle did not render');
+  }
+  await page.mouse.move(
+    workspaceResizeBox.x + workspaceResizeBox.width / 2,
+    workspaceResizeBox.y + 120,
+  );
+  await page.mouse.down();
+  await page.mouse.move(workspaceResizeBox.x + 44, workspaceResizeBox.y + 120);
+  await page.mouse.up();
+  const resizedWorkspaceSidebarBox = await workspaceSidebar.boundingBox();
+  if (
+    !resizedWorkspaceSidebarBox ||
+    resizedWorkspaceSidebarBox.width < initialWorkspaceSidebarBox.width + 30
+  ) {
+    throw new Error('workspace sidebar width did not respond to dragging');
+  }
+  await page.getByRole('button', { name: '折叠工作区侧栏' }).click();
+  await workspaceSidebar.waitFor({ state: 'detached' });
+  await page.getByRole('button', { name: '展开工作区侧栏' }).click();
+  await workspaceSidebar.waitFor();
+
+  const inspectorPanel = page.locator('app-inspector-panel');
+  await page.getByRole('button', { name: '折叠 Agent 侧栏' }).click();
+  await inspectorPanel.waitFor({ state: 'detached' });
+  await page.getByRole('button', { name: '展开 Agent 侧栏' }).click();
+  await inspectorPanel.waitFor();
+
   await toolbar.getByRole('button', { name: 'Agent', exact: true }).click();
   const agentMenu = page.locator('.agent-menu');
   await agentMenu.waitFor();
   await assertWithinViewport(agentMenu, 'Agent menu');
+  if ((await agentMenu.getByText(/Gemini|Google CLI/i).count()) !== 0) {
+    throw new Error('removed Google CLI feature is still visible');
+  }
   page.once('dialog', (dialog) => dialog.accept(dialog.defaultValue()));
   await page.getByRole('button', { name: /Claude Code/ }).click();
   const launchDialog = page.getByRole('dialog', { name: '新建 Claude 会话' });
@@ -185,7 +222,15 @@ try {
   }
   await launchDialog.getByRole('button', { name: '关闭' }).click();
 
-  await toolbar.getByRole('button', { name: '切换模型', exact: true }).click();
+  await toolbar.getByRole('button', { name: 'Agent', exact: true }).click();
+  page.once('dialog', (dialog) => dialog.accept(dialog.defaultValue()));
+  await page.getByRole('button', { name: /Codex CLI/ }).click();
+  const codexLaunchDialog = page.getByRole('dialog', { name: '新建 Codex 会话' });
+  await codexLaunchDialog.waitFor();
+  await codexLaunchDialog.getByLabel('Codex 模型').fill('gpt-5.6-sol');
+  await codexLaunchDialog.getByRole('button', { name: '关闭' }).click();
+
+  await toolbar.getByRole('button', { name: 'Claude 模型', exact: true }).click();
   const modelSwitchDialog = page.getByRole('dialog', {
     name: '切换 Claude Code 后端模型',
   });
@@ -240,6 +285,29 @@ try {
   await page.getByRole('button', { name: '设置', exact: true }).click();
   const settingsDialog = page.getByRole('dialog', { name: 'Agent 与开发环境设置' });
   await settingsDialog.waitFor();
+  await settingsDialog.getByRole('button', { name: '登录账号', exact: true }).click();
+  await settingsDialog.getByRole('button', { name: '添加隔离账号', exact: true }).click();
+  await settingsDialog.getByLabel('账号名称', { exact: true }).fill('Smoke ChatGPT');
+  await settingsDialog.locator('.account-editor select').selectOption('codex');
+  await settingsDialog.getByLabel('设为此 CLI 的默认登录账号', { exact: true }).check();
+  const saveAccountButton = settingsDialog.getByRole('button', {
+    name: '保存账号',
+    exact: true,
+  });
+  await saveAccountButton.click();
+  await settingsDialog
+    .locator('.profile-nav button')
+    .filter({ hasText: 'Smoke ChatGPT' })
+    .waitFor();
+  await saveAccountButton.click();
+  const smokeAccountCount = await settingsDialog
+    .locator('.profile-nav button')
+    .filter({ hasText: 'Smoke ChatGPT' })
+    .count();
+  if (smokeAccountCount !== 1) {
+    throw new Error('saving a new account twice created duplicate profiles');
+  }
+
   await settingsDialog.getByRole('button', { name: '模型 Profile' }).click();
   await settingsDialog.getByRole('button', { name: /新建 Profile/ }).click();
   await settingsDialog.getByLabel('名称', { exact: true }).fill('Smoke Profile');

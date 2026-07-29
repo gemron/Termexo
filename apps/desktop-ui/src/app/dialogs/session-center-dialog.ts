@@ -3,6 +3,7 @@ import { Component, computed, input, output, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 
 import {
+  type AccountProfile,
   type AgentInstallation,
   type AgentSession,
   type McpProfile,
@@ -15,6 +16,8 @@ export interface ResumeSessionValue {
   session: AgentSession;
   profileId?: string;
   mcpProfileId?: string;
+  accountProfileId?: string;
+  model?: string;
 }
 
 type SessionAgentFilter = 'all' | NativeAgentType;
@@ -189,11 +192,62 @@ const AGENT_FILTERS: readonly {
                 }
               </select>
             </label>
+            <label>
+              <span>Claude 登录账号</span>
+              <select
+                [ngModel]="resolvedClaudeAccountProfileId()"
+                (ngModelChange)="claudeAccountProfileId.set($event)"
+              >
+                @for (profile of claudeAccounts(); track profile.id) {
+                  <option [value]="profile.id">
+                    {{ profile.name }} · {{ profile.authenticated ? '已登录' : '未登录' }}
+                  </option>
+                }
+              </select>
+            </label>
           </div>
-        } @else if (agentFilter() === 'codex') {
-          <div class="codex-resume-note">
-            <app-icon name="radio" [size]="13" />
-            Codex 会使用原生会话 ID 和本机配置恢复，不修改 rollout 文件。
+        }
+
+        @if (showsCodexOptions()) {
+          <div class="resume-options codex-resume-options">
+            <div class="resume-options-copy">
+              <span class="session-agent" data-agent="codex">
+                <app-icon name="terminal" [size]="14" />
+              </span>
+              <div>
+                <strong>Codex 恢复配置</strong>
+                <small>保留原生会话 ID，只读使用 rollout 索引</small>
+              </div>
+            </div>
+            <label>
+              <span>ChatGPT 登录账号</span>
+              <select
+                [ngModel]="resolvedCodexAccountProfileId()"
+                (ngModelChange)="codexAccountProfileId.set($event)"
+              >
+                @for (profile of codexAccounts(); track profile.id) {
+                  <option [value]="profile.id">
+                    {{ profile.name }} · {{ profile.authenticated ? '已登录' : '未登录' }}
+                  </option>
+                }
+              </select>
+            </label>
+            <label>
+              <span>Codex 模型</span>
+              <input
+                type="text"
+                list="resume-codex-model-suggestions"
+                placeholder="留空沿用会话或配置默认模型"
+                aria-label="恢复 Codex 模型"
+                [ngModel]="codexModel()"
+                (ngModelChange)="codexModel.set($event)"
+              />
+              <datalist id="resume-codex-model-suggestions">
+                <option value="gpt-5.6-sol"></option>
+                <option value="gpt-5.6-terra"></option>
+                <option value="gpt-5.6-luna"></option>
+              </datalist>
+            </label>
           </div>
         }
 
@@ -278,6 +332,7 @@ export class SessionCenterDialogComponent {
   readonly sessions = input<AgentSession[]>([]);
   readonly profiles = input<ModelProfile[]>([]);
   readonly mcpProfiles = input<McpProfile[]>([]);
+  readonly accountProfiles = input<AccountProfile[]>([]);
   readonly projectPath = input('');
   readonly busy = input(false);
   readonly error = input<string | null>(null);
@@ -290,6 +345,9 @@ export class SessionCenterDialogComponent {
   protected readonly agentFilter = signal<SessionAgentFilter>('all');
   protected readonly profileId = signal('');
   protected readonly mcpProfileId = signal('');
+  protected readonly claudeAccountProfileId = signal('');
+  protected readonly codexAccountProfileId = signal('');
+  protected readonly codexModel = signal('');
   protected readonly agentFilters = AGENT_FILTERS;
   protected readonly sessionCounts = computed(() => {
     const sessions = this.sessions();
@@ -304,6 +362,26 @@ export class SessionCenterDialogComponent {
       this.profileId() ||
       this.profiles().find((profile) => profile.isDefault)?.id ||
       this.profiles()[0]?.id ||
+      '',
+  );
+  protected readonly claudeAccounts = computed(() =>
+    this.accountProfiles().filter((profile) => profile.agentType === 'claude'),
+  );
+  protected readonly codexAccounts = computed(() =>
+    this.accountProfiles().filter((profile) => profile.agentType === 'codex'),
+  );
+  protected readonly resolvedClaudeAccountProfileId = computed(
+    () =>
+      this.claudeAccountProfileId() ||
+      this.claudeAccounts().find((profile) => profile.isDefault)?.id ||
+      this.claudeAccounts()[0]?.id ||
+      '',
+  );
+  protected readonly resolvedCodexAccountProfileId = computed(
+    () =>
+      this.codexAccountProfileId() ||
+      this.codexAccounts().find((profile) => profile.isDefault)?.id ||
+      this.codexAccounts()[0]?.id ||
       '',
   );
   protected readonly filteredSessions = computed(() => {
@@ -330,6 +408,9 @@ export class SessionCenterDialogComponent {
   });
   protected readonly showsClaudeOptions = computed(
     () => this.agentFilter() !== 'codex' && this.sessionCounts().claude > 0,
+  );
+  protected readonly showsCodexOptions = computed(
+    () => this.agentFilter() !== 'claude' && this.sessionCounts().codex > 0,
   );
   protected readonly emptyTitle = computed(() => {
     if (this.search().trim()) {
@@ -365,6 +446,10 @@ export class SessionCenterDialogComponent {
       session,
       profileId: isClaude ? this.resolvedProfileId() || undefined : undefined,
       mcpProfileId: isClaude ? this.mcpProfileId() || undefined : undefined,
+      accountProfileId: isClaude
+        ? session.accountProfileId || this.resolvedClaudeAccountProfileId() || undefined
+        : session.accountProfileId || this.resolvedCodexAccountProfileId() || undefined,
+      model: isClaude ? undefined : this.codexModel().trim() || session.modelName || undefined,
     });
   }
 

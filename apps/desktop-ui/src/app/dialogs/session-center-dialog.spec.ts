@@ -137,6 +137,8 @@ describe('SessionCenterDialogComponent', () => {
       session: SESSIONS[1],
       profileId: undefined,
       mcpProfileId: undefined,
+      accountProfileId: undefined,
+      model: 'gpt-5.6-codex',
     });
   });
 

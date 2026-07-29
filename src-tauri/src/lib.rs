@@ -1,3 +1,4 @@
+mod account;
 mod agent;
 mod cli;
 mod commands;
@@ -56,6 +57,7 @@ pub fn run() {
             commands::agent::build_codex_launch_command,
             commands::agent::prepare_claude_launch,
             commands::agent::prepare_codex_launch,
+            commands::agent::prepare_account_login,
             commands::cli::preview_cli_operation,
             commands::cli::execute_cli_operation,
             commands::config::list_model_profiles,
@@ -68,6 +70,10 @@ pub fn run() {
             commands::config::save_network_profile,
             commands::config::delete_network_profile,
             commands::config::test_network_profile,
+            commands::config::list_account_profiles,
+            commands::config::save_account_profile,
+            commands::config::refresh_account_profile,
+            commands::config::delete_account_profile,
             commands::config::validate_claude_profile,
             commands::hooks::prepare_claude_runtime,
             commands::hooks::sync_agent_events,

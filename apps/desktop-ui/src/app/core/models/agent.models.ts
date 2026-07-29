@@ -15,6 +15,7 @@ export interface AgentSession {
   id: string;
   agentType: NativeAgentType;
   nativeSessionId: string;
+  accountProfileId?: string;
   projectPath?: string;
   modelName?: string;
   title: string;
@@ -84,6 +85,7 @@ export interface ClaudeLaunchRequest {
   name?: string;
   profileId?: string;
   mcpProfileId?: string;
+  accountProfileId?: string;
 }
 
 export interface CodexLaunchRequest {
@@ -91,6 +93,31 @@ export interface CodexLaunchRequest {
   workspaceId?: string;
   sessionId?: string;
   model?: string;
+  accountProfileId?: string;
+}
+
+export interface AccountLoginRequest {
+  terminalId: string;
+  workspaceId?: string;
+  accountProfileId: string;
+}
+
+export interface AccountProfile {
+  id: string;
+  name: string;
+  agentType: NativeAgentType;
+  configDir?: string;
+  isDefault: boolean;
+  isSystem: boolean;
+  authenticated: boolean;
+  diagnostic: string;
+}
+
+export interface AccountProfileInput {
+  id: string;
+  name: string;
+  agentType: NativeAgentType;
+  isDefault: boolean;
 }
 
 export interface ModelProfile {

@@ -3452,7 +3452,7 @@ dependencies = [
 
 [[package]]
 name = "termexo"
-version = "0.3.1"
+version = "0.3.2"
 dependencies = [
  "keyring",
  "portable-pty",

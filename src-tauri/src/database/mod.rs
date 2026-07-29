@@ -7,12 +7,13 @@ use serde_json::Value;
 use thiserror::Error;
 
 use crate::agent::AgentSession;
-use crate::config::{McpProfile, ModelProfile, NetworkProfile};
+use crate::config::{AccountProfile, McpProfile, ModelProfile, NetworkProfile};
 use crate::hooks::AgentEvent;
 
 const INITIAL_MIGRATION: &str = include_str!("../../migrations/0001_initial.sql");
 const AGENT_MIGRATION: &str = include_str!("../../migrations/0002_agent_sessions.sql");
 const NETWORK_MIGRATION: &str = include_str!("../../migrations/0003_network_profiles.sql");
+const ACCOUNT_MIGRATION: &str = include_str!("../../migrations/0004_account_profiles.sql");
 
 fn default_grid_dimension() -> u8 {
     2
@@ -67,6 +68,7 @@ pub struct TerminalSession {
     pub branch: String,
     pub command: Option<String>,
     pub native_session_id: Option<String>,
+    pub account_profile_id: Option<String>,
 }
 
 pub struct WorkspaceDatabase {
@@ -79,6 +81,7 @@ impl WorkspaceDatabase {
         connection.execute_batch(INITIAL_MIGRATION)?;
         connection.execute_batch(AGENT_MIGRATION)?;
         connection.execute_batch(NETWORK_MIGRATION)?;
+        connection.execute_batch(ACCOUNT_MIGRATION)?;
         ensure_default_profile(&connection)?;
         Ok(Self {
             connection: Mutex::new(connection),
@@ -214,6 +217,7 @@ impl WorkspaceDatabase {
                 id: row.get(0)?,
                 agent_type: row.get(1)?,
                 native_session_id: row.get(2)?,
+                account_profile_id: None,
                 project_path: row.get(3)?,
                 model_name: row.get(4)?,
                 title: row.get(5)?,
@@ -608,6 +612,86 @@ impl WorkspaceDatabase {
         connection.execute("DELETE FROM network_profiles WHERE id = ?1", [profile_id])?;
         Ok(())
     }
+
+    pub fn list_account_profiles(&self) -> Result<Vec<AccountProfile>, DatabaseError> {
+        let connection = self
+            .connection
+            .lock()
+            .map_err(|_| DatabaseError::LockPoisoned)?;
+        let mut statement = connection.prepare(
+            "SELECT id, name, agent_type, config_dir, is_default, is_system
+             FROM account_profiles
+             ORDER BY agent_type, is_default DESC, is_system DESC, name",
+        )?;
+        let rows = statement.query_map([], account_profile_from_row)?;
+        rows.collect::<Result<Vec<_>, _>>()
+            .map_err(DatabaseError::from)
+    }
+
+    pub fn find_account_profile(
+        &self,
+        profile_id: &str,
+    ) -> Result<Option<AccountProfile>, DatabaseError> {
+        let connection = self
+            .connection
+            .lock()
+            .map_err(|_| DatabaseError::LockPoisoned)?;
+        let mut statement = connection.prepare(
+            "SELECT id, name, agent_type, config_dir, is_default, is_system
+             FROM account_profiles
+             WHERE id = ?1",
+        )?;
+        let mut rows = statement.query_map([profile_id], account_profile_from_row)?;
+        rows.next().transpose().map_err(DatabaseError::from)
+    }
+
+    pub fn save_account_profile(&self, profile: &AccountProfile) -> Result<(), DatabaseError> {
+        let connection = self
+            .connection
+            .lock()
+            .map_err(|_| DatabaseError::LockPoisoned)?;
+        let now = unix_timestamp_millis();
+        if profile.is_default {
+            connection.execute(
+                "UPDATE account_profiles SET is_default = 0 WHERE agent_type = ?1",
+                [&profile.agent_type],
+            )?;
+        }
+        connection.execute(
+            "INSERT INTO account_profiles (
+                 id, name, agent_type, config_dir, is_default, is_system, created_at, updated_at
+             )
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?7)
+             ON CONFLICT(id) DO UPDATE SET
+                 name = excluded.name,
+                 agent_type = excluded.agent_type,
+                 config_dir = excluded.config_dir,
+                 is_default = excluded.is_default,
+                 updated_at = excluded.updated_at",
+            params![
+                profile.id,
+                profile.name,
+                profile.agent_type,
+                profile.config_dir,
+                profile.is_default,
+                profile.is_system,
+                now,
+            ],
+        )?;
+        Ok(())
+    }
+
+    pub fn delete_account_profile(&self, profile_id: &str) -> Result<(), DatabaseError> {
+        let connection = self
+            .connection
+            .lock()
+            .map_err(|_| DatabaseError::LockPoisoned)?;
+        connection.execute(
+            "DELETE FROM account_profiles WHERE id = ?1 AND is_system = 0",
+            [profile_id],
+        )?;
+        Ok(())
+    }
 }
 
 fn ensure_default_profile(connection: &Connection) -> Result<(), DatabaseError> {
@@ -664,6 +748,19 @@ fn network_profile_from_row(row: &rusqlite::Row<'_>) -> rusqlite::Result<Network
     })
 }
 
+fn account_profile_from_row(row: &rusqlite::Row<'_>) -> rusqlite::Result<AccountProfile> {
+    Ok(AccountProfile {
+        id: row.get(0)?,
+        name: row.get(1)?,
+        agent_type: row.get(2)?,
+        config_dir: row.get(3)?,
+        is_default: row.get(4)?,
+        is_system: row.get(5)?,
+        authenticated: false,
+        diagnostic: String::new(),
+    })
+}
+
 fn unix_timestamp_millis() -> i64 {
     use std::time::{SystemTime, UNIX_EPOCH};
 
@@ -687,7 +784,7 @@ mod tests {
             .lock()
             .unwrap()
             .execute_batch(&format!(
-                "{INITIAL_MIGRATION}\n{AGENT_MIGRATION}\n{NETWORK_MIGRATION}"
+                "{INITIAL_MIGRATION}\n{AGENT_MIGRATION}\n{NETWORK_MIGRATION}\n{ACCOUNT_MIGRATION}"
             ))
             .unwrap();
 
@@ -756,13 +853,14 @@ mod tests {
             .lock()
             .unwrap()
             .execute_batch(&format!(
-                "{INITIAL_MIGRATION}\n{AGENT_MIGRATION}\n{NETWORK_MIGRATION}"
+                "{INITIAL_MIGRATION}\n{AGENT_MIGRATION}\n{NETWORK_MIGRATION}\n{ACCOUNT_MIGRATION}"
             ))
             .unwrap();
         let session = AgentSession {
             id: "claude:session-1".into(),
             agent_type: "claude".into(),
             native_session_id: "session-1".into(),
+            account_profile_id: None,
             project_path: Some("D:\\dev\\Termexo".into()),
             model_name: Some("sonnet".into()),
             title: "Implement restore".into(),
@@ -797,7 +895,7 @@ mod tests {
             .lock()
             .unwrap()
             .execute_batch(&format!(
-                "{INITIAL_MIGRATION}\n{AGENT_MIGRATION}\n{NETWORK_MIGRATION}"
+                "{INITIAL_MIGRATION}\n{AGENT_MIGRATION}\n{NETWORK_MIGRATION}\n{ACCOUNT_MIGRATION}"
             ))
             .unwrap();
         let model = ModelProfile {
@@ -840,7 +938,7 @@ mod tests {
             .lock()
             .unwrap()
             .execute_batch(&format!(
-                "{INITIAL_MIGRATION}\n{AGENT_MIGRATION}\n{NETWORK_MIGRATION}"
+                "{INITIAL_MIGRATION}\n{AGENT_MIGRATION}\n{NETWORK_MIGRATION}\n{ACCOUNT_MIGRATION}"
             ))
             .unwrap();
         let global = test_network_profile("global", "global", None);
@@ -866,6 +964,56 @@ mod tests {
             "global"
         );
         assert_eq!(database.list_network_profiles().unwrap().len(), 2);
+    }
+
+    #[test]
+    fn saves_isolated_account_profiles_and_keeps_one_default_per_agent() {
+        let database = WorkspaceDatabase {
+            connection: Mutex::new(Connection::open_in_memory().unwrap()),
+        };
+        database
+            .connection
+            .lock()
+            .unwrap()
+            .execute_batch(&format!(
+                "{INITIAL_MIGRATION}\n{AGENT_MIGRATION}\n{NETWORK_MIGRATION}\n{ACCOUNT_MIGRATION}"
+            ))
+            .unwrap();
+        let first = AccountProfile {
+            id: "claude-one".into(),
+            name: "Claude One".into(),
+            agent_type: "claude".into(),
+            config_dir: Some("C:\\accounts\\claude-one".into()),
+            is_default: true,
+            is_system: false,
+            authenticated: false,
+            diagnostic: String::new(),
+        };
+        let second = AccountProfile {
+            id: "claude-two".into(),
+            name: "Claude Two".into(),
+            config_dir: Some("C:\\accounts\\claude-two".into()),
+            ..first.clone()
+        };
+
+        database.save_account_profile(&first).unwrap();
+        database.save_account_profile(&second).unwrap();
+
+        let profiles = database.list_account_profiles().unwrap();
+        assert!(profiles
+            .iter()
+            .any(|profile| profile.id == second.id && profile.is_default));
+        assert!(profiles
+            .iter()
+            .any(|profile| profile.id == first.id && !profile.is_default));
+        assert_eq!(
+            database
+                .find_account_profile(&second.id)
+                .unwrap()
+                .unwrap()
+                .config_dir,
+            second.config_dir
+        );
     }
 
     fn test_network_profile(id: &str, scope: &str, workspace_id: Option<&str>) -> NetworkProfile {

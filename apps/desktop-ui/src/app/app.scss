@@ -8,7 +8,10 @@
   height: 100%;
   min-width: 760px;
   min-height: 540px;
-  grid-template-columns: 208px minmax(0, 1fr) 252px;
+  grid-template-areas: 'workspace-sidebar workspace-resizer workspace-main inspector-resizer inspector';
+  grid-template-columns:
+    var(--workspace-sidebar-width, 208px) 5px minmax(0, 1fr) 5px
+    var(--inspector-width, 252px);
   overflow: hidden;
   color: var(--text);
   background:
@@ -19,15 +22,25 @@
     ),
     var(--surface-0);
 
+  &.workspace-sidebar-collapsed {
+    grid-template-columns: 0 0 minmax(0, 1fr) 5px var(--inspector-width, 252px);
+  }
+
   &.inspector-collapsed {
-    grid-template-columns: 208px minmax(0, 1fr);
+    grid-template-columns: var(--workspace-sidebar-width, 208px) 5px minmax(0, 1fr) 0 0;
+  }
+
+  &.workspace-sidebar-collapsed.inspector-collapsed {
+    grid-template-columns: 0 0 minmax(0, 1fr) 0 0;
   }
 
   &.workspace-maximized {
+    grid-template-areas: 'workspace-main';
     grid-template-columns: minmax(0, 1fr);
 
     app-workspace-sidebar,
     app-inspector-panel,
+    .sidebar-resizer,
     .statusbar {
       display: none;
     }
@@ -36,9 +49,61 @@
       grid-template-rows: 52px 44px minmax(0, 1fr);
     }
   }
+
+  &.is-resizing {
+    cursor: col-resize;
+    user-select: none;
+  }
+}
+
+app-workspace-sidebar {
+  grid-area: workspace-sidebar;
+}
+
+app-inspector-panel {
+  grid-area: inspector;
+}
+
+.sidebar-resizer {
+  position: relative;
+  z-index: 35;
+  width: 5px;
+  min-width: 5px;
+  cursor: col-resize;
+  touch-action: none;
+
+  &::after {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    left: 2px;
+    width: 1px;
+    background: var(--border);
+    content: '';
+    transition:
+      width 120ms ease,
+      background 120ms ease,
+      transform 120ms ease;
+  }
+
+  &:hover::after,
+  .is-resizing &::after {
+    width: 2px;
+    background: color-mix(in srgb, var(--accent) 72%, var(--border));
+    transform: translateX(-0.5px);
+  }
+}
+
+.workspace-sidebar-resizer {
+  grid-area: workspace-resizer;
+}
+
+.inspector-resizer {
+  grid-area: inspector-resizer;
 }
 
 .workspace-main {
+  grid-area: workspace-main;
   display: grid;
   min-width: 0;
   min-height: 0;
@@ -591,14 +656,6 @@
 }
 
 @media (max-width: 1120px) {
-  .app-shell {
-    grid-template-columns: 180px minmax(0, 1fr);
-
-    app-inspector-panel {
-      display: none;
-    }
-  }
-
   .topbar {
     grid-template-columns: minmax(110px, 1fr) auto 65px;
   }

@@ -9,40 +9,49 @@
   display: grid;
   height: 100%;
   min-height: 0;
-  grid-template-rows: 42px minmax(0, 1fr);
+  grid-template-rows: 52px minmax(0, 1fr);
 }
 
-.tab-list {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  padding: 0 9px;
+.inspector-heading {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 12px;
   border-bottom: 1px solid var(--border);
 
-  button {
-    position: relative;
-    border: 0;
-    color: var(--text-muted);
-    background: transparent;
+  div,
+  strong,
+  small {
+    display: block;
+  }
+
+  div {
+    min-width: 0;
+  }
+
+  strong {
+    color: var(--text-secondary);
     font-size: 11px;
-    font-weight: 580;
+    font-weight: 650;
+  }
 
-    &::after {
-      position: absolute;
-      right: 9px;
-      bottom: -1px;
-      left: 9px;
-      height: 2px;
-      background: transparent;
-      content: '';
-    }
+  small {
+    margin-top: 3px;
+    color: var(--text-muted);
+    font: 9px/1 var(--mono);
+  }
 
-    &.active {
-      color: var(--text);
-
-      &::after {
-        background: var(--accent);
-      }
-    }
+  > span {
+    display: grid;
+    min-width: 22px;
+    height: 20px;
+    place-items: center;
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    color: var(--text-secondary);
+    background: var(--surface-2);
+    font: 10px/1 var(--mono);
   }
 }
 

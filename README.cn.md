@@ -11,7 +11,7 @@
 </p>
 
 <p align="center">
-  <img alt="Version 0.3.1" src="https://img.shields.io/badge/version-0.3.1-58c7a0">
+  <img alt="Version 0.3.2" src="https://img.shields.io/badge/version-0.3.2-58c7a0">
   <img alt="Windows" src="https://img.shields.io/badge/platform-Windows-0078D4?logo=windows">
   <img alt="Tauri 2" src="https://img.shields.io/badge/Tauri-2-24C8DB?logo=tauri&logoColor=white">
   <img alt="Angular 22" src="https://img.shields.io/badge/Angular-22-DD0031?logo=angular">
@@ -25,24 +25,23 @@ Termexo 是一个本地优先的 AI 开发工作空间与控制平面。它把�
 逐步扩展多 Agent 编排、供应商 Plan 余量实时查看、安全的 Workspace 共享，以及从可信
 电脑和手机访问工作空间。项目数据与凭据仍由明确的设备、权限和加密边界保护。
 
-> 最新正式版本为 **V0.3.1 多 Agent 会话工作台完善版**。本版引入 DaisyUI/Lucide
-> 视觉体系，完善 Workspace 与弹窗交互，并加入按作用域配置网络/npm Profile 以及
-> Claude Code/Codex CLI 安装升级管理。
+> 最新正式版本为 **V0.3.2 Codex 与多账号工作台更新版**。本版完善 Codex 的模型、
+> 账号与会话恢复流程，支持隔离管理多个 Claude/ChatGPT 账号，并加入可缩放、可折叠侧栏。
 
-![Termexo 多终端网格工作台](docs/images/termexo-workbench-v0.3.1.png)
+![Termexo 多终端网格工作台](docs/images/termexo-workbench-v0.3.2.png)
 
 <p align="center">
   <sub>4 个 Claude Code/Codex 终端、2 × 2 自定义网格、指定窗口显示、会话状态与 Inspector。</sub>
 </p>
 
-## V0.3.1 更新
+## V0.3.2 更新
 
-- 桌面界面全面切换到 DaisyUI 主题与 Lucide 图标，并优化中文字体。
-- 完善 Workspace 菜单、当前终端强调、工具栏对齐、弹窗和消息提示样式。
-- Workspace 切换不再自动改变顺序，同时支持手动排序、改名和独立主题颜色。
-- 支持全局或 Workspace 作用域的 HTTP/HTTPS/SOCKS 与 npm Profile、凭据安全存储和连通性测试。
-- 支持预览、确认、安装或升级官方 Claude Code/Codex npm 包，并在完成后验证 CLI 健康状态。
-- 扩展菜单、弹窗、响应式布局、网络 Profile 和 CLI 生命周期的浏览器及桌面功能测试。
+- 支持创建、登录、管理和切换多个隔离的 Claude Code 与 ChatGPT/Codex 账号。
+- 新建或恢复 Codex 会话时可指定账号与模型，同时保持原生 rollout 文件只读。
+- 会话中心可扫描系统账号及所有隔离账号目录，并在恢复时沿用会话所属账号。
+- 左右侧栏均可拖动调整宽度、独立折叠，并持久化宽度和展开状态。
+- 移除 Google CLI 入口，隐藏尚未完成的快照、任务和原型 Git 界面。
+- 自动测试覆盖工具栏对齐、菜单、弹窗、消息、紧凑布局和双侧栏交互。
 
 ## V0.3.0 更新
 
@@ -71,7 +70,7 @@ Termexo 是一个本地优先的 AI 开发工作空间与控制平面。它把�
 - 支持 DNS/TCP 连通性测试，启动 Claude/Codex 时优先使用 Workspace Profile，再回退全局 Profile。
 - 支持预览并确认从官方 npm 包一键安装/升级 Claude Code 与 Codex，可选择精确版本或 dist-tag。
 - 安装时应用当前网络 Profile，先检查 registry，禁止并发修改，设置超时并在完成后验证 CLI 健康状态。
-- 多账号切换、失败自动回滚、系统代理发现和 Plan 余量监控仍在后续计划中。
+- 多个隔离 Claude/ChatGPT 账号已可使用；失败自动回滚、系统代理发现和 Plan 余量监控仍在后续计划中。
 
 ## 为什么做 Termexo
 
@@ -93,12 +92,13 @@ Termexo 以 **Workspace** 为组织单位，把这些信息集中到一个可观
 | Workspace 管理     | 创建、改名、换色、手动排序和切换 Workspace，并持久化项目路径、布局与终端配置      |
 | 多终端工作台       | 不限终端数量、指定窗口显示、1–6 行列网格、终端/工作区最大化；桌面端启动真实 PTY   |
 | Claude Code 检测   | 在 Windows 上检测 `claude.exe` / `claude.cmd`、版本与健康状态                     |
-| 新建 Claude 会话   | 选择会话名称、模型 Profile 和 MCP Profile 后启动 Claude                           |
-| Agent 会话中心     | 只读发现 Claude/Codex 会话，支持搜索、Workspace 过滤与原生恢复                   |
+| 新建 Agent 会话    | 按目录启动 Claude/Codex，并选择隔离账号及 Agent 对应的模型配置                    |
+| Agent 会话中心     | 只读发现多账号 Claude/Codex 会话，支持搜索、Workspace 过滤与原生恢复              |
 | Agent 状态识别     | 为每个终端生成隔离 Hooks 设置，识别思考、工具调用、权限确认、用户输入和完成状态   |
 | 模型与 MCP Profile | 管理模型、Endpoint、API Key 与 MCP 配置；Claude CLI 可切换 Anthropic 兼容后端     |
 | 网络与 npm Profile | 按全局/Workspace 管理 HTTP/HTTPS/SOCKS 与 npm 配置，测试连通性并在启动时注入      |
-| CLI 生命周期管理   | 预览、确认、安装或升级官方 Claude Code/Codex npm 包，并在完成后验证结果         |
+| 多账号管理         | 管理多个隔离 Claude 与 ChatGPT/Codex 登录、默认账号、认证状态和启动时选择         |
+| CLI 生命周期管理   | 预览、确认、安装或升级官方 Claude Code/Codex npm 包，并在完成后验证结果           |
 | 本地数据与密钥     | Workspace、会话索引和事件保存到 SQLite；API Key 保存到 Windows Credential Manager |
 | 浏览器预览         | 无需 Rust 即可预览完整 UI，并使用可交互的模拟终端验证布局与基础流程               |
 
@@ -121,12 +121,12 @@ Termexo 以 **Workspace** 为组织单位，把这些信息集中到一个可观
 
 ## 当前边界
 
-- Claude Code 仍是能力最完整的 Adapter。Codex 已支持原生检测、启动、本地会话发现和恢复，
-  但 Codex Hooks 与统一运行事件尚未实现；Gemini 仍为界面原型。
+- Claude Code 仍是事件能力最完整的 Adapter。Codex 已支持原生检测、按账号/模型启动、
+  多账号本地会话发现和恢复，但 Codex Hooks 与统一运行事件尚未实现。
 - 应用退出后，已退出的操作系统进程不会被“伪恢复”。Termexo 只恢复终端配置，
   历史 Claude 会话需要从会话中心显式恢复。
 - Claude 与 Codex 原始 JSONL 均只读，Termexo 不修改、重命名或删除这些文件。
-- Inspector 中的 Git 与任务页当前使用原型数据，尚未连接真实后端。
+- 快照、Git 与任务编排入口会保持隐藏，直到对应生产后端完成。
 - 当前版本不包含自动权限批准、跨 Agent 会话迁移或跨 Agent 批量模型切换事务。
 
 完整产品规划见 [Termexo.md](./Termexo.md)，当前架构边界见
@@ -223,7 +223,7 @@ flowchart LR
 | V0.1 | Workspace、多终端、PTY、SQLite 基础              | 已完成   |
 | V0.2 | Claude Code 检测、会话恢复、Hooks、Profile       | 已完成   |
 | V0.3 | Codex CLI Adapter 与 Claude/Codex 统一会话中心   | 当前版本 |
-| V0.4 | Gemini、CLI/网络环境、多账号/供应商与 Plan 控制 | 开发中   |
+| V0.4 | 账号/供应商控制、CLI/网络环境、回滚与 Plan 余量 | 开发中   |
 | V0.5 | 会话摘要与跨 Agent 迁移                          | 规划中   |
 | V0.6 | 多 Agent 协作、任务编排与通知                    | 规划中   |
 | V0.7 | Workspace 共享、远程电脑与手机访问               | 规划中   |

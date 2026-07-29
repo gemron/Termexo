@@ -1,6 +1,6 @@
 [package]
 name = "termexo"
-version = "0.3.1"
+version = "0.3.2"
 description = "Local-first AI coding workspace"
 authors = ["Termexo contributors"]
 edition = "2021"

@@ -31,11 +31,19 @@ pub enum ClaudeError {
 }
 
 #[derive(Debug, Default)]
-pub struct ClaudeCodeAdapter;
+pub struct ClaudeCodeAdapter {
+    config_dir_override: Option<PathBuf>,
+}
 
 impl ClaudeCodeAdapter {
     pub fn new() -> Self {
-        Self
+        Self::default()
+    }
+
+    pub fn with_config_dir(config_dir: PathBuf) -> Self {
+        Self {
+            config_dir_override: Some(config_dir),
+        }
     }
 
     fn find_executable(&self) -> Option<PathBuf> {
@@ -107,6 +115,9 @@ impl ClaudeCodeAdapter {
     }
 
     fn projects_directory(&self) -> PathBuf {
+        if let Some(config_dir) = self.config_dir_override.as_ref() {
+            return config_dir.join("projects");
+        }
         if let Some(config_dir) = env::var_os("CLAUDE_CONFIG_DIR") {
             return PathBuf::from(config_dir).join("projects");
         }
@@ -396,6 +407,7 @@ fn parse_session(path: &Path) -> Result<AgentSession, ClaudeError> {
         id: format!("claude:{native_session_id}"),
         agent_type: AGENT_TYPE.into(),
         native_session_id,
+        account_profile_id: None,
         project_path,
         model_name,
         title,

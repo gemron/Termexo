@@ -3,6 +3,7 @@ use std::collections::HashMap;
 use serde::Deserialize;
 use tauri::State;
 
+use crate::account;
 use crate::agent::{
     AgentAdapter, AgentInstallation, AgentLaunchSpec, AgentSession, ClaudeCodeAdapter,
     ClaudeLaunchOptions, CodexCliAdapter, CodexLaunchOptions,
@@ -39,9 +40,28 @@ pub fn scan_claude_sessions(
     project_path: Option<String>,
     database: State<'_, WorkspaceDatabase>,
 ) -> Result<Vec<AgentSession>, String> {
-    let sessions = ClaudeCodeAdapter::new()
-        .list_sessions(project_path.as_deref())
+    let profiles = database
+        .list_account_profiles()
         .map_err(|error| error.to_string())?;
+    let mut sessions = Vec::new();
+    for profile in profiles
+        .into_iter()
+        .filter(|profile| profile.agent_type == "claude")
+    {
+        account::prepare_managed_directory(&profile)?;
+        let mut profile_sessions = match profile.config_dir.as_deref() {
+            Some(config_dir) => ClaudeCodeAdapter::with_config_dir(config_dir.into())
+                .list_sessions(project_path.as_deref()),
+            None => ClaudeCodeAdapter::new().list_sessions(project_path.as_deref()),
+        }
+        .map_err(|error| error.to_string())?;
+        for session in &mut profile_sessions {
+            session.account_profile_id = Some(profile.id.clone());
+            session.id = format!("claude:{}:{}", profile.id, session.native_session_id);
+        }
+        sessions.extend(profile_sessions);
+    }
+    sessions.sort_by(|left, right| right.last_used_at.cmp(&left.last_used_at));
     database
         .save_agent_sessions(&sessions)
         .map_err(|error| error.to_string())?;
@@ -53,9 +73,29 @@ pub fn scan_codex_sessions(
     project_path: Option<String>,
     database: State<'_, WorkspaceDatabase>,
 ) -> Result<Vec<AgentSession>, String> {
-    let sessions = CodexCliAdapter::new()
-        .list_sessions(project_path.as_deref())
+    let profiles = database
+        .list_account_profiles()
         .map_err(|error| error.to_string())?;
+    let mut sessions = Vec::new();
+    for profile in profiles
+        .into_iter()
+        .filter(|profile| profile.agent_type == "codex")
+    {
+        account::prepare_managed_directory(&profile)?;
+        let mut profile_sessions = match profile.config_dir.as_deref() {
+            Some(config_dir) => {
+                CodexCliAdapter::with_home(config_dir.into()).list_sessions(project_path.as_deref())
+            }
+            None => CodexCliAdapter::new().list_sessions(project_path.as_deref()),
+        }
+        .map_err(|error| error.to_string())?;
+        for session in &mut profile_sessions {
+            session.account_profile_id = Some(profile.id.clone());
+            session.id = format!("codex:{}:{}", profile.id, session.native_session_id);
+        }
+        sessions.extend(profile_sessions);
+    }
+    sessions.sort_by(|left, right| right.last_used_at.cmp(&left.last_used_at));
     database
         .save_agent_sessions(&sessions)
         .map_err(|error| error.to_string())?;
@@ -96,6 +136,7 @@ pub struct PrepareClaudeLaunchRequest {
     pub name: Option<String>,
     pub profile_id: Option<String>,
     pub mcp_profile_id: Option<String>,
+    pub account_profile_id: Option<String>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -105,6 +146,15 @@ pub struct PrepareCodexLaunchRequest {
     pub workspace_id: Option<String>,
     pub session_id: Option<String>,
     pub model: Option<String>,
+    pub account_profile_id: Option<String>,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PrepareAccountLoginRequest {
+    pub terminal_id: String,
+    pub workspace_id: Option<String>,
+    pub account_profile_id: String,
 }
 
 #[tauri::command]
@@ -141,7 +191,9 @@ pub fn prepare_claude_launch(
         }
         None => None,
     };
-    let mut environment = profile_environment(profile.as_ref());
+    let mut environment =
+        account_profile_environment(&database, request.account_profile_id.as_deref(), "claude")?;
+    environment.extend(profile_environment(profile.as_ref()));
     if let Some(profile) = profile.as_ref() {
         if let Some(target) = profile.credential_target.as_deref() {
             let token = credentials.get(target).map_err(|error| error.to_string())?;
@@ -175,8 +227,13 @@ pub fn prepare_codex_launch(
     credentials: State<'_, CredentialStore>,
     launch_environment: State<'_, LaunchEnvironmentStore>,
 ) -> Result<AgentLaunchSpec, String> {
-    let environment =
-        network_environment(&database, &credentials, request.workspace_id.as_deref())?;
+    let mut environment =
+        account_profile_environment(&database, request.account_profile_id.as_deref(), "codex")?;
+    environment.extend(network_environment(
+        &database,
+        &credentials,
+        request.workspace_id.as_deref(),
+    )?);
     launch_environment
         .put(request.terminal_id, environment)
         .map_err(|error| error.to_string())?;
@@ -186,6 +243,63 @@ pub fn prepare_codex_launch(
             model: request.model,
         })
         .map_err(|error| error.to_string())
+}
+
+#[tauri::command]
+pub fn prepare_account_login(
+    request: PrepareAccountLoginRequest,
+    database: State<'_, WorkspaceDatabase>,
+    credentials: State<'_, CredentialStore>,
+    launch_environment: State<'_, LaunchEnvironmentStore>,
+) -> Result<AgentLaunchSpec, String> {
+    let profile = database
+        .find_account_profile(&request.account_profile_id)
+        .map_err(|error| error.to_string())?
+        .ok_or_else(|| "账号 Profile 不存在。".to_owned())?;
+    let mut environment = account::environment(&profile);
+    environment.extend(network_environment(
+        &database,
+        &credentials,
+        request.workspace_id.as_deref(),
+    )?);
+    launch_environment
+        .put(request.terminal_id, environment)
+        .map_err(|error| error.to_string())?;
+    let (command, executable_path) = account::login_spec(&profile)?;
+    Ok(AgentLaunchSpec {
+        command,
+        executable_path,
+    })
+}
+
+fn account_profile_environment(
+    database: &WorkspaceDatabase,
+    profile_id: Option<&str>,
+    agent_type: &str,
+) -> Result<HashMap<String, String>, String> {
+    let profiles = database
+        .list_account_profiles()
+        .map_err(|error| error.to_string())?;
+    let profile = match profile_id {
+        Some(profile_id) => profiles
+            .iter()
+            .find(|profile| profile.id == profile_id)
+            .ok_or_else(|| "账号 Profile 不存在。".to_owned())?,
+        None => profiles
+            .iter()
+            .find(|profile| profile.agent_type == agent_type && profile.is_default)
+            .or_else(|| {
+                profiles
+                    .iter()
+                    .find(|profile| profile.agent_type == agent_type)
+            })
+            .ok_or_else(|| "没有可用的账号 Profile。".to_owned())?,
+    };
+    if profile.agent_type != agent_type {
+        return Err("所选账号与 Agent 类型不匹配。".into());
+    }
+    account::prepare_managed_directory(profile)?;
+    Ok(account::environment(profile))
 }
 
 fn network_environment(

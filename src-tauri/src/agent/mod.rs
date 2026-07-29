@@ -23,6 +23,7 @@ pub struct AgentSession {
     pub id: String,
     pub agent_type: String,
     pub native_session_id: String,
+    pub account_profile_id: Option<String>,
     pub project_path: Option<String>,
     pub model_name: Option<String>,
     pub title: String,
