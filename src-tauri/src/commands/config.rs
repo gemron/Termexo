@@ -1,10 +1,11 @@
 use serde::Deserialize;
-use tauri::State;
+use tauri::{AppHandle, Manager, State};
 
+use crate::account;
 use crate::agent::{AgentAdapter, AgentLaunchSpec, ClaudeCodeAdapter, ClaudeLaunchOptions};
 use crate::config::{
-    CredentialStore, McpProfile, McpProfileInput, ModelProfile, ModelProfileInput, NetworkProfile,
-    NetworkProfileInput,
+    AccountProfile, AccountProfileInput, CredentialStore, McpProfile, McpProfileInput,
+    ModelProfile, ModelProfileInput, NetworkProfile, NetworkProfileInput,
 };
 use crate::database::WorkspaceDatabase;
 use crate::network::{self, NetworkTestResult};
@@ -213,6 +214,104 @@ pub fn delete_network_profile(
     }
     database
         .delete_network_profile(&profile_id)
+        .map_err(|error| error.to_string())
+}
+
+#[tauri::command]
+pub fn list_account_profiles(
+    database: State<'_, WorkspaceDatabase>,
+) -> Result<Vec<AccountProfile>, String> {
+    let mut profiles = database
+        .list_account_profiles()
+        .map_err(|error| error.to_string())?;
+    for profile in &mut profiles {
+        profile.diagnostic = "正在后台检测登录状态…".into();
+    }
+    Ok(profiles)
+}
+
+#[tauri::command]
+pub async fn save_account_profile(
+    input: AccountProfileInput,
+    app: AppHandle,
+    database: State<'_, WorkspaceDatabase>,
+) -> Result<AccountProfile, String> {
+    let requested_agent_type = account::validate_agent_type(&input.agent_type)?.to_owned();
+    let profile_id = account::validate_profile_id(&input.id)?.to_owned();
+    let name = input.name.trim().to_owned();
+    if name.is_empty() {
+        return Err("账号名称不能为空。".into());
+    }
+    let existing = database
+        .find_account_profile(&profile_id)
+        .map_err(|error| error.to_string())?;
+    let is_system = existing.as_ref().is_some_and(|profile| profile.is_system);
+    let agent_type = existing
+        .as_ref()
+        .filter(|profile| profile.is_system)
+        .map(|profile| profile.agent_type.clone())
+        .unwrap_or(requested_agent_type);
+    let config_dir = if is_system {
+        None
+    } else {
+        Some(
+            account::managed_config_dir(
+                &app.path().app_data_dir().map_err(|e| e.to_string())?,
+                &agent_type,
+                &profile_id,
+            )?
+            .to_string_lossy()
+            .into_owned(),
+        )
+    };
+    let mut profile = AccountProfile {
+        id: profile_id,
+        name,
+        agent_type,
+        config_dir,
+        is_default: input.is_default,
+        is_system,
+        authenticated: false,
+        diagnostic: String::new(),
+    };
+    account::prepare_managed_directory(&profile)?;
+    database
+        .save_account_profile(&profile)
+        .map_err(|error| error.to_string())?;
+    profile = tauri::async_runtime::spawn_blocking(move || account::refresh_status(profile))
+        .await
+        .map_err(|error| error.to_string())?;
+    Ok(profile)
+}
+
+#[tauri::command]
+pub async fn refresh_account_profile(
+    profile_id: String,
+    database: State<'_, WorkspaceDatabase>,
+) -> Result<AccountProfile, String> {
+    let profile = database
+        .find_account_profile(&profile_id)
+        .map_err(|error| error.to_string())?
+        .ok_or_else(|| "账号 Profile 不存在。".to_owned())?;
+    tauri::async_runtime::spawn_blocking(move || account::refresh_status(profile))
+        .await
+        .map_err(|error| error.to_string())
+}
+
+#[tauri::command]
+pub fn delete_account_profile(
+    profile_id: String,
+    database: State<'_, WorkspaceDatabase>,
+) -> Result<(), String> {
+    let profile = database
+        .find_account_profile(&profile_id)
+        .map_err(|error| error.to_string())?
+        .ok_or_else(|| "账号 Profile 不存在。".to_owned())?;
+    if profile.is_system {
+        return Err("系统账号不能删除。".into());
+    }
+    database
+        .delete_account_profile(&profile_id)
         .map_err(|error| error.to_string())
 }
 

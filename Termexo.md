@@ -17,16 +17,15 @@ Termexo 是一个面向开发者和企业研发团队的本地优先 AI 开发�
 * **多 Agent 与模型控制面**：Agent 编排、模型路由、供应商 Plan 余量、告警与耗尽降级。
 * **连接式 Workspace**：细粒度共享、可信设备、远程电脑、手机访问和操作审计。
 
-当前 V0.3.1 已形成 Claude Code 与 Codex CLI 共用的本地多 Agent 会话工作台，并完成
-界面主题升级、网络/npm Profile 和 CLI 安装升级管理；Gemini
-Adapter、Plan 余量监控和远程协作属于后续版本规划。所有远程能力都必须建立在本地所有权、
-明确授权、端到端加密和可撤销访问之上。
+当前 V0.3.2 已形成 Claude Code 与 Codex CLI 共用的本地多 Agent 会话工作台，并完成
+隔离多账号、Codex 按账号/模型启动恢复、可缩放折叠双侧栏、网络/npm Profile 和 CLI
+安装升级管理。Plan 余量监控和远程协作属于后续版本规划。所有远程能力都必须建立在
+本地所有权、明确授权、端到端加密和可撤销访问之上。
 
 Termexo 计划统一管理：
 
 * Claude Code
 * OpenAI Codex CLI
-* Gemini CLI
 * Aider
 * OpenCode
 * 自定义命令行 Agent
@@ -69,7 +68,7 @@ Agent 的原生会话、配置和恢复机制，并在其上提供 Workspace 状
 MTS 云平台
 ├── Claude Code：后端接口开发
 ├── Codex CLI：单元测试
-├── Gemini CLI：代码审查
+├── Codex CLI：代码审查
 └── Shell：运行服务
 
 设备健康管理系统
@@ -119,7 +118,7 @@ Agent 会话
 8. 标记无法恢复的会话。
 9. 提供“新会话继承上下文”降级方案。
 
-Claude Code 的本地会话记录可用于恢复，而且官方文档说明其会话转录默认保存在本地目录中；Codex 和 Gemini 也提供相应 Resume 入口。
+Claude Code 与 Codex 的本地会话记录可用于恢复；Termexo 通过各 CLI 的原生机制恢复会话。
 
 ---
 
@@ -130,7 +129,7 @@ Claude Code 的本地会话记录可用于恢复，而且官方文档说明其�
 ```text
 全部切换到 Claude Sonnet
 全部切换到 GPT 系列
-全部切换到 Gemini
+全部切换到指定 Codex 模型
 全部切换到 MiniMax
 全部切换到 DeepSeek
 全部切换到企业 LiteLLM 网关
@@ -201,7 +200,7 @@ Claude Code 的模型可通过命令行、配置和环境变量设置；官方�
 * 从 Git 仓库创建
 * 从本地目录创建
 * 从历史记录恢复
-* 导入现有 Claude、Codex、Gemini 会话
+* 导入现有 Claude 与 Codex 会话
 * 克隆工作区
 * 导出工作区配置
 * 工作区分组
@@ -293,7 +292,6 @@ interface AgentAdapter {
 ```text
 ClaudeCodeAdapter
 CodexAdapter
-GeminiAdapter
 AiderAdapter
 OpenCodeAdapter
 GenericCliAdapter
@@ -893,7 +891,7 @@ Token 消耗
                    │
 ┌──────────────────▼───────────────────┐
 │       Agent Runtime Manager          │
-│ Claude / Codex / Gemini / Generic    │
+│ Claude / Codex / Generic             │
 └──────────┬───────────┬───────────────┘
            │           │
 ┌──────────▼─────┐ ┌───▼──────────────┐
@@ -1292,7 +1290,7 @@ JSON 输出模式
 │ MTS          │ ┌─────────┬──────────────┐ │ Agent      │
 │ Health       │ │ Claude  │ Codex        │ │ Model      │
 │ ODS Server   │ ├─────────┴──────────────┤ │ Session    │
-│              │ │ Gemini                  │ │ Git        │
+│              │ │ Codex                   │ │ Git        │
 │              │ └────────────────────────┘ │ Task       │
 └──────────────┴────────────────────────────┴────────────┘
 ```
@@ -1319,7 +1317,7 @@ JSON 输出模式
 Agent               状态       模型             项目
 Claude-Backend      运行中     Claude Sonnet    MTS
 Codex-Test          等待输入   GPT              MTS
-Gemini-Review       已完成     Gemini Pro       MTS
+Codex-Review        已完成     GPT Codex        MTS
 Claude-Frontend     需确认     Claude Sonnet    Health
 ```
 
@@ -1416,7 +1414,6 @@ Model：Claude Sonnet
 增加：
 
 * Codex CLI
-* Gemini CLI
 * Aider
 * Generic CLI Adapter
 * Agent 安装检测
@@ -1431,13 +1428,12 @@ Model：Claude Sonnet
 * [x] Codex 原生 rollout 会话只读扫描与 UUID 恢复
 * [x] Claude / Codex 统一会话中心
 * [ ] Codex Hooks 与统一运行状态事件
-* [ ] Gemini CLI Adapter
 * [ ] Generic CLI Adapter 与 Adapter SDK
 
 交付标准：
 
 ```text
-至少同时运行 Claude、Codex、Gemini
+至少同时运行 Claude 与 Codex
 所有 Agent 可以从统一界面创建和恢复
 ```
 
@@ -1521,7 +1517,7 @@ Model：Claude Sonnet
 交付标准：
 
 ```text
-Claude 会话可以迁移到 Codex 或 Gemini
+Claude 会话可以迁移到 Codex
 新 Agent 能够了解已完成工作和下一步任务
 ```
 
@@ -1629,7 +1625,7 @@ Angular：1 人
 
 ---
 
-## 第三阶段：Codex 和 Gemini 集成
+## 第三阶段：Codex 集成
 
 周期：2～3 周。
 
@@ -1637,7 +1633,6 @@ Angular：1 人
 
 * Adapter 抽象
 * Codex Adapter
-* Gemini Adapter
 * Generic Adapter
 * 统一会话中心
 * 兼容性测试
@@ -1737,7 +1732,7 @@ Workspace 远程协作版本：17～21 周
 3. 多终端和分屏。
 4. Workspace 保存。
 5. Claude Code 会话扫描和恢复。
-6. Codex、Gemini 会话扫描和恢复。
+6. Codex 多账号会话扫描和恢复。
 7. 模型配置模板。
 8. 批量重启并恢复。
 9. Agent 状态看板。
@@ -1787,7 +1782,6 @@ termexo/
 │   │   │   ├── adapter.rs
 │   │   │   ├── claude.rs
 │   │   │   ├── codex.rs
-│   │   │   ├── gemini.rs
 │   │   │   └── generic.rs
 │   │   ├── session/
 │   │   ├── model_router/
@@ -1824,7 +1818,7 @@ termexo/
 
 * 多终端
 * Workspace
-* Claude、Codex、Gemini
+* Claude 与 Codex
 * 会话恢复
 * 本地模型配置
 * 基础 MCP

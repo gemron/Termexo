@@ -46,7 +46,7 @@ try {
   await page.waitForTimeout(200);
 
   await page.screenshot({
-    path: resolve(imageDirectory, 'termexo-workbench-v0.3.1.png'),
+    path: resolve(imageDirectory, 'termexo-workbench-v0.3.2.png'),
     fullPage: true,
   });
 
@@ -66,7 +66,7 @@ try {
   console.log(
     JSON.stringify({
       screenshots: [
-        resolve(imageDirectory, 'termexo-workbench-v0.3.1.png'),
+        resolve(imageDirectory, 'termexo-workbench-v0.3.2.png'),
         resolve(imageDirectory, 'termexo-model-profiles.png'),
       ],
     }),

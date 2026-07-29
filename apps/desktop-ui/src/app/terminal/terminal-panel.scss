@@ -94,10 +94,6 @@ header {
     background: var(--info-soft);
   }
 
-  &[data-agent='gemini'] {
-    color: var(--color-warning);
-    background: var(--warning-soft);
-  }
 }
 
 .status {

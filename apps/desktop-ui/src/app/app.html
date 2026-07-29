@@ -1,18 +1,31 @@
 <main
   class="app-shell bg-base-100 text-base-content"
+  [class.workspace-sidebar-collapsed]="!workspaceSidebarOpen()"
   [class.inspector-collapsed]="!inspectorOpen()"
   [class.workspace-maximized]="workspaceMaximized()"
+  [class.is-resizing]="resizingSidebar()"
+  [style.--workspace-sidebar-width.px]="workspaceSidebarWidth()"
+  [style.--inspector-width.px]="inspectorWidth()"
 >
-  <app-workspace-sidebar
-    [workspaces]="state.workspaces()"
-    [activeWorkspaceId]="state.activeWorkspace()?.id ?? null"
-    (workspaceSelected)="state.selectWorkspace($event)"
-    (favoriteToggled)="state.toggleFavorite($event)"
-    (editRequested)="openWorkspaceEditor($event)"
-    (moveRequested)="state.moveWorkspace($event.workspaceId, $event.direction)"
-    (createRequested)="createWorkspaceOpen.set(true)"
-    (settingsRequested)="settingsOpen.set(true)"
-  />
+  @if (workspaceSidebarOpen()) {
+    <app-workspace-sidebar
+      [workspaces]="state.workspaces()"
+      [activeWorkspaceId]="state.activeWorkspace()?.id ?? null"
+      (workspaceSelected)="state.selectWorkspace($event)"
+      (favoriteToggled)="state.toggleFavorite($event)"
+      (editRequested)="openWorkspaceEditor($event)"
+      (moveRequested)="state.moveWorkspace($event.workspaceId, $event.direction)"
+      (createRequested)="createWorkspaceOpen.set(true)"
+      (settingsRequested)="settingsOpen.set(true)"
+    />
+    <div
+      class="sidebar-resizer workspace-sidebar-resizer"
+      role="separator"
+      aria-label="调整工作区侧栏宽度"
+      aria-orientation="vertical"
+      (pointerdown)="startSidebarResize('workspace', $event)"
+    ></div>
+  }
 
   <section class="workspace-main">
     <header class="topbar navbar">
@@ -49,7 +62,7 @@
                 <span data-tone="green"><app-icon name="bot" [size]="14" /></span>
                 <div><strong>Claude Code</strong><small>Claude Sonnet</small></div>
               </button>
-              <button type="button" (click)="launchCodex()">
+              <button type="button" (click)="openCodexLaunch()">
                 <span data-tone="blue"><app-icon name="bot" [size]="14" /></span>
                 <div>
                   <strong>Codex CLI</strong>
@@ -59,10 +72,6 @@
                       : '未检测到'
                   }}</small>
                 </div>
-              </button>
-              <button type="button" (click)="createTerminal('gemini')">
-                <span data-tone="amber"><app-icon name="sparkles" [size]="14" /></span>
-                <div><strong>Gemini CLI</strong><small>Gemini Pro</small></div>
               </button>
             </div>
           }
@@ -81,20 +90,11 @@
         <button
           type="button"
           class="tool-button btn btn-ghost btn-sm join-item"
-          title="批量切换模型"
+          title="批量切换 Claude 模型"
           (click)="modelSwitchOpen.set(true)"
         >
           <app-icon name="zap" [size]="14" />
-          <span>切换模型</span>
-        </button>
-        <button
-          type="button"
-          class="tool-button btn btn-ghost btn-sm join-item"
-          title="保存 Workspace 快照"
-          (click)="saveSnapshot()"
-        >
-          <app-icon name="save" [size]="14" />
-          <span>快照</span>
+          <span>Claude 模型</span>
         </button>
       </div>
 
@@ -102,11 +102,15 @@
         <button
           type="button"
           class="btn btn-square btn-ghost btn-sm join-item"
-          title="任务看板"
-          aria-label="任务看板"
-          (click)="showPlaceholder('任务看板')"
+          [title]="workspaceSidebarOpen() ? '折叠工作区侧栏' : '展开工作区侧栏'"
+          [attr.aria-label]="workspaceSidebarOpen() ? '折叠工作区侧栏' : '展开工作区侧栏'"
+          [class.active]="workspaceSidebarOpen()"
+          (click)="toggleWorkspaceSidebar()"
         >
-          <app-icon name="task" [size]="15" />
+          <app-icon
+            [name]="workspaceSidebarOpen() ? 'panel-left-close' : 'panel-left-open'"
+            [size]="15"
+          />
         </button>
         <button
           type="button"
@@ -121,12 +125,12 @@
         <button
           type="button"
           class="btn btn-square btn-ghost btn-sm join-item"
-          title="切换检查器"
-          aria-label="切换检查器"
+          [title]="inspectorOpen() ? '折叠 Agent 侧栏' : '展开 Agent 侧栏'"
+          [attr.aria-label]="inspectorOpen() ? '折叠 Agent 侧栏' : '展开 Agent 侧栏'"
           [class.active]="inspectorOpen()"
-          (click)="inspectorOpen.set(!inspectorOpen())"
+          (click)="toggleInspector()"
         >
-          <app-icon name="panel-close" [size]="15" />
+          <app-icon [name]="inspectorOpen() ? 'panel-close' : 'panel-right-open'" [size]="15" />
         </button>
       </div>
     </header>
@@ -322,6 +326,13 @@
   </section>
 
   @if (inspectorOpen()) {
+    <div
+      class="sidebar-resizer inspector-resizer"
+      role="separator"
+      aria-label="调整 Agent 侧栏宽度"
+      aria-orientation="vertical"
+      (pointerdown)="startSidebarResize('inspector', $event)"
+    ></div>
     <app-inspector-panel
       [workspace]="state.activeWorkspace()"
       [activeTerminal]="state.activeTerminal()"
@@ -350,9 +361,20 @@
     [installation]="agents.installation()"
     [profiles]="agents.modelProfiles()"
     [mcpProfiles]="agents.mcpProfiles()"
+    [accountProfiles]="agents.accountProfiles()"
     [workingDirectory]="selectedTerminalDirectory() ?? ''"
     (launched)="launchClaude($event)"
     (cancelled)="closeClaudeLaunch()"
+  />
+}
+
+@if (codexLaunchOpen()) {
+  <app-codex-launch-dialog
+    [installation]="agents.codexInstallation()"
+    [accountProfiles]="agents.accountProfiles()"
+    [workingDirectory]="selectedTerminalDirectory() ?? ''"
+    (launched)="launchCodex($event)"
+    (cancelled)="closeCodexLaunch()"
   />
 }
 
@@ -363,6 +385,7 @@
     [sessions]="agents.sessions()"
     [profiles]="agents.modelProfiles()"
     [mcpProfiles]="agents.mcpProfiles()"
+    [accountProfiles]="agents.accountProfiles()"
     [projectPath]="state.activeWorkspace()?.projectPath ?? ''"
     [busy]="agents.busy() || launchingClaude() || launchingCodex()"
     [error]="agents.error()"
@@ -379,13 +402,14 @@
     [modelProfiles]="agents.modelProfiles()"
     [mcpProfiles]="agents.mcpProfiles()"
     [networkProfiles]="agents.networkProfiles()"
+    [accountProfiles]="agents.accountProfiles()"
     [activeWorkspaceId]="state.activeWorkspace()?.id ?? ''"
     [activeWorkspaceName]="state.activeWorkspace()?.name ?? '当前 Workspace'"
     [networkTestResult]="networkTestResult()"
     [cliPlan]="cliOperationPlan()"
     [cliResult]="cliOperationResult()"
     [busy]="agents.busy()"
-    (detectRequested)="agents.detectClaude()"
+    (detectRequested)="detectAgentInstallations()"
     (cliPreviewRequested)="previewCliOperation($event)"
     (cliExecuteRequested)="executeCliOperation($event)"
     (modelSaved)="saveModelProfile($event)"
@@ -395,6 +419,10 @@
     (networkSaved)="saveNetworkProfile($event)"
     (deleteNetworkRequested)="deleteNetworkProfile($event)"
     (networkTestRequested)="testNetworkProfile($event)"
+    (accountSaved)="saveAccountProfile($event)"
+    (deleteAccountRequested)="deleteAccountProfile($event)"
+    (accountLoginRequested)="loginAccount($event)"
+    (accountRefreshRequested)="refreshAccountProfile($event)"
     (cancelled)="
       settingsOpen.set(false);
       networkTestResult.set(null);

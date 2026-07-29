@@ -2,6 +2,8 @@ import { Component, effect, input, output, signal, untracked } from '@angular/co
 import { FormsModule } from '@angular/forms';
 
 import {
+  AccountProfile,
+  AccountProfileInput,
   AgentInstallation,
   CLAUDE_PROVIDER_PRESETS,
   CliOperationPlan,
@@ -19,7 +21,7 @@ import {
 } from '../core/models/agent.models';
 import { IconComponent } from '../shared/icon/icon';
 
-type SettingsTab = 'diagnostics' | 'cli' | 'models' | 'mcp' | 'network';
+type SettingsTab = 'diagnostics' | 'cli' | 'accounts' | 'models' | 'mcp' | 'network';
 
 @Component({
   selector: 'app-agent-settings-dialog',
@@ -72,6 +74,14 @@ type SettingsTab = 'diagnostics' | 'cli' | 'models' | 'mcp' | 'network';
           <button
             type="button"
             class="tab"
+            [class.active]="tab() === 'accounts'"
+            (click)="selectTab('accounts')"
+          >
+            登录账号
+          </button>
+          <button
+            type="button"
+            class="tab"
             [class.active]="tab() === 'models'"
             (click)="selectTab('models')"
           >
@@ -109,10 +119,27 @@ type SettingsTab = 'diagnostics' | 'cli' | 'models' | 'mcp' | 'network';
                   </div>
                   <code>{{ installation()?.version ?? '未检测' }}</code>
                 </div>
+                <div
+                  class="diagnostic-status alert"
+                  [class.unavailable]="!codexInstallation()?.healthy"
+                >
+                  <span><app-icon name="terminal" [size]="18" /></span>
+                  <div>
+                    <strong>{{
+                      codexInstallation()?.healthy ? 'Codex CLI 可用' : 'Codex CLI 不可用'
+                    }}</strong>
+                    <small>{{ codexInstallation()?.diagnostic ?? '等待检测' }}</small>
+                  </div>
+                  <code>{{ codexInstallation()?.version ?? '未检测' }}</code>
+                </div>
                 <dl>
                   <div>
-                    <dt>可执行文件</dt>
+                    <dt>Claude</dt>
                     <dd>{{ installation()?.executablePath ?? '未找到' }}</dd>
+                  </div>
+                  <div>
+                    <dt>Codex</dt>
+                    <dd>{{ codexInstallation()?.executablePath ?? '未找到' }}</dd>
                   </div>
                   <div>
                     <dt>凭据存储</dt>
@@ -120,7 +147,7 @@ type SettingsTab = 'diagnostics' | 'cli' | 'models' | 'mcp' | 'network';
                   </div>
                   <div>
                     <dt>会话策略</dt>
-                    <dd>只读扫描 Claude JSONL</dd>
+                    <dd>只读扫描 Claude JSONL 与 Codex rollout</dd>
                   </div>
                 </dl>
                 <button
@@ -128,7 +155,7 @@ type SettingsTab = 'diagnostics' | 'cli' | 'models' | 'mcp' | 'network';
                   class="secondary inline-command btn btn-outline btn-sm"
                   (click)="detectRequested.emit()"
                 >
-                  <app-icon name="refresh" [size]="13" />重新检测
+                  <app-icon name="refresh" [size]="13" />重新检测两个 CLI
                 </button>
               </section>
             }
@@ -271,6 +298,126 @@ type SettingsTab = 'diagnostics' | 'cli' | 'models' | 'mcp' | 'network';
                   </div>
                 }
               </section>
+            }
+            @case ('accounts') {
+              <div class="settings-split account-settings">
+                <div class="profile-nav">
+                  @for (profile of accountProfiles(); track profile.id) {
+                    <button
+                      type="button"
+                      [class.active]="profile.id === accountId()"
+                      (click)="editAccount(profile)"
+                    >
+                      <strong>
+                        {{ profile.name }}
+                        @if (profile.isDefault) {
+                          <span class="scope-chip">DEFAULT</span>
+                        }
+                      </strong>
+                      <small>
+                        {{ profile.agentType === 'claude' ? 'Claude Code' : 'ChatGPT / Codex' }}
+                        · {{ profile.authenticated ? '已登录' : '未登录' }}
+                      </small>
+                    </button>
+                  }
+                  <button type="button" class="new-profile" (click)="newAccount()">
+                    <app-icon name="plus" [size]="13" />添加隔离账号
+                  </button>
+                </div>
+                <div class="profile-editor account-editor">
+                  <div class="network-intro">
+                    <div>
+                      <strong>多账号隔离登录</strong>
+                      <span>每个账号使用独立配置目录；登录凭据不会与其他托管账号混用。</span>
+                    </div>
+                    <span class="scope-chip">{{
+                      accountAgentType === 'claude' ? 'CLAUDE' : 'CHATGPT'
+                    }}</span>
+                  </div>
+
+                  <div class="two-columns">
+                    <label><span>账号名称</span><input [(ngModel)]="accountName" /></label>
+                    <label>
+                      <span>CLI 类型</span>
+                      <select [(ngModel)]="accountAgentType" [disabled]="accountSystem()">
+                        <option value="claude">Claude Code</option>
+                        <option value="codex">ChatGPT / Codex</option>
+                      </select>
+                    </label>
+                  </div>
+
+                  @if (selectedAccount(); as profile) {
+                    <div class="account-status alert" [class.unavailable]="!profile.authenticated">
+                      <app-icon [name]="profile.authenticated ? 'check' : 'shield'" [size]="16" />
+                      <span>
+                        <strong>{{ profile.authenticated ? '账号已登录' : '账号尚未登录' }}</strong>
+                        <small>{{ profile.diagnostic }}</small>
+                      </span>
+                    </div>
+                    <label>
+                      <span>隔离配置目录</span>
+                      <input readonly [value]="profile.configDir ?? '使用 CLI 当前系统账号目录'" />
+                    </label>
+                  } @else {
+                    <div class="account-status alert">
+                      <app-icon name="shield" [size]="16" />
+                      <span>
+                        <strong>保存后即可登录</strong>
+                        <small>Termexo 会自动创建独立配置目录并隔离凭据。</small>
+                      </span>
+                    </div>
+                  }
+
+                  <label class="checkbox-control editor-checkbox">
+                    <input type="checkbox" [(ngModel)]="accountDefault" />
+                    <span>设为此 CLI 的默认登录账号</span>
+                  </label>
+
+                  <p class="workspace-binding">
+                    登录会在新终端中打开官方 CLI 流程。删除 Profile 不会删除磁盘凭据目录。
+                  </p>
+
+                  <div class="editor-actions account-actions">
+                    @if (accountId() && !accountSystem()) {
+                      <button
+                        type="button"
+                        class="danger"
+                        [disabled]="busy()"
+                        (click)="deleteAccountRequested.emit(accountId())"
+                      >
+                        <app-icon name="trash" [size]="13" />删除
+                      </button>
+                    }
+                    <span></span>
+                    @if (accountId()) {
+                      <button
+                        type="button"
+                        class="secondary"
+                        [disabled]="busy()"
+                        (click)="accountRefreshRequested.emit(accountId())"
+                      >
+                        <app-icon name="refresh" [size]="13" />刷新状态
+                      </button>
+                      <button
+                        type="button"
+                        class="secondary"
+                        [disabled]="busy()"
+                        (click)="accountLoginRequested.emit(accountId())"
+                      >
+                        <app-icon name="terminal" [size]="13" />登录 / 切换
+                      </button>
+                    }
+                    <button
+                      type="button"
+                      class="primary"
+                      [disabled]="busy() || !accountName.trim()"
+                      (click)="saveAccount()"
+                    >
+                      保存账号
+                    </button>
+                  </div>
+                </div>
+              </div>
             }
             @case ('models') {
               <div class="settings-split">
@@ -594,6 +741,7 @@ export class AgentSettingsDialogComponent {
   readonly modelProfiles = input<ModelProfile[]>([]);
   readonly mcpProfiles = input<McpProfile[]>([]);
   readonly networkProfiles = input<NetworkProfile[]>([]);
+  readonly accountProfiles = input<AccountProfile[]>([]);
   readonly activeWorkspaceId = input('');
   readonly activeWorkspaceName = input('当前 Workspace');
   readonly networkTestResult = input<NetworkTestResult | null>(null);
@@ -611,12 +759,18 @@ export class AgentSettingsDialogComponent {
   readonly networkSaved = output<NetworkProfileInput>();
   readonly deleteNetworkRequested = output<string>();
   readonly networkTestRequested = output<string>();
+  readonly accountSaved = output<AccountProfileInput>();
+  readonly deleteAccountRequested = output<string>();
+  readonly accountLoginRequested = output<string>();
+  readonly accountRefreshRequested = output<string>();
 
   protected readonly tab = signal<SettingsTab>('diagnostics');
   protected readonly modelId = signal('claude-default');
   protected readonly hasCredential = signal(false);
   protected readonly mcpId = signal('');
   protected readonly networkId = signal('');
+  protected readonly accountId = signal('');
+  protected readonly accountSystem = signal(false);
   protected readonly hasNetworkCredential = signal(false);
   protected readonly providerPresets = CLAUDE_PROVIDER_PRESETS;
   protected cliAgentType: NativeAgentType = 'claude';
@@ -648,19 +802,26 @@ export class AgentSettingsDialogComponent {
   protected proxyUsername = '';
   protected proxyPassword = '';
   protected clearNetworkCredential = false;
+  protected accountName = '';
+  protected accountAgentType: NativeAgentType = 'claude';
+  protected accountDefault = false;
   private modelProfilesInitialized = false;
   private mcpProfilesInitialized = false;
   private networkProfilesInitialized = false;
+  private accountProfilesInitialized = false;
 
   constructor() {
     effect(() => this.syncModelProfileEditor(this.modelProfiles()));
     effect(() => this.syncMcpProfileEditor(this.mcpProfiles()));
     effect(() => this.syncNetworkProfileEditor(this.networkProfiles()));
+    effect(() => this.syncAccountProfileEditor(this.accountProfiles()));
   }
 
   protected selectTab(tab: SettingsTab): void {
     this.tab.set(tab);
-    if (tab === 'models') {
+    if (tab === 'accounts') {
+      this.syncAccountProfileEditor(this.accountProfiles());
+    } else if (tab === 'models') {
       this.syncModelProfileEditor(this.modelProfiles());
     } else if (tab === 'mcp') {
       this.syncMcpProfileEditor(this.mcpProfiles());
@@ -672,6 +833,37 @@ export class AgentSettingsDialogComponent {
   protected selectCliAgent(agentType: NativeAgentType): void {
     this.cliAgentType = agentType;
     this.cliConfirmed = false;
+  }
+
+  protected selectedAccount(): AccountProfile | undefined {
+    return this.accountProfiles().find((profile) => profile.id === this.accountId());
+  }
+
+  protected editAccount(profile: AccountProfile): void {
+    this.accountId.set(profile.id);
+    this.accountName = profile.name;
+    this.accountAgentType = profile.agentType;
+    this.accountDefault = profile.isDefault;
+    this.accountSystem.set(profile.isSystem);
+  }
+
+  protected newAccount(): void {
+    this.accountId.set('');
+    this.accountName = '';
+    this.accountAgentType = 'claude';
+    this.accountDefault = false;
+    this.accountSystem.set(false);
+  }
+
+  protected saveAccount(): void {
+    const profileId = this.accountId() || crypto.randomUUID();
+    this.accountId.set(profileId);
+    this.accountSaved.emit({
+      id: profileId,
+      name: this.accountName.trim(),
+      agentType: this.accountAgentType,
+      isDefault: this.accountDefault,
+    });
   }
 
   protected previewCli(): void {
@@ -925,6 +1117,21 @@ export class AgentSettingsDialogComponent {
         profiles[0];
       fallback ? this.editNetwork(fallback) : this.newNetwork();
       this.networkProfilesInitialized = true;
+    }
+  }
+
+  private syncAccountProfileEditor(profiles: AccountProfile[]): void {
+    const selectedId = untracked(this.accountId);
+    const selectedProfile = profiles.find((profile) => profile.id === selectedId);
+    if (
+      !this.accountProfilesInitialized ||
+      (!selectedId && profiles.length > 0) ||
+      (selectedId && !selectedProfile)
+    ) {
+      const fallback =
+        selectedProfile ?? profiles.find((profile) => profile.isDefault) ?? profiles[0];
+      fallback ? this.editAccount(fallback) : this.newAccount();
+      this.accountProfilesInitialized = true;
     }
   }
 }

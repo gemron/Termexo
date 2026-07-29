@@ -310,16 +310,15 @@ export class AppStateService {
         input.model ??
         (agentType === 'claude'
           ? 'Claude Sonnet'
-          : agentType === 'gemini'
-            ? 'Gemini Pro'
-            : agentType === 'codex'
-              ? 'GPT Codex'
-              : 'Local'),
+          : agentType === 'codex'
+            ? 'GPT Codex'
+            : 'Local'),
       branch: workspace.activeBranch,
       command: input.command ?? this.defaultCommand(agentType),
       nativeSessionId: input.nativeSessionId,
       profileId: input.profileId,
       mcpProfileId: input.mcpProfileId,
+      accountProfileId: input.accountProfileId,
       runtimeRevision: 0,
     };
   }
@@ -338,11 +337,13 @@ export class AppStateService {
   private restartRestoredTerminals(workspaces: Workspace[]): Workspace[] {
     return workspaces.map((workspace) => ({
       ...workspace,
-      terminals: workspace.terminals.map((terminal) => ({
-        ...terminal,
-        status: 'STARTING',
-        command: terminal.command ?? this.restoredCommand(terminal),
-      })),
+      terminals: workspace.terminals
+        .filter((terminal) => (terminal.agentType as string) !== 'gemini')
+        .map((terminal) => ({
+          ...terminal,
+          status: 'STARTING',
+          command: terminal.command ?? this.restoredCommand(terminal),
+        })),
     }));
   }
 

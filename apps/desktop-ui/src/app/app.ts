@@ -1,6 +1,7 @@
 import { Component, computed, effect, HostListener, inject, signal } from '@angular/core';
 
 import {
+  AccountProfileInput,
   CliOperationPlan,
   CliOperationRequest,
   CliOperationResult,
@@ -26,6 +27,7 @@ import {
   ClaudeLaunchDialogComponent,
   ClaudeLaunchDialogValue,
 } from './dialogs/claude-launch-dialog';
+import { CodexLaunchDialogComponent, CodexLaunchDialogValue } from './dialogs/codex-launch-dialog';
 import { CreateWorkspaceDialogComponent } from './dialogs/create-workspace-dialog';
 import {
   EditWorkspaceDialogComponent,
@@ -43,11 +45,39 @@ import {
 import { TerminalWorkbenchComponent } from './terminal/terminal-workbench';
 import { WorkspaceSidebarComponent } from './workspace/workspace-sidebar';
 
+type SidebarResizeTarget = 'workspace' | 'inspector';
+
+const WORKSPACE_SIDEBAR_DEFAULT_WIDTH = 208;
+const WORKSPACE_SIDEBAR_MIN_WIDTH = 168;
+const WORKSPACE_SIDEBAR_MAX_WIDTH = 360;
+const INSPECTOR_DEFAULT_WIDTH = 252;
+const INSPECTOR_MIN_WIDTH = 220;
+const INSPECTOR_MAX_WIDTH = 460;
+
+function readStoredBoolean(key: string, fallback: boolean): boolean {
+  try {
+    const value = window.localStorage.getItem(key);
+    return value === null ? fallback : value === 'true';
+  } catch {
+    return fallback;
+  }
+}
+
+function readStoredWidth(key: string, fallback: number, min: number, max: number): number {
+  try {
+    const value = Number(window.localStorage.getItem(key));
+    return Number.isFinite(value) && value >= min && value <= max ? value : fallback;
+  } catch {
+    return fallback;
+  }
+}
+
 @Component({
   selector: 'app-root',
   imports: [
     AgentSettingsDialogComponent,
     ClaudeLaunchDialogComponent,
+    CodexLaunchDialogComponent,
     CreateWorkspaceDialogComponent,
     EditWorkspaceDialogComponent,
     IconComponent,
@@ -72,15 +102,38 @@ export class App {
   private readonly terminalGateway = inject(TerminalGatewayService);
   private readonly handledEventKeys = new Set<string>();
   private readonly preferredTerminalIds = signal<Record<string, string[]>>({});
+  private resizeStartX = 0;
+  private resizeStartWidth = 0;
 
   protected readonly createWorkspaceOpen = signal(false);
   protected readonly editingWorkspaceId = signal<string | null>(null);
   protected readonly claudeLaunchOpen = signal(false);
+  protected readonly codexLaunchOpen = signal(false);
   protected readonly sessionCenterOpen = signal(false);
   protected readonly settingsOpen = signal(false);
   protected readonly modelSwitchOpen = signal(false);
   protected readonly agentMenuOpen = signal(false);
-  protected readonly inspectorOpen = signal(true);
+  protected readonly workspaceSidebarOpen = signal(
+    readStoredBoolean('termexo.workspaceSidebarOpen', true),
+  );
+  protected readonly inspectorOpen = signal(readStoredBoolean('termexo.inspectorOpen', true));
+  protected readonly workspaceSidebarWidth = signal(
+    readStoredWidth(
+      'termexo.workspaceSidebarWidth',
+      WORKSPACE_SIDEBAR_DEFAULT_WIDTH,
+      WORKSPACE_SIDEBAR_MIN_WIDTH,
+      WORKSPACE_SIDEBAR_MAX_WIDTH,
+    ),
+  );
+  protected readonly inspectorWidth = signal(
+    readStoredWidth(
+      'termexo.inspectorWidth',
+      INSPECTOR_DEFAULT_WIDTH,
+      INSPECTOR_MIN_WIDTH,
+      INSPECTOR_MAX_WIDTH,
+    ),
+  );
+  protected readonly resizingSidebar = signal<SidebarResizeTarget | null>(null);
   protected readonly workspaceMaximized = signal(false);
   protected readonly terminalMaximized = signal(false);
   protected readonly launchingClaude = signal(false);
@@ -161,9 +214,20 @@ export class App {
     this.claudeLaunchOpen.set(true);
   }
 
-  protected async launchCodex(): Promise<void> {
+  protected async openCodexLaunch(): Promise<void> {
     this.agentMenuOpen.set(false);
-    if (this.launchingCodex()) {
+    const workingDirectory = await this.selectTerminalDirectory();
+    if (!workingDirectory) {
+      return;
+    }
+    this.selectedTerminalDirectory.set(workingDirectory);
+    this.codexLaunchOpen.set(true);
+  }
+
+  protected async launchCodex(value: CodexLaunchDialogValue): Promise<void> {
+    const workspace = this.state.activeWorkspace();
+    const workingDirectory = this.selectedTerminalDirectory();
+    if (!workspace || !workingDirectory || this.launchingCodex()) {
       return;
     }
 
@@ -176,25 +240,26 @@ export class App {
       return;
     }
 
-    const workingDirectory = await this.selectTerminalDirectory();
-    if (!workingDirectory) {
-      return;
-    }
-
     const terminalId = crypto.randomUUID();
     this.launchingCodex.set(true);
     try {
       const launch = await this.agents.prepareCodexLaunch({
         terminalId,
-        workspaceId: this.state.activeWorkspace()?.id,
+        workspaceId: workspace.id,
+        model: value.model,
+        accountProfileId: value.accountProfileId,
       });
       const terminal = this.state.createTerminal({
         id: terminalId,
         agentType: 'codex',
+        name: value.name || undefined,
         command: launch.command,
-        model: 'Codex 默认模型',
+        model: value.model ?? 'Codex 默认模型',
         workingDirectory,
+        accountProfileId: value.accountProfileId,
       });
+      this.codexLaunchOpen.set(false);
+      this.selectedTerminalDirectory.set(null);
       if (terminal) {
         this.showToast(`${terminal.name} 已启动`);
       }
@@ -203,6 +268,11 @@ export class App {
     } finally {
       this.launchingCodex.set(false);
     }
+  }
+
+  protected closeCodexLaunch(): void {
+    this.codexLaunchOpen.set(false);
+    this.selectedTerminalDirectory.set(null);
   }
 
   protected async launchClaude(value: ClaudeLaunchDialogValue): Promise<void> {
@@ -221,6 +291,7 @@ export class App {
         name: value.name || undefined,
         profileId: value.profileId,
         mcpProfileId: value.mcpProfileId,
+        accountProfileId: value.accountProfileId,
       });
       const profile = this.agents.modelProfiles().find((item) => item.id === value.profileId);
       const terminal = this.state.createTerminal({
@@ -232,6 +303,7 @@ export class App {
         workingDirectory,
         profileId: value.profileId,
         mcpProfileId: value.mcpProfileId,
+        accountProfileId: value.accountProfileId,
       });
       this.claudeLaunchOpen.set(false);
       this.selectedTerminalDirectory.set(null);
@@ -274,6 +346,8 @@ export class App {
             terminalId,
             workspaceId: workspace.id,
             sessionId: value.session.nativeSessionId,
+            model: value.model,
+            accountProfileId: value.accountProfileId,
           })
         : await this.agents.prepareLaunch({
             terminalId,
@@ -281,6 +355,7 @@ export class App {
             sessionId: value.session.nativeSessionId,
             profileId: value.profileId,
             mcpProfileId: value.mcpProfileId,
+            accountProfileId: value.accountProfileId,
           });
       const profile = isCodex
         ? undefined
@@ -292,12 +367,14 @@ export class App {
         command: launch.command,
         model:
           profile?.name ??
+          value.model ??
           value.session.modelName ??
           (isCodex ? 'Codex 默认模型' : 'Claude Sonnet'),
         nativeSessionId: value.session.nativeSessionId,
         workingDirectory: value.session.projectPath ?? workspace.projectPath,
         profileId: isCodex ? undefined : value.profileId,
         mcpProfileId: isCodex ? undefined : value.mcpProfileId,
+        accountProfileId: value.accountProfileId,
       });
       this.sessionCenterOpen.set(false);
       if (terminal) {
@@ -378,6 +455,70 @@ export class App {
     this.workspaceMaximized.update((maximized) => !maximized);
   }
 
+  protected toggleWorkspaceSidebar(): void {
+    this.workspaceSidebarOpen.update((open) => {
+      const next = !open;
+      this.storePreference('termexo.workspaceSidebarOpen', next);
+      return next;
+    });
+  }
+
+  protected toggleInspector(): void {
+    this.inspectorOpen.update((open) => {
+      const next = !open;
+      this.storePreference('termexo.inspectorOpen', next);
+      return next;
+    });
+  }
+
+  protected startSidebarResize(target: SidebarResizeTarget, event: PointerEvent): void {
+    if (event.button !== 0 || this.workspaceMaximized()) {
+      return;
+    }
+    event.preventDefault();
+    this.resizeStartX = event.clientX;
+    this.resizeStartWidth =
+      target === 'workspace' ? this.workspaceSidebarWidth() : this.inspectorWidth();
+    this.resizingSidebar.set(target);
+  }
+
+  @HostListener('window:pointermove', ['$event'])
+  protected resizeSidebar(event: PointerEvent): void {
+    const target = this.resizingSidebar();
+    if (!target) {
+      return;
+    }
+    const delta = event.clientX - this.resizeStartX;
+    if (target === 'workspace') {
+      this.workspaceSidebarWidth.set(
+        Math.min(
+          WORKSPACE_SIDEBAR_MAX_WIDTH,
+          Math.max(WORKSPACE_SIDEBAR_MIN_WIDTH, this.resizeStartWidth + delta),
+        ),
+      );
+    } else {
+      this.inspectorWidth.set(
+        Math.min(
+          INSPECTOR_MAX_WIDTH,
+          Math.max(INSPECTOR_MIN_WIDTH, this.resizeStartWidth - delta),
+        ),
+      );
+    }
+  }
+
+  @HostListener('window:pointerup')
+  protected stopSidebarResize(): void {
+    const target = this.resizingSidebar();
+    if (!target) {
+      return;
+    }
+    this.storePreference(
+      target === 'workspace' ? 'termexo.workspaceSidebarWidth' : 'termexo.inspectorWidth',
+      target === 'workspace' ? this.workspaceSidebarWidth() : this.inspectorWidth(),
+    );
+    this.resizingSidebar.set(null);
+  }
+
   @HostListener('window:keydown', ['$event'])
   protected restoreMaximizedView(event: KeyboardEvent): void {
     if (event.key !== 'Escape' || !event.shiftKey) {
@@ -452,6 +593,7 @@ export class App {
             sessionId: terminal.nativeSessionId,
             profileId,
             mcpProfileId: terminal.mcpProfileId,
+            accountProfileId: terminal.accountProfileId,
           });
           await this.terminalGateway.close(terminal.id).catch(() => undefined);
           if (
@@ -480,18 +622,72 @@ export class App {
     }
   }
 
-  protected saveSnapshot(): void {
-    this.showToast('Workspace 快照已保存');
-  }
-
-  protected showPlaceholder(name: string): void {
-    this.showToast(`${name}将在后续版本开放`);
-  }
-
   protected async saveModelProfile(input: ModelProfileInput): Promise<void> {
     try {
       await this.agents.saveModelProfile(input);
       this.showToast('模型 Profile 已保存');
+    } catch (error) {
+      this.showToast(this.errorMessage(error));
+    }
+  }
+
+  protected async saveAccountProfile(input: AccountProfileInput): Promise<void> {
+    try {
+      await this.agents.saveAccountProfile(input);
+      this.showToast('登录账号已保存');
+    } catch (error) {
+      this.showToast(this.errorMessage(error));
+    }
+  }
+
+  protected async deleteAccountProfile(profileId: string): Promise<void> {
+    try {
+      await this.agents.deleteAccountProfile(profileId);
+      this.showToast('账号 Profile 已移除，磁盘凭据目录已保留');
+    } catch (error) {
+      this.showToast(this.errorMessage(error));
+    }
+  }
+
+  protected async refreshAccountProfile(profileId: string): Promise<void> {
+    try {
+      await this.agents.refreshAccountProfile(profileId);
+      const profile = this.agents.accountProfiles().find((item) => item.id === profileId);
+      this.showToast(profile?.diagnostic ?? '账号状态已刷新');
+    } catch (error) {
+      this.showToast(this.errorMessage(error));
+    }
+  }
+
+  protected async loginAccount(profileId: string): Promise<void> {
+    const workspace = this.state.activeWorkspace();
+    const profile = this.agents.accountProfiles().find((item) => item.id === profileId);
+    if (!workspace || !profile) {
+      return;
+    }
+    const workingDirectory = await this.selectTerminalDirectory();
+    if (!workingDirectory) {
+      return;
+    }
+    const terminalId = crypto.randomUUID();
+    try {
+      const launch = await this.agents.prepareAccountLogin({
+        terminalId,
+        workspaceId: workspace.id,
+        accountProfileId: profileId,
+      });
+      const terminal = this.state.createTerminal({
+        id: terminalId,
+        agentType: profile.agentType,
+        name: `${profile.name} 登录`,
+        command: launch.command,
+        model: '账号登录',
+        workingDirectory,
+      });
+      this.settingsOpen.set(false);
+      if (terminal) {
+        this.showToast(`已打开 ${profile.name} 官方登录流程`);
+      }
     } catch (error) {
       this.showToast(this.errorMessage(error));
     }
@@ -575,6 +771,11 @@ export class App {
     }
   }
 
+  protected async detectAgentInstallations(): Promise<void> {
+    await Promise.all([this.agents.detectClaude(), this.agents.detectCodex()]);
+    this.showToast('Claude Code 与 Codex CLI 检测已完成');
+  }
+
   protected async executeCliOperation(request: CliOperationRequest): Promise<void> {
     this.cliOperationResult.set(null);
     try {
@@ -598,6 +799,14 @@ export class App {
 
   private errorMessage(error: unknown): string {
     return error instanceof Error ? error.message : String(error);
+  }
+
+  private storePreference(key: string, value: boolean | number): void {
+    try {
+      window.localStorage.setItem(key, String(value));
+    } catch {
+      // Persistence is optional in restricted webviews and test environments.
+    }
   }
 
   private async selectTerminalDirectory(): Promise<string | null> {

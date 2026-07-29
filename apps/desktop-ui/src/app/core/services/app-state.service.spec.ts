@@ -95,9 +95,9 @@ describe('AppStateService', () => {
   it('adds a terminal to the active workspace', async () => {
     await service.initialize();
 
-    const terminal = service.createTerminal({ agentType: 'gemini' });
+    const terminal = service.createTerminal({ agentType: 'codex' });
 
-    expect(terminal?.agentType).toBe('gemini');
+    expect(terminal?.agentType).toBe('codex');
     expect(service.activeTerminal()?.id).toBe(terminal?.id);
     expect(repository.save).toHaveBeenCalled();
   });

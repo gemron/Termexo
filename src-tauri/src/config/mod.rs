@@ -108,6 +108,31 @@ pub struct NetworkProfileInput {
     pub clear_credential: bool,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AccountProfile {
+    pub id: String,
+    pub name: String,
+    pub agent_type: String,
+    pub config_dir: Option<String>,
+    pub is_default: bool,
+    pub is_system: bool,
+    #[serde(default)]
+    pub authenticated: bool,
+    #[serde(default)]
+    pub diagnostic: String,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AccountProfileInput {
+    pub id: String,
+    pub name: String,
+    pub agent_type: String,
+    #[serde(default)]
+    pub is_default: bool,
+}
+
 fn default_true() -> bool {
     true
 }

@@ -97,6 +97,40 @@ try {
   const settingsDialog = page.getByRole('dialog', { name: 'Agent 与开发环境设置' });
   await settingsDialog.waitFor();
   await settingsDialog.getByText('Windows Credential Manager', { exact: true }).waitFor();
+  const storedAccountProfiles = await page.evaluate(() =>
+    window.__TAURI_INTERNALS__.invoke('list_account_profiles'),
+  );
+  if (
+    !storedAccountProfiles.some((profile) => profile.id === 'claude-system') ||
+    !storedAccountProfiles.some((profile) => profile.id === 'codex-system')
+  ) {
+    throw new Error('Desktop database did not seed the system account profiles.');
+  }
+  await settingsDialog.getByRole('button', { name: '登录账号', exact: true }).click();
+  await settingsDialog
+    .locator('.profile-nav button')
+    .filter({ hasText: '系统 Claude 账号' })
+    .waitFor();
+  await settingsDialog
+    .locator('.profile-nav button')
+    .filter({ hasText: '系统 ChatGPT 账号' })
+    .waitFor();
+  const accountProfiles = await page.evaluate(() =>
+    Promise.all(
+      ['claude-system', 'codex-system'].map((profileId) =>
+        window.__TAURI_INTERNALS__.invoke('refresh_account_profile', { profileId }),
+      ),
+    ),
+  );
+  if (
+    accountProfiles.some((profile) => !profile.diagnostic) ||
+    accountProfiles
+      .map((profile) => profile.agentType)
+      .sort()
+      .join(',') !== 'claude,codex'
+  ) {
+    throw new Error('Desktop account profiles did not resolve isolated CLI login status.');
+  }
 
   proxyServer = createServer((socket) => socket.end());
   await new Promise((resolveListen, rejectListen) => {
@@ -190,6 +224,11 @@ try {
       codexExecutablePath: codexResumeLaunch.executablePath,
       executablePath: backendInstallation.executablePath,
       sessionConnections: connectionStatuses.map((status) => status.trim()),
+      accountProfiles: accountProfiles.map((profile) => ({
+        agentType: profile.agentType,
+        authenticated: profile.authenticated,
+        diagnostic: profile.diagnostic,
+      })),
       networkProfileTest: {
         id: temporaryNetworkProfileId,
         target: proxyUrl,

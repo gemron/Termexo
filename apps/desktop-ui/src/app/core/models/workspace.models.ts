@@ -1,4 +1,4 @@
-export type AgentType = 'claude' | 'codex' | 'gemini' | 'shell';
+export type AgentType = 'claude' | 'codex' | 'shell';
 
 export type TerminalStatus =
   | 'STARTING'
@@ -58,6 +58,7 @@ export interface TerminalSession {
   nativeSessionId?: string;
   profileId?: string;
   mcpProfileId?: string;
+  accountProfileId?: string;
   runtimeRevision?: number;
 }
 
@@ -87,22 +88,7 @@ export interface CreateTerminalInput {
   workingDirectory?: string;
   profileId?: string;
   mcpProfileId?: string;
-}
-
-export interface GitSummary {
-  branch: string;
-  ahead: number;
-  behind: number;
-  changedFiles: number;
-  additions: number;
-  deletions: number;
-}
-
-export interface TaskSummary {
-  id: string;
-  title: string;
-  status: '进行中' | '等待确认' | '已完成';
-  progress: number;
+  accountProfileId?: string;
 }
 
 export const TERMINAL_STATUS_LABELS: Record<TerminalStatus, string> = {
@@ -121,6 +107,5 @@ export const TERMINAL_STATUS_LABELS: Record<TerminalStatus, string> = {
 export const AGENT_LABELS: Record<AgentType, string> = {
   claude: 'Claude Code',
   codex: 'Codex CLI',
-  gemini: 'Gemini CLI',
   shell: 'Shell',
 };

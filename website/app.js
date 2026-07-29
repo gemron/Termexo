@@ -35,7 +35,7 @@ const translations = {
       "Name, color, order, project path, layout, terminals, branch, and model state stay attached to one durable workspace.",
     featureSessionTitle: "Native session recovery",
     featureSessionBody:
-      "Discover and resume native Claude Code and Codex CLI sessions from one read-only session center.",
+      "Discover and resume native Claude Code and Codex CLI sessions across isolated accounts from one read-only session center.",
     featureModelTitle: "Provider profiles",
     featureModelBody:
       "Keep Claude Code while routing to Anthropic, DeepSeek, MiniMax, GLM, or a compatible gateway.",
@@ -61,10 +61,10 @@ const translations = {
     planned: "PLANNED",
     roadmap02Title: "Multi-Agent session workbench",
     roadmap02Body:
-      "Claude and Codex detection, native session discovery and resume, configurable grids, profiles, and local persistence.",
+      "Claude and Codex detection, isolated multi-account launch and resume, configurable grids, profiles, and local persistence.",
     roadmap04Title: "Multi-agent and provider control",
     roadmap04Body:
-      "Gemini and generic CLI adapters, one-click CLI lifecycle, internal-network and npm proxy profiles, multiple Claude, Codex, and provider accounts with scoped switching, rollback, and live Plan quota monitoring.",
+      "Account and provider controls, one-click CLI lifecycle, internal-network and npm proxy profiles, failure rollback, and live Plan quota monitoring.",
     roadmap06Title: "Context and orchestration",
     roadmap06Body:
       "Session summaries, cross-agent migration, task routing, collaboration, and notifications.",
@@ -126,7 +126,7 @@ const translations = {
       "名称、颜色、顺序、项目路径、布局、终端、分支和模型状态都归属于一个持久工作空间。",
     featureSessionTitle: "原生会话恢复",
     featureSessionBody:
-      "在统一的只读会话中心发现并恢复 Claude Code 与 Codex CLI 原生会话。",
+      "在统一的只读会话中心发现并恢复多个隔离账号中的 Claude Code 与 Codex CLI 原生会话。",
     featureModelTitle: "供应商 Profile",
     featureModelBody:
       "保留 Claude Code，通过 Profile 路由到 Anthropic、DeepSeek、MiniMax、GLM 或兼容网关。",
@@ -152,10 +152,10 @@ const translations = {
     planned: "规划中",
     roadmap02Title: "多 Agent 会话工作台",
     roadmap02Body:
-      "Claude 与 Codex 检测、原生会话发现和恢复、自定义网格、Profile 与本地持久化。",
+      "Claude 与 Codex 检测、隔离多账号启动和恢复、自定义网格、Profile 与本地持久化。",
     roadmap04Title: "多 Agent 与供应商控制",
     roadmap04Body:
-      "Gemini 与通用 CLI Adapter、CLI 一键安装升级、内网和 npm 代理 Profile、多个 Claude、Codex 和第三方供应商账号的分范围管理切换、失败回滚与 Plan 余量实时监控。",
+      "账号与供应商控制、CLI 一键安装升级、内网和 npm 代理 Profile、失败回滚与 Plan 余量实时监控。",
     roadmap06Title: "上下文与任务编排",
     roadmap06Body: "会话摘要、跨 Agent 迁移、任务路由、协作和通知。",
     roadmap07Title: "Workspace 共享与远程访问",

@@ -1,17 +1,13 @@
-import { Component, computed, input, signal } from '@angular/core';
+import { Component, computed, input } from '@angular/core';
 
 import { AgentEvent } from '../core/models/agent.models';
 import {
   AGENT_LABELS,
-  GitSummary,
-  TaskSummary,
   TERMINAL_STATUS_LABELS,
   TerminalSession,
   Workspace,
 } from '../core/models/workspace.models';
 import { IconComponent } from '../shared/icon/icon';
-
-type InspectorTab = 'agents' | 'git' | 'tasks';
 
 const EVENT_LABELS: Readonly<Record<string, string>> = {
   'session.started': '会话已启动',
@@ -26,36 +22,6 @@ const EVENT_LABELS: Readonly<Record<string, string>> = {
   'session.ended': '会话已结束',
 };
 
-const GIT_SUMMARY: GitSummary = {
-  branch: 'feature/terminal-runtime',
-  ahead: 2,
-  behind: 0,
-  changedFiles: 7,
-  additions: 284,
-  deletions: 41,
-};
-
-const TASKS: TaskSummary[] = [
-  {
-    id: 'task-1',
-    title: '实现 PTY 进程管理',
-    status: '进行中',
-    progress: 72,
-  },
-  {
-    id: 'task-2',
-    title: 'Workspace 快照恢复',
-    status: '等待确认',
-    progress: 90,
-  },
-  {
-    id: 'task-3',
-    title: '终端布局持久化',
-    status: '已完成',
-    progress: 100,
-  },
-];
-
 @Component({
   selector: 'app-inspector-panel',
   imports: [IconComponent],
@@ -66,7 +32,6 @@ export class InspectorPanelComponent {
   readonly workspace = input<Workspace | null>(null);
   readonly activeTerminal = input<TerminalSession | null>(null);
   readonly events = input<AgentEvent[]>([]);
-  readonly tab = signal<InspectorTab>('agents');
   protected readonly recentEvents = computed(() => {
     const terminalId = this.activeTerminal()?.id;
     return this.events()
@@ -76,8 +41,6 @@ export class InspectorPanelComponent {
 
   protected readonly agentLabels = AGENT_LABELS;
   protected readonly statusLabels = TERMINAL_STATUS_LABELS;
-  protected readonly git = GIT_SUMMARY;
-  protected readonly tasks = TASKS;
 
   protected eventLabel(event: AgentEvent): string {
     return EVENT_LABELS[event.eventType] ?? 'Agent 状态更新';

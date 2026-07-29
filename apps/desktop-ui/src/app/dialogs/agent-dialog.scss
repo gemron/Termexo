@@ -606,8 +606,13 @@ button:disabled {
 }
 
 .resume-options {
-  grid-template-columns: minmax(180px, 1fr) 190px 190px;
+  grid-template-columns: minmax(180px, 1fr) repeat(3, minmax(140px, 190px));
   align-items: center;
+}
+
+.codex-resume-options {
+  grid-template-columns: minmax(220px, 1fr) repeat(2, minmax(170px, 220px));
+  border-top: 1px solid var(--border);
 }
 
 .resume-options-copy {
@@ -753,6 +758,7 @@ button:disabled {
 
 .settings-tabs {
   display: flex;
+  overflow-x: auto;
   padding: 0 14px;
   border-bottom: 1px solid var(--border);
 
@@ -769,6 +775,50 @@ button:disabled {
       border-bottom-color: var(--color-primary);
       color: var(--text);
     }
+  }
+}
+
+.account-status {
+  display: grid;
+  grid-template-columns: 28px minmax(0, 1fr);
+  align-items: center;
+  gap: 9px;
+  margin-top: 14px;
+  padding: 10px 12px;
+  border: 1px solid color-mix(in oklab, var(--color-success) 38%, var(--border));
+  border-radius: var(--radius-field);
+  color: var(--color-success);
+  background: var(--success-soft);
+
+  strong,
+  small {
+    display: block;
+  }
+
+  strong {
+    font-size: 10px;
+  }
+
+  small {
+    margin-top: 3px;
+    color: var(--text-muted);
+    font-size: 9px;
+  }
+
+  &.unavailable {
+    border-color: color-mix(in oklab, var(--color-warning) 42%, var(--border));
+    color: var(--color-warning);
+    background: var(--warning-soft);
+  }
+}
+
+.account-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+
+  > span {
+    flex: 1;
   }
 }
 

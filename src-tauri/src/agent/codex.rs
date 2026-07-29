@@ -42,6 +42,13 @@ impl CodexCliAdapter {
         Self::default()
     }
 
+    pub fn with_home(codex_home: PathBuf) -> Self {
+        Self {
+            executable_override: None,
+            codex_home_override: Some(codex_home),
+        }
+    }
+
     #[cfg(test)]
     fn with_paths(executable: PathBuf, codex_home: PathBuf) -> Self {
         Self {
@@ -365,6 +372,7 @@ fn parse_session(
         id: format!("codex:{native_session_id}"),
         agent_type: AGENT_TYPE.into(),
         native_session_id,
+        account_profile_id: None,
         project_path,
         model_name,
         title,

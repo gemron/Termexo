@@ -1,23 +1,19 @@
 import { Component, computed, input, output, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 
-import {
-  AccountProfile,
-  AgentInstallation,
-  McpProfile,
-  ModelProfile,
-} from '../core/models/agent.models';
+import { AccountProfile, AgentInstallation } from '../core/models/agent.models';
 import { IconComponent } from '../shared/icon/icon';
 
-export interface ClaudeLaunchDialogValue {
+export interface CodexLaunchDialogValue {
   name: string;
-  profileId?: string;
-  mcpProfileId?: string;
+  model?: string;
   accountProfileId?: string;
 }
 
+const CODEX_MODEL_SUGGESTIONS = ['gpt-5.6-sol', 'gpt-5.6-terra', 'gpt-5.6-luna'] as const;
+
 @Component({
-  selector: 'app-claude-launch-dialog',
+  selector: 'app-codex-launch-dialog',
   imports: [FormsModule, IconComponent],
   template: `
     <div class="backdrop modal modal-open" (mousedown)="cancelled.emit()">
@@ -25,14 +21,14 @@ export interface ClaudeLaunchDialogValue {
         class="agent-dialog compact modal-box"
         role="dialog"
         aria-modal="true"
-        aria-labelledby="claude-launch-title"
+        aria-labelledby="codex-launch-title"
         (mousedown)="$event.stopPropagation()"
       >
         <header>
           <div class="dialog-title">
-            <span class="title-icon"><app-icon name="bot" [size]="17" /></span>
+            <span class="title-icon"><app-icon name="terminal" [size]="17" /></span>
             <div>
-              <h2 id="claude-launch-title">新建 Claude 会话</h2>
+              <h2 id="codex-launch-title">新建 Codex 会话</h2>
               <p>{{ workingDirectory() }}</p>
             </div>
           </div>
@@ -49,7 +45,7 @@ export interface ClaudeLaunchDialogValue {
 
         <div class="installation-line" [class.unavailable]="!installation()?.healthy">
           <i></i>
-          <span>{{ installation()?.diagnostic ?? '正在检测 Claude Code' }}</span>
+          <span>{{ installation()?.diagnostic ?? '正在检测 Codex CLI' }}</span>
           <code>{{ installation()?.version ?? '' }}</code>
         </div>
 
@@ -59,50 +55,43 @@ export interface ClaudeLaunchDialogValue {
             <input
               type="text"
               class="input input-bordered input-sm"
-              placeholder="例如：auth-refactor"
+              placeholder="例如：review-release"
               [ngModel]="name()"
               (ngModelChange)="name.set($event)"
               autofocus
             />
           </label>
-          <label>
-            <span>模型 Profile</span>
-            <select
-              class="select select-bordered select-sm"
-              [ngModel]="resolvedProfileId()"
-              (ngModelChange)="profileId.set($event)"
-            >
-              @for (profile of profiles(); track profile.id) {
-                <option [value]="profile.id">{{ profile.name }} · {{ profile.model }}</option>
-              }
-            </select>
-          </label>
-          <label>
-            <span>登录账号</span>
+          <label class="wide">
+            <span>ChatGPT 登录账号</span>
             <select
               class="select select-bordered select-sm"
               [ngModel]="resolvedAccountProfileId()"
               (ngModelChange)="accountProfileId.set($event)"
             >
-              @for (profile of claudeAccounts(); track profile.id) {
+              @for (profile of codexAccounts(); track profile.id) {
                 <option [value]="profile.id">
                   {{ profile.name }} · {{ profile.authenticated ? '已登录' : '未登录' }}
                 </option>
               }
             </select>
           </label>
-          <label>
-            <span>MCP Profile</span>
-            <select
-              class="select select-bordered select-sm"
-              [ngModel]="mcpProfileId()"
-              (ngModelChange)="mcpProfileId.set($event)"
-            >
-              <option value="">使用 Claude 默认配置</option>
-              @for (profile of mcpProfiles(); track profile.id) {
-                <option [value]="profile.id">{{ profile.name }}</option>
+          <label class="wide">
+            <span>Codex 模型</span>
+            <input
+              type="text"
+              class="input input-bordered input-sm"
+              list="codex-model-suggestions"
+              placeholder="留空使用 Codex 配置的默认模型"
+              aria-label="Codex 模型"
+              [ngModel]="model()"
+              (ngModelChange)="model.set($event)"
+            />
+            <datalist id="codex-model-suggestions">
+              @for (suggestion of modelSuggestions; track suggestion) {
+                <option [value]="suggestion"></option>
               }
-            </select>
+            </datalist>
+            <small>可选择推荐模型，也可输入当前 Codex CLI 支持的任意模型 ID。</small>
           </label>
         </div>
 
@@ -124,38 +113,29 @@ export interface ClaudeLaunchDialogValue {
   `,
   styleUrl: './agent-dialog.scss',
 })
-export class ClaudeLaunchDialogComponent {
+export class CodexLaunchDialogComponent {
   readonly installation = input<AgentInstallation | null>(null);
-  readonly profiles = input<ModelProfile[]>([]);
-  readonly mcpProfiles = input<McpProfile[]>([]);
   readonly accountProfiles = input<AccountProfile[]>([]);
   readonly workingDirectory = input('');
-  readonly launched = output<ClaudeLaunchDialogValue>();
+  readonly launched = output<CodexLaunchDialogValue>();
   readonly cancelled = output<void>();
 
   protected readonly name = signal('');
-  protected readonly profileId = signal('');
-  protected readonly mcpProfileId = signal('');
+  protected readonly model = signal('');
   protected readonly accountProfileId = signal('');
-  protected readonly claudeAccounts = computed(() =>
-    this.accountProfiles().filter((profile) => profile.agentType === 'claude'),
+  protected readonly modelSuggestions = CODEX_MODEL_SUGGESTIONS;
+  protected readonly codexAccounts = computed(() =>
+    this.accountProfiles().filter((profile) => profile.agentType === 'codex'),
   );
   protected readonly resolvedAccountProfileId = computed(
     () =>
       this.accountProfileId() ||
-      this.claudeAccounts().find((profile) => profile.isDefault)?.id ||
-      this.claudeAccounts()[0]?.id ||
-      '',
-  );
-  protected readonly resolvedProfileId = computed(
-    () =>
-      this.profileId() ||
-      this.profiles().find((profile) => profile.isDefault)?.id ||
-      this.profiles()[0]?.id ||
+      this.codexAccounts().find((profile) => profile.isDefault)?.id ||
+      this.codexAccounts()[0]?.id ||
       '',
   );
   protected readonly canLaunch = computed(
-    () => Boolean(this.installation()?.healthy) && Boolean(this.resolvedProfileId()),
+    () => Boolean(this.installation()?.healthy) && Boolean(this.resolvedAccountProfileId()),
   );
 
   protected submit(): void {
@@ -164,8 +144,7 @@ export class ClaudeLaunchDialogComponent {
     }
     this.launched.emit({
       name: this.name().trim(),
-      profileId: this.resolvedProfileId() || undefined,
-      mcpProfileId: this.mcpProfileId() || undefined,
+      model: this.model().trim() || undefined,
       accountProfileId: this.resolvedAccountProfileId() || undefined,
     });
   }
