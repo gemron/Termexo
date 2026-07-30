@@ -36,7 +36,7 @@
             <img src="assets/termexo-mark.svg" alt="" />
           </span>
           <span>Termexo</span>
-          <small>0.3.2</small>
+          <small>0.3.3</small>
         </a>
 
         <nav
@@ -98,35 +98,45 @@
             <em data-i18n="heroLine2">Every agent.</em>
           </h1>
           <p class="hero-lead" data-i18n="heroLead">
-            Coordinate coding terminals, native agent sessions, model providers,
-            and recoverable project state from one focused desktop environment.
+            Run the complete Windows desktop app directly from npm, then
+            coordinate coding terminals, native agent sessions, model providers,
+            and recoverable project state in one focused environment.
           </p>
           <div class="hero-actions">
             <a
               class="button primary"
-              href="https://github.com/gemron/Termexo/releases/latest"
+              href="https://www.npmjs.com/package/termexo"
               target="_blank"
               rel="noreferrer"
             >
-              <span data-i18n="download">Download for Windows</span>
+              <span data-i18n="runFromNpm">Run from npm</span>
               <svg viewBox="0 0 24 24" aria-hidden="true">
-                <path d="M12 3v12m0 0 5-5m-5 5-5-5M4 20h16" />
+                <path d="m9 7 5 5-5 5m7 0h3" />
               </svg>
             </a>
             <a
               class="button secondary"
-              href="https://github.com/gemron/Termexo"
+              href="https://github.com/gemron/Termexo/releases/latest"
               target="_blank"
               rel="noreferrer"
             >
-              <span data-i18n="viewSource">View source</span>
-              <span aria-hidden="true">↗</span>
+              <span data-i18n="download">Download installer</span>
+              <svg viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M12 3v12m0 0 5-5m-5 5-5-5M4 20h16" />
+              </svg>
             </a>
+          </div>
+          <div class="install-command" aria-label="npm command">
+            <span>PS</span>
+            <code>npx termexo@latest</code>
+            <button type="button" data-copy-command>
+              <span data-copy-label data-i18n="copyCommand">Copy</span>
+            </button>
           </div>
           <div class="hero-meta" aria-label="Product information">
             <span><i></i><b data-i18n="metaLocal">Local-first</b></span>
             <span><i></i><b>Windows x64</b></span>
-            <span><i></i><b>Tauri 2 + Angular 22</b></span>
+            <span><i></i><b data-i18n="metaNpm">npm + bundled EXE</b></span>
           </div>
         </div>
 
@@ -520,26 +530,26 @@
           <span class="section-index">BUILD WITH US</span>
           <h2 data-i18n="ctaTitle">Bring every coding agent into focus.</h2>
           <p data-i18n="ctaLead">
-            Termexo is early, local-first, and being built in public. Try the
-            Windows release or follow the roadmap on GitHub.
+            Start the complete Windows workspace directly from npm, or use the
+            traditional installer and follow development on GitHub.
           </p>
         </div>
         <div class="cta-actions">
           <a
             class="button primary"
+            href="https://www.npmjs.com/package/termexo"
+            target="_blank"
+            rel="noreferrer"
+            data-i18n="runFromNpm"
+            >Run from npm</a
+          >
+          <a
+            class="button secondary"
             href="https://github.com/gemron/Termexo/releases/latest"
             target="_blank"
             rel="noreferrer"
             data-i18n="getRelease"
-            >Get the latest release</a
-          >
-          <a
-            class="button secondary"
-            href="https://github.com/gemron/Termexo"
-            target="_blank"
-            rel="noreferrer"
-            data-i18n="starGithub"
-            >Explore on GitHub</a
+            >Download installer</a
           >
         </div>
       </section>
@@ -555,6 +565,12 @@
         </a>
         <p data-i18n="footerTagline">AI Workspace Control Plane</p>
         <div>
+          <a
+            href="https://www.npmjs.com/package/termexo"
+            target="_blank"
+            rel="noreferrer"
+            >npm</a
+          >
           <a
             href="https://github.com/gemron/Termexo"
             target="_blank"

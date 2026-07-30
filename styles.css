@@ -384,6 +384,56 @@ img {
   stroke-width: 1.8;
 }
 
+.install-command {
+  display: grid;
+  width: min(100%, 475px);
+  min-height: 48px;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: 12px;
+  margin-top: 12px;
+  padding: 6px 7px 6px 14px;
+  border: 1px solid var(--line-strong);
+  border-radius: 5px;
+  background: #080c0a;
+  box-shadow: inset 2px 0 var(--green);
+}
+
+.install-command > span {
+  color: var(--green);
+  font: 9px/1 var(--mono);
+}
+
+.install-command code {
+  overflow: hidden;
+  color: var(--text);
+  font: 12px/1 var(--mono);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.install-command button {
+  min-width: 64px;
+  min-height: 34px;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  color: var(--text-muted);
+  background: var(--panel);
+  font: 9px/1 var(--mono);
+  cursor: pointer;
+  transition:
+    color 160ms ease,
+    border-color 160ms ease,
+    background 160ms ease;
+}
+
+.install-command button:hover,
+.install-command button.copied {
+  border-color: var(--green);
+  color: var(--green-bright);
+  background: rgb(88 199 160 / 8%);
+}
+
 .hero-meta {
   display: flex;
   flex-wrap: wrap;
