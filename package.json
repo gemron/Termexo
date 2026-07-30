@@ -1,6 +1,6 @@
 {
   "name": "termexo",
-  "version": "0.3.3",
+  "version": "0.3.4",
   "description": "Local-first workspace for AI coding agents, models, and terminals",
   "private": true,
   "scripts": {
@@ -8,8 +8,8 @@
     "build": "npm --prefix apps/desktop-ui run build",
     "capture:readme": "npm --prefix apps/desktop-ui run capture:readme",
     "test": "npm --prefix apps/desktop-ui test -- --watch=false",
-    "npm:pack": "npm --prefix packages/termexo pack --dry-run",
-    "npm:publish": "npm --prefix packages/termexo publish --access public",
+    "npm:pack": "npm pack ./packages/termexo --dry-run",
+    "npm:publish": "npm publish ./packages/termexo --access public",
     "npm:test": "npm --prefix packages/termexo test",
     "tauri:dev": "scripts\\tauri-msvc.cmd dev",
     "tauri:build": "scripts\\tauri-msvc.cmd build"

@@ -17,26 +17,27 @@
   prefersdark: true;
   color-scheme: dark;
 
-  --color-base-100: oklch(17.5% 0.014 165);
-  --color-base-200: oklch(20.5% 0.016 165);
-  --color-base-300: oklch(25.5% 0.018 165);
-  --color-base-content: oklch(92% 0.012 165);
-  --color-primary: oklch(74% 0.14 163);
-  --color-primary-content: oklch(16% 0.03 163);
-  --color-secondary: oklch(71% 0.11 245);
-  --color-secondary-content: oklch(16% 0.025 245);
-  --color-accent: oklch(78% 0.12 190);
-  --color-accent-content: oklch(16% 0.025 190);
-  --color-neutral: oklch(27% 0.018 165);
-  --color-neutral-content: oklch(91% 0.01 165);
-  --color-info: oklch(73% 0.12 237);
-  --color-info-content: oklch(16% 0.03 237);
-  --color-success: oklch(74% 0.14 151);
-  --color-success-content: oklch(16% 0.03 151);
-  --color-warning: oklch(79% 0.14 78);
-  --color-warning-content: oklch(20% 0.035 78);
-  --color-error: oklch(69% 0.16 28);
-  --color-error-content: oklch(97% 0.01 28);
+  /* Hex values keep the theme readable on older WebView2 runtimes without OKLCH support. */
+  --color-base-100: #0b120f;
+  --color-base-200: #101a15;
+  --color-base-300: #1b2621;
+  --color-base-content: #dee7e2;
+  --color-primary: #3ec691;
+  --color-primary-content: #021109;
+  --color-secondary: #63a8e2;
+  --color-secondary-content: #050e17;
+  --color-accent: #3ed0c8;
+  --color-accent-content: #011110;
+  --color-neutral: #1e2924;
+  --color-neutral-content: #dbe3e0;
+  --color-info: #53b2e9;
+  --color-info-content: #020f18;
+  --color-success: #5fc37c;
+  --color-success-content: #041107;
+  --color-warning: #ebae42;
+  --color-warning-content: #1f1403;
+  --color-error: #ee6f61;
+  --color-error-content: #fcf3f1;
 
   --radius-selector: 0.45rem;
   --radius-field: 0.55rem;

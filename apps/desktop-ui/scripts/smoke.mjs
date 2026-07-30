@@ -73,7 +73,10 @@ try {
     const shellStyle = themeRoot ? getComputedStyle(themeRoot) : null;
     const bodyStyle = getComputedStyle(document.body);
     return {
+      documentTheme: document.documentElement.getAttribute('data-theme'),
       theme: themeRoot?.getAttribute('data-theme'),
+      bodyColor: bodyStyle.color,
+      bodyBackgroundColor: bodyStyle.backgroundColor,
       primaryColor: shellStyle?.getPropertyValue('--color-primary').trim() ?? '',
       radiusBox: shellStyle?.getPropertyValue('--radius-box').trim() ?? '',
       fontFamily: bodyStyle.fontFamily,
@@ -83,7 +86,11 @@ try {
     };
   });
   if (
+    uiIntegration.documentTheme !== 'termexo' ||
     uiIntegration.theme !== 'termexo' ||
+    uiIntegration.bodyColor === uiIntegration.bodyBackgroundColor ||
+    uiIntegration.bodyColor === 'rgb(0, 0, 0)' ||
+    uiIntegration.bodyBackgroundColor === 'rgba(0, 0, 0, 0)' ||
     !uiIntegration.primaryColor ||
     !uiIntegration.radiusBox ||
     !uiIntegration.fontFamily.includes('Microsoft YaHei UI') ||

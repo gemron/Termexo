@@ -11,7 +11,7 @@
 </p>
 
 <p align="center">
-  <img alt="Version 0.3.3" src="https://img.shields.io/badge/version-0.3.3-58c7a0">
+  <img alt="Version 0.3.4" src="https://img.shields.io/badge/version-0.3.4-58c7a0">
   <img alt="Windows" src="https://img.shields.io/badge/platform-Windows-0078D4?logo=windows">
   <img alt="Tauri 2" src="https://img.shields.io/badge/Tauri-2-24C8DB?logo=tauri&logoColor=white">
   <img alt="Angular 22" src="https://img.shields.io/badge/Angular-22-DD0031?logo=angular">
@@ -27,15 +27,25 @@ quota visibility, secure workspace sharing, and access from trusted computers an
 Local project data and credentials remain protected by explicit device, permission, and
 encryption boundaries.
 
-> The latest published release is **V0.3.3, the direct-from-npm Windows runtime update**.
-> The npm package now includes the complete Windows x64 desktop executable and starts without
-> requiring a separate Termexo installation.
+> The latest published release is **V0.3.4, the cross-system theme compatibility update**.
+> DaisyUI now applies from the document root, with readable color fallbacks for older WebView2
+> runtimes and Windows high-contrast mode.
 
 ![Termexo multi-terminal grid workbench](docs/images/termexo-workbench-v0.3.2.png)
 
 <p align="center">
   <sub>Four active Claude Code and Codex terminals in a configurable 2 × 2 grid with explicit pane selection and the Inspector.</sub>
 </p>
+
+## V0.3.4 Updates
+
+- Apply the Termexo DaisyUI theme from the document root so global surfaces inherit the correct
+  foreground and background colors on every supported system.
+- Replace OKLCH-only critical theme tokens with equivalent hexadecimal colors and use
+  `color-mix()` only as a progressive enhancement.
+- Add explicit website and desktop color fallbacks to prevent black text on black backgrounds.
+- Extend browser smoke coverage to verify the root theme and computed foreground/background
+  contrast.
 
 ## V0.3.3 Updates
 

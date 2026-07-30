@@ -11,7 +11,7 @@
 </p>
 
 <p align="center">
-  <img alt="Version 0.3.3" src="https://img.shields.io/badge/version-0.3.3-58c7a0">
+  <img alt="Version 0.3.4" src="https://img.shields.io/badge/version-0.3.4-58c7a0">
   <img alt="Windows" src="https://img.shields.io/badge/platform-Windows-0078D4?logo=windows">
   <img alt="Tauri 2" src="https://img.shields.io/badge/Tauri-2-24C8DB?logo=tauri&logoColor=white">
   <img alt="Angular 22" src="https://img.shields.io/badge/Angular-22-DD0031?logo=angular">
@@ -25,14 +25,21 @@ Termexo 是一个本地优先的 AI 开发工作空间与控制平面。它把�
 逐步扩展多 Agent 编排、供应商 Plan 余量实时查看、安全的 Workspace 共享，以及从可信
 电脑和手机访问工作空间。项目数据与凭据仍由明确的设备、权限和加密边界保护。
 
-> 最新正式版本为 **V0.3.3 npm 直接运行更新版**。npm 包已包含完整的 Windows x64
-> 桌面可执行程序，不需要预先单独安装 Termexo。
+> 最新正式版本为 **V0.3.4 跨系统主题兼容更新版**。DaisyUI 主题现在从文档根节点生效，
+> 并为较旧的 WebView2 运行时和 Windows 高对比度模式提供可读颜色兜底。
 
 ![Termexo 多终端网格工作台](docs/images/termexo-workbench-v0.3.2.png)
 
 <p align="center">
   <sub>4 个 Claude Code/Codex 终端、2 × 2 自定义网格、指定窗口显示、会话状态与 Inspector。</sub>
 </p>
+
+## V0.3.4 更新
+
+- 将 Termexo DaisyUI 主题挂载到文档根节点，确保所有全局界面都能继承正确的文字与背景颜色。
+- 为较旧的 WebView2 运行时提供等效十六进制颜色，并将 `color-mix()` 调整为渐进增强。
+- 为桌面应用和官网增加明确的颜色兜底，避免出现黑色文字与黑色背景重叠。
+- 扩展浏览器冒烟测试，自动检查根主题以及前景色、背景色的实际对比。
 
 ## V0.3.3 更新
 

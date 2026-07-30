@@ -29,17 +29,20 @@
 }
 
 html {
+  color: #edf3ef;
+  background-color: #0a0d0c;
   scroll-behavior: smooth;
   scroll-padding-top: 92px;
 }
 
 body {
   margin: 0;
+  color: #edf3ef;
   color: var(--text);
-  background:
-    linear-gradient(rgb(255 255 255 / 2%) 1px, transparent 1px),
-    linear-gradient(90deg, rgb(255 255 255 / 2%) 1px, transparent 1px),
-    var(--bg);
+  background-color: #0a0d0c;
+  background-image:
+    linear-gradient(rgba(255, 255, 255, 0.02) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.02) 1px, transparent 1px);
   background-size: 56px 56px;
   font-family: var(--sans);
   font-size: 16px;
@@ -77,6 +80,7 @@ a {
 }
 
 button {
+  color: inherit;
   font: inherit;
 }
 
