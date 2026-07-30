@@ -25,7 +25,7 @@ import {
 import { isTauriRuntime } from './tauri-runtime';
 
 const EVENT_POLL_INTERVAL_MS = 1_000;
-const MAX_RECENT_EVENTS = 100;
+const MAX_RECENT_EVENTS = 250;
 
 const BROWSER_INSTALLATION: AgentInstallation = {
   agentType: 'claude',
@@ -118,6 +118,7 @@ export class AgentService {
     ]);
     void this.refreshAccountStatuses();
     await this.syncEvents();
+    await this.loadEvents();
     this.pollingHandle = window.setInterval(() => {
       void this.syncEvents();
     }, EVENT_POLL_INTERVAL_MS);
@@ -411,6 +412,15 @@ export class AgentService {
     await this.run(async () => {
       this.sessionItems.set(await invoke<AgentSession[]>('list_agent_sessions'));
     });
+  }
+
+  private async loadEvents(): Promise<void> {
+    try {
+      const events = await invoke<AgentEvent[]>('list_agent_events', { terminalId: null });
+      this.eventItems.set(events.slice(0, MAX_RECENT_EVENTS));
+    } catch (error) {
+      console.warn('Unable to load agent event history.', error);
+    }
   }
 
   private async refreshAccountStatuses(): Promise<void> {

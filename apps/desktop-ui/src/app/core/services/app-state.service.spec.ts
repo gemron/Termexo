@@ -180,6 +180,7 @@ describe('AppStateService', () => {
       agentType: 'claude',
       command: 'claude --model sonnet',
       profileId: 'claude-default',
+      nativeSessionId: 'old-session',
     });
 
     const switched = service.restartTerminalWithProfile(
@@ -198,6 +199,7 @@ describe('AppStateService', () => {
         command: "claude --model 'deepseek-v4-pro[1m]'",
         model: 'DeepSeek V4 Pro',
         profileId: 'deepseek',
+        nativeSessionId: undefined,
         runtimeRevision: 1,
         status: 'STARTING',
       }),
@@ -205,6 +207,27 @@ describe('AppStateService', () => {
     expect(
       service.activeWorkspace()?.terminals.find((terminal) => terminal.id === shell?.id)?.model,
     ).toBe('Local');
+  });
+
+  it('moves terminal tabs manually and persists the new order', async () => {
+    await service.initialize();
+    const first = service.createTerminal({ agentType: 'shell', name: 'First' })!;
+    const second = service.createTerminal({ agentType: 'codex', name: 'Second' })!;
+    repository.save.mockClear();
+
+    const moved = service.moveTerminal(second.id, -1);
+
+    expect(moved).toBe(true);
+    const ids = service.activeWorkspace()!.terminals.map((terminal) => terminal.id);
+    expect(ids.indexOf(second.id)).toBe(ids.indexOf(first.id) - 1);
+    expect(repository.save).toHaveBeenCalledWith(
+      expect.objectContaining({
+        terminals: expect.arrayContaining([
+          expect.objectContaining({ id: first.id }),
+          expect.objectContaining({ id: second.id }),
+        ]),
+      }),
+    );
   });
 
   it('applies Claude hook events to the matching terminal', async () => {

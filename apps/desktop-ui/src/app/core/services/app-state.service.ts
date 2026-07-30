@@ -193,6 +193,28 @@ export class AppStateService {
     void this.repository.save(updatedWorkspace);
   }
 
+  moveTerminal(terminalId: string, direction: -1 | 1): boolean {
+    const workspace = this.activeWorkspace();
+    if (!workspace) {
+      return false;
+    }
+    const terminals = [...workspace.terminals];
+    const currentIndex = terminals.findIndex((terminal) => terminal.id === terminalId);
+    const targetIndex = currentIndex + direction;
+    if (currentIndex < 0 || targetIndex < 0 || targetIndex >= terminals.length) {
+      return false;
+    }
+
+    [terminals[currentIndex], terminals[targetIndex]] = [
+      terminals[targetIndex],
+      terminals[currentIndex],
+    ];
+    const updatedWorkspace = { ...workspace, terminals };
+    this.replaceWorkspace(updatedWorkspace);
+    void this.repository.save(updatedWorkspace);
+    return true;
+  }
+
   setLayout(layout: LayoutMode): void {
     this.updateActiveWorkspace((workspace) => ({ ...workspace, layout }));
   }
@@ -257,6 +279,7 @@ export class AppStateService {
             model,
             profileId,
             mcpProfileId,
+            nativeSessionId: undefined,
             status: 'STARTING' as const,
             runtimeRevision: (terminal.runtimeRevision ?? 0) + 1,
           },
@@ -308,11 +331,7 @@ export class AppStateService {
       status: 'STARTING',
       model:
         input.model ??
-        (agentType === 'claude'
-          ? 'Claude Sonnet'
-          : agentType === 'codex'
-            ? 'GPT Codex'
-            : 'Local'),
+        (agentType === 'claude' ? 'Claude Sonnet' : agentType === 'codex' ? 'GPT Codex' : 'Local'),
       branch: workspace.activeBranch,
       command: input.command ?? this.defaultCommand(agentType),
       nativeSessionId: input.nativeSessionId,

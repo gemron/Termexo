@@ -145,6 +145,7 @@
             class="tab"
             [class.active]="terminal.id === activeTerminalId()"
             [class.visible]="isTerminalVisible(terminal.id)"
+            [attr.data-status]="terminal.status"
             [attr.aria-selected]="terminal.id === activeTerminalId()"
             [attr.title]="isTerminalVisible(terminal.id) ? '激活此终端' : '在当前布局中显示此终端'"
             (click)="selectTerminal(terminal.id)"
@@ -180,6 +181,54 @@
           }
         </select>
       </label>
+
+      <div class="terminal-order-controls join" role="group" aria-label="调整终端排序">
+        <button
+          type="button"
+          class="btn btn-square btn-ghost btn-xs join-item"
+          title="将当前终端向左移动"
+          aria-label="将当前终端向左移动"
+          [disabled]="!canMoveActiveTerminal(-1)"
+          (click)="moveActiveTerminal(-1)"
+        >
+          <app-icon name="arrow-left" [size]="12" />
+        </button>
+        <button
+          type="button"
+          class="btn btn-square btn-ghost btn-xs join-item"
+          title="将当前终端向右移动"
+          aria-label="将当前终端向右移动"
+          [disabled]="!canMoveActiveTerminal(1)"
+          (click)="moveActiveTerminal(1)"
+        >
+          <app-icon name="arrow-right" [size]="12" />
+        </button>
+      </div>
+
+      <div class="font-size-controls" role="group" aria-label="调整终端字体大小">
+        <span aria-hidden="true">Aa</span>
+        <button
+          type="button"
+          title="减小终端字体"
+          aria-label="减小终端字体"
+          [disabled]="terminalFontSize() <= minTerminalFontSize"
+          (click)="adjustTerminalFontSize(-1)"
+        >
+          −
+        </button>
+        <output [attr.aria-label]="'当前终端字号 ' + terminalFontSize()">
+          {{ terminalFontSize() }}
+        </output>
+        <button
+          type="button"
+          title="增大终端字体"
+          aria-label="增大终端字体"
+          [disabled]="terminalFontSize() >= maxTerminalFontSize"
+          (click)="adjustTerminalFontSize(1)"
+        >
+          +
+        </button>
+      </div>
 
       <div class="layout-controls join" aria-label="终端布局">
         <button
@@ -305,6 +354,7 @@
           [activeTerminalId]="activeTerminalId()"
           [visibleTerminalIds]="visibleTerminalIds()"
           [terminalMaximized]="terminalMaximized()"
+          [terminalFontSize]="terminalFontSize()"
           [gridColumns]="gridColumns()"
           [gridRows]="gridRows()"
           (terminalSelected)="selectTerminal($event)"

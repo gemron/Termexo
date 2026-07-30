@@ -11,7 +11,7 @@
 </p>
 
 <p align="center">
-  <img alt="Version 0.3.4" src="https://img.shields.io/badge/version-0.3.4-58c7a0">
+  <img alt="Version 0.3.5" src="https://img.shields.io/badge/version-0.3.5-58c7a0">
   <img alt="Windows" src="https://img.shields.io/badge/platform-Windows-0078D4?logo=windows">
   <img alt="Tauri 2" src="https://img.shields.io/badge/Tauri-2-24C8DB?logo=tauri&logoColor=white">
   <img alt="Angular 22" src="https://img.shields.io/badge/Angular-22-DD0031?logo=angular">
@@ -25,14 +25,28 @@ Termexo 是一个本地优先的 AI 开发工作空间与控制平面。它把�
 逐步扩展多 Agent 编排、供应商 Plan 余量实时查看、安全的 Workspace 共享，以及从可信
 电脑和手机访问工作空间。项目数据与凭据仍由明确的设备、权限和加密边界保护。
 
-> 最新正式版本为 **V0.3.4 跨系统主题兼容更新版**。DaisyUI 主题现在从文档根节点生效，
-> 并为较旧的 WebView2 运行时和 Windows 高对比度模式提供可读颜色兜底。
+> 最新正式版本为 **V0.3.5 终端控制与 Agent 稳定性更新版**。新增持久化字体调节和终端
+> 排序，强化 Agent 状态与活动历史，并修复终端滚动、供应商切换和 Claude 恢复诊断。
 
 ![Termexo 多终端网格工作台](docs/images/termexo-workbench-v0.3.2.png)
 
 <p align="center">
   <sub>4 个 Claude Code/Codex 终端、2 × 2 自定义网格、指定窗口显示、会话状态与 Inspector。</sub>
 </p>
+
+## V0.3.5 更新
+
+- 可从工作区工具栏调整终端字体大小，并在重启后保留设置。
+- 支持将 CLI 标签向左或向右移动，不打乱当前选择和工作空间顺序。
+- 在标签、终端面板和 Inspector 中突出显示等待输入、等待授权、429 限流和已完成状态；
+  最多保留 250 条 Agent 活动，并展示更多最近活动。
+- 增加 xterm 滚动缓冲区；隐藏终端重新显示时主动校正尺寸，修复部分终端无法上下滚动。
+- 切换模型供应商时创建全新会话，校验自定义供应商凭据，并将 MiniMax 预设升级为
+  `MiniMax-M3[1m]`。
+- 识别 Claude 429/限流与超时错误，提供醒目提示；从多账号恢复会话时使用正确的隔离
+  Claude 配置目录。
+- 明确说明：手动恢复原生会话会重新加载历史上下文；切换供应商则不会回放旧会话，
+  从而避免无意的 Token 重复消耗。
 
 ## V0.3.4 更新
 

@@ -1,11 +1,16 @@
-<section class="terminal-panel card bg-base-200" [class.active]="active()" (mousedown)="focus()">
+<section
+  class="terminal-panel card bg-base-200"
+  [class.active]="active()"
+  [attr.data-status]="session().status"
+  (mousedown)="focus()"
+>
   <header>
     <div class="terminal-identity">
       <span class="agent-icon" [attr.data-agent]="session().agentType">
         <app-icon [name]="session().agentType === 'shell' ? 'terminal' : 'bot'" [size]="14" />
       </span>
       <strong>{{ session().name }}</strong>
-      <span class="status badge badge-sm" [attr.data-status]="session().status">
+      <span class="status badge badge-sm" aria-live="polite" [attr.data-status]="session().status">
         <i></i>{{ statusLabels[session().status] }}
       </span>
     </div>
@@ -32,6 +37,21 @@
       </button>
     </div>
   </header>
+  @if (runtimeNotice(); as notice) {
+    <div class="runtime-alert" role="alert">
+      <app-icon name="activity" [size]="13" />
+      <span>{{ notice }}</span>
+      <button
+        type="button"
+        class="btn btn-square btn-ghost btn-xs"
+        aria-label="关闭提示"
+        title="关闭提示"
+        (click)="$event.stopPropagation(); dismissRuntimeNotice()"
+      >
+        <app-icon name="x" [size]="12" />
+      </button>
+    </div>
+  }
   <div #terminal class="terminal-host" aria-label="终端"></div>
   <footer>
     <span>{{ session().workingDirectory }}</span>

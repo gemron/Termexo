@@ -282,14 +282,14 @@ impl WorkspaceDatabase {
              FROM agent_events
              WHERE terminal_id = ?1
              ORDER BY created_at DESC
-             LIMIT 100"
+             LIMIT 250"
         } else {
             "SELECT
                  event_key, agent_type, native_session_id, terminal_id,
                  event_type, detail_json, created_at
              FROM agent_events
              ORDER BY created_at DESC
-             LIMIT 100"
+             LIMIT 250"
         };
         let mut statement = connection.prepare(sql)?;
         let map_row = |row: &rusqlite::Row<'_>| -> rusqlite::Result<AgentEvent> {

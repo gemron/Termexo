@@ -10,6 +10,8 @@ import {
 } from '@angular/core';
 import {
   ArrowDown,
+  ArrowLeft,
+  ArrowRight,
   ArrowUp,
   Activity,
   Bot,
@@ -69,6 +71,8 @@ import {
 const ICONS: Record<string, IconNode> = {
   activity: Activity,
   'arrow-down': ArrowDown,
+  'arrow-left': ArrowLeft,
+  'arrow-right': ArrowRight,
   'arrow-up': ArrowUp,
   bot: Bot,
   boxes: Boxes,

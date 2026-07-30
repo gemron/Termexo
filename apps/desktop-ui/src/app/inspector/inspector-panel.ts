@@ -17,6 +17,8 @@ const EVENT_LABELS: Readonly<Record<string, string>> = {
   'tool.failed': '工具调用失败',
   'approval.required': '等待权限确认',
   'user.input.required': '等待用户输入',
+  'agent.rate_limited': '供应商 429 限流',
+  'agent.timeout': 'Claude 请求超时',
   'task.completed': '任务已完成',
   'agent.failed': 'Agent 运行失败',
   'session.ended': '会话已结束',
@@ -36,7 +38,7 @@ export class InspectorPanelComponent {
     const terminalId = this.activeTerminal()?.id;
     return this.events()
       .filter((event) => !terminalId || event.terminalId === terminalId)
-      .slice(0, 4);
+      .slice(0, 12);
   });
 
   protected readonly agentLabels = AGENT_LABELS;
@@ -51,9 +53,20 @@ export class InspectorPanelComponent {
     return String(
       detail['tool_name'] ??
         detail['notification_type'] ??
+        detail['error_details'] ??
+        detail['error'] ??
         detail['source'] ??
         event.nativeSessionId ??
         'Claude Code',
     );
+  }
+
+  protected eventTime(event: AgentEvent): string {
+    return new Date(event.createdAt).toLocaleTimeString('zh-CN', {
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit',
+      hour12: false,
+    });
   }
 }

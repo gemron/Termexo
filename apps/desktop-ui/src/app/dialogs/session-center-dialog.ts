@@ -172,7 +172,7 @@ const AGENT_FILTERS: readonly {
               </span>
               <div>
                 <strong>Claude 恢复配置</strong>
-                <small>仅恢复 Claude 会话时应用</small>
+                <small>完整恢复会加载历史上下文；跨供应商请使用顶部模型切换的新会话</small>
               </div>
             </div>
             <label>

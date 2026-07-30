@@ -12,9 +12,13 @@ import {
 } from './core/models/agent.models';
 import {
   AgentType,
+  DEFAULT_TERMINAL_FONT_SIZE,
   LayoutMode,
+  MAX_TERMINAL_FONT_SIZE,
   MAX_TERMINAL_GRID_DIMENSION,
+  MIN_TERMINAL_FONT_SIZE,
   MIN_TERMINAL_GRID_DIMENSION,
+  normalizeTerminalFontSize,
   normalizeTerminalGridDimension,
   normalizeWorkspaceThemeColor,
 } from './core/models/workspace.models';
@@ -101,6 +105,7 @@ export class App {
   private readonly directoryPicker = inject(DirectoryPickerService);
   private readonly terminalGateway = inject(TerminalGatewayService);
   private readonly handledEventKeys = new Set<string>();
+  private readonly eventStatusCutoff = Date.now();
   private readonly preferredTerminalIds = signal<Record<string, string[]>>({});
   private resizeStartX = 0;
   private resizeStartWidth = 0;
@@ -117,6 +122,14 @@ export class App {
     readStoredBoolean('termexo.workspaceSidebarOpen', true),
   );
   protected readonly inspectorOpen = signal(readStoredBoolean('termexo.inspectorOpen', true));
+  protected readonly terminalFontSize = signal(
+    readStoredWidth(
+      'termexo.terminalFontSize',
+      DEFAULT_TERMINAL_FONT_SIZE,
+      MIN_TERMINAL_FONT_SIZE,
+      MAX_TERMINAL_FONT_SIZE,
+    ),
+  );
   protected readonly workspaceSidebarWidth = signal(
     readStoredWidth(
       'termexo.workspaceSidebarWidth',
@@ -154,6 +167,8 @@ export class App {
   );
   protected readonly minGridDimension = MIN_TERMINAL_GRID_DIMENSION;
   protected readonly maxGridDimension = MAX_TERMINAL_GRID_DIMENSION;
+  protected readonly minTerminalFontSize = MIN_TERMINAL_FONT_SIZE;
+  protected readonly maxTerminalFontSize = MAX_TERMINAL_FONT_SIZE;
   protected readonly gridColumns = computed(() =>
     normalizeTerminalGridDimension(this.state.activeWorkspace()?.gridColumns),
   );
@@ -181,10 +196,12 @@ export class App {
   constructor() {
     void this.initialize();
     effect(() => {
-      for (const event of this.agents.events()) {
+      for (const event of [...this.agents.events()].reverse()) {
         if (!this.handledEventKeys.has(event.eventKey)) {
           this.handledEventKeys.add(event.eventKey);
-          this.state.applyAgentEvent(event);
+          if (event.createdAt >= this.eventStatusCutoff) {
+            this.state.applyAgentEvent(event);
+          }
         }
       }
     });
@@ -431,6 +448,25 @@ export class App {
     }
   }
 
+  protected canMoveActiveTerminal(direction: -1 | 1): boolean {
+    const terminals = this.state.activeWorkspace()?.terminals ?? [];
+    const currentIndex = terminals.findIndex((terminal) => terminal.id === this.activeTerminalId());
+    const targetIndex = currentIndex + direction;
+    return currentIndex >= 0 && targetIndex >= 0 && targetIndex < terminals.length;
+  }
+
+  protected moveActiveTerminal(direction: -1 | 1): void {
+    const terminalId = this.activeTerminalId();
+    if (!terminalId || !this.state.moveTerminal(terminalId, direction)) {
+      return;
+    }
+    window.requestAnimationFrame(() => {
+      document
+        .getElementById(`terminal-tab-${terminalId}`)
+        ?.scrollIntoView({ block: 'nearest', inline: 'nearest', behavior: 'smooth' });
+    });
+  }
+
   protected isTerminalVisible(terminalId: string): boolean {
     return this.visibleTerminalIds().includes(terminalId);
   }
@@ -498,10 +534,7 @@ export class App {
       );
     } else {
       this.inspectorWidth.set(
-        Math.min(
-          INSPECTOR_MAX_WIDTH,
-          Math.max(INSPECTOR_MIN_WIDTH, this.resizeStartWidth - delta),
-        ),
+        Math.min(INSPECTOR_MAX_WIDTH, Math.max(INSPECTOR_MIN_WIDTH, this.resizeStartWidth - delta)),
       );
     }
   }
@@ -551,6 +584,12 @@ export class App {
     this.state.setGridDimensions(this.gridRows(), this.gridColumns());
   }
 
+  protected adjustTerminalFontSize(delta: -1 | 1): void {
+    const next = normalizeTerminalFontSize(this.terminalFontSize() + delta);
+    this.terminalFontSize.set(next);
+    this.storePreference('termexo.terminalFontSize', next);
+  }
+
   protected createWorkspace(value: { name: string; projectPath: string }): void {
     this.state.createWorkspace(value.name, value.projectPath);
     this.createWorkspaceOpen.set(false);
@@ -582,6 +621,11 @@ export class App {
       this.showToast(profile ? '当前 Workspace 没有 Claude Code 终端' : '模型 Profile 不存在');
       return;
     }
+    if (profile.baseUrl && !profile.hasCredential) {
+      this.modelSwitchOpen.set(false);
+      this.showToast(`请先在设置中为 ${profile.name} 配置 API Key`);
+      return;
+    }
 
     this.launchingClaude.set(true);
     try {
@@ -590,7 +634,6 @@ export class App {
           const launch = await this.agents.prepareLaunch({
             terminalId: terminal.id,
             workspaceId: workspace?.id,
-            sessionId: terminal.nativeSessionId,
             profileId,
             mcpProfileId: terminal.mcpProfileId,
             accountProfileId: terminal.accountProfileId,
@@ -610,12 +653,14 @@ export class App {
         }),
       );
       const switched = results.filter((result) => result.status === 'fulfilled').length;
-      const failed = results.length - switched;
+      const failures = results.filter(
+        (result): result is PromiseRejectedResult => result.status === 'rejected',
+      );
       this.modelSwitchOpen.set(false);
       this.showToast(
-        failed > 0
-          ? `${switched} 个 Claude Code 终端已切换，${failed} 个失败`
-          : `${switched} 个 Claude Code 终端已切换到 ${profile.name}`,
+        failures.length > 0
+          ? `${switched} 个已切换，${failures.length} 个失败：${this.errorMessage(failures[0].reason)}`
+          : `${switched} 个 Claude Code 终端已切换到 ${profile.name}，已使用新会话避免重复加载上下文`,
       );
     } finally {
       this.launchingClaude.set(false);

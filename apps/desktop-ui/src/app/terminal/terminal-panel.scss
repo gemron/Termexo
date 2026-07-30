@@ -5,6 +5,7 @@
 }
 
 .terminal-panel {
+  position: relative;
   display: grid;
   height: 100%;
   min-height: 0;
@@ -45,6 +46,52 @@
           0 0 0 1px color-mix(in srgb, var(--accent) 36%, transparent),
           0 0 10px color-mix(in srgb, var(--accent) 17%, transparent);
       }
+    }
+  }
+
+  &[data-status='WAITING_INPUT'],
+  &[data-status='WAITING_APPROVAL'],
+  &[data-status='RATE_LIMITED'] {
+    border-color: color-mix(in srgb, var(--color-warning) 70%, var(--border));
+    box-shadow:
+      inset 0 2px 0 var(--color-warning),
+      0 0 0 1px color-mix(in srgb, var(--color-warning) 15%, transparent),
+      0 0 20px color-mix(in srgb, var(--color-warning) 16%, transparent);
+    animation: terminal-attention-pulse 2.8s ease-in-out infinite;
+
+    header {
+      background:
+        linear-gradient(
+          90deg,
+          color-mix(in srgb, var(--color-warning) 19%, transparent),
+          transparent 62%
+        ),
+        var(--surface-raised);
+    }
+  }
+
+  &[data-status='RATE_LIMITED'] {
+    border-color: color-mix(in srgb, var(--color-error) 70%, var(--border));
+    box-shadow:
+      inset 0 2px 0 var(--color-error),
+      0 0 0 1px color-mix(in srgb, var(--color-error) 15%, transparent),
+      0 0 20px color-mix(in srgb, var(--color-error) 15%, transparent);
+  }
+
+  &[data-status='COMPLETED'] {
+    border-color: color-mix(in srgb, var(--color-success) 62%, var(--border));
+    box-shadow:
+      inset 0 2px 0 var(--color-success),
+      0 0 17px color-mix(in srgb, var(--color-success) 13%, transparent);
+
+    header {
+      background:
+        linear-gradient(
+          90deg,
+          color-mix(in srgb, var(--color-success) 18%, transparent),
+          transparent 62%
+        ),
+        var(--surface-raised);
     }
   }
 }
@@ -93,7 +140,6 @@ header {
     color: var(--color-info);
     background: var(--info-soft);
   }
-
 }
 
 .status {
@@ -122,6 +168,36 @@ header {
 
   &[data-status='WAITING_APPROVAL'] i {
     background: var(--warning);
+  }
+
+  &[data-status='WAITING_INPUT'],
+  &[data-status='WAITING_APPROVAL'] {
+    border-color: color-mix(in srgb, var(--color-warning) 46%, var(--border));
+    color: color-mix(in srgb, var(--color-warning) 78%, var(--text));
+    background: color-mix(in srgb, var(--color-warning) 13%, var(--surface-raised));
+    font-weight: 700;
+  }
+
+  &[data-status='RATE_LIMITED'] {
+    border-color: color-mix(in srgb, var(--color-error) 52%, var(--border));
+    color: color-mix(in srgb, var(--color-error) 82%, var(--text));
+    background: color-mix(in srgb, var(--color-error) 13%, var(--surface-raised));
+    font-weight: 700;
+
+    i {
+      background: var(--color-error);
+    }
+  }
+
+  &[data-status='COMPLETED'] {
+    border-color: color-mix(in srgb, var(--color-success) 46%, var(--border));
+    color: color-mix(in srgb, var(--color-success) 82%, var(--text));
+    background: color-mix(in srgb, var(--color-success) 13%, var(--surface-raised));
+    font-weight: 700;
+
+    i {
+      background: var(--color-success);
+    }
   }
 
   &[data-status='FAILED'] i {
@@ -171,6 +247,34 @@ header {
   overflow: hidden;
 }
 
+.runtime-alert {
+  position: absolute;
+  z-index: 6;
+  top: 41px;
+  right: 13px;
+  display: flex;
+  max-width: min(520px, calc(100% - 26px));
+  min-height: 31px;
+  align-items: center;
+  gap: 7px;
+  padding: 4px 4px 4px 9px;
+  border: 1px solid color-mix(in srgb, var(--color-warning) 55%, var(--border));
+  border-radius: var(--radius-field);
+  color: color-mix(in srgb, var(--color-warning) 78%, var(--text));
+  background: color-mix(in srgb, var(--surface-raised) 94%, var(--color-warning) 6%);
+  box-shadow: 0 10px 26px rgb(0 0 0 / 32%);
+  font-size: 10px;
+
+  span {
+    min-width: 0;
+    line-height: 1.35;
+  }
+
+  button {
+    flex: 0 0 auto;
+  }
+}
+
 footer {
   display: flex;
   min-width: 0;
@@ -208,7 +312,22 @@ footer {
   }
 }
 
+@keyframes terminal-attention-pulse {
+  0%,
+  100% {
+    filter: saturate(0.96);
+  }
+
+  50% {
+    filter: saturate(1.18);
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
+  .terminal-panel {
+    animation: none;
+  }
+
   .terminal-panel.active .terminal-identity strong {
     color: color-mix(in srgb, var(--accent) 72%, white);
     text-shadow: none;

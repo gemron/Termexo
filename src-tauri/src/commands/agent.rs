@@ -1,4 +1,5 @@
 use std::collections::HashMap;
+use std::path::PathBuf;
 
 use serde::Deserialize;
 use tauri::State;
@@ -205,11 +206,15 @@ pub fn prepare_claude_launch(
         &credentials,
         request.workspace_id.as_deref(),
     )?);
+    let claude_config_dir = environment.get("CLAUDE_CONFIG_DIR").map(PathBuf::from);
     launch_environment
         .put(request.terminal_id, environment)
         .map_err(|error| error.to_string())?;
 
-    ClaudeCodeAdapter::new()
+    let adapter = claude_config_dir
+        .map(ClaudeCodeAdapter::with_config_dir)
+        .unwrap_or_else(ClaudeCodeAdapter::new);
+    adapter
         .build_launch_command(&ClaudeLaunchOptions {
             session_id: request.session_id,
             name: request.name,
@@ -426,5 +431,44 @@ mod tests {
         };
 
         assert!(profile_environment(Some(&profile)).is_empty());
+    }
+
+    #[test]
+    fn maps_minimax_profile_to_current_claude_compatibility_environment() {
+        let profile = ModelProfile {
+            id: "minimax".into(),
+            name: "MiniMax M3".into(),
+            provider: "MiniMax".into(),
+            model: "MiniMax-M3[1m]".into(),
+            base_url: Some("https://api.minimaxi.com/anthropic".into()),
+            credential_target: Some("profile:minimax".into()),
+            is_default: false,
+            has_credential: true,
+        };
+
+        let environment = profile_environment(Some(&profile));
+
+        assert_eq!(
+            environment.get("ANTHROPIC_BASE_URL").map(String::as_str),
+            Some("https://api.minimaxi.com/anthropic")
+        );
+        for key in [
+            "ANTHROPIC_MODEL",
+            "ANTHROPIC_DEFAULT_OPUS_MODEL",
+            "ANTHROPIC_DEFAULT_SONNET_MODEL",
+            "ANTHROPIC_DEFAULT_HAIKU_MODEL",
+            "CLAUDE_CODE_SUBAGENT_MODEL",
+        ] {
+            assert_eq!(
+                environment.get(key).map(String::as_str),
+                Some("MiniMax-M3[1m]")
+            );
+        }
+        assert_eq!(
+            environment
+                .get("CLAUDE_CODE_AUTO_COMPACT_WINDOW")
+                .map(String::as_str),
+            Some("1000000")
+        );
     }
 }

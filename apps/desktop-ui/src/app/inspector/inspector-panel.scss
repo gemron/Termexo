@@ -106,6 +106,25 @@ section {
     border-color: color-mix(in oklab, var(--color-primary) 34%, var(--border));
     background: var(--primary-soft);
   }
+
+  &[data-status='WAITING_INPUT'],
+  &[data-status='WAITING_APPROVAL'],
+  &[data-status='RATE_LIMITED'] {
+    border-color: color-mix(in srgb, var(--color-warning) 48%, var(--border));
+    background: color-mix(in srgb, var(--color-warning) 10%, var(--surface-raised));
+    box-shadow: inset 2px 0 0 var(--color-warning);
+  }
+
+  &[data-status='RATE_LIMITED'] {
+    border-color: color-mix(in srgb, var(--color-error) 52%, var(--border));
+    box-shadow: inset 2px 0 0 var(--color-error);
+  }
+
+  &[data-status='COMPLETED'] {
+    border-color: color-mix(in srgb, var(--color-success) 44%, var(--border));
+    background: color-mix(in srgb, var(--color-success) 9%, var(--surface-raised));
+    box-shadow: inset 2px 0 0 var(--color-success);
+  }
 }
 
 .agent-avatar,
@@ -174,6 +193,39 @@ section {
   &[data-status='WAITING_INPUT'] i {
     background: var(--info);
   }
+
+  &[data-status='WAITING_INPUT'],
+  &[data-status='WAITING_APPROVAL'],
+  &[data-status='RATE_LIMITED'],
+  &[data-status='COMPLETED'] {
+    padding-inline: 6px;
+    border: 1px solid color-mix(in srgb, currentColor 34%, var(--border));
+    font-weight: 700;
+  }
+
+  &[data-status='WAITING_APPROVAL'] {
+    color: var(--color-warning);
+
+    i {
+      background: var(--color-warning);
+    }
+  }
+
+  &[data-status='RATE_LIMITED'] {
+    color: var(--color-error);
+
+    i {
+      background: var(--color-error);
+    }
+  }
+
+  &[data-status='COMPLETED'] {
+    color: var(--color-success);
+
+    i {
+      background: var(--color-success);
+    }
+  }
 }
 
 .details dl {
@@ -214,12 +266,28 @@ section {
   gap: 7px;
   padding: 6px 0;
 
+  &.attention,
+  &.completed {
+    margin: 2px -5px;
+    padding: 7px 5px;
+    border-radius: var(--radius-field);
+  }
+
+  &.attention {
+    background: color-mix(in srgb, var(--color-warning) 9%, transparent);
+  }
+
+  &.completed {
+    background: color-mix(in srgb, var(--color-success) 8%, transparent);
+  }
+
   > span:last-child {
     min-width: 0;
   }
 
   strong,
-  small {
+  small,
+  time {
     display: block;
   }
 
@@ -236,6 +304,12 @@ section {
     font: 9px/1.35 var(--mono);
     text-overflow: ellipsis;
     white-space: nowrap;
+  }
+
+  time {
+    margin-top: 3px;
+    color: color-mix(in srgb, var(--text-muted) 78%, transparent);
+    font: 8px/1 var(--mono);
   }
 }
 

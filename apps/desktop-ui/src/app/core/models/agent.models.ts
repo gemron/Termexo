@@ -164,8 +164,8 @@ export const CLAUDE_PROVIDER_PRESETS: readonly ClaudeProviderPreset[] = [
   },
   {
     provider: 'MiniMax',
-    name: 'MiniMax M2.7',
-    model: 'MiniMax-M2.7',
+    name: 'MiniMax M3',
+    model: 'MiniMax-M3[1m]',
     baseUrl: 'https://api.minimaxi.com/anthropic',
   },
   {
@@ -248,6 +248,8 @@ export const EVENT_STATUS: Readonly<Record<string, TerminalStatus>> = {
   'tool.failed': 'RUNNING',
   'approval.required': 'WAITING_APPROVAL',
   'user.input.required': 'WAITING_INPUT',
+  'agent.rate_limited': 'RATE_LIMITED',
+  'agent.timeout': 'WAITING_INPUT',
   'task.completed': 'COMPLETED',
   'agent.failed': 'FAILED',
   'session.ended': 'STOPPED',

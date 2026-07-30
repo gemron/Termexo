@@ -60,7 +60,7 @@ import { IconComponent } from '../shared/icon/icon';
             <strong>{{ agentCount() }}</strong
             ><span>终端重启应用参数</span>
           </div>
-          <div><strong>自动</strong><span>按会话 ID 恢复上下文</span></div>
+          <div><strong>新会话</strong><span>避免跨供应商重放上下文与重复 token</span></div>
         </div>
         <footer>
           <button type="button" class="secondary btn btn-ghost btn-sm" (click)="cancelled.emit()">

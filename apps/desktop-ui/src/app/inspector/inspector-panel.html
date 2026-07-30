@@ -15,12 +15,13 @@
       </header>
       <div class="agent-list">
         @for (terminal of workspace()?.terminals ?? []; track terminal.id) {
-          <article class="agent-row card" [class.selected]="terminal.id === activeTerminal()?.id">
+          <article
+            class="agent-row card"
+            [class.selected]="terminal.id === activeTerminal()?.id"
+            [attr.data-status]="terminal.status"
+          >
             <span class="agent-avatar" [attr.data-agent]="terminal.agentType">
-              <app-icon
-                [name]="terminal.agentType === 'shell' ? 'terminal' : 'bot'"
-                [size]="15"
-              />
+              <app-icon [name]="terminal.agentType === 'shell' ? 'terminal' : 'bot'" [size]="15" />
             </span>
             <span class="agent-copy">
               <strong>{{ terminal.name }}</strong>
@@ -61,9 +62,20 @@
     }
 
     <section class="activity">
-      <header class="section-header"><span>最近活动</span></header>
+      <header class="section-header">
+        <span>最近活动</span>
+        <small>{{ recentEvents().length }}</small>
+      </header>
       @for (event of recentEvents(); track event.eventKey) {
-        <div class="event-row">
+        <div
+          class="event-row"
+          [class.attention]="
+            event.eventType === 'approval.required' ||
+            event.eventType === 'user.input.required' ||
+            event.eventType === 'agent.rate_limited'
+          "
+          [class.completed]="event.eventType === 'task.completed'"
+        >
           <span
             class="event-icon"
             [class.success]="
@@ -78,6 +90,7 @@
           <span>
             <strong>{{ eventLabel(event) }}</strong>
             <small>{{ eventDetail(event) }}</small>
+            <time [attr.datetime]="event.createdAt">{{ eventTime(event) }}</time>
           </span>
         </div>
       } @empty {

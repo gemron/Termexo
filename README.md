@@ -11,7 +11,7 @@
 </p>
 
 <p align="center">
-  <img alt="Version 0.3.4" src="https://img.shields.io/badge/version-0.3.4-58c7a0">
+  <img alt="Version 0.3.5" src="https://img.shields.io/badge/version-0.3.5-58c7a0">
   <img alt="Windows" src="https://img.shields.io/badge/platform-Windows-0078D4?logo=windows">
   <img alt="Tauri 2" src="https://img.shields.io/badge/Tauri-2-24C8DB?logo=tauri&logoColor=white">
   <img alt="Angular 22" src="https://img.shields.io/badge/Angular-22-DD0031?logo=angular">
@@ -27,15 +27,30 @@ quota visibility, secure workspace sharing, and access from trusted computers an
 Local project data and credentials remain protected by explicit device, permission, and
 encryption boundaries.
 
-> The latest published release is **V0.3.4, the cross-system theme compatibility update**.
-> DaisyUI now applies from the document root, with readable color fallbacks for older WebView2
-> runtimes and Windows high-contrast mode.
+> The latest published release is **V0.3.5, the terminal control and agent reliability update**.
+> It adds persistent font controls and terminal ordering, clearer agent states, durable activity
+> history, reliable scrolling, safer provider switching, and better Claude recovery diagnostics.
 
 ![Termexo multi-terminal grid workbench](docs/images/termexo-workbench-v0.3.2.png)
 
 <p align="center">
   <sub>Four active Claude Code and Codex terminals in a configurable 2 × 2 grid with explicit pane selection and the Inspector.</sub>
 </p>
+
+## V0.3.5 Updates
+
+- Adjust terminal font size from the workspace toolbar and persist the preference between launches.
+- Move CLI tabs left or right without disrupting the selected terminal or workspace order.
+- Make waiting, approval, rate-limit, and completed states visually distinct in tabs, panels, and
+  the Inspector; keep up to 250 Agent events and show more recent activity.
+- Preserve xterm scrollback and refit terminals when hidden panes become visible, fixing terminals
+  that could no longer scroll vertically.
+- Start a fresh session when switching model providers, validate custom provider credentials, and
+  update the MiniMax preset to `MiniMax-M3[1m]`.
+- Detect Claude 429/rate-limit and timeout failures, surface actionable notices, and resolve
+  managed-account sessions against the correct isolated Claude configuration directory.
+- Explain that an explicit native session resume reloads its historical context, while provider
+  switching deliberately avoids replaying the previous session.
 
 ## V0.3.4 Updates
 

@@ -6,6 +6,7 @@ export type TerminalStatus =
   | 'THINKING'
   | 'WAITING_INPUT'
   | 'WAITING_APPROVAL'
+  | 'RATE_LIMITED'
   | 'IDLE'
   | 'COMPLETED'
   | 'FAILED'
@@ -17,6 +18,9 @@ export type LayoutMode = 'single' | 'columns' | 'rows' | 'grid';
 export const MIN_TERMINAL_GRID_DIMENSION = 1;
 export const MAX_TERMINAL_GRID_DIMENSION = 6;
 export const DEFAULT_TERMINAL_GRID_DIMENSION = 2;
+export const MIN_TERMINAL_FONT_SIZE = 9;
+export const MAX_TERMINAL_FONT_SIZE = 24;
+export const DEFAULT_TERMINAL_FONT_SIZE = 12;
 export const DEFAULT_WORKSPACE_THEME_COLOR = '#58c7a0';
 
 export const WORKSPACE_THEME_PRESETS = [
@@ -36,6 +40,13 @@ export function normalizeTerminalGridDimension(value: number | undefined): numbe
     MAX_TERMINAL_GRID_DIMENSION,
     Math.max(MIN_TERMINAL_GRID_DIMENSION, Math.round(value!)),
   );
+}
+
+export function normalizeTerminalFontSize(value: number | undefined): number {
+  if (!Number.isFinite(value)) {
+    return DEFAULT_TERMINAL_FONT_SIZE;
+  }
+  return Math.min(MAX_TERMINAL_FONT_SIZE, Math.max(MIN_TERMINAL_FONT_SIZE, Math.round(value!)));
 }
 
 export function normalizeWorkspaceThemeColor(value: string | undefined): string {
@@ -97,6 +108,7 @@ export const TERMINAL_STATUS_LABELS: Record<TerminalStatus, string> = {
   THINKING: '思考中',
   WAITING_INPUT: '等待输入',
   WAITING_APPROVAL: '需要确认',
+  RATE_LIMITED: '429 限流',
   IDLE: '空闲',
   COMPLETED: '已完成',
   FAILED: '失败',

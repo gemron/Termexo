@@ -214,7 +214,7 @@ fn map_hook_event(stored: StoredHookEvent) -> AgentEvent {
             _ => "agent.notification",
         },
         "Stop" => "task.completed",
-        "StopFailure" => "agent.failed",
+        "StopFailure" => stop_failure_event_type(&stored.payload),
         "SessionEnd" => "session.ended",
         _ => "agent.event",
     };
@@ -232,6 +232,26 @@ fn map_hook_event(stored: StoredHookEvent) -> AgentEvent {
         detail: stored.payload,
         created_at: stored.received_at,
     }
+}
+
+fn stop_failure_event_type(payload: &Value) -> &'static str {
+    let detail = ["error", "error_details", "last_assistant_message"]
+        .iter()
+        .filter_map(|field| payload.get(field).and_then(Value::as_str))
+        .collect::<Vec<_>>()
+        .join(" ")
+        .to_ascii_lowercase();
+    if detail.contains("rate_limit")
+        || detail.contains("rate limit")
+        || detail.contains("too many requests")
+        || detail.contains("429")
+    {
+        return "agent.rate_limited";
+    }
+    if detail.contains("timeout") || detail.contains("timed out") {
+        return "agent.timeout";
+    }
+    "agent.failed"
 }
 
 fn argument_value(arguments: &[String], name: &str) -> Option<String> {
@@ -281,6 +301,42 @@ mod tests {
 
         assert_eq!(event.event_type, "approval.required");
         assert_eq!(event.native_session_id.as_deref(), Some("session-1"));
+    }
+
+    #[test]
+    fn maps_rate_limit_stop_failures_to_retryable_events() {
+        let stored = StoredHookEvent {
+            event_key: "event-rate-limit".into(),
+            terminal_id: "terminal-1".into(),
+            received_at: 10,
+            payload: json!({
+                "hook_event_name": "StopFailure",
+                "session_id": "session-1",
+                "error": "rate_limit",
+                "error_details": "429 Too Many Requests"
+            }),
+        };
+
+        let event = map_hook_event(stored);
+
+        assert_eq!(event.event_type, "agent.rate_limited");
+    }
+
+    #[test]
+    fn maps_timeout_stop_failures_to_waiting_events() {
+        let stored = StoredHookEvent {
+            event_key: "event-timeout".into(),
+            terminal_id: "terminal-1".into(),
+            received_at: 10,
+            payload: json!({
+                "hook_event_name": "StopFailure",
+                "error_details": "API request timed out"
+            }),
+        };
+
+        let event = map_hook_event(stored);
+
+        assert_eq!(event.event_type, "agent.timeout");
     }
 
     #[test]

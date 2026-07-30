@@ -135,6 +135,144 @@ try {
     throw new Error('creating a Shell did not add a terminal panel');
   }
 
+  const fontSizeOutput = page.locator('.font-size-controls output');
+  const initialFontSize = Number(await fontSizeOutput.textContent());
+  await page.getByRole('button', { name: '增大终端字体' }).click();
+  await fontSizeOutput.filter({ hasText: String(initialFontSize + 1) }).waitFor();
+  const storedFontSize = await page.evaluate(() =>
+    localStorage.getItem('termexo.terminalFontSize'),
+  );
+  if (storedFontSize !== String(initialFontSize + 1)) {
+    throw new Error('terminal font size was not persisted');
+  }
+  await page.getByRole('button', { name: '减小终端字体' }).click();
+
+  const terminalTabLabels = page.locator('.tab-strip button[role="tab"] > span');
+  const tabOrderBefore = await terminalTabLabels.allTextContents();
+  const activeTabName = (
+    await page.locator('.tab-strip button.active > span').textContent()
+  )?.trim();
+  const activeTabIndexBefore = tabOrderBefore.findIndex((name) => name.trim() === activeTabName);
+  await page.getByRole('button', { name: '将当前终端向左移动' }).click();
+  await page.waitForTimeout(120);
+  const tabOrderAfter = await terminalTabLabels.allTextContents();
+  const activeTabIndexAfter = tabOrderAfter.findIndex((name) => name.trim() === activeTabName);
+  if (activeTabIndexBefore < 1 || activeTabIndexAfter !== activeTabIndexBefore - 1) {
+    throw new Error(
+      `terminal tab did not move left: ${JSON.stringify({
+        activeTabName,
+        tabOrderBefore,
+        tabOrderAfter,
+      })}`,
+    );
+  }
+
+  const activeTerminalPanel = page.locator('.terminal-panel.active');
+  const seededScrollback = await activeTerminalPanel.evaluate((panel) => {
+    const host = panel.closest('app-terminal-panel');
+    const component = host && globalThis.ng?.getComponent(host);
+    const terminal = component?.terminal;
+    if (!terminal) {
+      return false;
+    }
+    for (let index = 0; index < 90; index += 1) {
+      terminal.writeln(`scrollback test line ${index + 1}`);
+    }
+    return true;
+  });
+  if (!seededScrollback) {
+    throw new Error('terminal component was unavailable for scrollback smoke setup');
+  }
+  await page.waitForTimeout(180);
+  const bufferBeforeScroll = await activeTerminalPanel.evaluate((panel) => {
+    const host = panel.closest('app-terminal-panel');
+    const terminal = host && globalThis.ng?.getComponent(host)?.terminal;
+    const buffer = terminal?.buffer.active;
+    return buffer ? { baseY: buffer.baseY, viewportY: buffer.viewportY, type: buffer.type } : null;
+  });
+  if (!bufferBeforeScroll || bufferBeforeScroll.baseY <= 0) {
+    throw new Error(
+      `terminal did not retain enough scrollback content: ${JSON.stringify(bufferBeforeScroll)}`,
+    );
+  }
+  await activeTerminalPanel.locator('.xterm-scrollable-element').hover();
+  await page.mouse.wheel(0, -900);
+  await page.waitForTimeout(120);
+  const viewportYAfterScroll = await activeTerminalPanel.evaluate((panel) => {
+    const host = panel.closest('app-terminal-panel');
+    return host && globalThis.ng?.getComponent(host)?.terminal?.buffer.active.viewportY;
+  });
+  if (
+    typeof viewportYAfterScroll !== 'number' ||
+    viewportYAfterScroll >= bufferBeforeScroll.viewportY
+  ) {
+    throw new Error('terminal viewport did not scroll upward');
+  }
+
+  const seededAgentEvents = await page.evaluate(() => {
+    const root = document.querySelector('app-root');
+    const app = root && globalThis.ng?.getComponent(root);
+    const terminal = app?.state?.activeTerminal();
+    if (!terminal || !app?.agents?.eventItems?.set) {
+      return false;
+    }
+    app.agents.eventItems.set(
+      Array.from({ length: 12 }, (_, index) => ({
+        eventKey: `smoke-event-${index}`,
+        agentType: 'claude',
+        nativeSessionId: 'smoke-session',
+        terminalId: terminal.id,
+        eventType: 'tool.completed',
+        detail: { tool_name: `Smoke tool ${index + 1}` },
+        createdAt: Date.now() - index * 1_000,
+      })),
+    );
+    return true;
+  });
+  if (!seededAgentEvents) {
+    throw new Error('Agent event state was unavailable for activity smoke setup');
+  }
+  await page.locator('.activity .event-row').nth(11).waitFor();
+  if ((await page.locator('.activity .event-row').count()) !== 12) {
+    throw new Error('recent activity did not render the expanded event history');
+  }
+
+  await page.evaluate(() => {
+    const root = document.querySelector('app-root');
+    const app = root && globalThis.ng?.getComponent(root);
+    const terminal = app?.state?.activeTerminal();
+    if (terminal) {
+      app.state.updateTerminalStatus(terminal.id, 'WAITING_INPUT');
+    }
+  });
+  const waitingPanel = page.locator('.terminal-panel[data-status="WAITING_INPUT"]');
+  await waitingPanel.waitFor();
+  const waitingVisual = await waitingPanel.evaluate((panel) => {
+    const panelStyle = getComputedStyle(panel);
+    const badgeStyle = getComputedStyle(panel.querySelector('.status'));
+    return {
+      boxShadow: panelStyle.boxShadow,
+      badgeBackground: badgeStyle.backgroundColor,
+    };
+  });
+  if (
+    waitingVisual.boxShadow === 'none' ||
+    waitingVisual.badgeBackground === 'transparent' ||
+    waitingVisual.badgeBackground === 'rgba(0, 0, 0, 0)'
+  ) {
+    throw new Error('waiting-for-input status is not visually prominent');
+  }
+
+  await page.evaluate(() => {
+    const root = document.querySelector('app-root');
+    const app = root && globalThis.ng?.getComponent(root);
+    const terminal = app?.state?.activeTerminal();
+    if (terminal) {
+      app.state.updateTerminalStatus(terminal.id, 'COMPLETED');
+    }
+  });
+  await page.locator('.terminal-panel[data-status="COMPLETED"]').waitFor();
+
   const workspaceEntries = page.locator('.workspace-entry');
   if ((await workspaceEntries.count()) === 0) {
     throw new Error('workspace menu did not render any entries');
