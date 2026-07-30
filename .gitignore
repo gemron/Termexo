@@ -6,6 +6,7 @@ apps/desktop-ui/coverage/
 
 # Tauri / Rust
 src-tauri/target/
+packages/termexo/vendor/
 .tooling/
 
 # Local data

@@ -14,10 +14,11 @@ test('TERMEXO_PATH has priority over standard installation directories', () => {
     LOCALAPPDATA: 'C:\\Users\\test\\AppData\\Local',
     ProgramFiles: 'C:\\Program Files',
     'ProgramFiles(x86)': 'C:\\Program Files (x86)',
-  });
+  }, 'C:\\npm\\termexo.exe');
 
   assert.deepEqual(candidates, [
     'D:\\Apps\\Termexo\\termexo.exe',
+    'C:\\npm\\termexo.exe',
     'C:\\Users\\test\\AppData\\Local\\Termexo\\termexo.exe',
     'C:\\Users\\test\\AppData\\Local\\Programs\\Termexo\\termexo.exe',
     'C:\\Program Files\\Termexo\\termexo.exe',
@@ -31,7 +32,7 @@ test('duplicate executable candidates are removed', () => {
     ProgramFiles: 'C:\\',
   };
 
-  assert.deepEqual(executableCandidates(environment), [
+  assert.deepEqual(executableCandidates(environment, 'C:\\Termexo\\termexo.exe'), [
     'C:\\Termexo\\termexo.exe',
   ]);
 });
@@ -43,11 +44,31 @@ test('findExecutable returns the first existing candidate', () => {
   };
   const expected = 'C:\\Users\\test\\AppData\\Local\\Programs\\Termexo\\termexo.exe';
 
-  assert.equal(findExecutable(environment, (candidate) => candidate === expected), expected);
+  assert.equal(
+    findExecutable(environment, (candidate) => candidate === expected, 'C:\\npm\\termexo.exe'),
+    expected,
+  );
 });
 
 test('findExecutable returns undefined when Termexo is not installed', () => {
-  assert.equal(findExecutable({ LOCALAPPDATA: 'C:\\Local' }, () => false), undefined);
+  assert.equal(
+    findExecutable({ LOCALAPPDATA: 'C:\\Local' }, () => false, 'C:\\npm\\termexo.exe'),
+    undefined,
+  );
+});
+
+test('findExecutable uses the bundled executable before installed copies', () => {
+  const bundledExecutable = 'C:\\npm\\termexo.exe';
+  assert.equal(
+    findExecutable(
+      {
+        LOCALAPPDATA: 'C:\\Users\\test\\AppData\\Local',
+      },
+      () => true,
+      bundledExecutable,
+    ),
+    bundledExecutable,
+  );
 });
 
 test('launchExecutable starts a detached GUI process', () => {

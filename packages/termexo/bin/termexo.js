@@ -17,8 +17,8 @@ function printHelp() {
   console.log(`Termexo ${packageJson.version}
 
 Usage:
-  termexo              Start the installed Termexo desktop app
-  termexo start        Start the installed Termexo desktop app
+  termexo              Start the bundled Termexo desktop app
+  termexo start        Start the bundled Termexo desktop app
   termexo download     Open the latest Termexo release page
   termexo --version    Print the launcher version
   termexo --help       Show this help
@@ -37,9 +37,10 @@ if (command === '--help' || command === '-h' || command === 'help') {
 } else if (command === 'start') {
   const executable = findExecutable();
   if (!executable) {
-    console.error(`Termexo is not installed in a standard location.
+    console.error(`The Termexo executable is missing from this npm package.
 
-Download the Windows installer:
+Reinstall the package or download the Windows installer:
+  npm install --global termexo@latest
   termexo download
   ${RELEASES_URL}
 

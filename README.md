@@ -149,6 +149,24 @@ See [Termexo.md](./Termexo.md) for the complete product plan and
 
 ## Quick Start
 
+### Run directly from npm
+
+The npm package includes the Windows x64 desktop executable:
+
+```powershell
+npx termexo
+```
+
+Or install the command globally:
+
+```powershell
+npm install --global termexo
+termexo
+```
+
+This path requires Windows 10/11, WebView2, and Node.js 18.18 or later. Building
+from source uses the newer toolchain listed below.
+
 ### Requirements
 
 - Windows 10/11;

@@ -1,10 +1,17 @@
 import { spawn } from 'node:child_process';
 import { existsSync } from 'node:fs';
 import { win32 } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 export const RELEASES_URL = 'https://github.com/gemron/Termexo/releases/latest';
+export const BUNDLED_EXECUTABLE = fileURLToPath(
+  new URL('../vendor/win32-x64/termexo.exe', import.meta.url),
+);
 
-export function executableCandidates(environment = process.env) {
+export function executableCandidates(
+  environment = process.env,
+  bundledExecutable = BUNDLED_EXECUTABLE,
+) {
   const candidates = [];
   const add = (value) => {
     if (value && !candidates.includes(value)) {
@@ -13,6 +20,7 @@ export function executableCandidates(environment = process.env) {
   };
 
   add(environment.TERMEXO_PATH);
+  add(bundledExecutable);
 
   if (environment.LOCALAPPDATA) {
     add(win32.join(environment.LOCALAPPDATA, 'Termexo', 'termexo.exe'));
@@ -30,8 +38,14 @@ export function executableCandidates(environment = process.env) {
   return candidates;
 }
 
-export function findExecutable(environment = process.env, fileExists = existsSync) {
-  return executableCandidates(environment).find((candidate) => fileExists(candidate));
+export function findExecutable(
+  environment = process.env,
+  fileExists = existsSync,
+  bundledExecutable = BUNDLED_EXECUTABLE,
+) {
+  return executableCandidates(environment, bundledExecutable).find((candidate) =>
+    fileExists(candidate),
+  );
 }
 
 export function launchExecutable(executable, spawnProcess = spawn) {

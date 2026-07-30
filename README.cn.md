@@ -134,6 +134,24 @@ Termexo 以 **Workspace** 为组织单位，把这些信息集中到一个可观
 
 ## 快速开始
 
+### 通过 npm 直接运行
+
+npm 包已经包含 Windows x64 桌面可执行文件：
+
+```powershell
+npx termexo
+```
+
+也可以全局安装命令：
+
+```powershell
+npm install --global termexo
+termexo
+```
+
+此方式需要 Windows 10/11、WebView2 和 Node.js 18.18 或更高版本。从源码构建
+则使用下方列出的新版开发工具链。
+
 ### 环境要求
 
 - Windows 10/11；

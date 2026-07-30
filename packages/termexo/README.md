@@ -1,6 +1,6 @@
 # Termexo npm launcher
 
-This package is the official Windows launcher for
+This package runs the official Windows desktop executable for
 [Termexo](https://www.termexo.com/), a local-first workspace for AI coding
 agents, models, and terminals.
 
@@ -13,25 +13,25 @@ npm install --global termexo
 termexo
 ```
 
-The npm package contains the launcher, not the desktop application. Install the
-latest Termexo desktop release first:
+The Windows desktop executable is included in the npm package, so no separate
+Termexo installation is required. You can also run it without a global install:
 
 ```powershell
-termexo download
+npx termexo
 ```
 
 ## Commands
 
 ```text
-termexo              Start Termexo
-termexo start        Start Termexo
+termexo              Start the bundled Termexo desktop app
+termexo start        Start the bundled Termexo desktop app
 termexo download     Open the latest release page
 termexo --version    Show the launcher version
 termexo --help       Show command help
 ```
 
-If Termexo is installed in a custom directory, set `TERMEXO_PATH` to the full
-path of `termexo.exe`.
+Set `TERMEXO_PATH` to the full path of another `termexo.exe` to override the
+bundled executable.
 
 Project source and desktop releases are available at
 [github.com/gemron/Termexo](https://github.com/gemron/Termexo).
