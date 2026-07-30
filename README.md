@@ -11,7 +11,7 @@
 </p>
 
 <p align="center">
-  <img alt="Version 0.3.2" src="https://img.shields.io/badge/version-0.3.2-58c7a0">
+  <img alt="Version 0.3.3" src="https://img.shields.io/badge/version-0.3.3-58c7a0">
   <img alt="Windows" src="https://img.shields.io/badge/platform-Windows-0078D4?logo=windows">
   <img alt="Tauri 2" src="https://img.shields.io/badge/Tauri-2-24C8DB?logo=tauri&logoColor=white">
   <img alt="Angular 22" src="https://img.shields.io/badge/Angular-22-DD0031?logo=angular">
@@ -27,15 +27,25 @@ quota visibility, secure workspace sharing, and access from trusted computers an
 Local project data and credentials remain protected by explicit device, permission, and
 encryption boundaries.
 
-> The latest published release is **V0.3.2, the Codex and multi-account workbench update**.
-> It completes Codex model/account-aware launch and recovery, adds isolated Claude/ChatGPT
-> accounts, resizable collapsible sidebars, and removes unfinished product surfaces.
+> The latest published release is **V0.3.3, the direct-from-npm Windows runtime update**.
+> The npm package now includes the complete Windows x64 desktop executable and starts without
+> requiring a separate Termexo installation.
 
 ![Termexo multi-terminal grid workbench](docs/images/termexo-workbench-v0.3.2.png)
 
 <p align="center">
   <sub>Four active Claude Code and Codex terminals in a configurable 2 × 2 grid with explicit pane selection and the Inspector.</sub>
 </p>
+
+## V0.3.3 Updates
+
+- Published the official [`termexo`](https://www.npmjs.com/package/termexo) package with the
+  complete Windows x64 desktop executable included.
+- Run the desktop app directly with `npx termexo@latest`, or install the command globally with
+  `npm install --global termexo@latest`.
+- Kept the package practical for npm delivery: about 4.8 MB compressed and 13.6 MB installed.
+- Added release-time PE validation, build-to-package SHA-256 verification, isolated installation
+  tests, and direct process-launch verification.
 
 ## V0.3.2 Updates
 

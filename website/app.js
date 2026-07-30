@@ -10,10 +10,14 @@ const translations = {
     heroLine1: "One workspace.",
     heroLine2: "Every agent.",
     heroLead:
-      "Coordinate coding terminals, native agent sessions, model providers, and recoverable project state from one focused desktop environment.",
-    download: "Download for Windows",
+      "Run the complete Windows desktop app directly from npm, then coordinate coding terminals, native agent sessions, model providers, and recoverable project state in one focused environment.",
+    runFromNpm: "Run from npm",
+    download: "Download installer",
+    copyCommand: "Copy",
+    copied: "Copied",
     viewSource: "View source",
     metaLocal: "Local-first",
+    metaNpm: "npm + bundled EXE",
     workbenchTitle: "See the whole development field.",
     workbenchLead:
       "Keep unlimited terminal tabs, choose exactly which panes are visible, and move between projects without losing the state that explains what each agent is doing.",
@@ -85,8 +89,8 @@ const translations = {
       "Planned remote access uses paired devices, short-lived tokens, encryption, clear roles, and immediate revocation.",
     ctaTitle: "Bring every coding agent into focus.",
     ctaLead:
-      "Termexo is early, local-first, and being built in public. Try the Windows release or follow the roadmap on GitHub.",
-    getRelease: "Get the latest release",
+      "Start the complete Windows workspace directly from npm, or use the traditional installer and follow development on GitHub.",
+    getRelease: "Download installer",
     starGithub: "Explore on GitHub",
     footerTagline: "AI Workspace Control Plane",
   },
@@ -101,10 +105,14 @@ const translations = {
     heroLine1: "一个工作空间。",
     heroLine2: "管理所有 Agent。",
     heroLead:
-      "在一个专注的桌面环境中统一管理编程终端、Agent 原生会话、模型供应商和可恢复的项目状态。",
-    download: "下载 Windows 版本",
+      "通过 npm 直接运行完整的 Windows 桌面应用，并在一个专注环境中统一管理编程终端、Agent 原生会话、模型供应商和可恢复的项目状态。",
+    runFromNpm: "通过 npm 运行",
+    download: "下载安装包",
+    copyCommand: "复制",
+    copied: "已复制",
     viewSource: "查看源码",
     metaLocal: "本地优先",
+    metaNpm: "npm + 内置 EXE",
     workbenchTitle: "看清整个开发现场。",
     workbenchLead:
       "保留不限数量的终端标签，明确选择当前显示的窗口；切换项目时，不再丢失解释每个 Agent 正在做什么的关键状态。",
@@ -174,8 +182,8 @@ const translations = {
       "规划中的远程访问采用设备配对、短期令牌、加密、明确角色和即时撤销。",
     ctaTitle: "让所有编程 Agent 聚焦在一个工作现场。",
     ctaLead:
-      "Termexo 仍处于早期阶段，坚持本地优先并公开开发。下载 Windows 版本，或在 GitHub 跟踪开发路线。",
-    getRelease: "获取最新版本",
+      "通过 npm 直接启动完整的 Windows 工作空间，也可以使用传统安装包并在 GitHub 跟踪开发。",
+    getRelease: "下载安装包",
     starGithub: "前往 GitHub",
     footerTagline: "AI 工作空间控制平面",
   },
@@ -186,9 +194,13 @@ const translatedElements = document.querySelectorAll("[data-i18n]");
 const nav = document.querySelector("[data-nav]");
 const menuToggle = document.querySelector("[data-menu-toggle]");
 const header = document.querySelector("[data-header]");
+const copyCommandButton = document.querySelector("[data-copy-command]");
+const copyCommandLabel = document.querySelector("[data-copy-label]");
+let activeLanguage = "en";
 
 function setLanguage(language) {
   const dictionary = translations[language] || translations.en;
+  activeLanguage = language in translations ? language : "en";
   document.documentElement.lang = language === "zh" ? "zh-CN" : "en";
   document.title =
     language === "zh"
@@ -213,6 +225,16 @@ function setLanguage(language) {
 
 languageButtons.forEach((button) => {
   button.addEventListener("click", () => setLanguage(button.dataset.lang));
+});
+
+copyCommandButton.addEventListener("click", async () => {
+  await navigator.clipboard.writeText("npx termexo@latest");
+  copyCommandLabel.textContent = translations[activeLanguage].copied;
+  copyCommandButton.classList.add("copied");
+  window.setTimeout(() => {
+    copyCommandLabel.textContent = translations[activeLanguage].copyCommand;
+    copyCommandButton.classList.remove("copied");
+  }, 1600);
 });
 
 menuToggle.addEventListener("click", () => {
