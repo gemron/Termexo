@@ -1,0 +1,47 @@
+{
+  "name": "termexo",
+  "version": "0.3.2",
+  "description": "Official Windows launcher for the Termexo AI development workspace",
+  "type": "module",
+  "bin": {
+    "termexo": "bin/termexo.js"
+  },
+  "files": [
+    "bin/",
+    "lib/",
+    "README.md"
+  ],
+  "os": [
+    "win32"
+  ],
+  "engines": {
+    "node": ">=18.18.0"
+  },
+  "scripts": {
+    "test": "node --test",
+    "prepublishOnly": "npm test"
+  },
+  "keywords": [
+    "termexo",
+    "terminal",
+    "ai",
+    "agent",
+    "claude",
+    "codex",
+    "desktop"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/gemron/Termexo.git",
+    "directory": "packages/termexo"
+  },
+  "homepage": "https://www.termexo.com/",
+  "bugs": {
+    "url": "https://github.com/gemron/Termexo/issues"
+  },
+  "license": "UNLICENSED",
+  "publishConfig": {
+    "access": "public",
+    "registry": "https://registry.npmjs.org/"
+  }
+}

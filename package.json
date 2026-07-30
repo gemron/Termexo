@@ -8,6 +8,9 @@
     "build": "npm --prefix apps/desktop-ui run build",
     "capture:readme": "npm --prefix apps/desktop-ui run capture:readme",
     "test": "npm --prefix apps/desktop-ui test -- --watch=false",
+    "npm:pack": "npm --prefix packages/termexo pack --dry-run",
+    "npm:publish": "npm --prefix packages/termexo publish --access public",
+    "npm:test": "npm --prefix packages/termexo test",
     "tauri:dev": "scripts\\tauri-msvc.cmd dev",
     "tauri:build": "scripts\\tauri-msvc.cmd build"
   },
