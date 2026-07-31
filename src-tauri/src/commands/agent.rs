@@ -197,7 +197,15 @@ pub fn prepare_claude_launch(
     environment.extend(profile_environment(profile.as_ref()));
     if let Some(profile) = profile.as_ref() {
         if let Some(target) = profile.credential_target.as_deref() {
-            let token = credentials.get(target).map_err(|error| error.to_string())?;
+            let token = credentials
+                .get_optional(target)
+                .map_err(|error| error.to_string())?
+                .ok_or_else(|| {
+                    format!(
+                        "模型 Profile「{}」的 API Key 不存在或已失效，请在设置中重新输入并保存。",
+                        profile.name
+                    )
+                })?;
             environment.insert("ANTHROPIC_AUTH_TOKEN".into(), token);
         }
     }

@@ -11,7 +11,7 @@
 </p>
 
 <p align="center">
-  <img alt="Version 0.3.5" src="https://img.shields.io/badge/version-0.3.5-58c7a0">
+  <img alt="Version 0.3.6" src="https://img.shields.io/badge/version-0.3.6-58c7a0">
   <img alt="Windows" src="https://img.shields.io/badge/platform-Windows-0078D4?logo=windows">
   <img alt="Tauri 2" src="https://img.shields.io/badge/Tauri-2-24C8DB?logo=tauri&logoColor=white">
   <img alt="Angular 22" src="https://img.shields.io/badge/Angular-22-DD0031?logo=angular">
@@ -27,15 +27,23 @@ quota visibility, secure workspace sharing, and access from trusted computers an
 Local project data and credentials remain protected by explicit device, permission, and
 encryption boundaries.
 
-> The latest published release is **V0.3.5, the terminal control and agent reliability update**.
-> It adds persistent font controls and terminal ordering, clearer agent states, durable activity
-> history, reliable scrolling, safer provider switching, and better Claude recovery diagnostics.
+> The latest published release is **V0.3.6, the secure credential recovery update**.
+> Model profiles now verify their actual Windows secure-storage entry and guide users to re-enter
+> an API key when a previously stored credential is missing.
 
 ![Termexo multi-terminal grid workbench](docs/images/termexo-workbench-v0.3.2.png)
 
 <p align="center">
   <sub>Four active Claude Code and Codex terminals in a configurable 2 × 2 grid with explicit pane selection and the Inspector.</sub>
 </p>
+
+## V0.3.6 Updates
+
+- Verify model-profile API keys against Windows secure storage instead of trusting a stale database
+  reference.
+- Treat a deleted secure-storage entry as an unconfigured credential and stop preserving invalid
+  references when a profile is saved.
+- Replace the low-level keyring error during provider switching with an actionable localized prompt.
 
 ## V0.3.5 Updates
 

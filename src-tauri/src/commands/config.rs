@@ -13,10 +13,20 @@ use crate::network::{self, NetworkTestResult};
 #[tauri::command]
 pub fn list_model_profiles(
     database: State<'_, WorkspaceDatabase>,
+    credentials: State<'_, CredentialStore>,
 ) -> Result<Vec<ModelProfile>, String> {
-    database
+    let mut profiles = database
         .list_model_profiles()
-        .map_err(|error| error.to_string())
+        .map_err(|error| error.to_string())?;
+    for profile in &mut profiles {
+        profile.has_credential = match profile.credential_target.as_deref() {
+            Some(target) => credentials
+                .contains(target)
+                .map_err(|error| error.to_string())?,
+            None => false,
+        };
+    }
+    Ok(profiles)
 }
 
 #[tauri::command]
@@ -28,6 +38,19 @@ pub fn save_model_profile(
     let existing = database
         .find_model_profile(&input.id)
         .map_err(|error| error.to_string())?;
+    let preserved_credential_target = match existing
+        .as_ref()
+        .and_then(|profile| profile.credential_target.as_deref())
+    {
+        Some(target)
+            if credentials
+                .contains(target)
+                .map_err(|error| error.to_string())? =>
+        {
+            Some(target.to_owned())
+        }
+        _ => None,
+    };
     let credential_target = if input.clear_credential {
         if let Some(target) = existing
             .as_ref()
@@ -45,7 +68,7 @@ pub fn save_model_profile(
                     .map_err(|error| error.to_string())?;
                 Some(target)
             }
-            _ => existing.and_then(|profile| profile.credential_target),
+            _ => preserved_credential_target,
         }
     };
     let profile = ModelProfile {
@@ -361,10 +384,16 @@ pub fn validate_claude_profile(
         .map_err(|error| error.to_string())?
         .ok_or_else(|| "模型 Profile 不存在".to_owned())?;
     if let Some(target) = profile.credential_target {
-        credentials
-            .get(&target)
-            .map(|_| ())
-            .map_err(|error| error.to_string())?;
+        if credentials
+            .get_optional(&target)
+            .map_err(|error| error.to_string())?
+            .is_none()
+        {
+            return Err(format!(
+                "模型 Profile「{}」的 API Key 不存在或已失效，请重新输入并保存。",
+                profile.name
+            ));
+        }
     }
     ClaudeCodeAdapter::new()
         .build_launch_command(&ClaudeLaunchOptions {

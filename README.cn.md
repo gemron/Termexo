@@ -11,7 +11,7 @@
 </p>
 
 <p align="center">
-  <img alt="Version 0.3.5" src="https://img.shields.io/badge/version-0.3.5-58c7a0">
+  <img alt="Version 0.3.6" src="https://img.shields.io/badge/version-0.3.6-58c7a0">
   <img alt="Windows" src="https://img.shields.io/badge/platform-Windows-0078D4?logo=windows">
   <img alt="Tauri 2" src="https://img.shields.io/badge/Tauri-2-24C8DB?logo=tauri&logoColor=white">
   <img alt="Angular 22" src="https://img.shields.io/badge/Angular-22-DD0031?logo=angular">
@@ -25,14 +25,20 @@ Termexo 是一个本地优先的 AI 开发工作空间与控制平面。它把�
 逐步扩展多 Agent 编排、供应商 Plan 余量实时查看、安全的 Workspace 共享，以及从可信
 电脑和手机访问工作空间。项目数据与凭据仍由明确的设备、权限和加密边界保护。
 
-> 最新正式版本为 **V0.3.5 终端控制与 Agent 稳定性更新版**。新增持久化字体调节和终端
-> 排序，强化 Agent 状态与活动历史，并修复终端滚动、供应商切换和 Claude 恢复诊断。
+> 最新正式版本为 **V0.3.6 安全凭据恢复更新版**。模型 Profile 现在会核对 Windows 安全
+> 存储中的真实条目；旧密钥丢失时会提示重新输入，不再在切换模型时显示底层错误。
 
 ![Termexo 多终端网格工作台](docs/images/termexo-workbench-v0.3.2.png)
 
 <p align="center">
   <sub>4 个 Claude Code/Codex 终端、2 × 2 自定义网格、指定窗口显示、会话状态与 Inspector。</sub>
 </p>
+
+## V0.3.6 更新
+
+- 模型 Profile 会核对 Windows 安全存储中的真实 API Key，不再只相信数据库里的旧引用。
+- 安全存储条目已删除时按“未配置密钥”处理，重新保存 Profile 时不会保留失效引用。
+- 切换供应商遇到密钥丢失时显示可操作的中文提示，不再显示底层 keyring 错误。
 
 ## V0.3.5 更新
 

@@ -147,13 +147,55 @@ impl CredentialStore {
     }
 
     pub fn get(&self, target: &str) -> Result<String, ConfigError> {
-        Ok(Entry::new(CREDENTIAL_SERVICE, target)?.get_password()?)
+        self.get_optional(target)?
+            .ok_or_else(|| ConfigError::Credential(keyring::Error::NoEntry))
+    }
+
+    pub fn get_optional(&self, target: &str) -> Result<Option<String>, ConfigError> {
+        let entry = Entry::new(CREDENTIAL_SERVICE, target)?;
+        normalize_credential_result(entry.get_password())
+    }
+
+    pub fn contains(&self, target: &str) -> Result<bool, ConfigError> {
+        self.get_optional(target).map(|secret| secret.is_some())
     }
 
     pub fn delete(&self, target: &str) {
         if let Ok(entry) = Entry::new(CREDENTIAL_SERVICE, target) {
             let _ = entry.delete_credential();
         }
+    }
+}
+
+fn normalize_credential_result(
+    result: Result<String, keyring::Error>,
+) -> Result<Option<String>, ConfigError> {
+    match result {
+        Ok(secret) => Ok(Some(secret)),
+        Err(keyring::Error::NoEntry) => Ok(None),
+        Err(error) => Err(ConfigError::Credential(error)),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn missing_secure_storage_entry_is_an_empty_optional_credential() {
+        assert!(normalize_credential_result(Err(keyring::Error::NoEntry))
+            .expect("missing entries should not fail")
+            .is_none());
+    }
+
+    #[test]
+    fn existing_secure_storage_entry_is_returned() {
+        assert_eq!(
+            normalize_credential_result(Ok("secret".into()))
+                .expect("stored credential should be readable")
+                .as_deref(),
+            Some("secret")
+        );
     }
 }
 
