@@ -60,4 +60,18 @@ export class WorkspaceRepository {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(workspaces));
     localStorage.removeItem(LEGACY_STORAGE_KEY);
   }
+
+  async delete(workspaceId: string): Promise<void> {
+    if (isTauriRuntime()) {
+      await invoke('delete_workspace', { workspaceId });
+      return;
+    }
+
+    const workspaces = await this.list();
+    localStorage.setItem(
+      STORAGE_KEY,
+      JSON.stringify(workspaces.filter((workspace) => workspace.id !== workspaceId)),
+    );
+    localStorage.removeItem(LEGACY_STORAGE_KEY);
+  }
 }

@@ -1,0 +1,45 @@
+.directory-field {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 7px;
+
+  input {
+    width: 100%;
+    min-width: 0;
+  }
+}
+
+.directory-button {
+  height: 34px;
+  min-height: 34px;
+  gap: 6px;
+  padding: 0 11px;
+  border-color: var(--border-strong);
+  color: var(--text-secondary);
+  background: var(--surface-2);
+  font-size: 11px;
+  white-space: nowrap;
+
+  &:hover:not(:disabled),
+  &:focus-visible {
+    border-color: color-mix(in srgb, var(--color-primary) 52%, var(--border));
+    color: var(--text);
+    background: var(--primary-soft);
+  }
+}
+
+.field-error {
+  color: var(--color-error);
+  font-size: 10px;
+  line-height: 1.4;
+}
+
+@media (max-width: 480px) {
+  .directory-field {
+    grid-template-columns: 1fr;
+  }
+
+  .directory-button {
+    width: 100%;
+  }
+}

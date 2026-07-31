@@ -114,6 +114,31 @@ export class AppStateService {
     void this.repository.save(workspace);
   }
 
+  async deleteWorkspace(workspaceId: string): Promise<Workspace | null> {
+    const workspaces = this.workspaceItems();
+    const removedIndex = workspaces.findIndex((workspace) => workspace.id === workspaceId);
+    if (removedIndex < 0) {
+      return null;
+    }
+
+    const removedWorkspace = workspaces[removedIndex];
+    const remainingWorkspaces = this.normalizeWorkspaceOrder(
+      workspaces.filter((workspace) => workspace.id !== workspaceId),
+    );
+    await this.repository.delete(workspaceId);
+    await this.repository.saveAll(remainingWorkspaces);
+    this.workspaceItems.set(remainingWorkspaces);
+
+    if (this.activeWorkspaceId() === workspaceId) {
+      const nextWorkspace =
+        remainingWorkspaces[Math.min(removedIndex, remainingWorkspaces.length - 1)];
+      this.activeWorkspaceId.set(nextWorkspace?.id ?? null);
+      this.activeTerminalId.set(nextWorkspace?.terminals[0]?.id ?? null);
+    }
+
+    return removedWorkspace;
+  }
+
   toggleFavorite(workspaceId: string): void {
     const workspace = this.workspaceItems().find((item) => item.id === workspaceId);
     if (!workspace) {
@@ -232,6 +257,27 @@ export class AppStateService {
     this.updateTerminal(terminalId, (terminal) => ({ ...terminal, status }));
   }
 
+  updateRestoredTerminalLaunch(terminalId: string, command: string): boolean {
+    const workspace = this.workspaceItems().find((item) =>
+      item.terminals.some((terminal) => terminal.id === terminalId),
+    );
+    if (!workspace) {
+      return false;
+    }
+
+    const updatedWorkspace = {
+      ...workspace,
+      terminals: workspace.terminals.map((terminal) =>
+        terminal.id === terminalId
+          ? { ...terminal, command, status: 'STARTING' as const }
+          : terminal,
+      ),
+    };
+    this.replaceWorkspace(updatedWorkspace);
+    void this.repository.save(updatedWorkspace);
+    return true;
+  }
+
   applyAgentEvent(event: AgentEvent): void {
     const status = EVENT_STATUS[event.eventType];
     const workspace = this.workspaceItems().find((item) =>
@@ -293,12 +339,20 @@ export class AppStateService {
     terminalId: string,
     update: (terminal: TerminalSession) => TerminalSession,
   ): void {
-    this.updateActiveWorkspace((workspace) => ({
+    const workspace = this.workspaceItems().find((item) =>
+      item.terminals.some((terminal) => terminal.id === terminalId),
+    );
+    if (!workspace) {
+      return;
+    }
+    const updatedWorkspace = {
       ...workspace,
       terminals: workspace.terminals.map((terminal) =>
         terminal.id === terminalId ? update(terminal) : terminal,
       ),
-    }));
+    };
+    this.replaceWorkspace(updatedWorkspace);
+    void this.repository.save(updatedWorkspace);
   }
 
   private updateActiveWorkspace(update: (workspace: Workspace) => Workspace): void {

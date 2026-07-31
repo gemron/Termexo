@@ -84,6 +84,12 @@ pub fn save_model_profile(
         credential_target,
         is_default: input.is_default,
     };
+    if profile.base_url.is_some() && !profile.has_credential {
+        return Err(format!(
+            "模型 Profile「{}」使用第三方 Endpoint，必须输入并保存 API Key。",
+            profile.name
+        ));
+    }
     database
         .save_model_profile(&profile)
         .map_err(|error| error.to_string())?;

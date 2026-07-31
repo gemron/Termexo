@@ -36,16 +36,16 @@ const translations = {
     roadmapTag: "ROADMAP",
     featureWorkspaceTitle: "Workspace identity",
     featureWorkspaceBody:
-      "Name, color, order, project path, layout, terminals, branch, and model state stay attached to one durable workspace.",
+      "Name, full desktop and terminal theme, order, project path, layout, terminals, branch, and model state stay attached to one durable workspace.",
     featureSessionTitle: "Native session recovery",
     featureSessionBody:
       "Discover and resume native Claude Code and Codex CLI sessions across isolated accounts from one read-only session center.",
     featureModelTitle: "Provider profiles",
     featureModelBody:
-      "Keep Claude Code while routing to Anthropic, DeepSeek, MiniMax, GLM, or a compatible gateway.",
+      "Keep Claude Code while routing to Anthropic, DeepSeek, MiniMax, GLM, or a compatible gateway, with missing-key repair built in.",
     featureStatusTitle: "Agent state you can act on",
     featureStatusBody:
-      "Normalize thinking, tool use, input, approval, completion, and failure into a workspace-wide operational view.",
+      "Normalize thinking, tool use, input, approval, completion, and failure across workspaces, including native Codex turn completion.",
     featureQuotaTitle: "Provider Plan visibility",
     featureQuotaBody:
       "Track quota, reset windows, thresholds, and provider availability before model routing decisions.",
@@ -57,7 +57,7 @@ const translations = {
       "Keep the CLI your team already understands. Termexo turns endpoint, model, API key, and MCP settings into explicit profiles that can be switched and recovered.",
     modelPoint1: "Compatible provider profiles",
     modelPoint2: "Credentials in Windows Credential Manager",
-    modelPoint3: "Batch switch with session-aware restart",
+    modelPoint3: "Missing-key repair and session-aware restart",
     roadmapTitle: "From local control to trusted access.",
     roadmapLead:
       "The roadmap expands the same local-first workspace model without presenting planned capabilities as already shipped.",
@@ -131,16 +131,16 @@ const translations = {
     roadmapTag: "开发计划",
     featureWorkspaceTitle: "工作空间身份",
     featureWorkspaceBody:
-      "名称、颜色、顺序、项目路径、布局、终端、分支和模型状态都归属于一个持久工作空间。",
+      "名称、全软件与终端主题、顺序、项目路径、布局、终端、分支和模型状态都归属于一个持久工作空间。",
     featureSessionTitle: "原生会话恢复",
     featureSessionBody:
       "在统一的只读会话中心发现并恢复多个隔离账号中的 Claude Code 与 Codex CLI 原生会话。",
     featureModelTitle: "供应商 Profile",
     featureModelBody:
-      "保留 Claude Code，通过 Profile 路由到 Anthropic、DeepSeek、MiniMax、GLM 或兼容网关。",
+      "保留 Claude Code，通过 Profile 路由到 Anthropic、DeepSeek、MiniMax、GLM 或兼容网关，并内置缺失密钥修复流程。",
     featureStatusTitle: "可操作的 Agent 状态",
     featureStatusBody:
-      "把思考、工具调用、输入、审批、完成和失败统一成整个工作空间的运行视图。",
+      "把思考、工具调用、输入、审批、完成和失败统一成跨工作空间运行视图，并接入 Codex 原生轮次完成通知。",
     featureQuotaTitle: "供应商 Plan 余量",
     featureQuotaBody:
       "在模型路由前查看额度、重置周期、告警阈值和供应商可用性。",
@@ -152,7 +152,7 @@ const translations = {
       "保留团队已经熟悉的 CLI。Termexo 把 Endpoint、模型、API Key 和 MCP 设置变成可切换、可恢复的明确 Profile。",
     modelPoint1: "兼容供应商 Profile",
     modelPoint2: "凭据保存到 Windows 凭据管理器",
-    modelPoint3: "结合会话恢复的批量切换",
+    modelPoint3: "缺失密钥修复与会话感知重启",
     roadmapTitle: "从本地控制走向可信访问。",
     roadmapLead:
       "路线图沿用同一个本地优先工作空间模型，并明确区分当前能力和后续规划。",

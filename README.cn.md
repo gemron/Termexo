@@ -11,7 +11,7 @@
 </p>
 
 <p align="center">
-  <img alt="Version 0.3.6" src="https://img.shields.io/badge/version-0.3.6-58c7a0">
+  <img alt="Version 0.3.7" src="https://img.shields.io/badge/version-0.3.7-58c7a0">
   <img alt="Windows" src="https://img.shields.io/badge/platform-Windows-0078D4?logo=windows">
   <img alt="Tauri 2" src="https://img.shields.io/badge/Tauri-2-24C8DB?logo=tauri&logoColor=white">
   <img alt="Angular 22" src="https://img.shields.io/badge/Angular-22-DD0031?logo=angular">
@@ -25,14 +25,31 @@ Termexo 是一个本地优先的 AI 开发工作空间与控制平面。它把�
 逐步扩展多 Agent 编排、供应商 Plan 余量实时查看、安全的 Workspace 共享，以及从可信
 电脑和手机访问工作空间。项目数据与凭据仍由明确的设备、权限和加密边界保护。
 
-> 最新正式版本为 **V0.3.6 安全凭据恢复更新版**。模型 Profile 现在会核对 Windows 安全
-> 存储中的真实条目；旧密钥丢失时会提示重新输入，不再在切换模型时显示底层错误。
+> 最新正式版本为 **V0.3.7 工作空间连续性、状态与主题更新版**。切换工作空间时会保留
+> 终端交互状态，全局提示需要关注的 Agent，通过 Codex 原生通知准确识别每轮完成状态，
+> 并让工作区主题颜色覆盖整个软件和 CLI 终端。
 
 ![Termexo 多终端网格工作台](docs/images/termexo-workbench-v0.3.2.png)
 
 <p align="center">
   <sub>4 个 Claude Code/Codex 终端、2 × 2 自定义网格、指定窗口显示、会话状态与 Inspector。</sub>
 </p>
+
+## V0.3.7 更新
+
+- 增加安全的工作空间删除功能；新建工作空间时可通过系统目录选择器指定项目路径。
+- 全局汇总所有工作空间中等待输入、等待授权和已完成的终端，并提供醒目的提示与定位入口。
+- 保持工作空间终端视图挂载，稳定切换后的 xterm 尺寸、焦点和鼠标滚轮行为，修复需要点击
+  其他窗口后才能恢复滚动的问题。
+- 将动画状态灯放到终端标题前，并优化运行状态的背景和对齐。
+- 接入 Codex 原生 `agent-turn-complete` 通知，使新建和恢复的会话都能从运行中或思考中
+  准确切换为已完成。
+- 在挂载终端前重新生成已恢复 Codex 会话的启动命令，使旧工作区也能接收原生完成事件，
+  不再长期停留在错误的运行状态。
+- MiniMax 或其他兼容供应商缺少 API Key 时，自动打开并定位对应 Profile；重新输入前禁止
+  保存和切换，密钥仍只写入 Windows 安全存储。
+- 工作区颜色升级为完整应用主题，同步修改 DaisyUI 表面、侧栏、弹窗、终端背景、选区、
+  ANSI 强调色和光标颜色。
 
 ## V0.3.6 更新
 
@@ -159,7 +176,7 @@ Termexo 以 **Workspace** 为组织单位，把这些信息集中到一个可观
 ## 当前边界
 
 - Claude Code 仍是事件能力最完整的 Adapter。Codex 已支持原生检测、按账号/模型启动、
-  多账号本地会话发现和恢复，但 Codex Hooks 与统一运行事件尚未实现。
+  多账号本地会话发现、恢复和原生轮次完成事件；工具、审批和限流事件尚未完全对齐。
 - 应用退出后，已退出的操作系统进程不会被“伪恢复”。Termexo 只恢复终端配置，
   历史 Claude 会话需要从会话中心显式恢复。
 - Claude 与 Codex 原始 JSONL 均只读，Termexo 不修改、重命名或删除这些文件。
@@ -273,16 +290,16 @@ flowchart LR
 
 ## 路线图
 
-| 版本 | 目标                                             | 状态     |
-| ---- | ------------------------------------------------ | -------- |
-| V0.1 | Workspace、多终端、PTY、SQLite 基础              | 已完成   |
-| V0.2 | Claude Code 检测、会话恢复、Hooks、Profile       | 已完成   |
-| V0.3 | Codex CLI Adapter 与 Claude/Codex 统一会话中心   | 当前版本 |
+| 版本 | 目标                                            | 状态     |
+| ---- | ----------------------------------------------- | -------- |
+| V0.1 | Workspace、多终端、PTY、SQLite 基础             | 已完成   |
+| V0.2 | Claude Code 检测、会话恢复、Hooks、Profile      | 已完成   |
+| V0.3 | Codex CLI Adapter 与 Claude/Codex 统一会话中心  | 当前版本 |
 | V0.4 | 账号/供应商控制、CLI/网络环境、回滚与 Plan 余量 | 开发中   |
-| V0.5 | 会话摘要与跨 Agent 迁移                          | 规划中   |
-| V0.6 | 多 Agent 协作、任务编排与通知                    | 规划中   |
-| V0.7 | Workspace 共享、远程电脑与手机访问               | 规划中   |
-| V1.0 | 稳定发布、安全加固与完整恢复体验                 | 规划中   |
+| V0.5 | 会话摘要与跨 Agent 迁移                         | 规划中   |
+| V0.6 | 多 Agent 协作、任务编排与通知                   | 规划中   |
+| V0.7 | Workspace 共享、远程电脑与手机访问              | 规划中   |
+| V1.0 | 稳定发布、安全加固与完整恢复体验                | 规划中   |
 
 ## 项目结构
 

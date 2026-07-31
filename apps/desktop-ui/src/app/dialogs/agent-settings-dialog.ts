@@ -21,7 +21,7 @@ import {
 } from '../core/models/agent.models';
 import { IconComponent } from '../shared/icon/icon';
 
-type SettingsTab = 'diagnostics' | 'cli' | 'accounts' | 'models' | 'mcp' | 'network';
+export type SettingsTab = 'diagnostics' | 'cli' | 'accounts' | 'models' | 'mcp' | 'network';
 
 @Component({
   selector: 'app-agent-settings-dialog',
@@ -426,10 +426,18 @@ type SettingsTab = 'diagnostics' | 'cli' | 'accounts' | 'models' | 'mcp' | 'netw
                     <button
                       type="button"
                       [class.active]="profile.id === modelId()"
+                      [class.credential-missing]="profile.baseUrl && !profile.hasCredential"
                       (click)="editModel(profile)"
                     >
                       <strong>{{ profile.name }}</strong>
                       <small>{{ profile.provider }} · {{ profile.model }}</small>
+                      @if (profile.baseUrl) {
+                        <small class="credential-state" [class.ready]="profile.hasCredential">
+                          {{
+                            profile.hasCredential ? 'API Key 已安全保存' : '需要重新输入 API Key'
+                          }}
+                        </small>
+                      }
                     </button>
                   }
                   <button type="button" class="new-profile" (click)="newModel()">
@@ -460,10 +468,28 @@ type SettingsTab = 'diagnostics' | 'cli' | 'accounts' | 'models' | 'mcp' | 'netw
                     <span>API Key</span>
                     <input
                       type="password"
-                      [placeholder]="hasCredential() ? '已安全保存，留空表示不修改' : '可选'"
+                      [disabled]="clearCredential"
+                      [placeholder]="
+                        hasCredential()
+                          ? '已安全保存，留空表示不修改'
+                          : baseUrl.trim()
+                            ? '第三方 Endpoint 必填'
+                            : '官方 Endpoint 可留空'
+                      "
                       [(ngModel)]="apiKey"
                     />
                   </label>
+                  @if (modelCredentialMissing()) {
+                    <div class="credential-warning" role="alert">
+                      <app-icon name="triangle-alert" [size]="15" />
+                      <div>
+                        <strong>此 Profile 尚无可用 API Key</strong>
+                        <span
+                          >请输入并保存后再切换模型。密钥只写入系统安全存储，不会写入数据库。</span
+                        >
+                      </div>
+                    </div>
+                  }
                   <label class="checkbox-control editor-checkbox">
                     <input type="checkbox" [(ngModel)]="isDefault" />
                     <span>设为默认 Claude Profile</span>
@@ -488,7 +514,7 @@ type SettingsTab = 'diagnostics' | 'cli' | 'accounts' | 'models' | 'mcp' | 'netw
                     <button
                       type="button"
                       class="primary"
-                      [disabled]="!modelName.trim() || !modelNameValue.trim()"
+                      [disabled]="busy() || !canSaveModel()"
                       (click)="saveModel()"
                     >
                       保存 Profile
@@ -744,6 +770,8 @@ export class AgentSettingsDialogComponent {
   readonly accountProfiles = input<AccountProfile[]>([]);
   readonly activeWorkspaceId = input('');
   readonly activeWorkspaceName = input('当前 Workspace');
+  readonly initialTab = input<SettingsTab>('diagnostics');
+  readonly initialModelProfileId = input('');
   readonly networkTestResult = input<NetworkTestResult | null>(null);
   readonly cliPlan = input<CliOperationPlan | null>(null);
   readonly cliResult = input<CliOperationResult | null>(null);
@@ -809,8 +837,28 @@ export class AgentSettingsDialogComponent {
   private mcpProfilesInitialized = false;
   private networkProfilesInitialized = false;
   private accountProfilesInitialized = false;
+  private initialSelectionApplied = false;
 
   constructor() {
+    effect(() => {
+      if (this.initialSelectionApplied) {
+        return;
+      }
+      const requestedTab = this.initialTab();
+      const requestedModelId = this.initialModelProfileId();
+      const profiles = this.modelProfiles();
+      const requestedProfile = requestedModelId
+        ? profiles.find((profile) => profile.id === requestedModelId)
+        : undefined;
+      if (requestedModelId && !requestedProfile) {
+        return;
+      }
+      this.initialSelectionApplied = true;
+      this.tab.set(requestedTab);
+      if (requestedProfile) {
+        this.editModel(requestedProfile);
+      }
+    });
     effect(() => this.syncModelProfileEditor(this.modelProfiles()));
     effect(() => this.syncMcpProfileEditor(this.mcpProfiles()));
     effect(() => this.syncNetworkProfileEditor(this.networkProfiles()));
@@ -916,6 +964,9 @@ export class AgentSettingsDialogComponent {
   }
 
   protected saveModel(): void {
+    if (!this.canSaveModel()) {
+      return;
+    }
     const profileId = this.modelId() || crypto.randomUUID();
     this.modelId.set(profileId);
     this.modelSaved.emit({
@@ -943,6 +994,22 @@ export class AgentSettingsDialogComponent {
 
   protected isPresetProvider(provider: string): boolean {
     return this.providerPresets.some((item) => item.provider === provider);
+  }
+
+  protected modelCredentialMissing(): boolean {
+    return (
+      Boolean(this.baseUrl.trim()) &&
+      (!this.hasCredential() || this.clearCredential) &&
+      !this.apiKey.trim()
+    );
+  }
+
+  protected canSaveModel(): boolean {
+    return (
+      Boolean(this.modelName.trim()) &&
+      Boolean(this.modelNameValue.trim()) &&
+      !this.modelCredentialMissing()
+    );
   }
 
   protected editMcp(profile: McpProfile): void {

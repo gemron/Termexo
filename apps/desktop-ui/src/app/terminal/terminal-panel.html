@@ -9,9 +9,17 @@
       <span class="agent-icon" [attr.data-agent]="session().agentType">
         <app-icon [name]="session().agentType === 'shell' ? 'terminal' : 'bot'" [size]="14" />
       </span>
+      <span
+        class="status-indicator"
+        [attr.data-status]="session().status"
+        [title]="statusLabels[session().status]"
+        aria-hidden="true"
+      >
+        <i class="status-light"></i>
+      </span>
       <strong>{{ session().name }}</strong>
-      <span class="status badge badge-sm" aria-live="polite" [attr.data-status]="session().status">
-        <i></i>{{ statusLabels[session().status] }}
+      <span class="status-label" aria-live="polite" [attr.data-status]="session().status">
+        {{ statusLabels[session().status] }}
       </span>
     </div>
     <div class="terminal-meta">

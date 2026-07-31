@@ -12,6 +12,7 @@
   min-height: 0;
   gap: 5px;
   overflow: hidden;
+  overscroll-behavior: contain;
 
   app-terminal-panel.workbench-hidden {
     display: none;

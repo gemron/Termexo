@@ -51,6 +51,7 @@ pub struct ClaudeLaunchOptions {
 pub struct CodexLaunchOptions {
     pub session_id: Option<String>,
     pub model: Option<String>,
+    pub notify_config: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize)]

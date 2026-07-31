@@ -22,6 +22,10 @@ pub fn capture_hook_event_from_cli() -> Result<(), String> {
     hooks::capture_hook_event_from_cli().map_err(|error| error.to_string())
 }
 
+pub fn capture_codex_notification_from_cli() -> Result<(), String> {
+    hooks::capture_codex_notification_from_cli().map_err(|error| error.to_string())
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tracing_subscriber::fmt()
@@ -80,6 +84,7 @@ pub fn run() {
             commands::hooks::list_agent_events,
             commands::workspace::list_workspaces,
             commands::workspace::save_workspace,
+            commands::workspace::delete_workspace,
             commands::terminal::create_terminal,
             commands::terminal::write_terminal,
             commands::terminal::resize_terminal,

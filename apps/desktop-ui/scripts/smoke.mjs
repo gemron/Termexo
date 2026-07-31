@@ -57,6 +57,33 @@ try {
 
   await page.goto(APP_URL, { waitUntil: 'networkidle' });
   await page.locator('.terminal-panel').first().waitFor();
+  const runningStatus = page
+    .locator('.terminal-panel .status-indicator[data-status="RUNNING"]')
+    .first();
+  await runningStatus.waitFor();
+  const runningStatusVisual = await runningStatus.evaluate((status) => {
+    const light = status.querySelector('.status-light');
+    const title = status.nextElementSibling;
+    const label = title?.nextElementSibling;
+    return {
+      lightBeforeLabel:
+        light instanceof HTMLElement &&
+        title?.tagName === 'STRONG' &&
+        label instanceof HTMLElement &&
+        label.classList.contains('status-label'),
+      animationName: light ? getComputedStyle(light).animationName : 'none',
+      labelBackground: label ? getComputedStyle(label).backgroundColor : '',
+    };
+  });
+  if (
+    !runningStatusVisual.lightBeforeLabel ||
+    runningStatusVisual.animationName === 'none' ||
+    !['transparent', 'rgba(0, 0, 0, 0)'].includes(runningStatusVisual.labelBackground)
+  ) {
+    throw new Error(
+      `running terminal status light is incomplete: ${JSON.stringify(runningStatusVisual)}`,
+    );
+  }
   if ((await page.title()) !== 'Termexo') {
     throw new Error(`unexpected document title: ${await page.title()}`);
   }
@@ -112,16 +139,84 @@ try {
   const createWorkspaceDialog = page.getByRole('dialog', { name: '新建工作区' });
   await createWorkspaceDialog.waitFor();
   await assertWithinViewport(createWorkspaceDialog, 'create workspace dialog');
-  await createWorkspaceDialog.getByRole('button', { name: '关闭', exact: true }).click();
+  page.once('dialog', (dialog) => dialog.accept('D:\\smoke-workspace'));
+  await createWorkspaceDialog.getByRole('button', { name: '选择目录', exact: true }).click();
+  await createWorkspaceDialog.getByLabel('工作空间项目目录').waitFor({ state: 'visible' });
+  if (
+    (await createWorkspaceDialog.getByLabel('工作空间项目目录').inputValue()) !==
+    'D:\\smoke-workspace'
+  ) {
+    throw new Error('workspace directory picker did not populate the project path');
+  }
+  if ((await createWorkspaceDialog.locator('input').first().inputValue()) !== 'smoke-workspace') {
+    throw new Error('workspace directory picker did not infer the workspace name');
+  }
+  await createWorkspaceDialog
+    .getByText('名称', { exact: true })
+    .locator('..')
+    .locator('input')
+    .fill('Smoke Workspace');
+  await createWorkspaceDialog.getByRole('button', { name: '创建工作区', exact: true }).click();
+
+  const smokeWorkspaceEntry = page
+    .locator('.workspace-entry')
+    .filter({ hasText: 'Smoke Workspace' });
+  await smokeWorkspaceEntry.waitFor();
+  await smokeWorkspaceEntry.hover();
+  await smokeWorkspaceEntry.getByRole('button', { name: '删除工作空间', exact: true }).click();
+  const deleteWorkspaceDialog = page.getByRole('dialog', { name: '删除工作空间' });
+  await deleteWorkspaceDialog.waitFor();
+  await assertWithinViewport(deleteWorkspaceDialog, 'delete workspace dialog');
+  await deleteWorkspaceDialog.getByRole('button', { name: '删除工作空间', exact: true }).click();
+  await smokeWorkspaceEntry.waitFor({ state: 'detached' });
 
   const firstWorkspaceEntry = page.locator('.workspace-entry').first();
+  await firstWorkspaceEntry.locator('.workspace-copy').click();
   await firstWorkspaceEntry.hover();
   await firstWorkspaceEntry.getByRole('button', { name: '编辑工作区', exact: true }).click();
   const editWorkspaceDialog = page.getByRole('dialog', { name: '编辑工作区' });
   await editWorkspaceDialog.waitFor();
   await assertWithinViewport(editWorkspaceDialog, 'edit workspace dialog');
-  await editWorkspaceDialog.getByRole('button', { name: '关闭', exact: true }).click();
-
+  const themeBefore = await page.evaluate(() => {
+    const root = document.querySelector('app-root');
+    const panelHost = document.querySelector('app-terminal-panel');
+    const terminal = panelHost && globalThis.ng?.getComponent(panelHost)?.terminal;
+    const style = root ? getComputedStyle(root) : null;
+    return {
+      accent: style?.getPropertyValue('--color-primary').trim(),
+      surface: style?.getPropertyValue('--surface-0').trim(),
+      terminalBackground: terminal?.options.theme?.background,
+    };
+  });
+  await editWorkspaceDialog.getByRole('button', { name: '紫罗兰', exact: true }).click();
+  await editWorkspaceDialog.getByRole('button', { name: '保存修改', exact: true }).click();
+  await editWorkspaceDialog.waitFor({ state: 'detached' });
+  await page.waitForTimeout(120);
+  const themeAfter = await page.evaluate(() => {
+    const root = document.querySelector('app-root');
+    const panelHost = document.querySelector('app-terminal-panel');
+    const terminal = panelHost && globalThis.ng?.getComponent(panelHost)?.terminal;
+    const style = root ? getComputedStyle(root) : null;
+    return {
+      accent: style?.getPropertyValue('--color-primary').trim(),
+      surface: style?.getPropertyValue('--surface-0').trim(),
+      terminalCursor: terminal?.options.theme?.cursor,
+      terminalBackground: terminal?.options.theme?.background,
+    };
+  });
+  if (
+    themeAfter.accent !== '#a78bfa' ||
+    themeAfter.terminalCursor !== '#a78bfa' ||
+    themeAfter.surface === themeBefore.surface ||
+    themeAfter.terminalBackground === themeBefore.terminalBackground
+  ) {
+    throw new Error(
+      `workspace theme did not update the app and CLI terminal: ${JSON.stringify({
+        themeBefore,
+        themeAfter,
+      })}`,
+    );
+  }
   const initialTerminalCount = await page.locator('.terminal-panel').count();
   const toolbar = page.getByRole('toolbar', { name: '工作区工具' });
   page.once('dialog', (dialog) => dialog.accept(dialog.defaultValue()));
@@ -209,6 +304,92 @@ try {
     throw new Error('terminal viewport did not scroll upward');
   }
 
+  const workspaceItemsForSwitch = page.locator('.workspace-item');
+  if ((await workspaceItemsForSwitch.count()) > 1) {
+    const preservedPanel = page.locator('.terminal-panel').first();
+    const preservedTerminalStored = await preservedPanel.evaluate((panel) => {
+      const host = panel.closest('app-terminal-panel');
+      const terminal = host && globalThis.ng?.getComponent(host)?.terminal;
+      globalThis.__termexoSmokePreservedTerminal = terminal;
+      return Boolean(terminal);
+    });
+    if (!preservedTerminalStored) {
+      throw new Error('terminal instance was unavailable before switching workspaces');
+    }
+    await workspaceItemsForSwitch.nth(1).click({ position: { x: 12, y: 12 } });
+    await page.locator('app-terminal-workbench:not(.workspace-hidden) .empty-state').waitFor();
+    await workspaceItemsForSwitch.first().click({ position: { x: 12, y: 12 } });
+    const restoredActivePanel = page.locator('.terminal-panel.active');
+    await restoredActivePanel.waitFor();
+    await page.waitForTimeout(220);
+    const activeTerminalFocused = await restoredActivePanel.evaluate((panel) =>
+      panel.contains(document.activeElement),
+    );
+    if (!activeTerminalFocused) {
+      throw new Error('active terminal was not focused after switching workspaces');
+    }
+    const terminalInstancePreserved = await page
+      .locator('.terminal-panel')
+      .first()
+      .evaluate((panel) => {
+        const host = panel.closest('app-terminal-panel');
+        const terminal = host && globalThis.ng?.getComponent(host)?.terminal;
+        return terminal === globalThis.__termexoSmokePreservedTerminal;
+      });
+    if (!terminalInstancePreserved) {
+      throw new Error('terminal instance was recreated while switching workspaces');
+    }
+
+    const restoredPanels = page.locator('.terminal-panel');
+    const lowerPanel = restoredPanels.nth(Math.min(1, (await restoredPanels.count()) - 1));
+    const lowerPanelBuffer = await lowerPanel.evaluate((panel) => {
+      const host = panel.closest('app-terminal-panel');
+      const terminal = host && globalThis.ng?.getComponent(host)?.terminal;
+      if (!terminal) {
+        return null;
+      }
+      for (let index = 0; index < 90; index += 1) {
+        terminal.writeln(`workspace switch scrollback line ${index + 1}`);
+      }
+      terminal.scrollToBottom();
+      return true;
+    });
+    if (!lowerPanelBuffer) {
+      throw new Error('lower terminal was unavailable after switching workspaces');
+    }
+    await page.waitForTimeout(180);
+    const lowerViewportBeforeScroll = await lowerPanel.evaluate((panel) => {
+      const host = panel.closest('app-terminal-panel');
+      return host && globalThis.ng?.getComponent(host)?.terminal?.buffer.active.viewportY;
+    });
+    await lowerPanel.locator('.xterm-scrollable-element').hover();
+    await page.mouse.wheel(0, -900);
+    await page.waitForTimeout(120);
+    const lowerPanelState = await lowerPanel.evaluate((panel) => {
+      const host = panel.closest('app-terminal-panel');
+      const terminal = host && globalThis.ng?.getComponent(host)?.terminal;
+      return {
+        active: panel.classList.contains('active'),
+        focused: panel.contains(document.activeElement),
+        viewportY: terminal?.buffer.active.viewportY,
+      };
+    });
+    if (
+      !lowerPanelState.active ||
+      !lowerPanelState.focused ||
+      typeof lowerPanelState.viewportY !== 'number' ||
+      typeof lowerViewportBeforeScroll !== 'number' ||
+      lowerPanelState.viewportY >= lowerViewportBeforeScroll
+    ) {
+      throw new Error(
+        `lower terminal did not activate and scroll after workspace switch: ${JSON.stringify({
+          lowerViewportBeforeScroll,
+          lowerPanelState,
+        })}`,
+      );
+    }
+  }
+
   const seededAgentEvents = await page.evaluate(() => {
     const root = document.querySelector('app-root');
     const app = root && globalThis.ng?.getComponent(root);
@@ -237,28 +418,61 @@ try {
     throw new Error('recent activity did not render the expanded event history');
   }
 
-  await page.evaluate(() => {
+  const globalNoticeSeed = await page.evaluate(() => {
     const root = document.querySelector('app-root');
     const app = root && globalThis.ng?.getComponent(root);
     const terminal = app?.state?.activeTerminal();
-    if (terminal) {
-      app.state.updateTerminalStatus(terminal.id, 'WAITING_INPUT');
+    const sourceWorkspace = app?.state?.activeWorkspace();
+    const backgroundWorkspace = app?.state
+      ?.workspaces()
+      .find((workspace) => workspace.id !== sourceWorkspace?.id);
+    if (!terminal || !sourceWorkspace || !backgroundWorkspace) {
+      return null;
     }
+    app.state.updateTerminalStatus(terminal.id, 'WAITING_INPUT');
+    app.state.selectWorkspace(backgroundWorkspace.id);
+    return {
+      workspaceName: sourceWorkspace.name,
+      terminalName: terminal.name,
+    };
   });
+  if (!globalNoticeSeed) {
+    throw new Error('cross-workspace notice smoke setup failed');
+  }
+
+  const globalNoticeTrigger = page.getByRole('button', {
+    name: '全局 Agent 提示',
+    exact: true,
+  });
+  await globalNoticeTrigger.waitFor();
+  await globalNoticeTrigger.click();
+  const globalNoticePanel = page.getByRole('dialog', { name: '全局 Agent 提示' });
+  await globalNoticePanel.waitFor();
+  await assertWithinViewport(globalNoticePanel, 'global Agent notice panel');
+  const globalNoticeItem = globalNoticePanel
+    .locator('.global-notice-item[data-status="WAITING_INPUT"]')
+    .filter({ hasText: globalNoticeSeed.workspaceName })
+    .filter({ hasText: globalNoticeSeed.terminalName });
+  await globalNoticeItem.waitFor();
+  await globalNoticeItem.click();
+
   const waitingPanel = page.locator('.terminal-panel[data-status="WAITING_INPUT"]');
   await waitingPanel.waitFor();
   const waitingVisual = await waitingPanel.evaluate((panel) => {
     const panelStyle = getComputedStyle(panel);
-    const badgeStyle = getComputedStyle(panel.querySelector('.status'));
+    const lightStyle = getComputedStyle(panel.querySelector('.status-light'));
+    const labelStyle = getComputedStyle(panel.querySelector('.status-label'));
     return {
       boxShadow: panelStyle.boxShadow,
-      badgeBackground: badgeStyle.backgroundColor,
+      lightBackground: lightStyle.backgroundColor,
+      labelColor: labelStyle.color,
     };
   });
   if (
     waitingVisual.boxShadow === 'none' ||
-    waitingVisual.badgeBackground === 'transparent' ||
-    waitingVisual.badgeBackground === 'rgba(0, 0, 0, 0)'
+    waitingVisual.lightBackground === 'transparent' ||
+    waitingVisual.lightBackground === 'rgba(0, 0, 0, 0)' ||
+    waitingVisual.labelColor === 'transparent'
   ) {
     throw new Error('waiting-for-input status is not visually prominent');
   }
@@ -282,6 +496,7 @@ try {
     throw new Error('workspace menu contains nested interactive buttons');
   }
   await firstWorkspaceMenuEntry.hover();
+  await page.waitForTimeout(180);
   const workspaceActions = firstWorkspaceMenuEntry.locator('.workspace-actions');
   const [workspaceEntryBox, workspaceActionsBox, workspaceActionsOpacity] = await Promise.all([
     firstWorkspaceMenuEntry.boundingBox(),
@@ -295,7 +510,13 @@ try {
     workspaceActionsBox.x + workspaceActionsBox.width >
       workspaceEntryBox.x + workspaceEntryBox.width + 1
   ) {
-    throw new Error('workspace menu actions are hidden or overflow their entry');
+    throw new Error(
+      `workspace menu actions are hidden or overflow their entry: ${JSON.stringify({
+        workspaceEntryBox,
+        workspaceActionsBox,
+        workspaceActionsOpacity,
+      })}`,
+    );
   }
 
   const toast = page.locator('.app-toast-region > .app-toast.alert');

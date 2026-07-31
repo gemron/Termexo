@@ -11,7 +11,7 @@
 </p>
 
 <p align="center">
-  <img alt="Version 0.3.6" src="https://img.shields.io/badge/version-0.3.6-58c7a0">
+  <img alt="Version 0.3.7" src="https://img.shields.io/badge/version-0.3.7-58c7a0">
   <img alt="Windows" src="https://img.shields.io/badge/platform-Windows-0078D4?logo=windows">
   <img alt="Tauri 2" src="https://img.shields.io/badge/Tauri-2-24C8DB?logo=tauri&logoColor=white">
   <img alt="Angular 22" src="https://img.shields.io/badge/Angular-22-DD0031?logo=angular">
@@ -27,15 +27,34 @@ quota visibility, secure workspace sharing, and access from trusted computers an
 Local project data and credentials remain protected by explicit device, permission, and
 encryption boundaries.
 
-> The latest published release is **V0.3.6, the secure credential recovery update**.
-> Model profiles now verify their actual Windows secure-storage entry and guide users to re-enter
-> an API key when a previously stored credential is missing.
+> The latest published release is **V0.3.7, the workspace continuity, status, and theme update**.
+> Workspaces now preserve terminal interaction across switches, surface global Agent attention
+> notices, track Codex turn completion through its native notification channel, and apply one
+> workspace color across the complete desktop and CLI terminal.
 
 ![Termexo multi-terminal grid workbench](docs/images/termexo-workbench-v0.3.2.png)
 
 <p align="center">
   <sub>Four active Claude Code and Codex terminals in a configurable 2 × 2 grid with explicit pane selection and the Inspector.</sub>
 </p>
+
+## V0.3.7 Updates
+
+- Add safe workspace deletion and a native folder picker when creating a workspace.
+- Surface waiting-input, approval, and completed terminals across every workspace through a global
+  attention center and prominent notifications.
+- Keep workspace terminal views mounted, stabilize xterm sizing and focus after workspace switches,
+  and restore reliable mouse-wheel scrollback without selecting an unrelated pane.
+- Align the animated terminal status indicator before the title and improve its running-state
+  background treatment.
+- Integrate Codex's native `agent-turn-complete` notification so new and resumed sessions reliably
+  transition from running or thinking to completed.
+- Regenerate restored Codex launch commands before terminal mounting so existing workspaces also
+  receive native completion events instead of remaining in a stale running state.
+- Route a missing MiniMax or other compatible-provider API key directly to the affected Profile,
+  require a replacement before saving or switching, and keep the value in Windows secure storage.
+- Turn each workspace color into a complete application theme, including DaisyUI surfaces, sidebars,
+  dialogs, terminal background, selection, ANSI accents, and cursor.
 
 ## V0.3.6 Updates
 
@@ -176,8 +195,8 @@ a local control plane that is observable, recoverable, and extensible.
 ## Current Boundaries
 
 - Claude Code remains the most complete event Adapter. Codex supports native detection,
-  model/account-aware launch, multi-account local session discovery, and resume; Codex
-  hooks and unified runtime events are not implemented yet.
+  model/account-aware launch, multi-account local session discovery, resume, and native
+  turn-completion events; tool, approval, and rate-limit event parity is still limited.
 - When the app exits, terminated operating-system processes are not “fake restored.”
   Termexo restores terminal configuration; historical Claude sessions must be resumed
   explicitly from the session center.
@@ -295,16 +314,16 @@ identifiers still use a legacy name. This does not affect the Termexo product na
 
 ## Roadmap
 
-| Version | Goal                                                             | Status   |
-| ------- | ---------------------------------------------------------------- | -------- |
-| V0.1    | Workspace, multi-terminal, PTY, and SQLite foundation            | Complete |
-| V0.2    | Claude detection, session resume, hooks, and profiles            | Complete |
-| V0.3    | Codex CLI adapter and unified Claude/Codex session center        | Current  |
+| Version | Goal                                                                           | Status      |
+| ------- | ------------------------------------------------------------------------------ | ----------- |
+| V0.1    | Workspace, multi-terminal, PTY, and SQLite foundation                          | Complete    |
+| V0.2    | Claude detection, session resume, hooks, and profiles                          | Complete    |
+| V0.3    | Codex CLI adapter and unified Claude/Codex session center                      | Current     |
 | V0.4    | Account/provider control, CLI/network lifecycle, rollback, and Plan visibility | In progress |
-| V0.5    | Session summaries and cross-agent migration                      | Planned  |
-| V0.6    | Multi-agent collaboration, task orchestration, and notifications | Planned  |
-| V0.7    | Workspace sharing, remote computers, and mobile access           | Planned  |
-| V1.0    | Stable release, security hardening, and complete recovery UX     | Planned  |
+| V0.5    | Session summaries and cross-agent migration                                    | Planned     |
+| V0.6    | Multi-agent collaboration, task orchestration, and notifications               | Planned     |
+| V0.7    | Workspace sharing, remote computers, and mobile access                         | Planned     |
+| V1.0    | Stable release, security hardening, and complete recovery UX                   | Planned     |
 
 ## Repository Layout
 

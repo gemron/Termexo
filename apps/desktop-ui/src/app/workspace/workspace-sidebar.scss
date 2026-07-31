@@ -142,7 +142,7 @@ nav {
   align-items: center;
   justify-content: stretch;
   gap: 7px;
-  padding: 7px 72px 7px 7px;
+  padding: 7px 94px 7px 7px;
   border: 1px solid transparent;
   border-radius: var(--radius-field);
   color: var(--text-secondary);
@@ -209,6 +209,8 @@ nav {
   right: 6px;
   display: flex;
   align-items: center;
+  gap: 0;
+  padding: 0;
   opacity: 0;
   pointer-events: none;
   transform: translateY(-50%);
@@ -225,7 +227,9 @@ nav {
 .workspace-order-actions {
   display: grid;
   width: 20px;
+  min-width: 20px;
   height: 24px;
+  flex: 0 0 20px;
   grid-template-rows: repeat(2, 12px);
   color: var(--text-muted);
 }
@@ -257,10 +261,13 @@ nav {
   }
 }
 
-.workspace-action {
+.workspace-list .workspace-action {
   display: grid;
   width: 22px;
+  min-width: 22px;
   height: 22px;
+  min-height: 22px;
+  flex: 0 0 22px;
   padding: 0;
   place-items: center;
   border: 0;
@@ -278,6 +285,12 @@ nav {
 
 .favorite.selected {
   color: var(--warning);
+}
+
+.delete:hover,
+.delete:focus-visible {
+  color: var(--color-error);
+  background: color-mix(in srgb, var(--color-error) 12%, transparent);
 }
 
 .edit {

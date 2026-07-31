@@ -18,6 +18,8 @@ pub enum HookError {
     LockPoisoned,
     #[error("hook command arguments are incomplete")]
     InvalidArguments,
+    #[error("Codex notification command contains an unsupported TOML delimiter")]
+    InvalidNotifyValue,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -43,6 +45,8 @@ pub struct ClaudeRuntimeSettings {
 #[serde(rename_all = "camelCase")]
 struct StoredHookEvent {
     event_key: String,
+    #[serde(default)]
+    agent_type: Option<String>,
     terminal_id: String,
     received_at: i64,
     payload: Value,
@@ -111,6 +115,30 @@ impl HookEventStore {
         })
     }
 
+    pub fn codex_notify_config(&self, terminal_id: &str) -> Result<String, HookError> {
+        let executable = std::env::current_exe()?;
+        let command = vec![
+            executable.to_string_lossy().into_owned(),
+            "codex-notify".into(),
+            "--event-file".into(),
+            self.event_file.to_string_lossy().into_owned(),
+            "--terminal-id".into(),
+            terminal_id.into(),
+        ];
+        // Literal TOML strings survive the Windows npm `.cmd` shim; JSON-style
+        // double quotes are stripped before Codex receives the override.
+        let values = command
+            .iter()
+            .map(|value| {
+                (!value.contains("'''"))
+                    .then(|| format!("'''{value}'''"))
+                    .ok_or(HookError::InvalidNotifyValue)
+            })
+            .collect::<Result<Vec<_>, _>>()?
+            .join(",");
+        Ok(format!("notify=[{values}]"))
+    }
+
     pub fn write_mcp_config(
         &self,
         terminal_id: &str,
@@ -170,9 +198,32 @@ pub fn capture_hook_event_from_cli() -> Result<(), HookError> {
     let mut input = String::new();
     std::io::stdin().read_to_string(&mut input)?;
     let payload = serde_json::from_str(&input).unwrap_or_else(|_| json!({ "raw": input }));
+    append_stored_event(&event_file, terminal_id, "claude", payload)
+}
+
+pub fn capture_codex_notification_from_cli() -> Result<(), HookError> {
+    let arguments = std::env::args().skip(2).collect::<Vec<_>>();
+    let event_file =
+        argument_value(&arguments, "--event-file").ok_or(HookError::InvalidArguments)?;
+    let terminal_id =
+        argument_value(&arguments, "--terminal-id").ok_or(HookError::InvalidArguments)?;
+    let payload = arguments
+        .last()
+        .ok_or(HookError::InvalidArguments)
+        .and_then(|value| serde_json::from_str(value).map_err(HookError::from))?;
+    append_stored_event(&event_file, terminal_id, "codex", payload)
+}
+
+fn append_stored_event(
+    event_file: &str,
+    terminal_id: String,
+    agent_type: &str,
+    payload: Value,
+) -> Result<(), HookError> {
     let received_at = unix_timestamp_millis();
     let event = StoredHookEvent {
         event_key: format!("{received_at}-{}", std::process::id()),
+        agent_type: Some(agent_type.into()),
         terminal_id,
         received_at,
         payload,
@@ -192,6 +243,10 @@ pub fn capture_hook_event_from_cli() -> Result<(), HookError> {
 }
 
 fn map_hook_event(stored: StoredHookEvent) -> AgentEvent {
+    if stored.agent_type.as_deref() == Some("codex") {
+        return map_codex_event(stored);
+    }
+
     let hook_name = stored
         .payload
         .get("hook_event_name")
@@ -225,6 +280,26 @@ fn map_hook_event(stored: StoredHookEvent) -> AgentEvent {
         native_session_id: stored
             .payload
             .get("session_id")
+            .and_then(Value::as_str)
+            .map(str::to_owned),
+        terminal_id: stored.terminal_id,
+        event_type: event_type.into(),
+        detail: stored.payload,
+        created_at: stored.received_at,
+    }
+}
+
+fn map_codex_event(stored: StoredHookEvent) -> AgentEvent {
+    let event_type = match stored.payload.get("type").and_then(Value::as_str) {
+        Some("agent-turn-complete") => "task.completed",
+        _ => "agent.notification",
+    };
+    AgentEvent {
+        event_key: stored.event_key,
+        agent_type: "codex".into(),
+        native_session_id: stored
+            .payload
+            .get("thread-id")
             .and_then(Value::as_str)
             .map(str::to_owned),
         terminal_id: stored.terminal_id,
@@ -288,6 +363,7 @@ mod tests {
     fn maps_permission_notifications_to_approval_events() {
         let stored = StoredHookEvent {
             event_key: "event-1".into(),
+            agent_type: None,
             terminal_id: "terminal-1".into(),
             received_at: 10,
             payload: json!({
@@ -307,6 +383,7 @@ mod tests {
     fn maps_rate_limit_stop_failures_to_retryable_events() {
         let stored = StoredHookEvent {
             event_key: "event-rate-limit".into(),
+            agent_type: None,
             terminal_id: "terminal-1".into(),
             received_at: 10,
             payload: json!({
@@ -326,6 +403,7 @@ mod tests {
     fn maps_timeout_stop_failures_to_waiting_events() {
         let stored = StoredHookEvent {
             event_key: "event-timeout".into(),
+            agent_type: None,
             terminal_id: "terminal-1".into(),
             received_at: 10,
             payload: json!({
@@ -357,11 +435,48 @@ mod tests {
     }
 
     #[test]
+    fn builds_a_codex_notify_override_for_the_terminal() {
+        let directory = test_directory("codex-notify");
+        let store = HookEventStore::new(&directory).unwrap();
+
+        let config = store.codex_notify_config("terminal-9").unwrap();
+
+        assert!(config.starts_with("notify=["));
+        assert!(config.contains("'''"));
+        assert!(config.contains("codex-notify"));
+        assert!(config.contains("terminal-9"));
+
+        fs::remove_dir_all(directory).unwrap();
+    }
+
+    #[test]
+    fn maps_codex_turn_completion_to_a_completed_agent_event() {
+        let stored = StoredHookEvent {
+            event_key: "event-codex-complete".into(),
+            agent_type: Some("codex".into()),
+            terminal_id: "terminal-codex".into(),
+            received_at: 10,
+            payload: json!({
+                "type": "agent-turn-complete",
+                "thread-id": "thread-1",
+                "turn-id": "turn-1"
+            }),
+        };
+
+        let event = map_hook_event(stored);
+
+        assert_eq!(event.agent_type, "codex");
+        assert_eq!(event.event_type, "task.completed");
+        assert_eq!(event.native_session_id.as_deref(), Some("thread-1"));
+    }
+
+    #[test]
     fn waits_for_a_complete_hook_event_before_advancing_the_cursor() {
         let directory = test_directory("partial-hook");
         let store = HookEventStore::new(&directory).unwrap();
         let stored = StoredHookEvent {
             event_key: "event-partial".into(),
+            agent_type: None,
             terminal_id: "terminal-1".into(),
             received_at: 10,
             payload: json!({

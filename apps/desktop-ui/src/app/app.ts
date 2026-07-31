@@ -21,18 +21,26 @@ import {
   normalizeTerminalFontSize,
   normalizeTerminalGridDimension,
   normalizeWorkspaceThemeColor,
+  TERMINAL_STATUS_LABELS,
+  Workspace,
 } from './core/models/workspace.models';
+import {
+  collectGlobalTerminalNotices,
+  GlobalTerminalNotice,
+} from './core/models/terminal-notifications';
+import { createAppThemePalette } from './core/models/theme-palette';
 import { AgentService } from './core/services/agent.service';
 import { AppStateService } from './core/services/app-state.service';
 import { DirectoryPickerService } from './core/services/directory-picker.service';
 import { TerminalGatewayService } from './core/services/terminal-gateway.service';
-import { AgentSettingsDialogComponent } from './dialogs/agent-settings-dialog';
+import { AgentSettingsDialogComponent, SettingsTab } from './dialogs/agent-settings-dialog';
 import {
   ClaudeLaunchDialogComponent,
   ClaudeLaunchDialogValue,
 } from './dialogs/claude-launch-dialog';
 import { CodexLaunchDialogComponent, CodexLaunchDialogValue } from './dialogs/codex-launch-dialog';
 import { CreateWorkspaceDialogComponent } from './dialogs/create-workspace-dialog';
+import { DeleteWorkspaceDialogComponent } from './dialogs/delete-workspace-dialog';
 import {
   EditWorkspaceDialogComponent,
   WorkspaceAppearanceValue,
@@ -83,6 +91,7 @@ function readStoredWidth(key: string, fallback: number, min: number, max: number
     ClaudeLaunchDialogComponent,
     CodexLaunchDialogComponent,
     CreateWorkspaceDialogComponent,
+    DeleteWorkspaceDialogComponent,
     EditWorkspaceDialogComponent,
     IconComponent,
     InspectorPanelComponent,
@@ -95,8 +104,19 @@ function readStoredWidth(key: string, fallback: number, min: number, max: number
   styleUrl: './app.scss',
   host: {
     'data-theme': 'termexo',
-    '[style.--color-primary]': 'workspaceThemeColor()',
-    '[style.--color-accent]': 'workspaceThemeColor()',
+    '[style.--color-primary]': 'workspaceThemePalette().accent',
+    '[style.--color-accent]': 'workspaceThemePalette().accent',
+    '[style.--accent]': 'workspaceThemePalette().accent',
+    '[style.--color-base-100]': 'workspaceThemePalette().surface0',
+    '[style.--color-base-200]': 'workspaceThemePalette().surface1',
+    '[style.--color-base-300]': 'workspaceThemePalette().surface2',
+    '[style.--surface-0]': 'workspaceThemePalette().surface0',
+    '[style.--surface-1]': 'workspaceThemePalette().surface1',
+    '[style.--surface-2]': 'workspaceThemePalette().surface2',
+    '[style.--surface-raised]': 'workspaceThemePalette().surfaceRaised',
+    '[style.--surface-inset]': 'workspaceThemePalette().surfaceInset',
+    '[style.--sidebar]': 'workspaceThemePalette().sidebar',
+    '[style.--primary-soft]': 'workspaceThemePalette().primarySoft',
   },
 })
 export class App {
@@ -107,6 +127,8 @@ export class App {
   private readonly handledEventKeys = new Set<string>();
   private readonly eventStatusCutoff = Date.now();
   private readonly preferredTerminalIds = signal<Record<string, string[]>>({});
+  private readonly mountedWorkspaceIds = signal<string[]>([]);
+  private previousGlobalNoticeKeys = new Set<string>();
   private resizeStartX = 0;
   private resizeStartWidth = 0;
 
@@ -116,6 +138,8 @@ export class App {
   protected readonly codexLaunchOpen = signal(false);
   protected readonly sessionCenterOpen = signal(false);
   protected readonly settingsOpen = signal(false);
+  protected readonly settingsInitialTab = signal<SettingsTab>('diagnostics');
+  protected readonly settingsInitialModelProfileId = signal('');
   protected readonly modelSwitchOpen = signal(false);
   protected readonly agentMenuOpen = signal(false);
   protected readonly workspaceSidebarOpen = signal(
@@ -153,10 +177,34 @@ export class App {
   protected readonly launchingCodex = signal(false);
   protected readonly selectedTerminalDirectory = signal<string | null>(null);
   protected readonly toastMessage = signal<string | null>(null);
+  protected readonly toastTone = signal<'success' | 'attention'>('success');
+  protected readonly globalNoticeOpen = signal(false);
+  protected readonly workspacePendingDeletion = signal<Workspace | null>(null);
+  protected readonly deletingWorkspace = signal(false);
   protected readonly networkTestResult = signal<NetworkTestResult | null>(null);
   protected readonly cliOperationPlan = signal<CliOperationPlan | null>(null);
   protected readonly cliOperationResult = signal<CliOperationResult | null>(null);
   protected readonly activeTerminalId = computed(() => this.state.activeTerminal()?.id ?? null);
+  protected readonly mountedWorkspaces = computed(() => {
+    const mountedIds = new Set(this.mountedWorkspaceIds());
+    return this.state.workspaces().filter((workspace) => mountedIds.has(workspace.id));
+  });
+  protected readonly globalTerminalNotices = computed(() =>
+    collectGlobalTerminalNotices(this.state.workspaces()),
+  );
+  protected readonly globalWaitingNoticeCount = computed(
+    () => this.globalTerminalNotices().filter((notice) => notice.status !== 'COMPLETED').length,
+  );
+  protected readonly globalCompletedNoticeCount = computed(
+    () => this.globalTerminalNotices().filter((notice) => notice.status === 'COMPLETED').length,
+  );
+  protected readonly globalNoticeSummary = computed(() => {
+    const waiting = this.globalWaitingNoticeCount();
+    const completed = this.globalCompletedNoticeCount();
+    return [waiting ? `${waiting} 等待` : '', completed ? `${completed} 完成` : '']
+      .filter(Boolean)
+      .join(' · ');
+  });
   protected readonly editingWorkspace = computed(
     () =>
       this.state.workspaces().find((workspace) => workspace.id === this.editingWorkspaceId()) ??
@@ -164,6 +212,9 @@ export class App {
   );
   protected readonly workspaceThemeColor = computed(() =>
     normalizeWorkspaceThemeColor(this.state.activeWorkspace()?.themeColor),
+  );
+  protected readonly workspaceThemePalette = computed(() =>
+    createAppThemePalette(this.workspaceThemeColor()),
   );
   protected readonly minGridDimension = MIN_TERMINAL_GRID_DIMENSION;
   protected readonly maxGridDimension = MAX_TERMINAL_GRID_DIMENSION;
@@ -177,6 +228,7 @@ export class App {
   );
   protected readonly gridCapacity = computed(() => this.gridColumns() * this.gridRows());
   protected readonly gridCells = computed(() => Array.from({ length: this.gridCapacity() }));
+  protected readonly statusLabels = TERMINAL_STATUS_LABELS;
   protected readonly visibleTerminalIds = computed(() => {
     const workspace = this.state.activeWorkspace();
     if (!workspace) {
@@ -203,6 +255,23 @@ export class App {
             this.state.applyAgentEvent(event);
           }
         }
+      }
+    });
+    effect(() => {
+      const notices = this.globalTerminalNotices();
+      const currentKeys = new Set(notices.map((notice) => `${notice.terminalId}:${notice.status}`));
+      const newNotices = notices.filter(
+        (notice) => !this.previousGlobalNoticeKeys.has(`${notice.terminalId}:${notice.status}`),
+      );
+      this.previousGlobalNoticeKeys = currentKeys;
+      if (newNotices.length === 1) {
+        const notice = newNotices[0];
+        this.showToast(
+          `${notice.workspaceName} · ${notice.terminalName}：${this.statusLabels[notice.status]}`,
+          'attention',
+        );
+      } else if (newNotices.length > 1) {
+        this.showToast(`${newNotices.length} 个 Agent 状态需要关注`, 'attention');
       }
     });
   }
@@ -299,6 +368,12 @@ export class App {
       return;
     }
 
+    const profile = this.agents.modelProfiles().find((item) => item.id === value.profileId);
+    if (profile?.baseUrl && !profile.hasCredential) {
+      this.openModelCredentialSettings(profile.id, profile.name);
+      return;
+    }
+
     const terminalId = crypto.randomUUID();
     this.launchingClaude.set(true);
     try {
@@ -310,7 +385,6 @@ export class App {
         mcpProfileId: value.mcpProfileId,
         accountProfileId: value.accountProfileId,
       });
-      const profile = this.agents.modelProfiles().find((item) => item.id === value.profileId);
       const terminal = this.state.createTerminal({
         id: terminalId,
         agentType: 'claude',
@@ -355,6 +429,14 @@ export class App {
       return;
     }
 
+    const profile = isCodex
+      ? undefined
+      : this.agents.modelProfiles().find((item) => item.id === value.profileId);
+    if (profile?.baseUrl && !profile.hasCredential) {
+      this.openModelCredentialSettings(profile.id, profile.name);
+      return;
+    }
+
     const terminalId = crypto.randomUUID();
     (isCodex ? this.launchingCodex : this.launchingClaude).set(true);
     try {
@@ -374,9 +456,6 @@ export class App {
             mcpProfileId: value.mcpProfileId,
             accountProfileId: value.accountProfileId,
           });
-      const profile = isCodex
-        ? undefined
-        : this.agents.modelProfiles().find((item) => item.id === value.profileId);
       const terminal = this.state.createTerminal({
         id: terminalId,
         agentType: value.session.agentType,
@@ -592,12 +671,73 @@ export class App {
 
   protected createWorkspace(value: { name: string; projectPath: string }): void {
     this.state.createWorkspace(value.name, value.projectPath);
+    this.mountWorkspace(this.state.activeWorkspace()?.id);
     this.createWorkspaceOpen.set(false);
     this.showToast(`工作区 ${value.name} 已创建`);
   }
 
+  protected openWorkspaceDelete(workspaceId: string): void {
+    const workspace = this.state.workspaces().find((item) => item.id === workspaceId);
+    if (workspace) {
+      this.workspacePendingDeletion.set(workspace);
+    }
+  }
+
+  protected closeWorkspaceDelete(): void {
+    if (!this.deletingWorkspace()) {
+      this.workspacePendingDeletion.set(null);
+    }
+  }
+
+  protected async confirmWorkspaceDelete(): Promise<void> {
+    const workspace = this.workspacePendingDeletion();
+    if (!workspace || this.deletingWorkspace()) {
+      return;
+    }
+
+    this.deletingWorkspace.set(true);
+    try {
+      await Promise.all(
+        workspace.terminals.map((terminal) =>
+          this.terminalGateway.close(terminal.id).catch(() => undefined),
+        ),
+      );
+      const removed = await this.state.deleteWorkspace(workspace.id);
+      if (!removed) {
+        throw new Error('工作空间不存在或已被删除');
+      }
+      this.mountedWorkspaceIds.update((workspaceIds) =>
+        workspaceIds.filter((workspaceId) => workspaceId !== workspace.id),
+      );
+      this.mountWorkspace(this.state.activeWorkspace()?.id);
+      this.preferredTerminalIds.update((items) => {
+        const next = { ...items };
+        delete next[workspace.id];
+        return next;
+      });
+      this.terminalMaximized.set(false);
+      this.workspacePendingDeletion.set(null);
+      this.showToast(`工作空间 ${workspace.name} 已删除`);
+    } catch (error) {
+      this.showToast(`删除失败：${this.errorMessage(error)}`, 'attention');
+    } finally {
+      this.deletingWorkspace.set(false);
+    }
+  }
+
   protected openWorkspaceEditor(workspaceId: string): void {
     this.editingWorkspaceId.set(workspaceId);
+  }
+
+  protected selectWorkspace(workspaceId: string): void {
+    this.globalNoticeOpen.set(false);
+    this.mountWorkspace(workspaceId);
+    this.state.selectWorkspace(workspaceId);
+  }
+
+  protected openGlobalTerminalNotice(notice: GlobalTerminalNotice): void {
+    this.selectWorkspace(notice.workspaceId);
+    window.requestAnimationFrame(() => this.selectTerminal(notice.terminalId));
   }
 
   protected saveWorkspaceAppearance(value: WorkspaceAppearanceValue): void {
@@ -622,8 +762,7 @@ export class App {
       return;
     }
     if (profile.baseUrl && !profile.hasCredential) {
-      this.modelSwitchOpen.set(false);
-      this.showToast(`请先在设置中为 ${profile.name} 配置 API Key`);
+      this.openModelCredentialSettings(profile.id, profile.name);
       return;
     }
 
@@ -674,6 +813,12 @@ export class App {
     } catch (error) {
       this.showToast(this.errorMessage(error));
     }
+  }
+
+  protected openSettings(tab: SettingsTab = 'diagnostics', modelProfileId = ''): void {
+    this.settingsInitialTab.set(tab);
+    this.settingsInitialModelProfileId.set(modelProfileId);
+    this.settingsOpen.set(true);
   }
 
   protected async saveAccountProfile(input: AccountProfileInput): Promise<void> {
@@ -833,7 +978,8 @@ export class App {
     }
   }
 
-  private showToast(message: string): void {
+  private showToast(message: string, tone: 'success' | 'attention' = 'success'): void {
+    this.toastTone.set(tone);
     this.toastMessage.set(message);
     window.setTimeout(() => {
       if (this.toastMessage() === message) {
@@ -868,8 +1014,59 @@ export class App {
     }
   }
 
+  private openModelCredentialSettings(profileId: string, profileName: string): void {
+    this.claudeLaunchOpen.set(false);
+    this.sessionCenterOpen.set(false);
+    this.modelSwitchOpen.set(false);
+    this.selectedTerminalDirectory.set(null);
+    this.openSettings('models', profileId);
+    this.showToast(`模型 Profile「${profileName}」需要重新输入并保存 API Key`, 'attention');
+  }
+
   private async initialize(): Promise<void> {
     await this.state.initialize();
     await this.agents.initialize();
+    await this.refreshRestoredCodexLaunches();
+    this.mountWorkspace(this.state.activeWorkspace()?.id);
+  }
+
+  private async refreshRestoredCodexLaunches(): Promise<void> {
+    const restoredCodexTerminals = this.state
+      .workspaces()
+      .flatMap((workspace) =>
+        workspace.terminals
+          .filter((terminal) => terminal.agentType === 'codex')
+          .map((terminal) => ({ workspaceId: workspace.id, terminal })),
+      );
+    if (restoredCodexTerminals.length === 0) {
+      return;
+    }
+
+    const results = await Promise.allSettled(
+      restoredCodexTerminals.map(async ({ workspaceId, terminal }) => {
+        const launch = await this.agents.prepareCodexLaunch({
+          terminalId: terminal.id,
+          workspaceId,
+          sessionId: terminal.nativeSessionId,
+          model:
+            terminal.model && !terminal.model.includes('默认模型') ? terminal.model : undefined,
+          accountProfileId: terminal.accountProfileId,
+        });
+        if (!this.state.updateRestoredTerminalLaunch(terminal.id, launch.command)) {
+          throw new Error(`Codex 终端 ${terminal.name} 已不存在`);
+        }
+      }),
+    );
+    const failed = results.filter((result) => result.status === 'rejected').length;
+    if (failed > 0) {
+      this.showToast(`${failed} 个 Codex 终端未能恢复状态跟踪，请重新启动对应终端`, 'attention');
+    }
+  }
+
+  private mountWorkspace(workspaceId: string | undefined): void {
+    if (!workspaceId || this.mountedWorkspaceIds().includes(workspaceId)) {
+      return;
+    }
+    this.mountedWorkspaceIds.update((workspaceIds) => [...workspaceIds, workspaceId]);
   }
 }

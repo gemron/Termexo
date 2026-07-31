@@ -16,6 +16,7 @@ export class WorkspaceSidebarComponent {
   readonly workspaceSelected = output<string>();
   readonly favoriteToggled = output<string>();
   readonly editRequested = output<string>();
+  readonly deleteRequested = output<string>();
   readonly moveRequested = output<{ workspaceId: string; direction: -1 | 1 }>();
   readonly createRequested = output<void>();
   readonly settingsRequested = output<void>();

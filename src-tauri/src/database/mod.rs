@@ -146,6 +146,15 @@ impl WorkspaceDatabase {
         Ok(())
     }
 
+    pub fn delete_workspace(&self, workspace_id: &str) -> Result<(), DatabaseError> {
+        let connection = self
+            .connection
+            .lock()
+            .map_err(|_| DatabaseError::LockPoisoned)?;
+        connection.execute("DELETE FROM workspaces WHERE id = ?1", [workspace_id])?;
+        Ok(())
+    }
+
     pub fn save_agent_sessions(&self, sessions: &[AgentSession]) -> Result<(), DatabaseError> {
         let mut connection = self
             .connection
@@ -818,6 +827,11 @@ mod tests {
         assert_eq!(stored[0].name, first_workspace.name);
         assert_eq!(stored[1].name, workspace.name);
         assert_eq!(stored[1].layout, workspace.layout);
+
+        database.delete_workspace(&workspace.id).unwrap();
+        let stored_after_delete = database.list().unwrap();
+        assert_eq!(stored_after_delete.len(), 1);
+        assert_eq!(stored_after_delete[0].id, first_workspace.id);
     }
 
     #[test]

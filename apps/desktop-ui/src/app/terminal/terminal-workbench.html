@@ -15,6 +15,7 @@
         [visible]="isVisible(terminal.id)"
         [maximized]="terminalMaximized() && terminal.id === activeTerminalId()"
         [fontSize]="terminalFontSize()"
+        [themeColor]="themeColor()"
         (selected)="terminalSelected.emit($event)"
         (closeRequested)="terminalClosed.emit($event)"
         (maximizeRequested)="terminalMaximizeRequested.emit($event)"

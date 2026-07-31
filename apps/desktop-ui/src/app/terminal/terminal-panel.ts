@@ -21,7 +21,9 @@ import {
 } from '../core/models/workspace.models';
 import { TerminalGatewayService } from '../core/services/terminal-gateway.service';
 import { IconComponent } from '../shared/icon/icon';
+import { TerminalResizeCoordinator } from './terminal-resize-coordinator';
 import { detectTerminalRuntimeIssue, TerminalRuntimeIssue } from './terminal-runtime-diagnostics';
+import { createTerminalTheme } from './terminal-theme';
 
 @Component({
   selector: 'app-terminal-panel',
@@ -40,29 +42,28 @@ export class TerminalPanelComponent implements AfterViewInit {
     fontSize: 12,
     lineHeight: 1.35,
     scrollback: 10_000,
-    scrollOnUserInput: false,
-    smoothScrollDuration: 90,
+    scrollOnUserInput: true,
+    smoothScrollDuration: 0,
     minimumContrastRatio: 4.5,
     allowTransparency: true,
-    theme: {
-      background: '#101312',
-      foreground: '#c9cecb',
-      cursor: '#58c7a0',
-      cursorAccent: '#101312',
-      selectionBackground: '#31594c',
-      black: '#151817',
-      red: '#e06c75',
-      green: '#70bd91',
-      yellow: '#d6a34a',
-      blue: '#68a9e8',
-      magenta: '#b494d6',
-      cyan: '#61b8b5',
-      white: '#d8dcd9',
-      brightBlack: '#656b68',
-    },
+    theme: createTerminalTheme(undefined),
   });
   private readonly fitAddon = new FitAddon();
+  private readonly resizeCoordinator = new TerminalResizeCoordinator(
+    ({ cols, rows }) => this.gateway.resize(this.session().id, cols, rows),
+    (error) => {
+      if (!this.destroyRef.destroyed) {
+        console.warn('Terminal resize failed', {
+          terminalId: this.session().id,
+          error: this.errorMessage(error),
+        });
+      }
+    },
+  );
   private resizeObserver?: ResizeObserver;
+  private fitFrame?: number;
+  private stabilizationFrame?: number;
+  private activationFrame?: number;
   private runtimeReady = false;
   private viewReady = false;
   private outputTail = '';
@@ -73,6 +74,7 @@ export class TerminalPanelComponent implements AfterViewInit {
   readonly visible = input(true);
   readonly maximized = input(false);
   readonly fontSize = input(12);
+  readonly themeColor = input<string>();
   readonly selected = output<string>();
   readonly closeRequested = output<string>();
   readonly maximizeRequested = output<string>();
@@ -88,17 +90,40 @@ export class TerminalPanelComponent implements AfterViewInit {
         this.scheduleFit();
       }
     });
+    effect(() => {
+      this.terminal.options.theme = createTerminalTheme(this.themeColor());
+      if (this.viewReady && this.visible()) {
+        this.terminal.refresh(0, Math.max(0, this.terminal.rows - 1));
+      }
+    });
+    effect(() => {
+      const shouldActivate = this.active() && this.visible();
+      if (this.viewReady && shouldActivate) {
+        this.scheduleActivation();
+      }
+    });
   }
 
   ngAfterViewInit(): void {
     this.viewReady = true;
     this.terminal.loadAddon(this.fitAddon);
-    this.terminal.open(this.container().nativeElement);
+    const terminalContainer = this.container().nativeElement;
+    this.terminal.open(terminalContainer);
+    terminalContainer.addEventListener('wheel', this.prepareWheelInteraction, {
+      capture: true,
+      passive: true,
+    });
+    terminalContainer.addEventListener('wheel', this.stopWheelPropagation, { passive: true });
     this.fitTerminal();
+    this.scheduleFit();
+    if (this.active() && this.visible()) {
+      this.scheduleActivation();
+    }
 
     void this.initializeRuntime();
     const inputDisposable = this.terminal.onData((data) => {
       if (data.includes('\r')) {
+        this.terminal.scrollToBottom();
         this.runtimeNotice.set(null);
         this.lastRuntimeIssue = null;
         this.outputTail = '';
@@ -110,19 +135,30 @@ export class TerminalPanelComponent implements AfterViewInit {
       void this.gateway.write(this.session(), data);
     });
 
-    this.resizeObserver = new ResizeObserver(() => this.fitTerminal());
-    this.resizeObserver.observe(this.container().nativeElement);
+    this.resizeObserver = new ResizeObserver(() => this.scheduleFit(false));
+    this.resizeObserver.observe(terminalContainer);
 
     this.destroyRef.onDestroy(() => {
       inputDisposable.dispose();
       this.resizeObserver?.disconnect();
+      terminalContainer.removeEventListener('wheel', this.prepareWheelInteraction, true);
+      terminalContainer.removeEventListener('wheel', this.stopWheelPropagation);
+      this.resizeCoordinator.dispose();
+      if (this.fitFrame !== undefined) {
+        window.cancelAnimationFrame(this.fitFrame);
+      }
+      if (this.stabilizationFrame !== undefined) {
+        window.cancelAnimationFrame(this.stabilizationFrame);
+      }
+      if (this.activationFrame !== undefined) {
+        window.cancelAnimationFrame(this.activationFrame);
+      }
       this.terminal.dispose();
     });
   }
 
   focus(): void {
-    this.selected.emit(this.session().id);
-    this.terminal.focus();
+    this.activateTerminal();
   }
 
   protected dismissRuntimeNotice(): void {
@@ -171,25 +207,70 @@ export class TerminalPanelComponent implements AfterViewInit {
         this.terminal.refresh(0, this.terminal.rows - 1);
       }
       if (this.runtimeReady) {
-        void this.resizeRuntime();
+        this.resizeCoordinator.schedule({
+          cols: this.terminal.cols,
+          rows: this.terminal.rows,
+        });
       }
     } catch {
       // The container may be temporarily hidden while the layout is changing.
     }
   }
 
-  private scheduleFit(): void {
-    window.requestAnimationFrame(() => {
+  private scheduleFit(stabilize = true): void {
+    if (this.fitFrame !== undefined) {
+      window.cancelAnimationFrame(this.fitFrame);
+    }
+    this.fitFrame = window.requestAnimationFrame(() => {
+      this.fitFrame = undefined;
       if (this.destroyRef.destroyed || !this.visible()) {
         return;
       }
       this.fitTerminal();
-      window.requestAnimationFrame(() => {
-        if (!this.destroyRef.destroyed && this.visible()) {
-          this.fitTerminal();
+      if (stabilize) {
+        if (this.stabilizationFrame !== undefined) {
+          window.cancelAnimationFrame(this.stabilizationFrame);
         }
-      });
+        this.stabilizationFrame = window.requestAnimationFrame(() => {
+          this.stabilizationFrame = undefined;
+          if (!this.destroyRef.destroyed && this.visible()) {
+            this.fitTerminal();
+          }
+        });
+      }
     });
+  }
+
+  private readonly stopWheelPropagation = (event: WheelEvent): void => {
+    event.stopPropagation();
+  };
+
+  private readonly prepareWheelInteraction = (): void => {
+    this.activateTerminal();
+  };
+
+  private scheduleActivation(): void {
+    if (this.activationFrame !== undefined) {
+      window.cancelAnimationFrame(this.activationFrame);
+    }
+    this.activationFrame = window.requestAnimationFrame(() => {
+      this.activationFrame = undefined;
+      if (this.destroyRef.destroyed || !this.active() || !this.visible()) {
+        return;
+      }
+      this.fitTerminal();
+      this.terminal.focus();
+    });
+  }
+
+  private activateTerminal(): void {
+    if (this.destroyRef.destroyed || !this.visible()) {
+      return;
+    }
+    if (!this.active()) {
+      this.selected.emit(this.session().id);
+    }
+    this.terminal.focus();
   }
 
   private handleOutput(data: string): void {
@@ -213,18 +294,5 @@ export class TerminalPanelComponent implements AfterViewInit {
 
   private errorMessage(error: unknown): string {
     return error instanceof Error ? error.message : String(error);
-  }
-
-  private async resizeRuntime(): Promise<void> {
-    try {
-      await this.gateway.resize(this.session().id, this.terminal.cols, this.terminal.rows);
-    } catch (error) {
-      if (!this.destroyRef.destroyed) {
-        console.warn('Terminal resize failed', {
-          terminalId: this.session().id,
-          error: this.errorMessage(error),
-        });
-      }
-    }
   }
 }

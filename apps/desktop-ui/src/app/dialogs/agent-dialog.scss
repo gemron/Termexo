@@ -929,9 +929,21 @@ button:disabled {
       background: var(--surface-2);
     }
 
+    &.credential-missing {
+      box-shadow: inset 2px 0 var(--color-warning);
+    }
+
     strong,
     small {
       display: block;
+    }
+
+    .credential-state {
+      color: var(--color-warning);
+
+      &.ready {
+        color: var(--color-success);
+      }
     }
 
     strong {
@@ -961,6 +973,34 @@ button:disabled {
 
   > label {
     margin-top: 13px;
+  }
+}
+
+.credential-warning {
+  display: flex;
+  align-items: flex-start;
+  gap: 9px;
+  margin-top: 10px;
+  padding: 10px;
+  border: 1px solid color-mix(in oklab, var(--color-warning) 46%, var(--border));
+  border-radius: var(--radius-box);
+  color: var(--color-warning);
+  background: var(--warning-soft);
+
+  strong,
+  span {
+    display: block;
+  }
+
+  strong {
+    font-size: 10px;
+  }
+
+  span {
+    margin-top: 4px;
+    color: var(--text-secondary);
+    font-size: 9px;
+    line-height: 1.45;
   }
 }
 

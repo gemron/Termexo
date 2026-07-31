@@ -142,66 +142,81 @@ header {
   }
 }
 
-.status {
-  display: flex;
-  align-items: center;
-  gap: 5px;
-  color: var(--text-muted);
-  font-size: 10px;
-  white-space: nowrap;
+.status-indicator {
+  display: grid;
+  width: 11px;
+  height: 14px;
+  flex: 0 0 11px;
+  place-items: center;
 
-  i {
-    width: 5px;
-    height: 5px;
+  .status-light {
+    width: 7px;
+    height: 7px;
+    display: block;
     border-radius: 50%;
-    background: var(--color-neutral-content);
+    color: var(--color-neutral-content);
+    background: currentColor;
+    box-shadow: 0 0 0 2px color-mix(in srgb, currentColor 14%, transparent);
   }
 
-  &[data-status='RUNNING'] i,
-  &[data-status='THINKING'] i {
-    background: var(--accent);
+  &[data-status='STARTING'] .status-light {
+    color: var(--color-warning);
+    animation: terminal-status-light 1.4s ease-in-out infinite;
   }
 
-  &[data-status='WAITING_INPUT'] i {
-    background: var(--info);
+  &[data-status='RUNNING'] .status-light {
+    color: var(--color-success);
+    animation: terminal-status-light 1.8s ease-in-out infinite;
   }
 
-  &[data-status='WAITING_APPROVAL'] i {
-    background: var(--warning);
+  &[data-status='THINKING'] .status-light {
+    color: var(--accent);
+    animation: terminal-status-light 1.15s ease-in-out infinite;
   }
+
+  &[data-status='WAITING_INPUT'] .status-light {
+    color: var(--info);
+  }
+
+  &[data-status='WAITING_APPROVAL'] .status-light {
+    color: var(--warning);
+  }
+
+  &[data-status='RATE_LIMITED'] .status-light {
+    color: var(--color-error);
+  }
+
+  &[data-status='COMPLETED'] .status-light {
+    color: var(--color-success);
+  }
+
+  &[data-status='FAILED'] .status-light {
+    color: var(--danger);
+  }
+}
+
+.status-label {
+  flex: 0 0 auto;
+  color: var(--text-muted);
+  background: transparent;
+  font-size: 10px;
+  line-height: 1;
+  white-space: nowrap;
 
   &[data-status='WAITING_INPUT'],
   &[data-status='WAITING_APPROVAL'] {
-    border-color: color-mix(in srgb, var(--color-warning) 46%, var(--border));
     color: color-mix(in srgb, var(--color-warning) 78%, var(--text));
-    background: color-mix(in srgb, var(--color-warning) 13%, var(--surface-raised));
     font-weight: 700;
   }
 
   &[data-status='RATE_LIMITED'] {
-    border-color: color-mix(in srgb, var(--color-error) 52%, var(--border));
     color: color-mix(in srgb, var(--color-error) 82%, var(--text));
-    background: color-mix(in srgb, var(--color-error) 13%, var(--surface-raised));
     font-weight: 700;
-
-    i {
-      background: var(--color-error);
-    }
   }
 
   &[data-status='COMPLETED'] {
-    border-color: color-mix(in srgb, var(--color-success) 46%, var(--border));
     color: color-mix(in srgb, var(--color-success) 82%, var(--text));
-    background: color-mix(in srgb, var(--color-success) 13%, var(--surface-raised));
     font-weight: 700;
-
-    i {
-      background: var(--color-success);
-    }
-  }
-
-  &[data-status='FAILED'] i {
-    background: var(--danger);
   }
 }
 
@@ -323,6 +338,23 @@ footer {
   }
 }
 
+@keyframes terminal-status-light {
+  0%,
+  100% {
+    opacity: 0.48;
+    transform: scale(0.82);
+    box-shadow: 0 0 0 1px color-mix(in srgb, currentColor 10%, transparent);
+  }
+
+  50% {
+    opacity: 1;
+    transform: scale(1);
+    box-shadow:
+      0 0 0 3px color-mix(in srgb, currentColor 15%, transparent),
+      0 0 9px currentColor;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .terminal-panel {
     animation: none;
@@ -331,6 +363,12 @@ footer {
   .terminal-panel.active .terminal-identity strong {
     color: color-mix(in srgb, var(--accent) 72%, white);
     text-shadow: none;
+    animation: none;
+  }
+
+  .status-indicator .status-light {
+    opacity: 1;
+    transform: none;
     animation: none;
   }
 }

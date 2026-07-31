@@ -9,6 +9,7 @@ describe('AppStateService', () => {
     list: vi.fn().mockResolvedValue([]),
     save: vi.fn().mockResolvedValue(undefined),
     saveAll: vi.fn().mockResolvedValue(undefined),
+    delete: vi.fn().mockResolvedValue(undefined),
   };
 
   beforeEach(() => {
@@ -154,6 +155,56 @@ describe('AppStateService', () => {
     expect(service.workspaces().map((workspace) => workspace.id)).toEqual(workspaceIds);
   });
 
+  it('updates a running terminal after its workspace becomes inactive', async () => {
+    await service.initialize();
+    const terminal = service.createTerminal({ agentType: 'claude' })!;
+    const terminalWorkspaceId = service.activeWorkspace()!.id;
+    const inactiveWorkspaceId = service.workspaces().at(-1)!.id;
+
+    service.selectWorkspace(inactiveWorkspaceId);
+    service.updateTerminalStatus(terminal.id, 'COMPLETED');
+
+    expect(service.activeWorkspace()?.id).toBe(inactiveWorkspaceId);
+    expect(
+      service
+        .workspaces()
+        .find((workspace) => workspace.id === terminalWorkspaceId)
+        ?.terminals.find((item) => item.id === terminal.id)?.status,
+    ).toBe('COMPLETED');
+    expect(repository.save).toHaveBeenLastCalledWith(
+      expect.objectContaining({ id: terminalWorkspaceId }),
+    );
+  });
+
+  it('replaces a restored Codex command before the terminal runtime is mounted', async () => {
+    await service.initialize();
+    const terminal = service.createTerminal({
+      agentType: 'codex',
+      command: "codex --model 'gpt-5.6-sol'",
+    })!;
+
+    const updated = service.updateRestoredTerminalLaunch(
+      terminal.id,
+      "codex -c 'notify=[...]' --model 'gpt-5.6-sol'",
+    );
+
+    expect(updated).toBe(true);
+    expect(service.activeTerminal()).toEqual(
+      expect.objectContaining({
+        id: terminal.id,
+        command: "codex -c 'notify=[...]' --model 'gpt-5.6-sol'",
+        status: 'STARTING',
+      }),
+    );
+    expect(repository.save).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        terminals: expect.arrayContaining([
+          expect.objectContaining({ id: terminal.id, command: expect.stringContaining('notify') }),
+        ]),
+      }),
+    );
+  });
+
   it('moves a workspace manually and persists the new order', async () => {
     await service.initialize();
     repository.saveAll.mockClear();
@@ -171,6 +222,31 @@ describe('AppStateService', () => {
     expect(repository.saveAll).toHaveBeenCalledWith(
       service.workspaces().map((workspace) => expect.objectContaining({ id: workspace.id })),
     );
+  });
+
+  it('deletes a workspace and selects a remaining workspace', async () => {
+    await service.initialize();
+    const deletedWorkspace = service.activeWorkspace()!;
+
+    const removed = await service.deleteWorkspace(deletedWorkspace.id);
+
+    expect(removed?.id).toBe(deletedWorkspace.id);
+    expect(service.workspaces().some((workspace) => workspace.id === deletedWorkspace.id)).toBe(
+      false,
+    );
+    expect(service.activeWorkspace()).not.toBeNull();
+    expect(repository.delete).toHaveBeenCalledWith(deletedWorkspace.id);
+  });
+
+  it('keeps a workspace when persistent deletion fails', async () => {
+    await service.initialize();
+    const workspace = service.activeWorkspace()!;
+    repository.delete.mockRejectedValueOnce(new Error('database unavailable'));
+
+    await expect(service.deleteWorkspace(workspace.id)).rejects.toThrow('database unavailable');
+
+    expect(service.workspaces().some((item) => item.id === workspace.id)).toBe(true);
+    expect(service.activeWorkspace()?.id).toBe(workspace.id);
   });
 
   it('restarts a Claude terminal with a new profile without changing the CLI type', async () => {

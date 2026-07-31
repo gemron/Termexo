@@ -76,6 +76,15 @@
             </button>
             <button
               type="button"
+              class="workspace-action delete"
+              title="删除工作空间"
+              aria-label="删除工作空间"
+              (click)="deleteRequested.emit(workspace.id)"
+            >
+              <app-icon name="trash" [size]="12" />
+            </button>
+            <button
+              type="button"
               class="workspace-action favorite"
               [class.selected]="workspace.favorite"
               [attr.aria-label]="workspace.favorite ? '取消收藏' : '收藏'"

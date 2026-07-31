@@ -29,7 +29,7 @@ export interface WorkspaceAppearanceValue {
         <header>
           <div>
             <h2 id="edit-workspace-dialog-title">编辑工作区</h2>
-            <p>修改工作区名称和独立主题颜色。</p>
+            <p>修改工作区名称和应用主题；颜色会同步到整个界面与 CLI 终端。</p>
           </div>
           <button
             type="button"
@@ -60,7 +60,7 @@ export interface WorkspaceAppearanceValue {
         </div>
 
         <fieldset>
-          <legend>主题颜色</legend>
+          <legend>应用与终端主题颜色</legend>
           <div class="theme-presets">
             @for (preset of themePresets; track preset.color) {
               <button

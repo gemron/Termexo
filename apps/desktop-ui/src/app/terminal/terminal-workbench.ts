@@ -23,6 +23,7 @@ export class TerminalWorkbenchComponent {
   readonly visibleTerminalIds = input<string[]>([]);
   readonly terminalMaximized = input(false);
   readonly terminalFontSize = input(12);
+  readonly themeColor = input<string>();
   readonly gridColumns = input(DEFAULT_TERMINAL_GRID_DIMENSION);
   readonly gridRows = input(DEFAULT_TERMINAL_GRID_DIMENSION);
 

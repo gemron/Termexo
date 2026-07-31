@@ -239,6 +239,7 @@ pub fn prepare_codex_launch(
     database: State<'_, WorkspaceDatabase>,
     credentials: State<'_, CredentialStore>,
     launch_environment: State<'_, LaunchEnvironmentStore>,
+    hooks: State<'_, HookEventStore>,
 ) -> Result<AgentLaunchSpec, String> {
     let mut environment =
         account_profile_environment(&database, request.account_profile_id.as_deref(), "codex")?;
@@ -248,12 +249,16 @@ pub fn prepare_codex_launch(
         request.workspace_id.as_deref(),
     )?);
     launch_environment
-        .put(request.terminal_id, environment)
+        .put(request.terminal_id.clone(), environment)
+        .map_err(|error| error.to_string())?;
+    let notify_config = hooks
+        .codex_notify_config(&request.terminal_id)
         .map_err(|error| error.to_string())?;
     CodexCliAdapter::new()
         .build_launch_command(&CodexLaunchOptions {
             session_id: request.session_id,
             model: request.model,
+            notify_config: Some(notify_config),
         })
         .map_err(|error| error.to_string())
 }

@@ -215,6 +215,7 @@ impl AgentAdapter for CodexCliAdapter {
     ) -> Result<AgentLaunchSpec, Self::Error> {
         let executable = self.find_executable().ok_or(CodexError::NotInstalled)?;
         let mut command = format!("& {}", powershell_quote(&executable.to_string_lossy()));
+        append_option(&mut command, "-c", options.notify_config.as_deref());
         if let Some(session_id) = options
             .session_id
             .as_deref()
@@ -575,8 +576,14 @@ mod tests {
             .build_launch_command(&CodexLaunchOptions {
                 session_id: None,
                 model: Some("gpt-5.6-sol".into()),
+                notify_config: Some(
+                    r"notify=['''C:\Program Files\Termexo\termexo.exe''','''codex-notify''']"
+                        .into(),
+                ),
             })
             .unwrap();
+        assert!(fresh.command.contains("-c 'notify=["));
+        assert!(fresh.command.contains("codex-notify"));
         assert!(fresh.command.contains("--model 'gpt-5.6-sol'"));
         assert!(!fresh.command.contains(" resume "));
 
@@ -584,6 +591,7 @@ mod tests {
             .build_launch_command(&CodexLaunchOptions {
                 session_id: Some("019f9978-f46b-7d50-93b6-927b7eefcb1f".into()),
                 model: None,
+                notify_config: None,
             })
             .unwrap();
         assert!(resumed

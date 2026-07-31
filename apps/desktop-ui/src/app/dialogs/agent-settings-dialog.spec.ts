@@ -106,11 +106,46 @@ describe('AgentSettingsDialogComponent', () => {
     expect(inputs[0].value).toBe('DeepSeek V4 Pro');
     expect(inputs[1].value).toBe('deepseek-v4-pro[1m]');
     expect(inputs[2].value).toBe('https://api.deepseek.com/anthropic');
+    setEditorInputValue(3, 'test-deepseek-key');
 
     const saved: ModelProfileInput[] = [];
     component.modelSaved.subscribe((profile) => saved.push(profile));
     clickButton('保存 Profile');
     expect(saved[0]).toEqual(expect.objectContaining({ provider: 'DeepSeek' }));
+  });
+
+  it('opens a requested third-party profile and requires its missing API key', async () => {
+    const minimax: ModelProfile = {
+      id: 'minimax-m3',
+      name: 'MiniMax M3',
+      provider: 'MiniMax',
+      model: 'MiniMax-M3[1m]',
+      baseUrl: 'https://api.minimaxi.com/anthropic',
+      isDefault: false,
+      hasCredential: false,
+    };
+    fixture.componentRef.setInput('modelProfiles', [CUSTOM_PROFILE, minimax]);
+    fixture.componentRef.setInput('initialTab', 'models');
+    fixture.componentRef.setInput('initialModelProfileId', minimax.id);
+    fixture.detectChanges();
+    await fixture.whenStable();
+    fixture.detectChanges();
+
+    expect(root.querySelector('.credential-warning')?.textContent).toContain('尚无可用 API Key');
+    const saveButton = Array.from(root.querySelectorAll<HTMLButtonElement>('button')).find(
+      (candidate) => candidate.textContent?.includes('保存 Profile'),
+    );
+    expect(saveButton?.disabled).toBe(true);
+
+    setEditorInputValue(3, 'test-minimax-key');
+    expect(saveButton?.disabled).toBe(false);
+    const saved: ModelProfileInput[] = [];
+    component.modelSaved.subscribe((profile) => saved.push(profile));
+    clickButton('保存 Profile');
+
+    expect(saved).toEqual([
+      expect.objectContaining({ id: minimax.id, apiKey: 'test-minimax-key' }),
+    ]);
   });
 
   it('edits and saves a workspace network and npm proxy profile', async () => {

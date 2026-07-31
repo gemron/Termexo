@@ -1,0 +1,36 @@
+.delete-workspace-summary {
+  display: grid;
+  grid-template-columns: 24px minmax(0, 1fr);
+  align-items: center;
+  gap: 10px;
+  margin-top: 16px;
+  border: 1px solid color-mix(in srgb, var(--color-warning) 42%, var(--border));
+  color: var(--text-secondary);
+  background: color-mix(in srgb, var(--color-warning) 10%, var(--surface-raised));
+}
+
+.delete-workspace-summary strong,
+.delete-workspace-summary span {
+  display: block;
+}
+
+.delete-workspace-summary strong {
+  color: var(--text);
+  font-size: 12px;
+}
+
+.delete-workspace-summary span {
+  overflow: hidden;
+  margin-top: 4px;
+  color: var(--text-muted);
+  font: 10px/1.3 var(--mono);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.delete-workspace-warning {
+  margin: 12px 0 0;
+  color: color-mix(in srgb, var(--color-warning) 76%, var(--text));
+  font-size: 11px;
+  line-height: 1.55;
+}

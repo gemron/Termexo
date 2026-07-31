@@ -28,4 +28,19 @@ describe('WorkspaceRepository', () => {
     expect(localStorage.getItem(storageKey)).toBeNull();
     expect(localStorage.getItem(legacyStorageKey)).toBeNull();
   });
+
+  it('deletes a browser workspace without removing the remaining entries', async () => {
+    localStorage.setItem(
+      storageKey,
+      JSON.stringify([
+        { id: 'workspace-1', name: 'First' },
+        { id: 'workspace-2', name: 'Second' },
+      ]),
+    );
+    const repository = new WorkspaceRepository();
+
+    await repository.delete('workspace-1');
+
+    expect(await repository.list()).toEqual([{ id: 'workspace-2', name: 'Second' }]);
+  });
 });

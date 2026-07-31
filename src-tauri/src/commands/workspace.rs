@@ -14,3 +14,13 @@ pub fn save_workspace(
 ) -> Result<(), String> {
     database.save(&workspace).map_err(|error| error.to_string())
 }
+
+#[tauri::command]
+pub fn delete_workspace(
+    workspace_id: String,
+    database: State<'_, WorkspaceDatabase>,
+) -> Result<(), String> {
+    database
+        .delete_workspace(&workspace_id)
+        .map_err(|error| error.to_string())
+}

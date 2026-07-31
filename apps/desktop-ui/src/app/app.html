@@ -11,12 +11,13 @@
     <app-workspace-sidebar
       [workspaces]="state.workspaces()"
       [activeWorkspaceId]="state.activeWorkspace()?.id ?? null"
-      (workspaceSelected)="state.selectWorkspace($event)"
+      (workspaceSelected)="selectWorkspace($event)"
       (favoriteToggled)="state.toggleFavorite($event)"
       (editRequested)="openWorkspaceEditor($event)"
+      (deleteRequested)="openWorkspaceDelete($event)"
       (moveRequested)="state.moveWorkspace($event.workspaceId, $event.direction)"
       (createRequested)="createWorkspaceOpen.set(true)"
-      (settingsRequested)="settingsOpen.set(true)"
+      (settingsRequested)="openSettings()"
     />
     <div
       class="sidebar-resizer workspace-sidebar-resizer"
@@ -96,6 +97,72 @@
           <app-icon name="zap" [size]="14" />
           <span>Claude 模型</span>
         </button>
+
+        @if (globalTerminalNotices().length > 0) {
+          <span class="tool-divider"></span>
+          <div class="global-notice-anchor">
+            <button
+              type="button"
+              class="tool-button global-notice-trigger btn btn-ghost btn-sm join-item"
+              [class.active]="globalNoticeOpen()"
+              [class.has-waiting]="globalWaitingNoticeCount() > 0"
+              [attr.aria-expanded]="globalNoticeOpen()"
+              aria-haspopup="dialog"
+              aria-label="全局 Agent 提示"
+              title="查看所有工作空间中等待输入和已完成的 Agent"
+              (click)="globalNoticeOpen.set(!globalNoticeOpen())"
+            >
+              <app-icon name="bell" [size]="14" />
+              <span>{{ globalNoticeSummary() }}</span>
+              <b>{{ globalTerminalNotices().length }}</b>
+            </button>
+
+            @if (globalNoticeOpen()) {
+              <section
+                class="global-notice-panel"
+                role="dialog"
+                aria-modal="false"
+                aria-label="全局 Agent 提示"
+              >
+                <header>
+                  <div>
+                    <strong>全局 Agent 提示</strong>
+                    <small>所有工作空间</small>
+                  </div>
+                  <button
+                    type="button"
+                    class="btn btn-square btn-ghost btn-xs"
+                    aria-label="关闭全局提示"
+                    title="关闭"
+                    (click)="globalNoticeOpen.set(false)"
+                  >
+                    <app-icon name="x" [size]="13" />
+                  </button>
+                </header>
+                <div class="global-notice-list">
+                  @for (
+                    notice of globalTerminalNotices();
+                    track notice.terminalId + ':' + notice.status
+                  ) {
+                    <button
+                      type="button"
+                      class="global-notice-item"
+                      [attr.data-status]="notice.status"
+                      (click)="openGlobalTerminalNotice(notice)"
+                    >
+                      <i aria-hidden="true"></i>
+                      <span>
+                        <strong>{{ notice.terminalName }}</strong>
+                        <small>{{ notice.workspaceName }}</small>
+                      </span>
+                      <em>{{ statusLabels[notice.status] }}</em>
+                    </button>
+                  }
+                </div>
+              </section>
+            }
+          </div>
+        }
       </div>
 
       <div class="window-tools join">
@@ -347,22 +414,27 @@
     </div>
 
     <section class="workbench-area">
-      @if (state.activeWorkspace(); as workspace) {
-        <app-terminal-workbench
-          [terminals]="workspace.terminals"
-          [layout]="workspace.layout"
-          [activeTerminalId]="activeTerminalId()"
-          [visibleTerminalIds]="visibleTerminalIds()"
-          [terminalMaximized]="terminalMaximized()"
-          [terminalFontSize]="terminalFontSize()"
-          [gridColumns]="gridColumns()"
-          [gridRows]="gridRows()"
-          (terminalSelected)="selectTerminal($event)"
-          (terminalClosed)="closeTerminal($event)"
-          (terminalMaximizeRequested)="toggleTerminalMaximize($event)"
-          (terminalRequested)="createTerminal('shell')"
-          (terminalStatusChanged)="state.updateTerminalStatus($event.terminalId, $event.status)"
-        />
+      @if (state.activeWorkspace(); as activeWorkspace) {
+        @for (workspace of mountedWorkspaces(); track workspace.id) {
+          <app-terminal-workbench
+            [class.workspace-hidden]="workspace.id !== activeWorkspace.id"
+            [attr.aria-hidden]="workspace.id !== activeWorkspace.id"
+            [terminals]="workspace.terminals"
+            [layout]="workspace.layout"
+            [activeTerminalId]="workspace.id === activeWorkspace.id ? activeTerminalId() : null"
+            [visibleTerminalIds]="workspace.id === activeWorkspace.id ? visibleTerminalIds() : []"
+            [terminalMaximized]="workspace.id === activeWorkspace.id && terminalMaximized()"
+            [terminalFontSize]="terminalFontSize()"
+            [themeColor]="workspace.themeColor"
+            [gridColumns]="gridColumns()"
+            [gridRows]="gridRows()"
+            (terminalSelected)="selectTerminal($event)"
+            (terminalClosed)="closeTerminal($event)"
+            (terminalMaximizeRequested)="toggleTerminalMaximize($event)"
+            (terminalRequested)="createTerminal('shell')"
+            (terminalStatusChanged)="state.updateTerminalStatus($event.terminalId, $event.status)"
+          />
+        }
       }
     </section>
 
@@ -403,6 +475,15 @@
     [workspace]="workspace"
     (saved)="saveWorkspaceAppearance($event)"
     (cancelled)="editingWorkspaceId.set(null)"
+  />
+}
+
+@if (workspacePendingDeletion(); as workspace) {
+  <app-delete-workspace-dialog
+    [workspace]="workspace"
+    [deleting]="deletingWorkspace()"
+    (confirmed)="confirmWorkspaceDelete()"
+    (cancelled)="closeWorkspaceDelete()"
   />
 }
 
@@ -455,6 +536,8 @@
     [accountProfiles]="agents.accountProfiles()"
     [activeWorkspaceId]="state.activeWorkspace()?.id ?? ''"
     [activeWorkspaceName]="state.activeWorkspace()?.name ?? '当前 Workspace'"
+    [initialTab]="settingsInitialTab()"
+    [initialModelProfileId]="settingsInitialModelProfileId()"
     [networkTestResult]="networkTestResult()"
     [cliPlan]="cliOperationPlan()"
     [cliResult]="cliOperationResult()"
@@ -494,8 +577,10 @@
 
 @if (toastMessage(); as message) {
   <div class="app-toast-region toast toast-end toast-bottom" aria-live="polite">
-    <div class="app-toast alert shadow-xl" role="status">
-      <span class="app-toast-icon"><app-icon name="check" [size]="15" /></span>
+    <div class="app-toast alert shadow-xl" role="status" [attr.data-tone]="toastTone()">
+      <span class="app-toast-icon">
+        <app-icon [name]="toastTone() === 'attention' ? 'bell' : 'check'" [size]="15" />
+      </span>
       <span>{{ message }}</span>
     </div>
   </div>
