@@ -1,4 +1,12 @@
-import { Component, computed, effect, HostListener, inject, signal } from '@angular/core';
+import {
+  Component,
+  computed,
+  effect,
+  HostListener,
+  inject,
+  signal,
+  untracked,
+} from '@angular/core';
 
 import {
   AccountProfileInput,
@@ -26,12 +34,16 @@ import {
 } from './core/models/workspace.models';
 import {
   collectGlobalTerminalNotices,
+  createAttentionBanner,
+  globalNoticeKey,
   GlobalTerminalNotice,
+  isWaitingNotice,
 } from './core/models/terminal-notifications';
 import { createAppThemePalette } from './core/models/theme-palette';
 import { AgentService } from './core/services/agent.service';
 import { AppStateService } from './core/services/app-state.service';
 import { DirectoryPickerService } from './core/services/directory-picker.service';
+import { DesktopNotificationService } from './core/services/desktop-notification.service';
 import { TerminalGatewayService } from './core/services/terminal-gateway.service';
 import { AgentSettingsDialogComponent, SettingsTab } from './dialogs/agent-settings-dialog';
 import {
@@ -45,6 +57,7 @@ import {
   EditWorkspaceDialogComponent,
   WorkspaceAppearanceValue,
 } from './dialogs/edit-workspace-dialog';
+import { MergeWorkspaceDialogComponent } from './dialogs/merge-workspace-dialog';
 import { ModelSwitchDialogComponent } from './dialogs/model-switch-dialog';
 import { ResumeSessionValue, SessionCenterDialogComponent } from './dialogs/session-center-dialog';
 import { InspectorPanelComponent } from './inspector/inspector-panel';
@@ -65,6 +78,8 @@ const WORKSPACE_SIDEBAR_MAX_WIDTH = 360;
 const INSPECTOR_DEFAULT_WIDTH = 252;
 const INSPECTOR_MIN_WIDTH = 220;
 const INSPECTOR_MAX_WIDTH = 460;
+const INSPECTOR_AUTO_COLLAPSE_WIDTH = 900;
+const WORKSPACE_SIDEBAR_AUTO_COLLAPSE_WIDTH = 760;
 
 function readStoredBoolean(key: string, fallback: boolean): boolean {
   try {
@@ -95,13 +110,14 @@ function readStoredWidth(key: string, fallback: number, min: number, max: number
     EditWorkspaceDialogComponent,
     IconComponent,
     InspectorPanelComponent,
+    MergeWorkspaceDialogComponent,
     ModelSwitchDialogComponent,
     SessionCenterDialogComponent,
     TerminalWorkbenchComponent,
     WorkspaceSidebarComponent,
   ],
   templateUrl: './app.html',
-  styleUrl: './app.scss',
+  styleUrls: ['./app.scss', './attention-banner.scss'],
   host: {
     'data-theme': 'termexo',
     '[style.--color-primary]': 'workspaceThemePalette().accent',
@@ -123,6 +139,7 @@ export class App {
   protected readonly state = inject(AppStateService);
   protected readonly agents = inject(AgentService);
   private readonly directoryPicker = inject(DirectoryPickerService);
+  private readonly desktopNotifications = inject(DesktopNotificationService);
   private readonly terminalGateway = inject(TerminalGatewayService);
   private readonly handledEventKeys = new Set<string>();
   private readonly eventStatusCutoff = Date.now();
@@ -131,6 +148,7 @@ export class App {
   private previousGlobalNoticeKeys = new Set<string>();
   private resizeStartX = 0;
   private resizeStartWidth = 0;
+  private previousViewportWidth = Number.POSITIVE_INFINITY;
 
   protected readonly createWorkspaceOpen = signal(false);
   protected readonly editingWorkspaceId = signal<string | null>(null);
@@ -173,14 +191,18 @@ export class App {
   protected readonly resizingSidebar = signal<SidebarResizeTarget | null>(null);
   protected readonly workspaceMaximized = signal(false);
   protected readonly terminalMaximized = signal(false);
+  protected readonly layoutRevision = signal(0);
   protected readonly launchingClaude = signal(false);
   protected readonly launchingCodex = signal(false);
   protected readonly selectedTerminalDirectory = signal<string | null>(null);
   protected readonly toastMessage = signal<string | null>(null);
   protected readonly toastTone = signal<'success' | 'attention'>('success');
   protected readonly globalNoticeOpen = signal(false);
+  protected readonly dismissedNoticeKeys = signal<ReadonlySet<string>>(new Set());
   protected readonly workspacePendingDeletion = signal<Workspace | null>(null);
   protected readonly deletingWorkspace = signal(false);
+  protected readonly workspacePendingMerge = signal<Workspace | null>(null);
+  protected readonly mergingWorkspace = signal(false);
   protected readonly networkTestResult = signal<NetworkTestResult | null>(null);
   protected readonly cliOperationPlan = signal<CliOperationPlan | null>(null);
   protected readonly cliOperationResult = signal<CliOperationResult | null>(null);
@@ -198,6 +220,12 @@ export class App {
   protected readonly globalCompletedNoticeCount = computed(
     () => this.globalTerminalNotices().filter((notice) => notice.status === 'COMPLETED').length,
   );
+  protected readonly attentionBanner = computed(() => {
+    const dismissed = this.dismissedNoticeKeys();
+    return createAttentionBanner(
+      this.globalTerminalNotices().filter((notice) => !dismissed.has(globalNoticeKey(notice))),
+    );
+  });
   protected readonly globalNoticeSummary = computed(() => {
     const waiting = this.globalWaitingNoticeCount();
     const completed = this.globalCompletedNoticeCount();
@@ -246,6 +274,7 @@ export class App {
   });
 
   constructor() {
+    this.adaptLayoutToViewport();
     void this.initialize();
     effect(() => {
       for (const event of [...this.agents.events()].reverse()) {
@@ -259,19 +288,24 @@ export class App {
     });
     effect(() => {
       const notices = this.globalTerminalNotices();
-      const currentKeys = new Set(notices.map((notice) => `${notice.terminalId}:${notice.status}`));
+      const currentKeys = new Set(notices.map(globalNoticeKey));
       const newNotices = notices.filter(
-        (notice) => !this.previousGlobalNoticeKeys.has(`${notice.terminalId}:${notice.status}`),
+        (notice) => !this.previousGlobalNoticeKeys.has(globalNoticeKey(notice)),
       );
       this.previousGlobalNoticeKeys = currentKeys;
-      if (newNotices.length === 1) {
-        const notice = newNotices[0];
-        this.showToast(
-          `${notice.workspaceName} · ${notice.terminalName}：${this.statusLabels[notice.status]}`,
-          'attention',
-        );
-      } else if (newNotices.length > 1) {
-        this.showToast(`${newNotices.length} 个 Agent 状态需要关注`, 'attention');
+      this.forgetResolvedDismissals(currentKeys);
+      if (newNotices.length > 0) {
+        void this.desktopNotifications.notify(newNotices);
+      }
+
+      // Waiting terminals are surfaced by the persistent attention banner instead, so the
+      // transient toast only reports completions.
+      const completed = newNotices.filter((notice) => !isWaitingNotice(notice));
+      if (completed.length === 1) {
+        const notice = completed[0];
+        this.showToast(`${notice.workspaceName} · ${notice.terminalName}：任务已完成`);
+      } else if (completed.length > 1) {
+        this.showToast(`${completed.length} 个 Agent 任务已完成`);
       }
     });
   }
@@ -564,10 +598,12 @@ export class App {
     const shouldRestore = this.terminalMaximized() && this.activeTerminalId() === terminalId;
     this.selectTerminal(terminalId);
     this.terminalMaximized.set(!shouldRestore);
+    this.requestTerminalRefit();
   }
 
   protected toggleWorkspaceMaximize(): void {
     this.workspaceMaximized.update((maximized) => !maximized);
+    this.requestTerminalRefit();
   }
 
   protected toggleWorkspaceSidebar(): void {
@@ -629,6 +665,29 @@ export class App {
       target === 'workspace' ? this.workspaceSidebarWidth() : this.inspectorWidth(),
     );
     this.resizingSidebar.set(null);
+  }
+
+  @HostListener('window:resize')
+  protected adaptLayoutToViewport(): void {
+    const width = window.innerWidth;
+    if (
+      this.previousViewportWidth >= INSPECTOR_AUTO_COLLAPSE_WIDTH &&
+      width < INSPECTOR_AUTO_COLLAPSE_WIDTH
+    ) {
+      this.inspectorOpen.set(false);
+    }
+    if (
+      this.previousViewportWidth >= WORKSPACE_SIDEBAR_AUTO_COLLAPSE_WIDTH &&
+      width < WORKSPACE_SIDEBAR_AUTO_COLLAPSE_WIDTH
+    ) {
+      this.workspaceSidebarOpen.set(false);
+    }
+    this.previousViewportWidth = width;
+    this.requestTerminalRefit();
+  }
+
+  private requestTerminalRefit(): void {
+    this.layoutRevision.update((revision) => revision + 1);
   }
 
   @HostListener('window:keydown', ['$event'])
@@ -725,6 +784,71 @@ export class App {
     }
   }
 
+  protected openWorkspaceMerge(workspaceId: string): void {
+    const workspace = this.state.workspaces().find((item) => item.id === workspaceId);
+    if (workspace && this.state.workspaces().length > 1) {
+      this.workspacePendingMerge.set(workspace);
+    }
+  }
+
+  protected closeWorkspaceMerge(): void {
+    if (!this.mergingWorkspace()) {
+      this.workspacePendingMerge.set(null);
+    }
+  }
+
+  protected async confirmWorkspaceMerge(targetWorkspaceId: string): Promise<void> {
+    const sourceWorkspace = this.workspacePendingMerge();
+    if (!sourceWorkspace || this.mergingWorkspace()) {
+      return;
+    }
+
+    const targetWorkspace = this.state
+      .workspaces()
+      .find((workspace) => workspace.id === targetWorkspaceId);
+    if (!targetWorkspace) {
+      this.showToast('目标工作空间不存在或已被删除', 'attention');
+      return;
+    }
+
+    this.mergingWorkspace.set(true);
+    try {
+      const mergedWorkspace = await this.state.mergeWorkspaces(
+        sourceWorkspace.id,
+        targetWorkspaceId,
+      );
+      if (!mergedWorkspace) {
+        throw new Error('来源或目标工作空间不存在');
+      }
+
+      this.mountedWorkspaceIds.update((workspaceIds) =>
+        workspaceIds.filter((workspaceId) => workspaceId !== sourceWorkspace.id),
+      );
+      this.mountWorkspace(mergedWorkspace.id);
+      this.preferredTerminalIds.update((items) => {
+        const terminalIds = new Set(mergedWorkspace.terminals.map((terminal) => terminal.id));
+        const preferredIds = [
+          ...(items[targetWorkspaceId] ?? []),
+          ...(items[sourceWorkspace.id] ?? []),
+          ...mergedWorkspace.terminals.map((terminal) => terminal.id),
+        ].filter(
+          (terminalId, index, values) =>
+            terminalIds.has(terminalId) && values.indexOf(terminalId) === index,
+        );
+        const next = { ...items, [targetWorkspaceId]: preferredIds };
+        delete next[sourceWorkspace.id];
+        return next;
+      });
+      this.terminalMaximized.set(false);
+      this.workspacePendingMerge.set(null);
+      this.showToast(`工作空间 ${sourceWorkspace.name} 已合并到 ${targetWorkspace.name}`);
+    } catch (error) {
+      this.showToast(`合并失败：${this.errorMessage(error)}`, 'attention');
+    } finally {
+      this.mergingWorkspace.set(false);
+    }
+  }
+
   protected openWorkspaceEditor(workspaceId: string): void {
     this.editingWorkspaceId.set(workspaceId);
   }
@@ -738,6 +862,38 @@ export class App {
   protected openGlobalTerminalNotice(notice: GlobalTerminalNotice): void {
     this.selectWorkspace(notice.workspaceId);
     window.requestAnimationFrame(() => this.selectTerminal(notice.terminalId));
+  }
+
+  protected openAttentionBanner(): void {
+    const banner = this.attentionBanner();
+    if (!banner) {
+      return;
+    }
+
+    this.dismissNoticeKeys([globalNoticeKey(banner.target)]);
+    this.openGlobalTerminalNotice(banner.target);
+  }
+
+  protected dismissAttentionBanner(): void {
+    this.dismissNoticeKeys(
+      this.globalTerminalNotices().filter(isWaitingNotice).map(globalNoticeKey),
+    );
+  }
+
+  private dismissNoticeKeys(keys: readonly string[]): void {
+    this.dismissedNoticeKeys.update((dismissed) => new Set([...dismissed, ...keys]));
+  }
+
+  /**
+   * Drops dismissals whose terminal already left the waiting state, so the same terminal
+   * blocking again raises a fresh banner instead of staying silently hidden.
+   */
+  private forgetResolvedDismissals(currentKeys: ReadonlySet<string>): void {
+    const dismissed = untracked(this.dismissedNoticeKeys);
+    const retained = [...dismissed].filter((key) => currentKeys.has(key));
+    if (retained.length !== dismissed.size) {
+      this.dismissedNoticeKeys.set(new Set(retained));
+    }
   }
 
   protected saveWorkspaceAppearance(value: WorkspaceAppearanceValue): void {
@@ -1026,8 +1182,58 @@ export class App {
   private async initialize(): Promise<void> {
     await this.state.initialize();
     await this.agents.initialize();
+    await this.refreshRestoredClaudeLaunches();
     await this.refreshRestoredCodexLaunches();
     this.mountWorkspace(this.state.activeWorkspace()?.id);
+  }
+
+  private async refreshRestoredClaudeLaunches(): Promise<void> {
+    const profiles = this.agents.modelProfiles();
+    const defaultProfile = profiles.find((profile) => profile.isDefault) ?? profiles[0];
+    const restoredClaudeTerminals = this.state
+      .workspaces()
+      .flatMap((workspace) =>
+        workspace.terminals
+          .filter((terminal) => terminal.agentType === 'claude')
+          .map((terminal) => ({ workspaceId: workspace.id, terminal })),
+      );
+    if (restoredClaudeTerminals.length === 0) {
+      return;
+    }
+
+    const results = await Promise.allSettled(
+      restoredClaudeTerminals.map(async ({ workspaceId, terminal }) => {
+        const profile =
+          profiles.find((candidate) => candidate.id === terminal.profileId) ?? defaultProfile;
+        if (!profile) {
+          throw new Error(`Claude 终端 ${terminal.name} 没有可用的模型 Profile`);
+        }
+        if (profile.baseUrl && !profile.hasCredential) {
+          throw new Error(`模型 Profile「${profile.name}」的 API Key 不存在或已失效`);
+        }
+
+        const launch = await this.agents.prepareLaunch({
+          terminalId: terminal.id,
+          workspaceId,
+          sessionId: terminal.nativeSessionId,
+          profileId: profile.id,
+          mcpProfileId: terminal.mcpProfileId,
+          accountProfileId: terminal.accountProfileId,
+        });
+        if (
+          !this.state.updateRestoredTerminalLaunch(terminal.id, launch.command, {
+            profileId: profile.id,
+            model: profile.name,
+          })
+        ) {
+          throw new Error(`Claude 终端 ${terminal.name} 已不存在`);
+        }
+      }),
+    );
+    const failed = results.filter((result) => result.status === 'rejected').length;
+    if (failed > 0) {
+      this.showToast(`${failed} 个 Claude 终端未能恢复模型配置，请重新启动对应终端`, 'attention');
+    }
   }
 
   private async refreshRestoredCodexLaunches(): Promise<void> {

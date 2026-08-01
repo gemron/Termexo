@@ -248,17 +248,22 @@ pub fn prepare_codex_launch(
         &credentials,
         request.workspace_id.as_deref(),
     )?);
-    launch_environment
-        .put(request.terminal_id.clone(), environment)
-        .map_err(|error| error.to_string())?;
+    environment.extend(hooks.codex_hook_environment(&request.terminal_id));
     let notify_config = hooks
         .codex_notify_config(&request.terminal_id)
+        .map_err(|error| error.to_string())?;
+    let hook_configs = hooks
+        .codex_hook_configs()
+        .map_err(|error| error.to_string())?;
+    launch_environment
+        .put(request.terminal_id.clone(), environment)
         .map_err(|error| error.to_string())?;
     CodexCliAdapter::new()
         .build_launch_command(&CodexLaunchOptions {
             session_id: request.session_id,
             model: request.model,
             notify_config: Some(notify_config),
+            hook_configs,
         })
         .map_err(|error| error.to_string())
 }
@@ -372,7 +377,10 @@ fn profile_environment(profile: Option<&ModelProfile>) -> HashMap<String, String
         ] {
             environment.insert(key.into(), model.into());
         }
-        if model.contains("[1m]") {
+        if model.contains("[1m]")
+            || (profile.provider.eq_ignore_ascii_case("MiniMax")
+                && model.eq_ignore_ascii_case("MiniMax-M3"))
+        {
             environment.insert("CLAUDE_CODE_AUTO_COMPACT_WINDOW".into(), "1000000".into());
         }
     }
@@ -452,7 +460,7 @@ mod tests {
             id: "minimax".into(),
             name: "MiniMax M3".into(),
             provider: "MiniMax".into(),
-            model: "MiniMax-M3[1m]".into(),
+            model: "MiniMax-M3".into(),
             base_url: Some("https://api.minimaxi.com/anthropic".into()),
             credential_target: Some("profile:minimax".into()),
             is_default: false,
@@ -472,10 +480,7 @@ mod tests {
             "ANTHROPIC_DEFAULT_HAIKU_MODEL",
             "CLAUDE_CODE_SUBAGENT_MODEL",
         ] {
-            assert_eq!(
-                environment.get(key).map(String::as_str),
-                Some("MiniMax-M3[1m]")
-            );
+            assert_eq!(environment.get(key).map(String::as_str), Some("MiniMax-M3"));
         }
         assert_eq!(
             environment

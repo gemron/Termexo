@@ -14,6 +14,7 @@
       (workspaceSelected)="selectWorkspace($event)"
       (favoriteToggled)="state.toggleFavorite($event)"
       (editRequested)="openWorkspaceEditor($event)"
+      (mergeRequested)="openWorkspaceMerge($event)"
       (deleteRequested)="openWorkspaceDelete($event)"
       (moveRequested)="state.moveWorkspace($event.workspaceId, $event.direction)"
       (createRequested)="createWorkspaceOpen.set(true)"
@@ -413,6 +414,42 @@
       </div>
     </div>
 
+    @if (attentionBanner(); as banner) {
+      <div
+        class="attention-banner"
+        role="alert"
+        aria-live="assertive"
+        [attr.data-status]="banner.target.status"
+      >
+        <button
+          type="button"
+          class="attention-banner-open"
+          [attr.aria-label]="banner.title + '：' + banner.detail + '，跳转到该终端'"
+          (click)="openAttentionBanner()"
+        >
+          <span class="attention-banner-icon" aria-hidden="true">
+            <app-icon name="bell" [size]="17" />
+          </span>
+          <span class="attention-banner-text">
+            <strong>{{ banner.title }}</strong>
+            <small>{{ banner.detail }}</small>
+          </span>
+          @if (banner.extraCount > 0) {
+            <em class="attention-banner-count">+{{ banner.extraCount }}</em>
+          }
+        </button>
+        <button
+          type="button"
+          class="attention-banner-dismiss btn btn-square btn-ghost btn-xs"
+          aria-label="忽略当前等待提示"
+          title="忽略，直到有新的 Agent 等待"
+          (click)="dismissAttentionBanner()"
+        >
+          <app-icon name="x" [size]="13" />
+        </button>
+      </div>
+    }
+
     <section class="workbench-area">
       @if (state.activeWorkspace(); as activeWorkspace) {
         @for (workspace of mountedWorkspaces(); track workspace.id) {
@@ -424,6 +461,7 @@
             [activeTerminalId]="workspace.id === activeWorkspace.id ? activeTerminalId() : null"
             [visibleTerminalIds]="workspace.id === activeWorkspace.id ? visibleTerminalIds() : []"
             [terminalMaximized]="workspace.id === activeWorkspace.id && terminalMaximized()"
+            [layoutRevision]="layoutRevision()"
             [terminalFontSize]="terminalFontSize()"
             [themeColor]="workspace.themeColor"
             [gridColumns]="gridColumns()"
@@ -484,6 +522,16 @@
     [deleting]="deletingWorkspace()"
     (confirmed)="confirmWorkspaceDelete()"
     (cancelled)="closeWorkspaceDelete()"
+  />
+}
+
+@if (workspacePendingMerge(); as workspace) {
+  <app-merge-workspace-dialog
+    [sourceWorkspace]="workspace"
+    [workspaces]="state.workspaces()"
+    [merging]="mergingWorkspace()"
+    (confirmed)="confirmWorkspaceMerge($event)"
+    (cancelled)="closeWorkspaceMerge()"
   />
 }
 

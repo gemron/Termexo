@@ -11,7 +11,7 @@
 </p>
 
 <p align="center">
-  <img alt="Version 0.3.8" src="https://img.shields.io/badge/version-0.3.8-58c7a0">
+  <img alt="Version 0.3.9" src="https://img.shields.io/badge/version-0.3.9-58c7a0">
   <img alt="Windows" src="https://img.shields.io/badge/platform-Windows-0078D4?logo=windows">
   <img alt="Tauri 2" src="https://img.shields.io/badge/Tauri-2-24C8DB?logo=tauri&logoColor=white">
   <img alt="Angular 22" src="https://img.shields.io/badge/Angular-22-DD0031?logo=angular">
@@ -27,16 +27,30 @@ quota visibility, secure workspace sharing, and access from trusted computers an
 Local project data and credentials remain protected by explicit device, permission, and
 encryption boundaries.
 
-> The latest published release is **V0.3.8, the Windows credential persistence fix**. Model
-> provider API keys now use the native Windows Credential Manager backend and are read back before
-> a save is reported as successful. Users upgrading from V0.3.7 must enter third-party provider
-> API keys once more because that release did not persist them outside the running process.
+> The latest published release is **V0.3.9, the restored-session and attention workflow update**.
+> Claude and Codex sessions now rebuild their launch configuration before restoration, MiniMax M3
+> profiles keep the correct provider environment, and blocked or completed agents surface through
+> persistent in-app attention, native notifications, and taskbar alerts.
 
 ![Termexo multi-terminal grid workbench](docs/images/termexo-workbench-v0.3.2.png)
 
 <p align="center">
   <sub>Four active Claude Code and Codex terminals in a configurable 2 × 2 grid with explicit pane selection and the Inspector.</sub>
 </p>
+
+## V0.3.9 Updates
+
+- Rebuild restored Claude launch commands, model profiles, credentials, provider URLs, and hook
+  environments before mounting terminals; migrate legacy `MiniMax-M3[1m]` profiles to
+  `MiniMax-M3` so restored MiniMax sessions no longer fall back to Claude Sonnet.
+- Add Codex lifecycle hooks for prompts, tools, permissions, compaction, subagents, completion, and
+  session boundaries, with accurate terminal states for new and restored sessions.
+- Add persistent waiting/approval banners, Windows notifications, and taskbar attention while
+  keeping completed-task feedback concise and actionable.
+- Add workspace merging with terminal preservation and safe persistence.
+- Improve responsive sidebar behavior, terminal refitting, grid sizing, maximized/fullscreen views,
+  hidden initial Codex commands, and narrow-window usability.
+- Document the repository architecture and release workflow for Claude Code contributors.
 
 ## V0.3.8 Updates
 

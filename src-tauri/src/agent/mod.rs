@@ -52,6 +52,7 @@ pub struct CodexLaunchOptions {
     pub session_id: Option<String>,
     pub model: Option<String>,
     pub notify_config: Option<String>,
+    pub hook_configs: Vec<String>,
 }
 
 #[derive(Debug, Clone, Serialize)]

@@ -14,6 +14,8 @@ const INITIAL_MIGRATION: &str = include_str!("../../migrations/0001_initial.sql"
 const AGENT_MIGRATION: &str = include_str!("../../migrations/0002_agent_sessions.sql");
 const NETWORK_MIGRATION: &str = include_str!("../../migrations/0003_network_profiles.sql");
 const ACCOUNT_MIGRATION: &str = include_str!("../../migrations/0004_account_profiles.sql");
+const LEGACY_MINIMAX_M3_MODEL: &str = "MiniMax-M3[1m]";
+const MINIMAX_M3_MODEL: &str = "MiniMax-M3";
 
 fn default_grid_dimension() -> u8 {
     2
@@ -82,6 +84,7 @@ impl WorkspaceDatabase {
         connection.execute_batch(AGENT_MIGRATION)?;
         connection.execute_batch(NETWORK_MIGRATION)?;
         connection.execute_batch(ACCOUNT_MIGRATION)?;
+        migrate_legacy_minimax_m3_model(&connection)?;
         ensure_default_profile(&connection)?;
         Ok(Self {
             connection: Mutex::new(connection),
@@ -719,6 +722,23 @@ fn ensure_default_profile(connection: &Connection) -> Result<(), DatabaseError> 
     Ok(())
 }
 
+fn migrate_legacy_minimax_m3_model(connection: &Connection) -> Result<(), DatabaseError> {
+    let now = unix_timestamp_millis();
+    connection.execute(
+        "UPDATE model_profiles
+         SET model = ?1, updated_at = ?2
+         WHERE provider COLLATE NOCASE = 'MiniMax' AND model = ?3",
+        params![MINIMAX_M3_MODEL, now, LEGACY_MINIMAX_M3_MODEL],
+    )?;
+    connection.execute(
+        "UPDATE workspaces
+         SET layout_json = replace(layout_json, ?1, ?2), updated_at = ?3
+         WHERE instr(layout_json, ?1) > 0",
+        params![LEGACY_MINIMAX_M3_MODEL, MINIMAX_M3_MODEL, now],
+    )?;
+    Ok(())
+}
+
 fn model_profile_from_row(row: &rusqlite::Row<'_>) -> rusqlite::Result<ModelProfile> {
     let credential_target: Option<String> = row.get(5)?;
     Ok(ModelProfile {
@@ -940,6 +960,57 @@ mod tests {
                 .unwrap()
                 .has_credential
         );
+    }
+
+    #[test]
+    fn migrates_legacy_minimax_m3_profiles_and_resume_commands() {
+        let connection = Connection::open_in_memory().unwrap();
+        connection
+            .execute_batch(&format!(
+                "{INITIAL_MIGRATION}\n{AGENT_MIGRATION}\n{NETWORK_MIGRATION}\n{ACCOUNT_MIGRATION}"
+            ))
+            .unwrap();
+        connection
+            .execute(
+                "INSERT INTO model_profiles (
+                     id, name, provider, model, base_url, is_default, created_at, updated_at
+                 ) VALUES ('minimax', 'MiniMax M3', 'MiniMax', ?1,
+                     'https://api.minimaxi.com/anthropic', 1, 1, 1)",
+                [LEGACY_MINIMAX_M3_MODEL],
+            )
+            .unwrap();
+        connection
+            .execute(
+                "INSERT INTO workspaces (
+                     id, name, project_path, project_type, active_branch,
+                     layout_json, created_at, updated_at, last_opened_at
+                 ) VALUES ('workspace-1', 'Workspace', 'D:\\dev', 'Local', 'main', ?1, 1, 1, 1)",
+                [format!(
+                    r#"{{"terminals":[{{"command":"claude --model '{}' --resume session-1"}}]}}"#,
+                    LEGACY_MINIMAX_M3_MODEL
+                )],
+            )
+            .unwrap();
+
+        migrate_legacy_minimax_m3_model(&connection).unwrap();
+
+        let model: String = connection
+            .query_row(
+                "SELECT model FROM model_profiles WHERE id = 'minimax'",
+                [],
+                |row| row.get(0),
+            )
+            .unwrap();
+        let layout_json: String = connection
+            .query_row(
+                "SELECT layout_json FROM workspaces WHERE id = 'workspace-1'",
+                [],
+                |row| row.get(0),
+            )
+            .unwrap();
+        assert_eq!(model, MINIMAX_M3_MODEL);
+        assert!(layout_json.contains(MINIMAX_M3_MODEL));
+        assert!(!layout_json.contains(LEGACY_MINIMAX_M3_MODEL));
     }
 
     #[test]

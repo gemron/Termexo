@@ -5,6 +5,7 @@
     [attr.data-visible-count]="visibleTerminalIds().length"
     [style.--terminal-columns]="renderedGridColumns()"
     [style.--terminal-rows]="renderedGridRows()"
+    [style.--terminal-count]="visibleTerminalIds().length"
   >
     @for (terminal of terminals(); track terminal.id + ':' + (terminal.runtimeRevision ?? 0)) {
       <app-terminal-panel
@@ -14,6 +15,7 @@
         [active]="terminal.id === activeTerminalId()"
         [visible]="isVisible(terminal.id)"
         [maximized]="terminalMaximized() && terminal.id === activeTerminalId()"
+        [layoutRevision]="layoutRevision()"
         [fontSize]="terminalFontSize()"
         [themeColor]="themeColor()"
         (selected)="terminalSelected.emit($event)"

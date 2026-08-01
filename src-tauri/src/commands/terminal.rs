@@ -11,6 +11,8 @@ pub struct TerminalStartRequest {
     pub shell: String,
     pub working_directory: String,
     pub command: Option<String>,
+    #[serde(default)]
+    pub hide_initial_command: bool,
     pub cols: u16,
     pub rows: u16,
 }

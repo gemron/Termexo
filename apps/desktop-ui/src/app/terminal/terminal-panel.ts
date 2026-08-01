@@ -73,6 +73,7 @@ export class TerminalPanelComponent implements AfterViewInit {
   readonly active = input(false);
   readonly visible = input(true);
   readonly maximized = input(false);
+  readonly layoutRevision = input(0);
   readonly fontSize = input(12);
   readonly themeColor = input<string>();
   readonly selected = output<string>();
@@ -100,6 +101,12 @@ export class TerminalPanelComponent implements AfterViewInit {
       const shouldActivate = this.active() && this.visible();
       if (this.viewReady && shouldActivate) {
         this.scheduleActivation();
+      }
+    });
+    effect(() => {
+      this.layoutRevision();
+      if (this.viewReady && this.visible()) {
+        this.scheduleFit();
       }
     });
   }
@@ -179,6 +186,11 @@ export class TerminalPanelComponent implements AfterViewInit {
         unlisten = undefined;
       });
 
+      if (this.session().agentType === 'codex' && this.session().command) {
+        this.terminal.writeln(
+          '\u001b[38;2;150;157;164mTermexo · 正在启动 Codex CLI（hooks 已自动允许）\u001b[0m',
+        );
+      }
       await this.gateway.start(
         this.session(),
         Math.max(this.terminal.cols, 20),

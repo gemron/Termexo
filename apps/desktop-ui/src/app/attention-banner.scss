@@ -1,0 +1,120 @@
+// Persistent banner for terminals blocked on the user. It stays on screen while the agent
+// waits, because the taskbar flash is suppressed by the operating system once the window
+// already has focus.
+
+// Sits in the document flow between the tab strip and the workbench so it never covers a
+// terminal; the panels carry a ResizeObserver and refit themselves when it appears.
+.attention-banner {
+  --attention-accent: var(--color-warning);
+  --attention-accent-content: var(--color-warning-content);
+
+  z-index: 20;
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 3px;
+  margin: 0 10px 6px;
+  padding: 4px 6px 4px 4px;
+  // --border is itself a color-mix; nesting it inside another one voids the declaration and
+  // the border falls back to currentColor, so the accent is faded against transparent instead.
+  border: 1px solid color-mix(in oklab, var(--attention-accent) 62%, transparent);
+  border-radius: var(--radius-box);
+  background: color-mix(in oklab, var(--attention-accent) 16%, var(--surface-raised));
+  box-shadow: 0 6px 18px rgb(0 0 0 / 28%);
+  animation: attention-banner-enter 180ms ease-out;
+
+  // Approval blocks the agent on an explicit decision, so it outranks a plain input prompt.
+  &[data-status='WAITING_APPROVAL'] {
+    --attention-accent: var(--color-error);
+    --attention-accent-content: var(--color-error-content);
+  }
+}
+
+.attention-banner-open {
+  display: grid;
+  min-width: 0;
+  flex: 1;
+  grid-template-columns: 30px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 9px;
+  padding: 5px 8px;
+  border-radius: calc(var(--radius-box) - 3px);
+  color: var(--text);
+  background: none;
+  text-align: left;
+  cursor: pointer;
+
+  &:hover {
+    background: color-mix(in oklab, var(--attention-accent) 22%, transparent);
+  }
+}
+
+.attention-banner-icon {
+  display: grid;
+  width: 30px;
+  height: 30px;
+  place-items: center;
+  border-radius: 50%;
+  color: var(--attention-accent-content);
+  background: var(--attention-accent);
+  animation: attention-banner-pulse 1.6s ease-in-out infinite;
+}
+
+.attention-banner-text {
+  display: grid;
+  min-width: 0;
+  gap: 1px;
+
+  strong {
+    font-size: 12.5px;
+    font-weight: 640;
+  }
+
+  small {
+    overflow: hidden;
+    color: var(--text-muted);
+    font-size: 11px;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+}
+
+.attention-banner-count {
+  padding: 2px 7px;
+  border-radius: 999px;
+  color: var(--attention-accent-content);
+  background: var(--attention-accent);
+  font-size: 11px;
+  font-style: normal;
+  font-weight: 680;
+}
+
+@keyframes attention-banner-enter {
+  from {
+    opacity: 0;
+  }
+
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes attention-banner-pulse {
+  0%,
+  100% {
+    opacity: 0.82;
+    transform: scale(0.94);
+  }
+
+  50% {
+    opacity: 1;
+    transform: scale(1.06);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .attention-banner,
+  .attention-banner-icon {
+    animation: none;
+  }
+}

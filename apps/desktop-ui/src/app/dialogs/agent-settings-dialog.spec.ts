@@ -119,7 +119,7 @@ describe('AgentSettingsDialogComponent', () => {
       id: 'minimax-m3',
       name: 'MiniMax M3',
       provider: 'MiniMax',
-      model: 'MiniMax-M3[1m]',
+      model: 'MiniMax-M3',
       baseUrl: 'https://api.minimaxi.com/anthropic',
       isDefault: false,
       hasCredential: false,

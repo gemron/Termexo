@@ -1,3 +1,4 @@
+use std::env;
 use std::fs::{self, File, OpenOptions};
 use std::io::{BufRead, BufReader, Read, Seek, SeekFrom, Write};
 use std::path::{Path, PathBuf};
@@ -18,9 +19,25 @@ pub enum HookError {
     LockPoisoned,
     #[error("hook command arguments are incomplete")]
     InvalidArguments,
-    #[error("Codex notification command contains an unsupported TOML delimiter")]
-    InvalidNotifyValue,
+    #[error("Codex runtime command contains an unsupported TOML delimiter")]
+    InvalidCodexConfigValue,
 }
+
+const TERMEXO_CODEX_EVENT_FILE: &str = "TERMEXO_CODEX_EVENT_FILE";
+const TERMEXO_CODEX_TERMINAL_ID: &str = "TERMEXO_CODEX_TERMINAL_ID";
+const CODEX_HOOK_EVENTS: [&str; 11] = [
+    "SessionStart",
+    "UserPromptSubmit",
+    "PreToolUse",
+    "PermissionRequest",
+    "PostToolUse",
+    "PreCompact",
+    "PostCompact",
+    "SubagentStart",
+    "SubagentStop",
+    "Stop",
+    "SessionEnd",
+];
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -129,14 +146,37 @@ impl HookEventStore {
         // double quotes are stripped before Codex receives the override.
         let values = command
             .iter()
-            .map(|value| {
-                (!value.contains("'''"))
-                    .then(|| format!("'''{value}'''"))
-                    .ok_or(HookError::InvalidNotifyValue)
-            })
+            .map(|value| toml_literal(value))
             .collect::<Result<Vec<_>, _>>()?
             .join(",");
         Ok(format!("notify=[{values}]"))
+    }
+
+    pub fn codex_hook_configs(&self) -> Result<Vec<String>, HookError> {
+        let executable = std::env::current_exe()?;
+        let command = format!(
+            "{} codex-hook-event",
+            command_quote(&executable.to_string_lossy()),
+        );
+        let command = toml_literal(&command)?;
+        Ok(CODEX_HOOK_EVENTS
+            .iter()
+            .map(|event| {
+                format!(
+                    "hooks.{event}=[{{hooks=[{{type='command',command={command},command_windows={command},timeout=10}}]}}]"
+                )
+            })
+            .collect())
+    }
+
+    pub fn codex_hook_environment(&self, terminal_id: &str) -> [(String, String); 2] {
+        [
+            (
+                TERMEXO_CODEX_EVENT_FILE.into(),
+                self.event_file.to_string_lossy().into_owned(),
+            ),
+            (TERMEXO_CODEX_TERMINAL_ID.into(), terminal_id.into()),
+        ]
     }
 
     pub fn write_mcp_config(
@@ -199,6 +239,18 @@ pub fn capture_hook_event_from_cli() -> Result<(), HookError> {
     std::io::stdin().read_to_string(&mut input)?;
     let payload = serde_json::from_str(&input).unwrap_or_else(|_| json!({ "raw": input }));
     append_stored_event(&event_file, terminal_id, "claude", payload)
+}
+
+pub fn capture_codex_hook_event_from_cli() -> Result<(), HookError> {
+    let event_file = env::var(TERMEXO_CODEX_EVENT_FILE).map_err(|_| HookError::InvalidArguments)?;
+    let terminal_id =
+        env::var(TERMEXO_CODEX_TERMINAL_ID).map_err(|_| HookError::InvalidArguments)?;
+    let mut input = String::new();
+    std::io::stdin().read_to_string(&mut input)?;
+    let payload = serde_json::from_str(&input).unwrap_or_else(|_| json!({ "raw": input }));
+    append_stored_event(&event_file, terminal_id, "codex", payload)?;
+    println!("{{}}");
+    Ok(())
 }
 
 pub fn capture_codex_notification_from_cli() -> Result<(), HookError> {
@@ -292,7 +344,29 @@ fn map_hook_event(stored: StoredHookEvent) -> AgentEvent {
 fn map_codex_event(stored: StoredHookEvent) -> AgentEvent {
     let event_type = match stored.payload.get("type").and_then(Value::as_str) {
         Some("agent-turn-complete") => "task.completed",
-        _ => "agent.notification",
+        _ => match stored
+            .payload
+            .get("hook_event_name")
+            .and_then(Value::as_str)
+        {
+            Some("SessionStart") => "session.started",
+            Some("UserPromptSubmit" | "PreCompact" | "PostCompact" | "SubagentStart") => {
+                "agent.thinking"
+            }
+            Some("PreToolUse") => "tool.started",
+            Some("PermissionRequest") => "approval.required",
+            Some("PostToolUse") => {
+                if codex_tool_failed(&stored.payload) {
+                    "tool.failed"
+                } else {
+                    "tool.completed"
+                }
+            }
+            Some("SubagentStop") => "agent.thinking",
+            Some("Stop") => "task.completed",
+            Some("SessionEnd") => "session.ended",
+            _ => "agent.notification",
+        },
     };
     AgentEvent {
         event_key: stored.event_key,
@@ -301,12 +375,35 @@ fn map_codex_event(stored: StoredHookEvent) -> AgentEvent {
             .payload
             .get("thread-id")
             .and_then(Value::as_str)
+            .or_else(|| stored.payload.get("session_id").and_then(Value::as_str))
             .map(str::to_owned),
         terminal_id: stored.terminal_id,
         event_type: event_type.into(),
         detail: stored.payload,
         created_at: stored.received_at,
     }
+}
+
+fn codex_tool_failed(payload: &Value) -> bool {
+    let response = payload.get("tool_response").unwrap_or(&Value::Null);
+    response
+        .get("is_error")
+        .or_else(|| response.get("isError"))
+        .and_then(Value::as_bool)
+        .unwrap_or(false)
+        || response
+            .get("success")
+            .and_then(Value::as_bool)
+            .is_some_and(|success| !success)
+        || response
+            .get("exit_code")
+            .or_else(|| response.get("exitCode"))
+            .and_then(Value::as_i64)
+            .is_some_and(|exit_code| exit_code != 0)
+        || response
+            .get("status")
+            .and_then(Value::as_str)
+            .is_some_and(|status| matches!(status, "error" | "failed"))
 }
 
 fn stop_failure_event_type(payload: &Value) -> &'static str {
@@ -338,6 +435,12 @@ fn argument_value(arguments: &[String], name: &str) -> Option<String> {
 
 fn command_quote(value: &str) -> String {
     format!("\"{}\"", value.replace('"', "\\\""))
+}
+
+fn toml_literal(value: &str) -> Result<String, HookError> {
+    (!value.contains("'''"))
+        .then(|| format!("'''{value}'''"))
+        .ok_or(HookError::InvalidCodexConfigValue)
 }
 
 fn unix_timestamp_millis() -> i64 {
@@ -450,6 +553,42 @@ mod tests {
     }
 
     #[test]
+    fn builds_codex_lifecycle_hook_overrides_and_terminal_environment() {
+        let directory = test_directory("codex-hooks");
+        let store = HookEventStore::new(&directory).unwrap();
+
+        let configs = store.codex_hook_configs().unwrap();
+        let environment = store
+            .codex_hook_environment("terminal-11")
+            .into_iter()
+            .collect::<std::collections::HashMap<_, _>>();
+
+        assert_eq!(configs.len(), CODEX_HOOK_EVENTS.len());
+        assert!(configs
+            .iter()
+            .any(|config| config.starts_with("hooks.PermissionRequest=")));
+        assert!(configs.iter().all(|config| config.contains("command=")));
+        assert!(configs
+            .iter()
+            .all(|config| config.contains("command_windows=")));
+        assert!(configs
+            .iter()
+            .all(|config| config.contains("codex-hook-event")));
+        assert_eq!(
+            environment
+                .get(TERMEXO_CODEX_TERMINAL_ID)
+                .map(String::as_str),
+            Some("terminal-11")
+        );
+        assert_eq!(
+            environment.get(TERMEXO_CODEX_EVENT_FILE).map(PathBuf::from),
+            Some(store.event_file.clone())
+        );
+
+        fs::remove_dir_all(directory).unwrap();
+    }
+
+    #[test]
     fn maps_codex_turn_completion_to_a_completed_agent_event() {
         let stored = StoredHookEvent {
             event_key: "event-codex-complete".into(),
@@ -468,6 +607,56 @@ mod tests {
         assert_eq!(event.agent_type, "codex");
         assert_eq!(event.event_type, "task.completed");
         assert_eq!(event.native_session_id.as_deref(), Some("thread-1"));
+    }
+
+    #[test]
+    fn maps_codex_lifecycle_hooks_to_terminal_events() {
+        let cases = [
+            ("SessionStart", "session.started"),
+            ("UserPromptSubmit", "agent.thinking"),
+            ("PreToolUse", "tool.started"),
+            ("PermissionRequest", "approval.required"),
+            ("PostToolUse", "tool.completed"),
+            ("PreCompact", "agent.thinking"),
+            ("PostCompact", "agent.thinking"),
+            ("SubagentStart", "agent.thinking"),
+            ("SubagentStop", "agent.thinking"),
+            ("Stop", "task.completed"),
+            ("SessionEnd", "session.ended"),
+        ];
+
+        for (hook_name, expected_event_type) in cases {
+            let event = map_hook_event(StoredHookEvent {
+                event_key: format!("event-{hook_name}"),
+                agent_type: Some("codex".into()),
+                terminal_id: "terminal-codex".into(),
+                received_at: 10,
+                payload: json!({
+                    "hook_event_name": hook_name,
+                    "session_id": "session-codex"
+                }),
+            });
+
+            assert_eq!(event.event_type, expected_event_type, "{hook_name}");
+            assert_eq!(event.native_session_id.as_deref(), Some("session-codex"));
+        }
+    }
+
+    #[test]
+    fn maps_failed_codex_tools_to_failure_events() {
+        let event = map_hook_event(StoredHookEvent {
+            event_key: "event-tool-failed".into(),
+            agent_type: Some("codex".into()),
+            terminal_id: "terminal-codex".into(),
+            received_at: 10,
+            payload: json!({
+                "hook_event_name": "PostToolUse",
+                "session_id": "session-codex",
+                "tool_response": { "success": false }
+            }),
+        });
+
+        assert_eq!(event.event_type, "tool.failed");
     }
 
     #[test]

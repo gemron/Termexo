@@ -18,6 +18,8 @@ const SESSION_STATUS: &str = "HISTORICAL";
 const MAX_TITLE_LENGTH: usize = 96;
 const CODEX_PATH_ENV: &str = "TERMEXO_CODEX_PATH";
 const LEGACY_CODEX_PATH_ENV: &str = "AGENTDOCK_CODEX_PATH";
+const HOOKS_ENABLED_CONFIG: &str = "features.hooks=true";
+const BYPASS_HOOK_TRUST_FLAG: &str = "--dangerously-bypass-hook-trust";
 
 #[derive(Debug, Error)]
 pub enum CodexError {
@@ -216,6 +218,12 @@ impl AgentAdapter for CodexCliAdapter {
         let executable = self.find_executable().ok_or(CodexError::NotInstalled)?;
         let mut command = format!("& {}", powershell_quote(&executable.to_string_lossy()));
         append_option(&mut command, "-c", options.notify_config.as_deref());
+        for hook_config in &options.hook_configs {
+            append_option(&mut command, "-c", Some(hook_config));
+        }
+        append_option(&mut command, "-c", Some(HOOKS_ENABLED_CONFIG));
+        command.push(' ');
+        command.push_str(BYPASS_HOOK_TRUST_FLAG);
         if let Some(session_id) = options
             .session_id
             .as_deref()
@@ -580,10 +588,18 @@ mod tests {
                     r"notify=['''C:\Program Files\Termexo\termexo.exe''','''codex-notify''']"
                         .into(),
                 ),
+                hook_configs: vec![
+                    "hooks.UserPromptSubmit=[{hooks=[{type='command',command='termexo codex-hook-event'}]}]"
+                        .into(),
+                ],
             })
             .unwrap();
         assert!(fresh.command.contains("-c 'notify=["));
         assert!(fresh.command.contains("codex-notify"));
+        assert!(fresh.command.contains("hooks.UserPromptSubmit"));
+        assert!(fresh.command.contains("codex-hook-event"));
+        assert!(fresh.command.contains("-c 'features.hooks=true'"));
+        assert!(fresh.command.contains("--dangerously-bypass-hook-trust"));
         assert!(fresh.command.contains("--model 'gpt-5.6-sol'"));
         assert!(!fresh.command.contains(" resume "));
 
@@ -592,11 +608,14 @@ mod tests {
                 session_id: Some("019f9978-f46b-7d50-93b6-927b7eefcb1f".into()),
                 model: None,
                 notify_config: None,
+                hook_configs: Vec::new(),
             })
             .unwrap();
         assert!(resumed
             .command
             .contains("resume '019f9978-f46b-7d50-93b6-927b7eefcb1f'"));
+        assert!(resumed.command.contains("-c 'features.hooks=true'"));
+        assert!(resumed.command.contains("--dangerously-bypass-hook-trust"));
 
         fs::remove_dir_all(directory).unwrap();
     }

@@ -26,6 +26,10 @@ pub fn capture_codex_notification_from_cli() -> Result<(), String> {
     hooks::capture_codex_notification_from_cli().map_err(|error| error.to_string())
 }
 
+pub fn capture_codex_hook_event_from_cli() -> Result<(), String> {
+    hooks::capture_codex_hook_event_from_cli().map_err(|error| error.to_string())
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tracing_subscriber::fmt()
@@ -36,6 +40,7 @@ pub fn run() {
         .init();
 
     tauri::Builder::default()
+        .plugin(tauri_plugin_notification::init())
         .plugin(tauri_plugin_dialog::init())
         .setup(|app| {
             let app_data_dir = app.path().app_data_dir()?;

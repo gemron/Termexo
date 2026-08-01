@@ -4,14 +4,18 @@
 }
 
 .app-shell {
+  --workspace-sidebar-track: clamp(152px, var(--workspace-sidebar-width, 208px), 30vw);
+  --inspector-track: clamp(200px, var(--inspector-width, 252px), 32vw);
+
   display: grid;
   height: 100%;
-  min-width: 760px;
-  min-height: 540px;
+  min-width: 0;
+  min-height: 0;
   grid-template-areas: 'workspace-sidebar workspace-resizer workspace-main inspector-resizer inspector';
   grid-template-columns:
-    var(--workspace-sidebar-width, 208px) 5px minmax(0, 1fr) 5px
-    var(--inspector-width, 252px);
+    var(--workspace-sidebar-track) 5px minmax(0, 1fr) 5px
+    var(--inspector-track);
+  grid-template-rows: minmax(0, 1fr);
   overflow: hidden;
   color: var(--text);
   background:
@@ -22,21 +26,22 @@
     ),
     var(--surface-0);
 
-  &.workspace-sidebar-collapsed {
-    grid-template-columns: 0 0 minmax(0, 1fr) 5px var(--inspector-width, 252px);
+  &.workspace-sidebar-collapsed:not(.workspace-maximized) {
+    grid-template-columns: 0 0 minmax(0, 1fr) 5px var(--inspector-track);
   }
 
-  &.inspector-collapsed {
-    grid-template-columns: var(--workspace-sidebar-width, 208px) 5px minmax(0, 1fr) 0 0;
+  &.inspector-collapsed:not(.workspace-maximized) {
+    grid-template-columns: var(--workspace-sidebar-track) 5px minmax(0, 1fr) 0 0;
   }
 
-  &.workspace-sidebar-collapsed.inspector-collapsed {
+  &.workspace-sidebar-collapsed.inspector-collapsed:not(.workspace-maximized) {
     grid-template-columns: 0 0 minmax(0, 1fr) 0 0;
   }
 
   &.workspace-maximized {
     grid-template-areas: 'workspace-main';
     grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: minmax(0, 1fr);
 
     app-workspace-sidebar,
     app-inspector-panel,
@@ -46,7 +51,9 @@
     }
 
     .workspace-main {
-      grid-template-rows: 52px 44px minmax(0, 1fr);
+      width: 100%;
+      height: 100%;
+      grid-template-rows: 52px 44px auto minmax(0, 1fr) 0;
     }
   }
 
@@ -105,9 +112,11 @@ app-inspector-panel {
 .workspace-main {
   grid-area: workspace-main;
   display: grid;
+  width: 100%;
+  height: 100%;
   min-width: 0;
   min-height: 0;
-  grid-template-rows: 52px 44px minmax(0, 1fr) 22px;
+  grid-template-rows: 52px 44px auto minmax(0, 1fr) 22px;
   background: var(--surface-0);
 }
 
@@ -830,6 +839,8 @@ app-inspector-panel {
 }
 
 .workbench-area {
+  // Pinned so the optional attention banner row above can collapse to zero when absent.
+  grid-row: 4;
   min-width: 0;
   min-height: 0;
   padding: 5px;
@@ -844,6 +855,7 @@ app-inspector-panel {
 }
 
 .statusbar {
+  grid-row: 5;
   display: flex;
   align-items: center;
   gap: 14px;
@@ -986,6 +998,21 @@ app-inspector-panel {
   }
 
   .grid-dimensions .dimension-axis {
+    display: none;
+  }
+}
+
+@media (max-height: 560px) {
+  .workspace-main,
+  .app-shell.workspace-maximized .workspace-main {
+    grid-template-rows: 46px 40px auto minmax(0, 1fr) 0;
+  }
+
+  .topbar {
+    height: 46px;
+  }
+
+  .statusbar {
     display: none;
   }
 }

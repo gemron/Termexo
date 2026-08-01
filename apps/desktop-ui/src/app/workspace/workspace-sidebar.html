@@ -15,6 +15,16 @@
     <button
       class="icon-button btn btn-square btn-ghost btn-sm"
       type="button"
+      title="合并当前工作空间"
+      aria-label="合并当前工作空间"
+      [disabled]="workspaces().length < 2 || !activeWorkspaceId()"
+      (click)="requestActiveWorkspaceMerge()"
+    >
+      <app-icon name="merge" [size]="15" />
+    </button>
+    <button
+      class="icon-button btn btn-square btn-ghost btn-sm"
+      type="button"
       title="新建工作区"
       aria-label="新建工作区"
       (click)="createRequested.emit()"

@@ -11,7 +11,7 @@
 </p>
 
 <p align="center">
-  <img alt="Version 0.3.8" src="https://img.shields.io/badge/version-0.3.8-58c7a0">
+  <img alt="Version 0.3.9" src="https://img.shields.io/badge/version-0.3.9-58c7a0">
   <img alt="Windows" src="https://img.shields.io/badge/platform-Windows-0078D4?logo=windows">
   <img alt="Tauri 2" src="https://img.shields.io/badge/Tauri-2-24C8DB?logo=tauri&logoColor=white">
   <img alt="Angular 22" src="https://img.shields.io/badge/Angular-22-DD0031?logo=angular">
@@ -25,15 +25,28 @@ Termexo 是一个本地优先的 AI 开发工作空间与控制平面。它把�
 逐步扩展多 Agent 编排、供应商 Plan 余量实时查看、安全的 Workspace 共享，以及从可信
 电脑和手机访问工作空间。项目数据与凭据仍由明确的设备、权限和加密边界保护。
 
-> 最新正式版本为 **V0.3.8 Windows 凭据持久化修复版**。模型供应商 API Key 现在会写入
-> 原生 Windows 凭据管理器，并在提示保存成功前重新读取校验。从 V0.3.7 升级后需要重新
-> 输入一次第三方供应商 API Key，因为该版本没有把密钥持久化到运行进程之外。
+> 最新正式版本为 **V0.3.9 会话恢复与状态提醒增强版**。Claude/Codex 会话恢复前会重新
+> 生成启动配置，MiniMax M3 会继续使用正确的供应商环境；等待处理和任务完成状态会通过
+> 应用内常驻提醒、Windows 系统通知和任务栏闪烁及时呈现。
 
 ![Termexo 多终端网格工作台](docs/images/termexo-workbench-v0.3.2.png)
 
 <p align="center">
   <sub>4 个 Claude Code/Codex 终端、2 × 2 自定义网格、指定窗口显示、会话状态与 Inspector。</sub>
 </p>
+
+## V0.3.9 更新
+
+- Claude 会话恢复前重新生成启动命令、模型 Profile、凭据、供应商地址和 hooks 环境；将
+  旧 `MiniMax-M3[1m]` 配置迁移为 `MiniMax-M3`，避免恢复后回落到 Claude Sonnet。
+- 为 Codex 接入提示提交、工具调用、授权、压缩、子 Agent、任务完成和会话边界等完整
+  生命周期 hooks，新建与恢复会话都能准确更新终端状态。
+- 增加等待输入/授权的常驻横幅、Windows 系统通知和任务栏提醒，同时保持任务完成反馈
+  简洁且可直接定位。
+- 支持合并工作空间，并安全保留与持久化其中的终端。
+- 改进响应式侧栏、终端自动适配、网格尺寸、最大化/全屏显示、Codex 初始长命令隐藏和
+  窄窗口可用性。
+- 增加面向 Claude Code 贡献者的仓库架构与发布流程说明。
 
 ## V0.3.8 更新
 

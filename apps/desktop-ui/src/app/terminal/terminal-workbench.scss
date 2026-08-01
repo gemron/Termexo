@@ -1,4 +1,5 @@
 :host {
+  container: terminal-workbench / size;
   display: block;
   height: 100%;
   min-width: 0;
@@ -46,7 +47,7 @@
 .empty-state {
   display: grid;
   height: 100%;
-  min-height: 260px;
+  min-height: 0;
   place-content: center;
   justify-items: center;
   color: var(--text-muted);
@@ -90,10 +91,28 @@
   background: var(--surface-raised);
 }
 
-@media (max-width: 920px) {
-  .terminal-grid[data-layout] {
+@container terminal-workbench (max-height: 420px) and (min-width: 721px) {
+  .terminal-grid[data-layout='rows'],
+  .terminal-grid[data-layout='grid'] {
+    grid-template-columns: repeat(var(--terminal-count, 1), minmax(280px, 1fr));
+    grid-template-rows: minmax(0, 1fr);
+    overflow-x: auto;
+    overflow-y: hidden;
+  }
+}
+
+@container terminal-workbench (max-width: 720px) {
+  .terminal-grid[data-layout='columns'],
+  .terminal-grid[data-layout='grid'] {
     grid-template-columns: minmax(0, 1fr);
-    grid-template-rows: repeat(auto-fit, minmax(240px, 1fr));
-    overflow: auto;
+    grid-template-rows: repeat(var(--terminal-count, 1), minmax(160px, 1fr));
+    overflow-x: hidden;
+    overflow-y: auto;
+  }
+
+  .terminal-grid[data-visible-count='1'] {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: minmax(0, 1fr);
+    overflow: hidden;
   }
 }

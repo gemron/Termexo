@@ -1,6 +1,6 @@
 {
   "name": "desktop-ui",
-  "version": "0.3.8",
+  "version": "0.3.9",
   "scripts": {
     "ng": "node scripts/run-angular.mjs",
     "start": "node scripts/run-angular.mjs serve",
@@ -9,6 +9,7 @@
     "watch": "node scripts/run-angular.mjs build --watch --configuration development",
     "test": "node scripts/run-angular.mjs test",
     "e2e:smoke": "node scripts/smoke.mjs",
+    "e2e:responsive": "node scripts/responsive-smoke.mjs",
     "e2e:desktop": "node scripts/desktop-smoke.mjs",
     "tauri:dev": "node scripts/run-tauri.mjs dev",
     "tauri:build": "node scripts/run-tauri.mjs build"
@@ -24,6 +25,7 @@
     "@angular/router": "^22.0.0",
     "@tauri-apps/api": "^2.11.1",
     "@tauri-apps/plugin-dialog": "^2.7.2",
+    "@tauri-apps/plugin-notification": "^2.3.3",
     "@xterm/addon-fit": "^0.11.0",
     "@xterm/xterm": "^6.0.0",
     "lucide": "^1.27.0",

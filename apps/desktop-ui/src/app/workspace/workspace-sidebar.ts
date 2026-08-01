@@ -16,6 +16,7 @@ export class WorkspaceSidebarComponent {
   readonly workspaceSelected = output<string>();
   readonly favoriteToggled = output<string>();
   readonly editRequested = output<string>();
+  readonly mergeRequested = output<string>();
   readonly deleteRequested = output<string>();
   readonly moveRequested = output<{ workspaceId: string; direction: -1 | 1 }>();
   readonly createRequested = output<void>();
@@ -23,5 +24,12 @@ export class WorkspaceSidebarComponent {
 
   protected workspaceColor(workspace: Workspace): string {
     return normalizeWorkspaceThemeColor(workspace.themeColor);
+  }
+
+  protected requestActiveWorkspaceMerge(): void {
+    const workspaceId = this.activeWorkspaceId();
+    if (workspaceId && this.workspaces().length > 1) {
+      this.mergeRequested.emit(workspaceId);
+    }
   }
 }

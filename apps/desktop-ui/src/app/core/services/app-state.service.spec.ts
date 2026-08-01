@@ -205,6 +205,44 @@ describe('AppStateService', () => {
     );
   });
 
+  it('persists the resolved model profile when refreshing a restored Claude launch', async () => {
+    await service.initialize();
+    const terminal = service.createTerminal({
+      agentType: 'claude',
+      command: "claude --model 'sonnet'",
+      nativeSessionId: 'legacy-session',
+    })!;
+
+    const updated = service.updateRestoredTerminalLaunch(
+      terminal.id,
+      "claude --model 'MiniMax-M3' --resume 'legacy-session'",
+      { profileId: 'claude-default', model: 'MiniMax M3' },
+    );
+
+    expect(updated).toBe(true);
+    expect(service.activeTerminal()).toEqual(
+      expect.objectContaining({
+        id: terminal.id,
+        command: "claude --model 'MiniMax-M3' --resume 'legacy-session'",
+        model: 'MiniMax M3',
+        profileId: 'claude-default',
+        nativeSessionId: 'legacy-session',
+        status: 'STARTING',
+      }),
+    );
+    expect(repository.save).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        terminals: expect.arrayContaining([
+          expect.objectContaining({
+            id: terminal.id,
+            model: 'MiniMax M3',
+            profileId: 'claude-default',
+          }),
+        ]),
+      }),
+    );
+  });
+
   it('moves a workspace manually and persists the new order', async () => {
     await service.initialize();
     repository.saveAll.mockClear();
@@ -247,6 +285,53 @@ describe('AppStateService', () => {
 
     expect(service.workspaces().some((item) => item.id === workspace.id)).toBe(true);
     expect(service.activeWorkspace()?.id).toBe(workspace.id);
+  });
+
+  it('merges terminals into a target workspace and removes the source workspace', async () => {
+    await service.initialize();
+    const sourceWorkspace = service.activeWorkspace()!;
+    const sourceTerminalIds = sourceWorkspace.terminals.map((terminal) => terminal.id);
+    const sourceActiveTerminalId = service.activeTerminal()!.id;
+    const targetWorkspace = service.workspaces()[1];
+    service.selectWorkspace(targetWorkspace.id);
+    const targetTerminal = service.createTerminal({ agentType: 'shell', name: 'Target shell' })!;
+    service.selectWorkspace(sourceWorkspace.id);
+    repository.saveAll.mockClear();
+    repository.delete.mockClear();
+
+    const merged = await service.mergeWorkspaces(sourceWorkspace.id, targetWorkspace.id);
+
+    expect(merged?.id).toBe(targetWorkspace.id);
+    expect(merged?.terminals.map((terminal) => terminal.id)).toEqual([
+      targetTerminal.id,
+      ...sourceTerminalIds,
+    ]);
+    expect(service.workspaces().some((workspace) => workspace.id === sourceWorkspace.id)).toBe(
+      false,
+    );
+    expect(service.activeWorkspace()?.id).toBe(targetWorkspace.id);
+    expect(service.activeTerminal()?.id).toBe(sourceActiveTerminalId);
+    expect(service.workspaces().map((workspace) => workspace.sortOrder)).toEqual([0, 1]);
+    expect(repository.saveAll).toHaveBeenCalledOnce();
+    expect(repository.delete).toHaveBeenCalledWith(sourceWorkspace.id);
+  });
+
+  it('keeps both workspaces when a merge cannot delete the source', async () => {
+    await service.initialize();
+    const originalWorkspaces = service.workspaces();
+    const sourceWorkspace = originalWorkspaces[0];
+    const targetWorkspace = originalWorkspaces[1];
+    repository.delete.mockRejectedValueOnce(new Error('database unavailable'));
+    repository.saveAll.mockClear();
+
+    await expect(service.mergeWorkspaces(sourceWorkspace.id, targetWorkspace.id)).rejects.toThrow(
+      'database unavailable',
+    );
+
+    expect(service.workspaces()).toEqual(originalWorkspaces);
+    expect(service.activeWorkspace()?.id).toBe(sourceWorkspace.id);
+    expect(repository.saveAll).toHaveBeenCalledTimes(2);
+    expect(repository.saveAll).toHaveBeenLastCalledWith(originalWorkspaces);
   });
 
   it('restarts a Claude terminal with a new profile without changing the CLI type', async () => {

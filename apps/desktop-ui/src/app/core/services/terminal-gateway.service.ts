@@ -15,6 +15,7 @@ interface TerminalStartRequest {
   shell: string;
   workingDirectory: string;
   command?: string;
+  hideInitialCommand?: boolean;
   cols: number;
   rows: number;
 }
@@ -46,6 +47,7 @@ export class TerminalGatewayService {
       shell: session.shell,
       workingDirectory: session.workingDirectory,
       command: session.command,
+      hideInitialCommand: session.agentType === 'codex',
       cols,
       rows,
     };

@@ -165,7 +165,7 @@ export const CLAUDE_PROVIDER_PRESETS: readonly ClaudeProviderPreset[] = [
   {
     provider: 'MiniMax',
     name: 'MiniMax M3',
-    model: 'MiniMax-M3[1m]',
+    model: 'MiniMax-M3',
     baseUrl: 'https://api.minimaxi.com/anthropic',
   },
   {

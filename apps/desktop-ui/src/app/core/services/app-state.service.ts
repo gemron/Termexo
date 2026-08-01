@@ -139,6 +139,66 @@ export class AppStateService {
     return removedWorkspace;
   }
 
+  async mergeWorkspaces(
+    sourceWorkspaceId: string,
+    targetWorkspaceId: string,
+  ): Promise<Workspace | null> {
+    if (sourceWorkspaceId === targetWorkspaceId) {
+      return null;
+    }
+
+    const workspaces = this.workspaceItems();
+    const sourceWorkspace = workspaces.find((workspace) => workspace.id === sourceWorkspaceId);
+    const targetWorkspace = workspaces.find((workspace) => workspace.id === targetWorkspaceId);
+    if (!sourceWorkspace || !targetWorkspace) {
+      return null;
+    }
+
+    const targetTerminalIds = new Set(targetWorkspace.terminals.map((terminal) => terminal.id));
+    const movedTerminals = sourceWorkspace.terminals.filter(
+      (terminal) => !targetTerminalIds.has(terminal.id),
+    );
+    const mergedWorkspace: Workspace = {
+      ...targetWorkspace,
+      lastOpenedAt: Date.now(),
+      terminals: [...targetWorkspace.terminals, ...movedTerminals],
+    };
+    const mergedWorkspaces = this.normalizeWorkspaceOrder(
+      workspaces
+        .filter((workspace) => workspace.id !== sourceWorkspaceId)
+        .map((workspace) => (workspace.id === targetWorkspaceId ? mergedWorkspace : workspace)),
+    );
+    const normalizedMergedWorkspace = mergedWorkspaces.find(
+      (workspace) => workspace.id === targetWorkspaceId,
+    )!;
+
+    await this.repository.saveAll(mergedWorkspaces);
+    try {
+      await this.repository.delete(sourceWorkspaceId);
+    } catch (error) {
+      await this.repository.saveAll(workspaces).catch(() => undefined);
+      throw error;
+    }
+
+    const previouslyActiveWorkspaceId = this.activeWorkspaceId();
+    const previouslyActiveTerminalId = this.activeTerminalId();
+    this.workspaceItems.set(mergedWorkspaces);
+    this.activeWorkspaceId.set(targetWorkspaceId);
+    const preservesActiveTerminal =
+      (previouslyActiveWorkspaceId === sourceWorkspaceId ||
+        previouslyActiveWorkspaceId === targetWorkspaceId) &&
+      normalizedMergedWorkspace.terminals.some(
+        (terminal) => terminal.id === previouslyActiveTerminalId,
+      );
+    this.activeTerminalId.set(
+      preservesActiveTerminal
+        ? previouslyActiveTerminalId
+        : (normalizedMergedWorkspace.terminals[0]?.id ?? null),
+    );
+
+    return normalizedMergedWorkspace;
+  }
+
   toggleFavorite(workspaceId: string): void {
     const workspace = this.workspaceItems().find((item) => item.id === workspaceId);
     if (!workspace) {
@@ -257,7 +317,13 @@ export class AppStateService {
     this.updateTerminal(terminalId, (terminal) => ({ ...terminal, status }));
   }
 
-  updateRestoredTerminalLaunch(terminalId: string, command: string): boolean {
+  updateRestoredTerminalLaunch(
+    terminalId: string,
+    command: string,
+    metadata: Partial<
+      Pick<TerminalSession, 'model' | 'profileId' | 'mcpProfileId' | 'accountProfileId'>
+    > = {},
+  ): boolean {
     const workspace = this.workspaceItems().find((item) =>
       item.terminals.some((terminal) => terminal.id === terminalId),
     );
@@ -269,7 +335,7 @@ export class AppStateService {
       ...workspace,
       terminals: workspace.terminals.map((terminal) =>
         terminal.id === terminalId
-          ? { ...terminal, command, status: 'STARTING' as const }
+          ? { ...terminal, ...metadata, command, status: 'STARTING' as const }
           : terminal,
       ),
     };

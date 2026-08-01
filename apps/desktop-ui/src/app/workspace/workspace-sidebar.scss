@@ -48,7 +48,7 @@
 
 .sidebar-tools {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 30px;
+  grid-template-columns: minmax(0, 1fr) repeat(2, 30px);
   gap: 6px;
   padding: 12px 10px 8px;
 }

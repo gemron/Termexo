@@ -70,7 +70,15 @@ impl PtyManager {
         for (key, value) in environment {
             command.env(key, value);
         }
-        configure_shell(&mut command, &request.shell);
+        let initial_command = request.command.as_deref().filter(|value| !value.is_empty());
+        let command_started_without_echo = configure_shell(
+            &mut command,
+            &request.shell,
+            request
+                .hide_initial_command
+                .then_some(initial_command)
+                .flatten(),
+        );
 
         let child = pair
             .slave
@@ -86,8 +94,7 @@ impl PtyManager {
             .take_writer()
             .map_err(|error| PtyError::Backend(error.to_string()))?;
 
-        if let Some(initial_command) = request.command.as_deref().filter(|value| !value.is_empty())
-        {
+        if let Some(initial_command) = initial_command.filter(|_| !command_started_without_echo) {
             writer.write_all(initial_command.as_bytes())?;
             writer.write_all(line_ending().as_bytes())?;
             writer.flush()?;
@@ -170,9 +177,53 @@ fn spawn_reader(terminal_id: String, app: AppHandle, mut reader: Box<dyn Read + 
     });
 }
 
-fn configure_shell(command: &mut CommandBuilder, shell: &str) {
-    if shell.to_ascii_lowercase().contains("powershell") {
+fn configure_shell(
+    command: &mut CommandBuilder,
+    shell: &str,
+    hidden_initial_command: Option<&str>,
+) -> bool {
+    let normalized_shell = shell.to_ascii_lowercase();
+    if normalized_shell.contains("powershell")
+        || normalized_shell.ends_with("pwsh")
+        || normalized_shell.ends_with("pwsh.exe")
+    {
         command.args(["-NoLogo", "-NoProfile"]);
+        if let Some(initial_command) = hidden_initial_command {
+            command.args(["-NoExit", "-Command"]);
+            command.arg(initial_command);
+            return true;
+        }
+    }
+    false
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn powershell_consumes_hidden_initial_commands() {
+        let mut powershell = CommandBuilder::new("powershell.exe");
+        assert!(configure_shell(
+            &mut powershell,
+            "powershell.exe",
+            Some("codex")
+        ));
+
+        let mut pwsh = CommandBuilder::new("pwsh");
+        assert!(configure_shell(&mut pwsh, "pwsh", Some("codex")));
+    }
+
+    #[test]
+    fn other_shells_keep_using_pty_input() {
+        let mut bash = CommandBuilder::new("bash");
+        assert!(!configure_shell(&mut bash, "bash", Some("codex")));
+    }
+
+    #[test]
+    fn powershell_without_hidden_command_keeps_using_pty_input() {
+        let mut powershell = CommandBuilder::new("powershell.exe");
+        assert!(!configure_shell(&mut powershell, "powershell.exe", None));
     }
 }
 

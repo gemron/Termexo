@@ -3,5 +3,10 @@
   "identifier": "default",
   "description": "Default Termexo desktop capability",
   "windows": ["main"],
-  "permissions": ["core:default", "dialog:allow-open"]
+  "permissions": [
+    "core:default",
+    "core:window:allow-request-user-attention",
+    "dialog:allow-open",
+    "notification:default"
+  ]
 }
