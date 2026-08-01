@@ -4,7 +4,7 @@
 
 <h1 align="center">Termexo</h1>
 
-<p align="center">A local-first AI development workspace for agents, models, and connected devices</p>
+<p align="center"><strong>One window for every coding agent</strong></p>
 
 <p align="center">
   <strong>English</strong> · <a href="./README.cn.md">简体中文</a>
@@ -17,26 +17,79 @@
   <img alt="Angular 22" src="https://img.shields.io/badge/Angular-22-DD0031?logo=angular">
 </p>
 
-Termexo is a local-first AI development workspace and control plane. It brings projects,
-terminals, native agent sessions, model/provider profiles, and runtime state into one
-recoverable desktop environment instead of another isolated chat window.
+<p align="center">
+  <a href="https://www.termexo.com">Website</a> ·
+  <a href="https://github.com/gemron/Termexo/releases/latest">Download</a> ·
+  <a href="https://www.npmjs.com/package/termexo">npm</a>
+</p>
 
-The current desktop release focuses on coordinating local AI coding terminals. The roadmap
-extends the same Workspace model into multi-agent orchestration, real-time provider Plan
-quota visibility, secure workspace sharing, and access from trusted computers and phones.
-Local project data and credentials remain protected by explicit device, permission, and
-encryption boundaries.
+Termexo puts Claude Code, Codex, and the terminals around them into one recoverable Windows
+workspace. Keep several agents visible at once, see immediately when one needs input or
+approval, reopen yesterday's native session, and switch the Claude CLI between compatible
+model providers without rebuilding your setup.
+
+Run the complete Windows app with one command—no Termexo account or server required:
+
+```powershell
+npx termexo@latest
+```
 
 > The latest published release is **V0.3.9, the restored-session and attention workflow update**.
 > Claude and Codex sessions now rebuild their launch configuration before restoration, MiniMax M3
 > profiles keep the correct provider environment, and blocked or completed agents surface through
 > persistent in-app attention, native notifications, and taskbar alerts.
 
-![Termexo multi-terminal grid workbench](docs/images/termexo-workbench-v0.3.2.png)
+![Termexo multi-terminal grid workbench](website/assets/termexo-workbench.png)
 
 <p align="center">
-  <sub>Four active Claude Code and Codex terminals in a configurable 2 × 2 grid with explicit pane selection and the Inspector.</sub>
+  <sub>Claude Code and Codex terminals side by side in a workspace that remembers its layout.</sub>
 </p>
+
+## What Works Today
+
+<table>
+  <tr>
+    <td width="50%" valign="top">
+      <strong>Four agents. One screen.</strong><br><br>
+      Open as many real PTY terminals as you need, choose which stay visible, and arrange them
+      in a custom 1–6 row/column grid. Each workspace remembers its folder, tabs, layout, model,
+      and theme.
+      <br><br>
+      <a href="website/assets/termexo-workbench.png"><img src="website/assets/termexo-workbench.png" alt="Termexo multi-agent workbench"></a>
+    </td>
+    <td width="50%" valign="top">
+      <strong>Know when an agent needs you.</strong><br><br>
+      Waiting for input, waiting for approval, completed, and failed states are distinct. A
+      persistent banner, native Windows notification, and taskbar flash bring you back to the
+      exact terminal that needs attention.
+      <br><br>
+      <a href="website/assets/termexo-attention.png"><img src="website/assets/termexo-attention.png" alt="Termexo agent attention notifications"></a>
+    </td>
+  </tr>
+  <tr>
+    <td width="50%" valign="top">
+      <strong>Pick up yesterday's conversation.</strong><br><br>
+      Search local Claude Code and Codex sessions across projects, accounts, branches, and
+      models. Termexo restores them through the CLIs' own <code>claude --resume</code> and
+      <code>codex resume</code> commands while keeping native session files read-only.
+      <br><br>
+      <a href="website/assets/termexo-session-center.png"><img src="website/assets/termexo-session-center.png" alt="Termexo native session center"></a>
+    </td>
+    <td width="50%" valign="top">
+      <strong>Same CLI. Different model.</strong><br><br>
+      Point Claude Code at Anthropic, DeepSeek, MiniMax, GLM, or a custom Anthropic-compatible
+      endpoint. Save providers as profiles, keep API keys in Windows Credential Manager, and
+      switch every Claude terminal in a workspace together.
+      <br><br>
+      <a href="website/assets/termexo-models.png"><img src="website/assets/termexo-models.png" alt="Termexo model provider profiles"></a>
+    </td>
+  </tr>
+</table>
+
+Termexo is local by default: it has no account, cloud service, or required sync. Workspace
+state stays in local SQLite storage, credentials stay in Windows Credential Manager, and
+Claude/Codex session histories are read-only. The agent CLIs still connect to the providers
+you configure under their own terms and privacy policies.
 
 ## V0.3.9 Updates
 
@@ -192,7 +245,7 @@ a local control plane that is observable, recoverable, and extensible.
 | Local data and secrets   | Store workspace/session/event data in SQLite and API keys in Windows Credential Manager                            |
 | Browser preview          | Preview the complete UI without Rust and exercise layout flows through an interactive simulated terminal           |
 
-![Termexo model profiles](docs/images/termexo-model-profiles.png)
+![Termexo model profiles](website/assets/termexo-models.png)
 
 <p align="center">
   <sub>Models, endpoints, and credential entry are managed in one place. Stored secrets are never returned to the frontend.</sub>
@@ -217,9 +270,9 @@ a local control plane that is observable, recoverable, and extensible.
 
 ## Current Boundaries
 
-- Claude Code remains the most complete event Adapter. Codex supports native detection,
-  model/account-aware launch, multi-account local session discovery, resume, and native
-  turn-completion events; tool, approval, and rate-limit event parity is still limited.
+- Claude Code and Codex both support native detection, account/model-aware launch, local session
+  discovery, resume, and lifecycle-driven terminal states. Their event vocabularies are not
+  identical, and compatible-provider model switching currently applies to Claude terminals.
 - When the app exits, terminated operating-system processes are not “fake restored.”
   Termexo restores terminal configuration; historical Claude sessions must be resumed
   explicitly from the session center.
@@ -257,7 +310,7 @@ from source uses the newer toolchain listed below.
 - Windows 10/11;
 - Node.js `^22.22.3`, `^24.15.0`, or `>=26.0.0`;
 - Rust stable, Visual Studio C++ Build Tools, and WebView2 for the desktop runtime;
-- a local Claude Code installation for Claude integration.
+- a local Claude Code and/or Codex CLI installation (Termexo can also manage installation and upgrades).
 
 ### 1. Clone and install frontend dependencies
 
@@ -296,18 +349,18 @@ flowchart LR
     UI["Angular Desktop UI"]
     IPC["Tauri Commands"]
     PTY["PTY Service"]
-    Adapter["Claude Adapter"]
+    Adapters["Agent Adapters"]
     Hooks["Hooks / Event Pipeline"]
     DB[("SQLite")]
     Vault["Windows Credential Manager"]
-    Claude["Claude Code"]
+    Agents["Claude Code / Codex"]
 
     UI <--> IPC
     IPC --> PTY
-    PTY --> Claude
-    IPC --> Adapter
-    Adapter --> Claude
-    Claude --> Hooks
+    PTY --> Agents
+    IPC --> Adapters
+    Adapters --> Agents
+    Agents --> Hooks
     Hooks --> DB
     IPC <--> DB
     IPC --> Vault
@@ -316,8 +369,8 @@ flowchart LR
 - **Angular UI** — workspaces, terminal layouts, session center, settings, and Inspector.
 - **Tauri Commands** — a minimal IPC boundary between the frontend and desktop core.
 - **PTY Service** — creates, writes to, resizes, and closes real terminal processes.
-- **Claude Adapter** — installation detection, read-only session scanning, and native launch/resume.
-- **Hooks Pipeline** — receives Claude hooks, deduplicates events, and maps common agent states.
+- **Agent Adapters** — Claude/Codex installation detection, read-only session scanning, and native launch/resume.
+- **Hooks Pipeline** — receives agent lifecycle events, deduplicates them, and maps common terminal states.
 - **SQLite / Credential Manager** — stores structured local data and sensitive credentials separately.
 
 ## Data and Security
@@ -325,11 +378,11 @@ flowchart LR
 | Data                                  | Storage                          | Policy                                       |
 | ------------------------------------- | -------------------------------- | -------------------------------------------- |
 | Workspaces and terminal configuration | SQLite                           | Local persistence                            |
-| Claude session index                  | SQLite                           | Upserted from read-only Claude JSONL parsing |
+| Claude/Codex session index            | SQLite                           | Upserted from read-only native session files |
 | Agent events                          | JSONL spool + SQLite             | Deduplicated by `event_key`                  |
 | Model and MCP profiles                | SQLite                           | Plaintext API keys never enter the database  |
 | API keys                              | Windows Credential Manager       | The frontend can read only `hasCredential`   |
-| Native Claude sessions                | `%USERPROFILE%\.claude\projects` | Read-only; never written back                |
+| Native agent sessions                 | Claude/Codex data directories    | Read-only; never modified or deleted          |
 
 For compatibility with early installations, the database filename and some internal Tauri
 identifiers still use a legacy name. This does not affect the Termexo product name or new

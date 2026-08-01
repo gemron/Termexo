@@ -4,7 +4,7 @@
 
 <h1 align="center">Termexo</h1>
 
-<p align="center">面向 Agent、模型与多设备连接的本地优先 AI 开发工作空间</p>
+<p align="center"><strong>一个窗口，装下所有编程 Agent</strong></p>
 
 <p align="center">
   <a href="./README.md">English</a> · <strong>简体中文</strong>
@@ -17,23 +17,72 @@
   <img alt="Angular 22" src="https://img.shields.io/badge/Angular-22-DD0031?logo=angular">
 </p>
 
-Termexo 是一个本地优先的 AI 开发工作空间与控制平面。它把项目、终端、Agent
-原生会话、模型/供应商配置和运行状态集中到一个可恢复的桌面环境中，而不是再做一个
-彼此隔离的聊天窗口。
+<p align="center">
+  <a href="https://www.termexo.com">官方网站</a> ·
+  <a href="https://github.com/gemron/Termexo/releases/latest">下载安装</a> ·
+  <a href="https://www.npmjs.com/package/termexo">npm</a>
+</p>
 
-当前桌面版本重点统一管理本机 AI 编程终端；后续路线图会沿用同一个 Workspace 模型，
-逐步扩展多 Agent 编排、供应商 Plan 余量实时查看、安全的 Workspace 共享，以及从可信
-电脑和手机访问工作空间。项目数据与凭据仍由明确的设备、权限和加密边界保护。
+Termexo 把 Claude Code、Codex 和围绕它们运行的终端收进一个可恢复的 Windows
+工作空间。你可以同时盯住多个 Agent，及时知道谁在等待输入或授权，接着昨天的原生会话
+继续工作，也可以在不重搭环境的情况下为 Claude CLI 切换兼容模型供应商。
+
+一条命令运行完整 Windows 应用，不需要注册 Termexo 账号，也不依赖 Termexo 服务器：
+
+```powershell
+npx termexo@latest
+```
 
 > 最新正式版本为 **V0.3.9 会话恢复与状态提醒增强版**。Claude/Codex 会话恢复前会重新
 > 生成启动配置，MiniMax M3 会继续使用正确的供应商环境；等待处理和任务完成状态会通过
 > 应用内常驻提醒、Windows 系统通知和任务栏闪烁及时呈现。
 
-![Termexo 多终端网格工作台](docs/images/termexo-workbench-v0.3.2.png)
+![Termexo 多终端网格工作台](website/assets/termexo-workbench.png)
 
 <p align="center">
-  <sub>4 个 Claude Code/Codex 终端、2 × 2 自定义网格、指定窗口显示、会话状态与 Inspector。</sub>
+  <sub>Claude Code 与 Codex 终端并排运行，工作空间会记住它们的布局。</sub>
 </p>
+
+## 现在已经能做什么
+
+<table>
+  <tr>
+    <td width="50%" valign="top">
+      <strong>四个 Agent，一块屏幕。</strong><br><br>
+      想开多少真实 PTY 终端就开多少，再选择当前要显示的终端，排成 1–6 行/列的自定义网格。
+      每个工作空间都会记住目录、标签、布局、模型和主题。
+      <br><br>
+      <a href="website/assets/termexo-workbench.png"><img src="website/assets/termexo-workbench.png" alt="Termexo 多 Agent 工作台"></a>
+    </td>
+    <td width="50%" valign="top">
+      <strong>Agent 需要你时，马上知道。</strong><br><br>
+      等待输入、等待授权、已完成和失败状态一眼可分；常驻提示条、Windows 系统通知与任务栏
+      闪烁会把你带回真正需要处理的那个终端。
+      <br><br>
+      <a href="website/assets/termexo-attention.png"><img src="website/assets/termexo-attention.png" alt="Termexo Agent 状态提醒"></a>
+    </td>
+  </tr>
+  <tr>
+    <td width="50%" valign="top">
+      <strong>接着昨天的会话继续。</strong><br><br>
+      跨项目、账号、分支和模型搜索本机 Claude Code/Codex 会话。Termexo 调用 CLI 原生的
+      <code>claude --resume</code> 与 <code>codex resume</code> 恢复完整上下文，并始终只读原生会话文件。
+      <br><br>
+      <a href="website/assets/termexo-session-center.png"><img src="website/assets/termexo-session-center.png" alt="Termexo 原生会话中心"></a>
+    </td>
+    <td width="50%" valign="top">
+      <strong>同一个 CLI，换个模型运行。</strong><br><br>
+      让 Claude Code 使用 Anthropic、DeepSeek、MiniMax、GLM 或自定义 Anthropic 兼容 Endpoint。
+      供应商保存为 Profile，API Key 交给 Windows 凭据管理器保管，还能一次切换工作空间里的全部 Claude 终端。
+      <br><br>
+      <a href="website/assets/termexo-models.png"><img src="website/assets/termexo-models.png" alt="Termexo 模型供应商 Profile"></a>
+    </td>
+  </tr>
+</table>
+
+Termexo 默认只在本地工作：没有 Termexo 账号、云服务或强制同步。工作空间状态保存在本机
+SQLite，密钥保存在 Windows Credential Manager，Claude/Codex 历史会话只读。Agent CLI
+仍会按照你选择的供应商及其隐私政策连接对应模型服务。
 
 ## V0.3.9 更新
 
@@ -177,7 +226,7 @@ Termexo 以 **Workspace** 为组织单位，把这些信息集中到一个可观
 | 本地数据与密钥     | Workspace、会话索引和事件保存到 SQLite；API Key 保存到 Windows Credential Manager |
 | 浏览器预览         | 无需 Rust 即可预览完整 UI，并使用可交互的模拟终端验证布局与基础流程               |
 
-![Termexo 模型 Profile](docs/images/termexo-model-profiles.png)
+![Termexo 模型 Profile](website/assets/termexo-models.png)
 
 <p align="center">
   <sub>模型、Endpoint 与凭据入口集中管理；已保存的密钥不会回传给前端。</sub>
@@ -196,8 +245,8 @@ Termexo 以 **Workspace** 为组织单位，把这些信息集中到一个可观
 
 ## 当前边界
 
-- Claude Code 仍是事件能力最完整的 Adapter。Codex 已支持原生检测、按账号/模型启动、
-  多账号本地会话发现、恢复和原生轮次完成事件；工具、审批和限流事件尚未完全对齐。
+- Claude Code 与 Codex 都已支持原生检测、按账号/模型启动、本地会话发现、恢复和基于生命周期
+  事件的终端状态。两者的事件语义并不完全相同；兼容供应商模型切换目前只适用于 Claude 终端。
 - 应用退出后，已退出的操作系统进程不会被“伪恢复”。Termexo 只恢复终端配置，
   历史 Claude 会话需要从会话中心显式恢复。
 - Claude 与 Codex 原始 JSONL 均只读，Termexo 不修改、重命名或删除这些文件。
@@ -232,7 +281,7 @@ termexo
 - Windows 10/11；
 - Node.js `^22.22.3`、`^24.15.0` 或 `>=26.0.0`；
 - 桌面模式需要 Rust stable、Visual Studio C++ Build Tools 和 WebView2；
-- 使用 Claude 功能需要本机已安装 Claude Code。
+- 本机已安装 Claude Code 和/或 Codex CLI（也可由 Termexo 管理安装与升级）。
 
 ### 1. 获取代码与安装前端依赖
 
@@ -271,18 +320,18 @@ flowchart LR
     UI["Angular Desktop UI"]
     IPC["Tauri Commands"]
     PTY["PTY Service"]
-    Adapter["Claude Adapter"]
+    Adapters["Agent Adapters"]
     Hooks["Hooks / Event Pipeline"]
     DB[("SQLite")]
     Vault["Windows Credential Manager"]
-    Claude["Claude Code"]
+    Agents["Claude Code / Codex"]
 
     UI <--> IPC
     IPC --> PTY
-    PTY --> Claude
-    IPC --> Adapter
-    Adapter --> Claude
-    Claude --> Hooks
+    PTY --> Agents
+    IPC --> Adapters
+    Adapters --> Agents
+    Agents --> Hooks
     Hooks --> DB
     IPC <--> DB
     IPC --> Vault
@@ -291,8 +340,8 @@ flowchart LR
 - **Angular UI**：Workspace、终端布局、会话中心、设置和 Inspector。
 - **Tauri Commands**：前后端 IPC 边界，暴露最小化桌面能力。
 - **PTY Service**：创建、输入、调整尺寸和关闭真实终端进程。
-- **Claude Adapter**：安装检测、只读会话扫描和原生启动/恢复命令。
-- **Hooks Pipeline**：接收 Claude Hooks，去重并映射统一 Agent 状态。
+- **Agent Adapters**：检测 Claude/Codex 安装、只读扫描会话，并生成原生启动/恢复命令。
+- **Hooks Pipeline**：接收 Agent 生命周期事件，去重并映射统一终端状态。
 - **SQLite / Credential Manager**：分别保存结构化本地数据和敏感凭据。
 
 ## 数据与安全
@@ -300,11 +349,11 @@ flowchart LR
 | 数据                | 存储位置                         | 处理原则                          |
 | ------------------- | -------------------------------- | --------------------------------- |
 | Workspace、终端配置 | SQLite                           | 本地持久化                        |
-| Claude 会话索引     | SQLite                           | 从 Claude JSONL 只读解析后 Upsert |
+| Claude/Codex 会话索引 | SQLite                         | 从 Agent 原生会话文件只读解析后 Upsert |
 | Agent 事件          | JSONL spool + SQLite             | 按 `event_key` 去重               |
 | 模型与 MCP Profile  | SQLite                           | API Key 明文不进入数据库          |
 | API Key             | Windows Credential Manager       | 前端只能读取 `hasCredential`      |
-| Claude 原始会话     | `%USERPROFILE%\.claude\projects` | 只读，不回写                      |
+| Agent 原始会话      | Claude/Codex 数据目录            | 只读，不修改、重命名或删除         |
 
 为兼容早期安装，数据库文件和部分 Tauri 内部标识仍沿用旧标识；这不影响产品名称
 与新的 `TERMEXO_*` 环境变量。
