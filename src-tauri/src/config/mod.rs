@@ -11,6 +11,8 @@ const CREDENTIAL_SERVICE: &str = "dev.agentdock.desktop";
 pub enum ConfigError {
     #[error("credential store operation failed: {0}")]
     Credential(#[from] keyring::Error),
+    #[error("credential store did not persist the saved secret")]
+    CredentialNotPersisted,
     #[error("launch environment lock is poisoned")]
     LockPoisoned,
 }
@@ -143,7 +145,10 @@ pub struct CredentialStore;
 impl CredentialStore {
     pub fn set(&self, target: &str, secret: &str) -> Result<(), ConfigError> {
         Entry::new(CREDENTIAL_SERVICE, target)?.set_password(secret)?;
-        Ok(())
+        match self.get_optional(target)? {
+            Some(stored) if stored == secret => Ok(()),
+            _ => Err(ConfigError::CredentialNotPersisted),
+        }
     }
 
     pub fn get(&self, target: &str) -> Result<String, ConfigError> {
@@ -196,6 +201,29 @@ mod tests {
                 .as_deref(),
             Some("secret")
         );
+    }
+
+    #[cfg(target_os = "windows")]
+    #[test]
+    fn native_windows_credential_store_is_enabled() {
+        let _ = keyring::windows::default_credential_builder();
+    }
+
+    #[test]
+    #[ignore = "uses the operating system credential store"]
+    fn secure_storage_round_trips_a_credential() {
+        let target = format!("credential-probe:{}", std::process::id());
+        let store = CredentialStore;
+
+        store
+            .set(&target, "probe-secret")
+            .expect("credential should be written");
+        let stored = store
+            .get_optional(&target)
+            .expect("credential should be readable");
+        store.delete(&target);
+
+        assert_eq!(stored.as_deref(), Some("probe-secret"));
     }
 }
 

@@ -1,6 +1,6 @@
 {
   "name": "termexo",
-  "version": "0.3.7",
+  "version": "0.3.8",
   "description": "Local-first workspace for AI coding agents, models, and terminals",
   "private": true,
   "scripts": {

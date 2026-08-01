@@ -11,7 +11,7 @@
 </p>
 
 <p align="center">
-  <img alt="Version 0.3.7" src="https://img.shields.io/badge/version-0.3.7-58c7a0">
+  <img alt="Version 0.3.8" src="https://img.shields.io/badge/version-0.3.8-58c7a0">
   <img alt="Windows" src="https://img.shields.io/badge/platform-Windows-0078D4?logo=windows">
   <img alt="Tauri 2" src="https://img.shields.io/badge/Tauri-2-24C8DB?logo=tauri&logoColor=white">
   <img alt="Angular 22" src="https://img.shields.io/badge/Angular-22-DD0031?logo=angular">
@@ -27,16 +27,25 @@ quota visibility, secure workspace sharing, and access from trusted computers an
 Local project data and credentials remain protected by explicit device, permission, and
 encryption boundaries.
 
-> The latest published release is **V0.3.7, the workspace continuity, status, and theme update**.
-> Workspaces now preserve terminal interaction across switches, surface global Agent attention
-> notices, track Codex turn completion through its native notification channel, and apply one
-> workspace color across the complete desktop and CLI terminal.
+> The latest published release is **V0.3.8, the Windows credential persistence fix**. Model
+> provider API keys now use the native Windows Credential Manager backend and are read back before
+> a save is reported as successful. Users upgrading from V0.3.7 must enter third-party provider
+> API keys once more because that release did not persist them outside the running process.
 
 ![Termexo multi-terminal grid workbench](docs/images/termexo-workbench-v0.3.2.png)
 
 <p align="center">
   <sub>Four active Claude Code and Codex terminals in a configurable 2 × 2 grid with explicit pane selection and the Inspector.</sub>
 </p>
+
+## V0.3.8 Updates
+
+- Enable keyring's native Windows Credential Manager backend instead of its process-local mock
+  backend, so MiniMax and other model-provider API keys survive new sessions and app restarts.
+- Read back every credential immediately after writing it and fail the save if secure storage did
+  not persist the exact secret.
+- Add compile-time backend coverage and an explicit native credential-store round-trip test.
+- Existing V0.3.7 users need to re-enter third-party model-provider API keys once after upgrading.
 
 ## V0.3.7 Updates
 

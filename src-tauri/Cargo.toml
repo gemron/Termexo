@@ -1,6 +1,6 @@
 [package]
 name = "termexo"
-version = "0.3.7"
+version = "0.3.8"
 description = "Local-first AI coding workspace"
 authors = ["Termexo contributors"]
 edition = "2021"
@@ -14,7 +14,7 @@ crate-type = ["staticlib", "cdylib", "rlib"]
 tauri-build = { version = "2.5.1", features = [] }
 
 [dependencies]
-keyring = "3.6.3"
+keyring = { version = "3.6.3", features = ["windows-native"] }
 portable-pty = "0.9.0"
 rusqlite = { version = "0.40.1", features = ["bundled"] }
 serde = { version = "1.0", features = ["derive"] }

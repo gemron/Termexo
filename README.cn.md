@@ -11,7 +11,7 @@
 </p>
 
 <p align="center">
-  <img alt="Version 0.3.7" src="https://img.shields.io/badge/version-0.3.7-58c7a0">
+  <img alt="Version 0.3.8" src="https://img.shields.io/badge/version-0.3.8-58c7a0">
   <img alt="Windows" src="https://img.shields.io/badge/platform-Windows-0078D4?logo=windows">
   <img alt="Tauri 2" src="https://img.shields.io/badge/Tauri-2-24C8DB?logo=tauri&logoColor=white">
   <img alt="Angular 22" src="https://img.shields.io/badge/Angular-22-DD0031?logo=angular">
@@ -25,15 +25,23 @@ Termexo 是一个本地优先的 AI 开发工作空间与控制平面。它把�
 逐步扩展多 Agent 编排、供应商 Plan 余量实时查看、安全的 Workspace 共享，以及从可信
 电脑和手机访问工作空间。项目数据与凭据仍由明确的设备、权限和加密边界保护。
 
-> 最新正式版本为 **V0.3.7 工作空间连续性、状态与主题更新版**。切换工作空间时会保留
-> 终端交互状态，全局提示需要关注的 Agent，通过 Codex 原生通知准确识别每轮完成状态，
-> 并让工作区主题颜色覆盖整个软件和 CLI 终端。
+> 最新正式版本为 **V0.3.8 Windows 凭据持久化修复版**。模型供应商 API Key 现在会写入
+> 原生 Windows 凭据管理器，并在提示保存成功前重新读取校验。从 V0.3.7 升级后需要重新
+> 输入一次第三方供应商 API Key，因为该版本没有把密钥持久化到运行进程之外。
 
 ![Termexo 多终端网格工作台](docs/images/termexo-workbench-v0.3.2.png)
 
 <p align="center">
   <sub>4 个 Claude Code/Codex 终端、2 × 2 自定义网格、指定窗口显示、会话状态与 Inspector。</sub>
 </p>
+
+## V0.3.8 更新
+
+- 启用 keyring 的原生 Windows 凭据管理器后端，不再使用仅在当前进程内有效的 Mock
+  Store，使 MiniMax 等模型供应商 API Key 能跨新会话和应用重启保留。
+- 每次写入凭据后立即重新读取并比对；安全存储未保存完整密钥时不再提示保存成功。
+- 增加 Windows 原生后端编译保护和真实安全存储读写回环测试。
+- V0.3.7 用户升级后需要重新输入一次第三方模型供应商 API Key。
 
 ## V0.3.7 更新
 
