@@ -5,22 +5,25 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta
       name="description"
-      content="Termexo is a local-first AI development workspace for coding agents, models, terminals, and connected devices."
+      content="Run Claude Code and Codex side by side in one window. See which agent is waiting on you, pick up yesterday's session, and switch models without restarting. Windows, local-first, no account."
     />
     <meta name="theme-color" content="#0a0d0c" />
     <meta property="og:type" content="website" />
-    <meta property="og:title" content="Termexo — AI Workspace Control Plane" />
+    <meta
+      property="og:title"
+      content="Termexo — One window for every coding agent"
+    />
     <meta
       property="og:description"
-      content="One workspace for every coding agent, model, and terminal."
+      content="Claude Code in one terminal, Codex in another. Termexo puts them on one screen and tells you the moment one needs you."
     />
     <meta
       property="og:image"
-      content="https://www.termexo.com/assets/termexo-workbench-v0.3.2.png"
+      content="https://www.termexo.com/assets/termexo-attention.png"
     />
     <meta property="og:url" content="https://www.termexo.com/" />
     <meta name="twitter:card" content="summary_large_image" />
-    <title>Termexo — AI Workspace Control Plane</title>
+    <title>Termexo — One window for every coding agent</title>
     <link rel="canonical" href="https://www.termexo.com/" />
     <link rel="icon" href="assets/termexo-mark.svg" type="image/svg+xml" />
     <link rel="stylesheet" href="styles.css" />
@@ -36,7 +39,7 @@
             <img src="assets/termexo-mark.svg" alt="" />
           </span>
           <span>Termexo</span>
-          <small>0.3.7</small>
+          <small>0.3.9</small>
         </a>
 
         <nav
@@ -46,9 +49,9 @@
           data-nav
         >
           <a href="#workbench" data-i18n="navWorkbench">Workbench</a>
-          <a href="#capabilities" data-i18n="navCapabilities">Capabilities</a>
+          <a href="#capabilities" data-i18n="navCapabilities">Featuress</a>
           <a href="#roadmap" data-i18n="navRoadmap">Roadmap</a>
-          <a href="#principles" data-i18n="navPrinciples">Principles</a>
+          <a href="#principles" data-i18n="navPrinciples">Privacy</a>
         </nav>
 
         <div class="header-actions">
@@ -90,17 +93,18 @@
           <div class="eyebrow">
             <span class="live-dot"></span>
             <span data-i18n="eyebrow"
-              >Local-first AI workspace control plane</span
+              >Runs on your machine · Windows · No account needed</span
             >
           </div>
           <h1>
-            <span data-i18n="heroLine1">One workspace.</span>
+            <span data-i18n="heroLine1">One window.</span>
             <em data-i18n="heroLine2">Every agent.</em>
           </h1>
           <p class="hero-lead" data-i18n="heroLead">
-            Run the complete Windows desktop app directly from npm, then
-            coordinate coding terminals, native agent sessions, model providers,
-            and recoverable project state in one focused environment.
+            Claude Code in one terminal, Codex in another, and three more you
+            have stopped keeping track of. Termexo puts them all on one screen —
+            you can see which one is waiting on you, pick up yesterday's
+            conversation, and switch models without restarting anything.
           </p>
           <div class="hero-actions">
             <a
@@ -109,7 +113,7 @@
               target="_blank"
               rel="noreferrer"
             >
-              <span data-i18n="runFromNpm">Run from npm</span>
+              <span data-i18n="runFromNpm">Run it now</span>
               <svg viewBox="0 0 24 24" aria-hidden="true">
                 <path d="m9 7 5 5-5 5m7 0h3" />
               </svg>
@@ -134,9 +138,11 @@
             </button>
           </div>
           <div class="hero-meta" aria-label="Product information">
-            <span><i></i><b data-i18n="metaLocal">Local-first</b></span>
-            <span><i></i><b>Windows x64</b></span>
-            <span><i></i><b data-i18n="metaNpm">npm + bundled EXE</b></span>
+            <span
+              ><i></i><b data-i18n="metaLocal">Nothing leaves your PC</b></span
+            >
+            <span><i></i><b>Windows 10 / 11</b></span>
+            <span><i></i><b data-i18n="metaNpm">One command to start</b></span>
           </div>
         </div>
 
@@ -204,83 +210,226 @@
         <div class="section-heading reveal">
           <div>
             <span class="section-index">01 / WORKBENCH</span>
-            <h2 data-i18n="workbenchTitle">See the whole development field.</h2>
+            <h2 data-i18n="workbenchTitle">Four agents. One screen.</h2>
           </div>
           <p data-i18n="workbenchLead">
-            Keep unlimited terminal tabs, choose exactly which panes are
-            visible, and move between projects without losing the state that
-            explains what each agent is doing.
+            Open as many terminals as you like, then choose which ones stay
+            visible and arrange them in a grid that fits how you work. Switch to
+            another project and back, and everything is exactly where you left
+            it.
           </p>
         </div>
 
         <figure class="product-frame reveal">
           <div class="frame-label">
-            <span><i></i> MTS Cloud / 4 agents</span>
-            <small>Configurable 2 × 2 grid</small>
+            <span><i></i> Claude Code + Codex CLI</span>
+            <small>2 × 2 grid · 3 projects open</small>
           </div>
           <img
-            src="assets/termexo-workbench-v0.3.2.png"
-            alt="Termexo showing four Claude Code and Codex terminals in a configurable workspace grid"
-            width="2565"
-            height="1340"
+            src="assets/termexo-workbench.png"
+            alt="Termexo with a Claude Code terminal and a Codex CLI terminal side by side, each showing its current status"
+            width="2880"
+            height="1800"
+            loading="lazy"
           />
         </figure>
 
         <div class="metrics-grid">
           <article class="metric reveal">
             <strong>∞</strong>
-            <span data-i18n="metricTabsTitle">Terminal tabs</span>
+            <span data-i18n="metricTabsTitle">Open as many as you want</span>
             <p data-i18n="metricTabsBody">
-              Keep every session available; choose panes on demand.
+              Every session stays alive in a tab. Show the ones you are watching
+              right now.
             </p>
           </article>
           <article class="metric reveal" data-delay="1">
             <strong>6 × 6</strong>
-            <span data-i18n="metricGridTitle">Custom grid</span>
+            <span data-i18n="metricGridTitle">Arrange your own grid</span>
             <p data-i18n="metricGridBody">
-              Persist row and column layouts per workspace.
+              Anything from 1 to 6 rows and columns. Each project remembers its
+              own layout.
             </p>
           </article>
           <article class="metric reveal" data-delay="2">
-            <strong>1 → N</strong>
-            <span data-i18n="metricModelTitle">Model routing</span>
+            <strong>5+</strong>
+            <span data-i18n="metricModelTitle"
+              >Swap the model, keep the CLI</span
+            >
             <p data-i18n="metricModelBody">
-              Keep the CLI and switch compatible providers.
+              Same Claude Code you already know, pointed at a different
+              provider.
             </p>
           </article>
           <article class="metric reveal" data-delay="3">
-            <strong>0 cloud</strong>
-            <span data-i18n="metricLocalTitle">Required services</span>
+            <strong>0</strong>
+            <span data-i18n="metricLocalTitle">No sign-up, no server</span>
             <p data-i18n="metricLocalBody">
-              Workspaces and credentials stay local by default.
+              Your projects and API keys stay on your computer. Termexo has no
+              cloud to log into.
             </p>
           </article>
         </div>
+      </section>
+
+      <section class="section model-section shell">
+        <div class="model-copy reveal">
+          <span class="section-index">02 / NEVER MISS ONE</span>
+          <h2 data-i18n="attentionTitle">
+            It tells you when an agent is stuck.
+          </h2>
+          <p data-i18n="attentionLead">
+            An agent sitting on an approval prompt helps nobody if you are
+            looking at a different window. Termexo flashes the taskbar, sends a
+            system notification, and keeps a banner on screen until you deal
+            with it — for every project you have open, not just the one in front
+            of you.
+          </p>
+          <ul>
+            <li data-i18n="attentionPoint1">
+              Waiting for approval, waiting for input, and finished all look
+              different at a glance
+            </li>
+            <li data-i18n="attentionPoint2">
+              Works even when the Termexo window is already focused
+            </li>
+            <li data-i18n="attentionPoint3">
+              Click the banner to jump straight to that terminal
+            </li>
+          </ul>
+        </div>
+        <figure class="settings-frame reveal" data-delay="1">
+          <img
+            src="assets/termexo-attention.png"
+            alt="A red banner across the top of Termexo reading waiting for approval, above a Claude terminal stopped at a permission prompt"
+            width="2880"
+            height="1800"
+            loading="lazy"
+          />
+          <figcaption>
+            <span
+              ><i></i>
+              <span data-i18n="attentionCaption"
+                >One agent needs a decision. The other is still working.</span
+              ></span
+            >
+          </figcaption>
+        </figure>
+      </section>
+
+      <section class="section model-section reversed shell">
+        <figure class="settings-frame reveal">
+          <img
+            src="assets/termexo-session-center.png"
+            alt="Termexo session centre listing four past Claude Code and Codex sessions, each with a resume button"
+            width="1960"
+            height="1440"
+            loading="lazy"
+          />
+          <figcaption>
+            <span
+              ><i></i>
+              <span data-i18n="sessionCaption"
+                >Every local session, searchable and one click from
+                resuming</span
+              ></span
+            >
+          </figcaption>
+        </figure>
+        <div class="model-copy reveal" data-delay="1">
+          <span class="section-index">03 / NOTHING IS LOST</span>
+          <h2 data-i18n="sessionTitle">Pick up yesterday's conversation.</h2>
+          <p data-i18n="sessionLead">
+            Claude Code and Codex already save your sessions on disk. Termexo
+            simply lists them so you can search and reopen one — it calls the
+            CLI's own resume, so the full context comes back. Nothing you close
+            is really lost.
+          </p>
+          <ul>
+            <li data-i18n="sessionPoint1">
+              Search across every project by name, path, branch, or model
+            </li>
+            <li data-i18n="sessionPoint2">
+              Resumes through the real `claude --resume` and `codex resume`
+            </li>
+            <li data-i18n="sessionPoint3">
+              Your session files are read-only — Termexo never edits or deletes
+              them
+            </li>
+          </ul>
+        </div>
+      </section>
+
+      <section class="section model-section shell">
+        <div class="model-copy reveal">
+          <span class="section-index">04 / MODEL ROUTING</span>
+          <h2 data-i18n="modelTitle">Same CLI. Different model.</h2>
+          <p data-i18n="modelLead">
+            Keep using Claude Code, but point it at DeepSeek, MiniMax, GLM, or
+            your own compatible gateway. Save each one as a profile and switch
+            between them in two clicks — no reinstalling, no editing config
+            files by hand.
+          </p>
+          <ul>
+            <li data-i18n="modelPoint1">
+              Anthropic, DeepSeek, MiniMax, GLM, or any compatible endpoint
+            </li>
+            <li data-i18n="modelPoint2">
+              API keys go into Windows Credential Manager, never a plain text
+              file
+            </li>
+            <li data-i18n="modelPoint3">
+              Switch every Claude terminal in a project at once
+            </li>
+          </ul>
+        </div>
+        <figure class="settings-frame reveal" data-delay="1">
+          <img
+            src="assets/termexo-models.png"
+            alt="Termexo model profile settings listing Claude Sonnet, DeepSeek, MiniMax, and GLM profiles"
+            width="1720"
+            height="1136"
+            loading="lazy"
+          />
+          <figcaption>
+            <span
+              ><i></i>
+              <span data-i18n="modelCaption"
+                >Keys are stored by Windows — the app only ever sees whether one
+                exists</span
+              ></span
+            >
+          </figcaption>
+        </figure>
       </section>
 
       <section class="section capabilities-section" id="capabilities">
         <div class="shell">
           <div class="section-heading reveal">
             <div>
-              <span class="section-index">02 / CONTROL PLANE</span>
-              <h2 data-i18n="capabilitiesTitle">More than terminal chrome.</h2>
+              <span class="section-index">05 / FEATURES</span>
+              <h2 data-i18n="capabilitiesTitle">
+                The things you keep doing by hand.
+              </h2>
             </div>
             <p data-i18n="capabilitiesLead">
-              Termexo adds the state, recovery, model configuration, and runtime
-              visibility needed to operate several coding agents as one
-              development system.
+              Most of the friction with coding agents is not the model. It is
+              remembering which terminal was doing what, and setting it all up
+              again tomorrow.
             </p>
           </div>
 
           <div class="bento-grid">
             <article class="bento bento-large reveal">
-              <span class="card-tag now" data-i18n="now">AVAILABLE NOW</span>
+              <span class="card-tag now" data-i18n="now">WORKS TODAY</span>
               <div class="card-icon" aria-hidden="true">⌘</div>
-              <h3 data-i18n="featureWorkspaceTitle">Workspace identity</h3>
+              <h3 data-i18n="featureWorkspaceTitle">
+                Close it. Reopen it. Still there.
+              </h3>
               <p data-i18n="featureWorkspaceBody">
-                Name, full desktop and terminal theme, order, project path,
-                layout, terminals, branch, and model state stay attached to one
-                durable workspace.
+                Project folder, grid layout, which terminals were open, what
+                model each was running, even the colour you picked — it all
+                comes back with the workspace.
               </p>
               <div class="workspace-stack" aria-hidden="true">
                 <span style="--tone: #58c7a0"
@@ -296,23 +445,25 @@
             </article>
 
             <article class="bento reveal" data-delay="1">
-              <span class="card-tag now" data-i18n="now">AVAILABLE NOW</span>
+              <span class="card-tag now" data-i18n="now">WORKS TODAY</span>
               <div class="card-icon orange" aria-hidden="true">↻</div>
-              <h3 data-i18n="featureSessionTitle">Native session recovery</h3>
+              <h3 data-i18n="featureSessionTitle">Nothing you close is lost</h3>
               <p data-i18n="featureSessionBody">
-                Discover and resume native Claude Code and Codex CLI sessions
-                from one read-only session center.
+                Find any past Claude Code or Codex session across your projects
+                and reopen it with its full history intact.
               </p>
               <code>claude --resume · codex resume</code>
             </article>
 
             <article class="bento reveal" data-delay="2">
-              <span class="card-tag now" data-i18n="now">AVAILABLE NOW</span>
+              <span class="card-tag now" data-i18n="now">WORKS TODAY</span>
               <div class="card-icon blue" aria-hidden="true">⇄</div>
-              <h3 data-i18n="featureModelTitle">Provider profiles</h3>
+              <h3 data-i18n="featureModelTitle">
+                Try a cheaper model on the same task
+              </h3>
               <p data-i18n="featureModelBody">
-                Keep Claude Code while routing to Anthropic, DeepSeek, MiniMax,
-                GLM, or a compatible gateway, with missing-key repair built in.
+                Point the same CLI at a different provider, switch back if the
+                result is worse, and keep every key in secure storage.
               </p>
               <div class="provider-row" aria-hidden="true">
                 <i>A</i><i>D</i><i>M</i><i>G</i><i>+</i>
@@ -320,7 +471,7 @@
             </article>
 
             <article class="bento bento-wide reveal">
-              <span class="card-tag now" data-i18n="now">AVAILABLE NOW</span>
+              <span class="card-tag now" data-i18n="now">WORKS TODAY</span>
               <div class="status-card">
                 <div>
                   <span><i class="green-bg"></i>Claude Core</span><b>RUNNING</b>
@@ -336,25 +487,26 @@
               <div>
                 <div class="card-icon" aria-hidden="true">◉</div>
                 <h3 data-i18n="featureStatusTitle">
-                  Agent state you can act on
+                  Know the moment it needs you
                 </h3>
                 <p data-i18n="featureStatusBody">
-                  Normalize thinking, tool use, input, approval, completion, and
-                  failure across workspaces, including native Codex turn
-                  completion.
+                  Waiting, thinking, needs approval, done, failed — shown in the
+                  tab, the panel, and the taskbar, across every project at once.
                 </p>
               </div>
             </article>
 
             <article class="bento reveal" data-delay="1">
               <span class="card-tag planned" data-i18n="roadmapTag"
-                >ROADMAP</span
+                >COMING LATER</span
               >
               <div class="card-icon violet" aria-hidden="true">◔</div>
-              <h3 data-i18n="featureQuotaTitle">Provider Plan visibility</h3>
+              <h3 data-i18n="featureQuotaTitle">
+                See your quota before you burn it
+              </h3>
               <p data-i18n="featureQuotaBody">
-                Track quota, reset windows, thresholds, and provider
-                availability before model routing decisions.
+                Check how much of your plan is left and when it resets, before
+                you decide which model to send the next task to.
               </p>
               <div class="quota-bars" aria-hidden="true">
                 <span
@@ -374,13 +526,16 @@
 
             <article class="bento reveal" data-delay="2">
               <span class="card-tag planned" data-i18n="roadmapTag"
-                >ROADMAP</span
+                >COMING LATER</span
               >
               <div class="card-icon cyan" aria-hidden="true">⌁</div>
-              <h3 data-i18n="featureRemoteTitle">Connected workspaces</h3>
+              <h3 data-i18n="featureRemoteTitle">
+                Approve it from your phone
+              </h3>
               <p data-i18n="featureRemoteBody">
-                Securely share workspace state and reach authorized terminals
-                from trusted computers and phones.
+                Step away from the desk and still let an agent through the
+                approval it is waiting on, over an encrypted link to your own
+                machine.
               </p>
               <div class="device-map" aria-hidden="true">
                 <span class="device desktop">▱</span><i></i
@@ -392,89 +547,59 @@
         </div>
       </section>
 
-      <section class="section model-section shell">
-        <div class="model-copy reveal">
-          <span class="section-index">MODEL ROUTING</span>
-          <h2 data-i18n="modelTitle">Change the model, not the workflow.</h2>
-          <p data-i18n="modelLead">
-            Keep the CLI your team already understands. Termexo turns endpoint,
-            model, API key, and MCP settings into explicit profiles that can be
-            switched and recovered.
-          </p>
-          <ul>
-            <li data-i18n="modelPoint1">Compatible provider profiles</li>
-            <li data-i18n="modelPoint2">
-              Credentials in Windows Credential Manager
-            </li>
-            <li data-i18n="modelPoint3">
-              Missing-key repair and session-aware restart
-            </li>
-          </ul>
-        </div>
-        <figure class="settings-frame reveal" data-delay="1">
-          <img
-            src="assets/termexo-model-profiles.png"
-            alt="Termexo model profile settings"
-            width="1440"
-            height="900"
-          />
-          <figcaption>
-            <span><i></i> Credentials stay outside workspace snapshots</span>
-          </figcaption>
-        </figure>
-      </section>
-
       <section class="section roadmap-section" id="roadmap">
         <div class="shell">
           <div class="section-heading reveal">
             <div>
-              <span class="section-index">03 / ROADMAP</span>
-              <h2 data-i18n="roadmapTitle">
-                From local control to trusted access.
-              </h2>
+              <span class="section-index">06 / ROADMAP</span>
+              <h2 data-i18n="roadmapTitle">What comes next.</h2>
             </div>
             <p data-i18n="roadmapLead">
-              The roadmap expands the same local-first workspace model without
-              presenting planned capabilities as already shipped.
+              Everything above already works. Here is what is being built, and
+              in what order — nothing on this list is being sold as finished.
             </p>
           </div>
 
           <div class="roadmap-list">
             <article class="roadmap-item current reveal">
-              <div><span>V0.3</span><b data-i18n="current">CURRENT</b></div>
-              <h3 data-i18n="roadmap02Title">Multi-Agent session workbench</h3>
+              <div>
+                <span>V0.3</span><b data-i18n="current">YOU ARE HERE</b>
+              </div>
+              <h3 data-i18n="roadmap02Title">
+                Run several agents side by side
+              </h3>
               <p data-i18n="roadmap02Body">
-                Claude and Codex detection, isolated multi-account launch and
-                resume, configurable grids, profiles, and local persistence.
+                Claude and Codex detection, separate logins, resume, custom
+                grids, model profiles, and everything saved locally.
               </p>
             </article>
             <article class="roadmap-item reveal" data-delay="1">
               <div><span>V0.4</span><b data-i18n="planned">PLANNED</b></div>
               <h3 data-i18n="roadmap04Title">
-                Multi-agent and provider control
+                Accounts, installs, and networks
               </h3>
               <p data-i18n="roadmap04Body">
-                Account and provider controls, one-click CLI lifecycle,
-                internal-network and npm proxy profiles, failure rollback, and
-                live Plan quota monitoring.
+                Install or upgrade the CLIs in one click, keep several logins
+                apart, set up proxies for a company network, and watch how much
+                plan quota is left.
               </p>
             </article>
             <article class="roadmap-item reveal" data-delay="2">
               <div><span>V0.5–0.6</span><b data-i18n="planned">PLANNED</b></div>
-              <h3 data-i18n="roadmap06Title">Context and orchestration</h3>
+              <h3 data-i18n="roadmap06Title">Handing work between agents</h3>
               <p data-i18n="roadmap06Body">
-                Session summaries, cross-agent migration, task routing,
-                collaboration, and notifications.
+                Session summaries, moving a task from one agent to another,
+                routing work, and notifications.
               </p>
             </article>
             <article class="roadmap-item reveal" data-delay="3">
               <div><span>V0.7</span><b data-i18n="planned">PLANNED</b></div>
               <h3 data-i18n="roadmap07Title">
-                Workspace sharing and remote access
+                Reaching your desk from anywhere
               </h3>
               <p data-i18n="roadmap07Body">
-                Trusted devices, encrypted remote terminals, mobile approvals,
-                granular roles, and audit logs.
+                Paired devices, encrypted remote terminals, approving from a
+                phone, clear roles, and an audit trail.
               </p>
             </article>
           </div>
@@ -483,13 +608,12 @@
 
       <section class="section principles-section shell" id="principles">
         <div class="principles-copy reveal">
-          <span class="section-index">04 / PRINCIPLES</span>
-          <h2 data-i18n="principlesTitle">
-            Your machine remains the authority.
-          </h2>
+          <span class="section-index">07 / PRIVACY</span>
+          <h2 data-i18n="principlesTitle">It all stays on your computer.</h2>
           <p data-i18n="principlesLead">
-            Remote capability should extend local ownership, never erase it.
-            Termexo is designed around explicit trust boundaries from the start.
+            Termexo has no account, no server, and nothing to sync. Later
+            versions add remote access — but only the kind you switch on
+            yourself and can switch off just as fast.
           </p>
         </div>
         <div class="principles-list">
@@ -498,29 +622,34 @@
             <div>
               <h3 data-i18n="principle1Title">Local by default</h3>
               <p data-i18n="principle1Body">
-                Project paths, session indexes, terminal state, and
-                configuration remain on the machine unless you explicitly share
-                them.
+                Your project paths, sessions, terminal state, and settings sit
+                in a file on your disk. There is no cloud service to sign into.
               </p>
             </div>
           </article>
           <article class="reveal" data-delay="1">
             <span>02</span>
             <div>
-              <h3 data-i18n="principle2Title">Native agent semantics</h3>
+              <h3 data-i18n="principle2Title">
+                Your API keys are not in a config files
+              </h3>
               <p data-i18n="principle2Body">
-                Use each CLI's real resume and configuration mechanisms instead
-                of inventing a fake universal session.
+                Keys go into Windows Credential Manager. The app stores only a
+                reference, and the interface can tell you a key exists but never
+                show it back.
               </p>
             </div>
           </article>
           <article class="reveal" data-delay="2">
             <span>03</span>
             <div>
-              <h3 data-i18n="principle3Title">Revocable remote trust</h3>
+              <h3 data-i18n="principle3Title">
+                Your agent files are read-only
+              </h3>
               <p data-i18n="principle3Body">
-                Planned remote access uses paired devices, short-lived tokens,
-                encryption, clear roles, and immediate revocation.
+                Termexo reads what Claude Code and Codex write, and uses their
+                own resume commands. It never rewrites, renames, or deletes your
+                session history.
               </p>
             </div>
           </article>
@@ -530,10 +659,10 @@
       <section class="cta-section shell reveal">
         <div>
           <span class="section-index">BUILD WITH US</span>
-          <h2 data-i18n="ctaTitle">Bring every coding agent into focus.</h2>
+          <h2 data-i18n="ctaTitle">One command. No account.</h2>
           <p data-i18n="ctaLead">
-            Start the complete Windows workspace directly from npm, or use the
-            traditional installer and follow development on GitHub.
+            The npm package ships the whole Windows app. Run it, and if you do
+            not like it, delete it — nothing was created anywhere else.
           </p>
         </div>
         <div class="cta-actions">
@@ -543,7 +672,7 @@
             target="_blank"
             rel="noreferrer"
             data-i18n="runFromNpm"
-            >Run from npm</a
+            >Run it now</a
           >
           <a
             class="button secondary"
@@ -565,7 +694,7 @@
           </span>
           <span>Termexo</span>
         </a>
-        <p data-i18n="footerTagline">AI Workspace Control Plane</p>
+        <p data-i18n="footerTagline">One window for every coding agent</p>
         <div>
           <a
             href="https://www.npmjs.com/package/termexo"
