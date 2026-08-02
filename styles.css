@@ -1081,6 +1081,26 @@ img {
   background: #28604c;
 }
 
+.language-pills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 30px;
+}
+
+.language-pills span {
+  display: grid;
+  min-width: 30px;
+  height: 26px;
+  place-items: center;
+  padding-inline: 7px;
+  border: 1px solid rgb(82 199 217 / 22%);
+  border-radius: 999px;
+  color: var(--cyan);
+  background: rgb(82 199 217 / 7%);
+  font: 8px/1 var(--mono);
+}
+
 .status-card {
   display: grid;
   gap: 6px;
