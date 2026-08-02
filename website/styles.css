@@ -438,6 +438,34 @@ img {
   background: rgb(88 199 160 / 8%);
 }
 
+.product-hunt-badge {
+  display: inline-flex;
+  max-width: 100%;
+  margin-top: 18px;
+  border-radius: 6px;
+  transition:
+    transform 160ms ease,
+    box-shadow 160ms ease;
+}
+
+.product-hunt-badge:hover {
+  box-shadow: 0 10px 30px rgb(0 0 0 / 24%);
+  transform: translateY(-2px);
+}
+
+.product-hunt-badge:focus-visible {
+  outline: 2px solid var(--green);
+  outline-offset: 4px;
+}
+
+.product-hunt-badge img {
+  display: block;
+  width: 250px;
+  max-width: 100%;
+  height: auto;
+  border-radius: 6px;
+}
+
 .hero-meta {
   display: flex;
   flex-wrap: wrap;
@@ -1660,6 +1688,11 @@ img {
 
   .hero-meta {
     display: grid;
+  }
+
+  .product-hunt-badge {
+    width: 100%;
+    justify-content: center;
   }
 
   .hero-console {
