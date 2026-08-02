@@ -39,6 +39,7 @@ describe('AgentSettingsDialogComponent', () => {
   let root: HTMLElement;
 
   beforeEach(async () => {
+    window.localStorage.setItem('termexo.language', 'zh-CN');
     await TestBed.configureTestingModule({
       imports: [AgentSettingsDialogComponent],
     }).compileComponents();

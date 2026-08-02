@@ -1,11 +1,12 @@
 import { Component, input, output } from '@angular/core';
 
 import { normalizeWorkspaceThemeColor, Workspace } from '../core/models/workspace.models';
+import { TranslatePipe } from '../core/i18n/translate.pipe';
 import { IconComponent } from '../shared/icon/icon';
 
 @Component({
   selector: 'app-workspace-sidebar',
-  imports: [IconComponent],
+  imports: [IconComponent, TranslatePipe],
   templateUrl: './workspace-sidebar.html',
   styleUrl: './workspace-sidebar.scss',
 })

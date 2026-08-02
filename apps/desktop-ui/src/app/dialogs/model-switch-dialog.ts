@@ -1,11 +1,12 @@
 import { Component, computed, input, output, signal } from '@angular/core';
 
+import { TranslatePipe } from '../core/i18n/translate.pipe';
 import { ModelProfile } from '../core/models/agent.models';
 import { IconComponent } from '../shared/icon/icon';
 
 @Component({
   selector: 'app-model-switch-dialog',
-  imports: [IconComponent],
+  imports: [IconComponent, TranslatePipe],
   template: `
     <div class="backdrop modal modal-open" (mousedown)="cancelled.emit()">
       <section
@@ -17,14 +18,14 @@ import { IconComponent } from '../shared/icon/icon';
       >
         <header>
           <div>
-            <h2 id="model-dialog-title">切换 Claude Code 后端模型</h2>
-            <p>CLI 客户端保持不变，通过 Profile 切换供应商、Endpoint 和模型。</p>
+            <h2 id="model-dialog-title">{{ 'modelSwitch.title' | t }}</h2>
+            <p>{{ 'modelSwitch.description' | t }}</p>
           </div>
           <button
             type="button"
             class="btn btn-square btn-ghost btn-sm"
-            title="关闭"
-            aria-label="关闭"
+            [title]="'common.close' | t"
+            [attr.aria-label]="'common.close' | t"
             (click)="cancelled.emit()"
           >
             <app-icon name="x" [size]="15" />
@@ -49,22 +50,27 @@ import { IconComponent } from '../shared/icon/icon';
             </button>
           } @empty {
             <div class="dialog-empty">
-              <strong>还没有模型 Profile</strong>
-              <span>请先在设置中配置 Anthropic、DeepSeek、MiniMax 或 GLM。</span>
+              <strong>{{ 'modelSwitch.empty' | t }}</strong>
+              <span>{{ 'modelSwitch.emptyHelp' | t }}</span>
             </div>
           }
         </div>
         <div class="switch-plan">
-          <div><strong>Claude Code</strong><span>CLI 保持不变</span></div>
+          <div>
+            <strong>Claude Code</strong><span>{{ 'modelSwitch.cliUnchanged' | t }}</span>
+          </div>
           <div>
             <strong>{{ agentCount() }}</strong
-            ><span>终端重启应用参数</span>
+            ><span>{{ 'modelSwitch.terminalsRestart' | t }}</span>
           </div>
-          <div><strong>新会话</strong><span>避免跨供应商重放上下文与重复 token</span></div>
+          <div>
+            <strong>{{ 'modelSwitch.newSession' | t }}</strong
+            ><span>{{ 'modelSwitch.newSessionHelp' | t }}</span>
+          </div>
         </div>
         <footer>
           <button type="button" class="secondary btn btn-ghost btn-sm" (click)="cancelled.emit()">
-            取消
+            {{ 'common.cancel' | t }}
           </button>
           <button
             type="button"
@@ -72,7 +78,7 @@ import { IconComponent } from '../shared/icon/icon';
             [disabled]="busy() || !resolvedProfileId()"
             (click)="confirmed.emit(resolvedProfileId())"
           >
-            执行切换
+            {{ 'modelSwitch.execute' | t }}
           </button>
         </footer>
       </section>

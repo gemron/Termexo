@@ -12,14 +12,14 @@
       <span
         class="status-indicator"
         [attr.data-status]="session().status"
-        [title]="statusLabels[session().status]"
+        [title]="statusLabel(session().status)"
         aria-hidden="true"
       >
         <i class="status-light"></i>
       </span>
       <strong>{{ session().name }}</strong>
       <span class="status-label" aria-live="polite" [attr.data-status]="session().status">
-        {{ statusLabels[session().status] }}
+        {{ statusLabel(session().status) }}
       </span>
     </div>
     <div class="terminal-meta">
@@ -27,8 +27,8 @@
       <button
         type="button"
         class="btn btn-square btn-ghost btn-xs"
-        [title]="maximized() ? '恢复终端窗口（Shift+Esc）' : '最大化终端窗口'"
-        [attr.aria-label]="maximized() ? '恢复终端窗口' : '最大化终端窗口'"
+        [title]="maximized() ? ('terminal.restoreShortcut' | t) : ('terminal.maximize' | t)"
+        [attr.aria-label]="maximized() ? ('terminal.restore' | t) : ('terminal.maximize' | t)"
         [class.active]="maximized()"
         (click)="$event.stopPropagation(); maximizeRequested.emit(session().id)"
       >
@@ -37,8 +37,8 @@
       <button
         type="button"
         class="btn btn-square btn-ghost btn-xs"
-        title="关闭终端"
-        aria-label="关闭终端"
+        [title]="'terminal.close' | t"
+        [attr.aria-label]="'terminal.close' | t"
         (click)="$event.stopPropagation(); closeRequested.emit(session().id)"
       >
         <app-icon name="x" [size]="13" />
@@ -52,15 +52,15 @@
       <button
         type="button"
         class="btn btn-square btn-ghost btn-xs"
-        aria-label="关闭提示"
-        title="关闭提示"
+        [attr.aria-label]="'terminal.closeNotice' | t"
+        [title]="'terminal.closeNotice' | t"
         (click)="$event.stopPropagation(); dismissRuntimeNotice()"
       >
         <app-icon name="x" [size]="12" />
       </button>
     </div>
   }
-  <div #terminal class="terminal-host" aria-label="终端"></div>
+  <div #terminal class="terminal-host" [attr.aria-label]="'terminal.aria' | t"></div>
   <footer>
     <span>{{ session().workingDirectory }}</span>
     <span>{{ session().branch }}</span>

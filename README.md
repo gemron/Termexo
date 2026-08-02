@@ -11,7 +11,7 @@
 </p>
 
 <p align="center">
-  <img alt="Version 0.3.9" src="https://img.shields.io/badge/version-0.3.9-58c7a0">
+  <img alt="Version 0.3.10" src="https://img.shields.io/badge/version-0.3.10-58c7a0">
   <img alt="Windows" src="https://img.shields.io/badge/platform-Windows-0078D4?logo=windows">
   <img alt="Tauri 2" src="https://img.shields.io/badge/Tauri-2-24C8DB?logo=tauri&logoColor=white">
   <img alt="Angular 22" src="https://img.shields.io/badge/Angular-22-DD0031?logo=angular">
@@ -34,10 +34,9 @@ Run the complete Windows app with one command—no Termexo account or server req
 npx termexo@latest
 ```
 
-> The latest published release is **V0.3.9, the restored-session and attention workflow update**.
-> Claude and Codex sessions now rebuild their launch configuration before restoration, MiniMax M3
-> profiles keep the correct provider environment, and blocked or completed agents surface through
-> persistent in-app attention, native notifications, and taskbar alerts.
+> The latest published release is **V0.3.10, the multilingual interface update**. Termexo now
+> follows the Windows language automatically, can be switched manually at any time, and presents
+> its workspace, terminal, session, notification, and settings workflows in seven languages.
 
 ![Termexo multi-terminal grid workbench](website/assets/termexo-workbench.png)
 
@@ -90,6 +89,22 @@ Termexo is local by default: it has no account, cloud service, or required sync.
 state stays in local SQLite storage, credentials stay in Windows Credential Manager, and
 Claude/Codex session histories are read-only. The agent CLIs still connect to the providers
 you configure under their own terms and privacy policies.
+
+The interface is available in Simplified Chinese, English, Spanish, French, German, Japanese,
+and Korean. It follows the Windows language automatically, or you can choose a language from
+the main toolbar and keep that choice across restarts.
+
+## V0.3.10 Updates
+
+- Add Simplified Chinese, English, Spanish, French, German, Japanese, and Korean interface support.
+- Follow the operating-system language by default, react to system-language changes, and fall back
+  to English when the locale is not supported.
+- Add a compact language picker to the main toolbar; manual selections apply immediately, persist
+  across restarts, and can return to automatic system-language mode at any time.
+- Localize the workspace, terminal layout, Agent status, session center, model switching, settings,
+  directory picker, runtime diagnostics, in-app alerts, Windows notifications, and taskbar prompts.
+- Add language-family resolution, persistence, interpolation, and document-locale tests while
+  retaining the complete existing desktop UI test suite.
 
 ## V0.3.9 Updates
 
@@ -375,14 +390,14 @@ flowchart LR
 
 ## Data and Security
 
-| Data                                  | Storage                          | Policy                                       |
-| ------------------------------------- | -------------------------------- | -------------------------------------------- |
-| Workspaces and terminal configuration | SQLite                           | Local persistence                            |
-| Claude/Codex session index            | SQLite                           | Upserted from read-only native session files |
-| Agent events                          | JSONL spool + SQLite             | Deduplicated by `event_key`                  |
-| Model and MCP profiles                | SQLite                           | Plaintext API keys never enter the database  |
-| API keys                              | Windows Credential Manager       | The frontend can read only `hasCredential`   |
-| Native agent sessions                 | Claude/Codex data directories    | Read-only; never modified or deleted          |
+| Data                                  | Storage                       | Policy                                       |
+| ------------------------------------- | ----------------------------- | -------------------------------------------- |
+| Workspaces and terminal configuration | SQLite                        | Local persistence                            |
+| Claude/Codex session index            | SQLite                        | Upserted from read-only native session files |
+| Agent events                          | JSONL spool + SQLite          | Deduplicated by `event_key`                  |
+| Model and MCP profiles                | SQLite                        | Plaintext API keys never enter the database  |
+| API keys                              | Windows Credential Manager    | The frontend can read only `hasCredential`   |
+| Native agent sessions                 | Claude/Codex data directories | Read-only; never modified or deleted         |
 
 For compatibility with early installations, the database filename and some internal Tauri
 identifiers still use a legacy name. This does not affect the Termexo product name or new

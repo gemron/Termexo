@@ -8,11 +8,12 @@ import {
   TerminalStatus,
 } from '../core/models/workspace.models';
 import { IconComponent } from '../shared/icon/icon';
+import { TranslatePipe } from '../core/i18n/translate.pipe';
 import { TerminalPanelComponent } from './terminal-panel';
 
 @Component({
   selector: 'app-terminal-workbench',
-  imports: [IconComponent, TerminalPanelComponent],
+  imports: [IconComponent, TerminalPanelComponent, TranslatePipe],
   templateUrl: './terminal-workbench.html',
   styleUrl: './terminal-workbench.scss',
 })

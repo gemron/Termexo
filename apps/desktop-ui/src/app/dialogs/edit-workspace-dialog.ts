@@ -1,6 +1,8 @@
-import { Component, effect, input, output, signal } from '@angular/core';
+import { Component, effect, inject, input, output, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 
+import { I18nService } from '../core/i18n/i18n.service';
+import { TranslatePipe } from '../core/i18n/translate.pipe';
 import {
   normalizeWorkspaceThemeColor,
   Workspace,
@@ -16,7 +18,7 @@ export interface WorkspaceAppearanceValue {
 
 @Component({
   selector: 'app-edit-workspace-dialog',
-  imports: [FormsModule, IconComponent],
+  imports: [FormsModule, IconComponent, TranslatePipe],
   template: `
     <div class="backdrop modal modal-open" (mousedown)="cancelled.emit()">
       <section
@@ -28,14 +30,14 @@ export interface WorkspaceAppearanceValue {
       >
         <header>
           <div>
-            <h2 id="edit-workspace-dialog-title">编辑工作区</h2>
-            <p>修改工作区名称和应用主题；颜色会同步到整个界面与 CLI 终端。</p>
+            <h2 id="edit-workspace-dialog-title">{{ 'dialog.workspaceEditTitle' | t }}</h2>
+            <p>{{ 'dialog.workspaceEditDescription' | t }}</p>
           </div>
           <button
             type="button"
             class="btn btn-square btn-ghost btn-sm"
-            title="关闭"
-            aria-label="关闭"
+            [title]="'common.close' | t"
+            [attr.aria-label]="'common.close' | t"
             (click)="cancelled.emit()"
           >
             <app-icon name="x" [size]="15" />
@@ -43,7 +45,7 @@ export interface WorkspaceAppearanceValue {
         </header>
 
         <label>
-          <span>工作区名称</span>
+          <span>{{ 'dialog.workspaceName' | t }}</span>
           <input
             type="text"
             class="input input-bordered input-sm"
@@ -55,12 +57,12 @@ export interface WorkspaceAppearanceValue {
         </label>
 
         <div class="project-path">
-          <span>项目目录</span>
+          <span>{{ 'dialog.projectDirectory' | t }}</span>
           <code>{{ workspace().projectPath }}</code>
         </div>
 
         <fieldset>
-          <legend>应用与终端主题颜色</legend>
+          <legend>{{ 'dialog.themeColor' | t }}</legend>
           <div class="theme-presets">
             @for (preset of themePresets; track preset.color) {
               <button
@@ -68,13 +70,13 @@ export interface WorkspaceAppearanceValue {
                 class="theme-swatch"
                 [class.selected]="themeColor() === preset.color"
                 [style.--swatch-color]="preset.color"
-                [attr.aria-label]="preset.name"
-                [attr.title]="preset.name"
+                [attr.aria-label]="themePresetLabel(preset.color)"
+                [attr.title]="themePresetLabel(preset.color)"
                 [attr.aria-pressed]="themeColor() === preset.color"
                 (click)="themeColor.set(preset.color)"
               >
                 <i></i>
-                <span>{{ preset.name }}</span>
+                <span>{{ themePresetLabel(preset.color) }}</span>
                 @if (themeColor() === preset.color) {
                   <app-icon name="check" [size]="12" />
                 }
@@ -84,7 +86,7 @@ export interface WorkspaceAppearanceValue {
         </fieldset>
 
         <div class="custom-color">
-          <label for="workspace-theme-color">自定义颜色</label>
+          <label for="workspace-theme-color">{{ 'dialog.customColor' | t }}</label>
           <input
             id="workspace-theme-color"
             type="color"
@@ -93,13 +95,13 @@ export interface WorkspaceAppearanceValue {
           />
           <code>{{ themeColor() }}</code>
           <span class="theme-preview" [style.--preview-color]="themeColor()">
-            <i></i>{{ name().trim() || '工作区预览' }}
+            <i></i>{{ name().trim() || ('dialog.workspacePreview' | t) }}
           </span>
         </div>
 
         <footer>
           <button type="button" class="secondary btn btn-ghost btn-sm" (click)="cancelled.emit()">
-            取消
+            {{ 'common.cancel' | t }}
           </button>
           <button
             type="button"
@@ -107,7 +109,7 @@ export interface WorkspaceAppearanceValue {
             [disabled]="!isValid()"
             (click)="submit()"
           >
-            保存修改
+            {{ 'dialog.saveChanges' | t }}
           </button>
         </footer>
       </section>
@@ -116,6 +118,7 @@ export interface WorkspaceAppearanceValue {
   styleUrls: ['./dialog.scss', './edit-workspace-dialog.scss'],
 })
 export class EditWorkspaceDialogComponent {
+  private readonly i18n = inject(I18nService);
   readonly workspace = input.required<Workspace>();
   readonly saved = output<WorkspaceAppearanceValue>();
   readonly cancelled = output<void>();
@@ -138,6 +141,18 @@ export class EditWorkspaceDialogComponent {
 
   protected selectThemeColor(event: Event): void {
     this.themeColor.set(normalizeWorkspaceThemeColor((event.target as HTMLInputElement).value));
+  }
+
+  protected themePresetLabel(color: string): string {
+    const keys: Readonly<Record<string, string>> = {
+      '#58c7a0': 'theme.emerald',
+      '#68a9e8': 'theme.oceanBlue',
+      '#a78bfa': 'theme.violet',
+      '#e4a35a': 'theme.warmOrange',
+      '#ef7890': 'theme.rose',
+      '#52c7d9': 'theme.cyan',
+    };
+    return this.i18n.t(keys[color] ?? 'dialog.customColor');
   }
 
   protected isValid(): boolean {

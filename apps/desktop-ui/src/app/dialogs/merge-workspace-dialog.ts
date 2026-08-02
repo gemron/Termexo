@@ -1,12 +1,13 @@
 import { Component, computed, effect, input, output, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 
+import { TranslatePipe } from '../core/i18n/translate.pipe';
 import { Workspace } from '../core/models/workspace.models';
 import { IconComponent } from '../shared/icon/icon';
 
 @Component({
   selector: 'app-merge-workspace-dialog',
-  imports: [FormsModule, IconComponent],
+  imports: [FormsModule, IconComponent, TranslatePipe],
   template: `
     <div class="backdrop modal modal-open" (mousedown)="cancel()">
       <section
@@ -18,14 +19,14 @@ import { IconComponent } from '../shared/icon/icon';
       >
         <header>
           <div>
-            <h2 id="merge-workspace-dialog-title">合并工作空间</h2>
-            <p>将一个工作空间中的终端统一移动到另一个工作空间。</p>
+            <h2 id="merge-workspace-dialog-title">{{ 'dialog.workspaceMergeTitle' | t }}</h2>
+            <p>{{ 'dialog.workspaceMergeDescription' | t }}</p>
           </div>
           <button
             type="button"
             class="btn btn-square btn-ghost btn-sm"
-            title="关闭"
-            aria-label="关闭"
+            [title]="'common.close' | t"
+            [attr.aria-label]="'common.close' | t"
             [disabled]="merging()"
             (click)="cancel()"
           >
@@ -36,11 +37,11 @@ import { IconComponent } from '../shared/icon/icon';
         <div class="merge-source">
           <span class="merge-workspace-icon"><app-icon name="folder" [size]="18" /></span>
           <span>
-            <small>来源工作空间</small>
+            <small>{{ 'dialog.sourceWorkspace' | t }}</small>
             <strong>{{ sourceWorkspace().name }}</strong>
             <code>{{ sourceWorkspace().projectPath }}</code>
           </span>
-          <em>{{ sourceWorkspace().terminals.length }} 个终端</em>
+          <em>{{ 'dialog.terminalCount' | t: { count: sourceWorkspace().terminals.length } }}</em>
         </div>
 
         <div class="merge-direction" aria-hidden="true">
@@ -50,7 +51,7 @@ import { IconComponent } from '../shared/icon/icon';
         </div>
 
         <label class="merge-target-field">
-          <span>合并到</span>
+          <span>{{ 'dialog.mergeInto' | t }}</span>
           <select
             class="select select-bordered select-sm"
             [ngModel]="targetWorkspaceId()"
@@ -59,7 +60,8 @@ import { IconComponent } from '../shared/icon/icon';
           >
             @for (workspace of targetWorkspaces(); track workspace.id) {
               <option [value]="workspace.id">
-                {{ workspace.name }} · {{ workspace.terminals.length }} 个终端
+                {{ workspace.name }} ·
+                {{ 'dialog.terminalCount' | t: { count: workspace.terminals.length } }}
               </option>
             }
           </select>
@@ -69,16 +71,18 @@ import { IconComponent } from '../shared/icon/icon';
           <div class="merge-preview">
             <app-icon name="merge" [size]="16" />
             <span>
-              合并后“{{ targetWorkspace.name }}”共有
-              <strong>{{ mergedTerminalCount() }}</strong> 个终端
+              {{
+                'dialog.mergedTerminalCount'
+                  | t: { name: targetWorkspace.name, count: mergedTerminalCount() }
+              }}
             </span>
           </div>
         }
 
         <ul class="merge-notes">
-          <li>目标工作空间的名称、项目目录、主题和布局保持不变。</li>
-          <li>来源工作空间配置会被删除，但不会删除任何本地项目文件。</li>
-          <li>正在运行的终端进程会继续运行。</li>
+          <li>{{ 'dialog.mergeKeepsTarget' | t }}</li>
+          <li>{{ 'dialog.mergeRemovesSource' | t }}</li>
+          <li>{{ 'dialog.mergeKeepsProcesses' | t }}</li>
         </ul>
 
         <footer>
@@ -88,7 +92,7 @@ import { IconComponent } from '../shared/icon/icon';
             [disabled]="merging()"
             (click)="cancel()"
           >
-            取消
+            {{ 'common.cancel' | t }}
           </button>
           <button
             type="button"
@@ -97,7 +101,7 @@ import { IconComponent } from '../shared/icon/icon';
             (click)="submit()"
           >
             <app-icon name="merge" [size]="14" />
-            {{ merging() ? '正在合并…' : '确认合并' }}
+            {{ merging() ? ('dialog.merging' | t) : ('dialog.confirmMerge' | t) }}
           </button>
         </footer>
       </section>

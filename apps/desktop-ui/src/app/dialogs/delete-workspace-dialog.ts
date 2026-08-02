@@ -1,11 +1,12 @@
 import { Component, input, output } from '@angular/core';
 
+import { TranslatePipe } from '../core/i18n/translate.pipe';
 import { Workspace } from '../core/models/workspace.models';
 import { IconComponent } from '../shared/icon/icon';
 
 @Component({
   selector: 'app-delete-workspace-dialog',
-  imports: [IconComponent],
+  imports: [IconComponent, TranslatePipe],
   template: `
     <div class="backdrop modal modal-open" (mousedown)="cancelled.emit()">
       <section
@@ -17,14 +18,14 @@ import { IconComponent } from '../shared/icon/icon';
       >
         <header>
           <div>
-            <h2 id="delete-workspace-dialog-title">删除工作空间</h2>
-            <p>该操作只删除 Termexo 中的工作空间配置，不会删除本地项目文件。</p>
+            <h2 id="delete-workspace-dialog-title">{{ 'dialog.workspaceDeleteTitle' | t }}</h2>
+            <p>{{ 'dialog.workspaceDeleteDescription' | t }}</p>
           </div>
           <button
             type="button"
             class="btn btn-square btn-ghost btn-sm"
-            title="关闭"
-            aria-label="关闭"
+            [title]="'common.close' | t"
+            [attr.aria-label]="'common.close' | t"
             [disabled]="deleting()"
             (click)="cancelled.emit()"
           >
@@ -35,14 +36,14 @@ import { IconComponent } from '../shared/icon/icon';
         <div class="delete-workspace-summary alert alert-warning">
           <app-icon name="trash" [size]="18" />
           <div>
-            <strong>确定删除“{{ workspace().name }}”吗？</strong>
+            <strong>{{ 'dialog.workspaceDeleteConfirm' | t: { name: workspace().name } }}</strong>
             <span>{{ workspace().projectPath }}</span>
           </div>
         </div>
 
         @if (workspace().terminals.length > 0) {
           <p class="delete-workspace-warning">
-            删除时将停止并关闭该工作空间中的 {{ workspace().terminals.length }} 个终端进程。
+            {{ 'dialog.workspaceDeleteProcesses' | t: { count: workspace().terminals.length } }}
           </p>
         }
 
@@ -53,7 +54,7 @@ import { IconComponent } from '../shared/icon/icon';
             [disabled]="deleting()"
             (click)="cancelled.emit()"
           >
-            取消
+            {{ 'common.cancel' | t }}
           </button>
           <button
             type="button"
@@ -62,7 +63,7 @@ import { IconComponent } from '../shared/icon/icon';
             (click)="confirmed.emit()"
           >
             <app-icon name="trash" [size]="14" />
-            {{ deleting() ? '正在删除…' : '删除工作空间' }}
+            {{ deleting() ? ('dialog.deleting' | t) : ('dialog.workspaceDeleteTitle' | t) }}
           </button>
         </footer>
       </section>

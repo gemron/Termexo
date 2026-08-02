@@ -1,8 +1,8 @@
 <aside class="inspector bg-base-200">
   <header class="inspector-heading">
     <div>
-      <strong>Agent 状态</strong>
-      <small>当前工作区</small>
+      <strong>{{ 'inspector.title' | t }}</strong>
+      <small>{{ 'inspector.currentWorkspace' | t }}</small>
     </div>
     <span>{{ workspace()?.terminals?.length ?? 0 }}</span>
   </header>
@@ -10,7 +10,7 @@
   <div class="inspector-body">
     <section>
       <header class="section-header">
-        <span>活动 Agent</span>
+        <span>{{ 'inspector.activeAgents' | t }}</span>
         <small>{{ workspace()?.terminals?.length ?? 0 }}</small>
       </header>
       <div class="agent-list">
@@ -28,34 +28,36 @@
               <small>{{ terminal.model }}</small>
             </span>
             <span class="state badge badge-sm" [attr.data-status]="terminal.status">
-              <i></i>{{ statusLabels[terminal.status] }}
+              <i></i>{{ statusLabel(terminal.status) }}
             </span>
           </article>
         } @empty {
-          <p class="inline-empty">没有活动 Agent</p>
+          <p class="inline-empty">{{ 'inspector.noActiveAgents' | t }}</p>
         }
       </div>
     </section>
 
     @if (activeTerminal(); as terminal) {
       <section class="details">
-        <header class="section-header"><span>会话详情</span></header>
+        <header class="section-header">
+          <span>{{ 'inspector.sessionDetails' | t }}</span>
+        </header>
         <dl>
           <div>
             <dt>Agent</dt>
             <dd>{{ agentLabels[terminal.agentType] }}</dd>
           </div>
           <div>
-            <dt>模型</dt>
+            <dt>{{ 'inspector.model' | t }}</dt>
             <dd>{{ terminal.model }}</dd>
           </div>
           <div>
-            <dt>分支</dt>
+            <dt>{{ 'inspector.branch' | t }}</dt>
             <dd>{{ terminal.branch }}</dd>
           </div>
           <div>
-            <dt>会话</dt>
-            <dd>{{ terminal.nativeSessionId ?? '新会话' }}</dd>
+            <dt>{{ 'inspector.session' | t }}</dt>
+            <dd>{{ terminal.nativeSessionId ?? ('inspector.newSession' | t) }}</dd>
           </div>
         </dl>
       </section>
@@ -63,7 +65,7 @@
 
     <section class="activity">
       <header class="section-header">
-        <span>最近活动</span>
+        <span>{{ 'inspector.recentActivity' | t }}</span>
         <small>{{ recentEvents().length }}</small>
       </header>
       @for (event of recentEvents(); track event.eventKey) {
@@ -94,7 +96,7 @@
           </span>
         </div>
       } @empty {
-        <p class="inline-empty">暂无 Agent 事件</p>
+        <p class="inline-empty">{{ 'inspector.noEvents' | t }}</p>
       }
     </section>
   </div>

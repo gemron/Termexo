@@ -23,7 +23,7 @@
     <div
       class="sidebar-resizer workspace-sidebar-resizer"
       role="separator"
-      aria-label="调整工作区侧栏宽度"
+      [attr.aria-label]="'workspace.resizeSidebar' | t"
       aria-orientation="vertical"
       (pointerdown)="startSidebarResize('workspace', $event)"
     ></div>
@@ -32,19 +32,19 @@
   <section class="workspace-main">
     <header class="topbar navbar">
       <div class="workspace-title">
-        <strong>{{ state.activeWorkspace()?.name ?? '加载中' }}</strong>
+        <strong>{{ state.activeWorkspace()?.name ?? ('workspace.loading' | t) }}</strong>
         <span>{{ state.activeWorkspace()?.projectPath ?? '' }}</span>
       </div>
 
-      <div class="toolbar join" role="toolbar" aria-label="工作区工具">
+      <div class="toolbar join" role="toolbar" [attr.aria-label]="'workspace.tools' | t">
         <button
           type="button"
           class="tool-button btn btn-ghost btn-sm join-item"
-          title="新建 Shell 终端"
+          [title]="'terminal.newShell' | t"
           (click)="createTerminal('shell')"
         >
           <app-icon name="terminal" [size]="14" />
-          <span>终端</span>
+          <span>{{ 'terminal.short' | t }}</span>
         </button>
 
         <div class="menu-anchor">
@@ -70,8 +70,8 @@
                   <strong>Codex CLI</strong>
                   <small>{{
                     agents.codexInstallation()?.healthy
-                      ? (agents.codexInstallation()?.version ?? '已连接')
-                      : '未检测到'
+                      ? (agents.codexInstallation()?.version ?? ('common.connected' | t))
+                      : ('common.notDetected' | t)
                   }}</small>
                 </div>
               </button>
@@ -83,20 +83,20 @@
         <button
           type="button"
           class="tool-button btn btn-ghost btn-sm join-item"
-          title="恢复会话"
+          [title]="'terminal.resumeTitle' | t"
           (click)="openSessionCenter()"
         >
           <app-icon name="play" [size]="14" />
-          <span>恢复</span>
+          <span>{{ 'terminal.resume' | t }}</span>
         </button>
         <button
           type="button"
           class="tool-button btn btn-ghost btn-sm join-item"
-          title="批量切换 Claude 模型"
+          [title]="'terminal.switchClaudeModel' | t"
           (click)="modelSwitchOpen.set(true)"
         >
           <app-icon name="zap" [size]="14" />
-          <span>Claude 模型</span>
+          <span>{{ 'terminal.claudeModel' | t }}</span>
         </button>
 
         @if (globalTerminalNotices().length > 0) {
@@ -109,8 +109,8 @@
               [class.has-waiting]="globalWaitingNoticeCount() > 0"
               [attr.aria-expanded]="globalNoticeOpen()"
               aria-haspopup="dialog"
-              aria-label="全局 Agent 提示"
-              title="查看所有工作空间中等待输入和已完成的 Agent"
+              [attr.aria-label]="'notice.global' | t"
+              [title]="'notice.globalDescription' | t"
               (click)="globalNoticeOpen.set(!globalNoticeOpen())"
             >
               <app-icon name="bell" [size]="14" />
@@ -123,18 +123,18 @@
                 class="global-notice-panel"
                 role="dialog"
                 aria-modal="false"
-                aria-label="全局 Agent 提示"
+                [attr.aria-label]="'notice.global' | t"
               >
                 <header>
                   <div>
-                    <strong>全局 Agent 提示</strong>
-                    <small>所有工作空间</small>
+                    <strong>{{ 'notice.global' | t }}</strong>
+                    <small>{{ 'notice.allWorkspaces' | t }}</small>
                   </div>
                   <button
                     type="button"
                     class="btn btn-square btn-ghost btn-xs"
-                    aria-label="关闭全局提示"
-                    title="关闭"
+                    [attr.aria-label]="'notice.closeGlobal' | t"
+                    [title]="'common.close' | t"
                     (click)="globalNoticeOpen.set(false)"
                   >
                     <app-icon name="x" [size]="13" />
@@ -156,7 +156,7 @@
                         <strong>{{ notice.terminalName }}</strong>
                         <small>{{ notice.workspaceName }}</small>
                       </span>
-                      <em>{{ statusLabels[notice.status] }}</em>
+                      <em>{{ statusLabel(notice.status) }}</em>
                     </button>
                   }
                 </div>
@@ -167,11 +167,20 @@
       </div>
 
       <div class="window-tools join">
+        <app-language-selector />
         <button
           type="button"
           class="btn btn-square btn-ghost btn-sm join-item"
-          [title]="workspaceSidebarOpen() ? '折叠工作区侧栏' : '展开工作区侧栏'"
-          [attr.aria-label]="workspaceSidebarOpen() ? '折叠工作区侧栏' : '展开工作区侧栏'"
+          [title]="
+            workspaceSidebarOpen()
+              ? ('workspace.collapseSidebar' | t)
+              : ('workspace.expandSidebar' | t)
+          "
+          [attr.aria-label]="
+            workspaceSidebarOpen()
+              ? ('workspace.collapseSidebar' | t)
+              : ('workspace.expandSidebar' | t)
+          "
           [class.active]="workspaceSidebarOpen()"
           (click)="toggleWorkspaceSidebar()"
         >
@@ -183,8 +192,12 @@
         <button
           type="button"
           class="btn btn-square btn-ghost btn-sm join-item"
-          [title]="workspaceMaximized() ? '恢复工作区（Shift+Esc）' : '最大化工作区'"
-          [attr.aria-label]="workspaceMaximized() ? '恢复工作区' : '最大化工作区'"
+          [title]="
+            workspaceMaximized() ? ('workspace.restoreShortcut' | t) : ('workspace.maximize' | t)
+          "
+          [attr.aria-label]="
+            workspaceMaximized() ? ('workspace.restore' | t) : ('workspace.maximize' | t)
+          "
           [class.active]="workspaceMaximized()"
           (click)="toggleWorkspaceMaximize()"
         >
@@ -193,8 +206,10 @@
         <button
           type="button"
           class="btn btn-square btn-ghost btn-sm join-item"
-          [title]="inspectorOpen() ? '折叠 Agent 侧栏' : '展开 Agent 侧栏'"
-          [attr.aria-label]="inspectorOpen() ? '折叠 Agent 侧栏' : '展开 Agent 侧栏'"
+          [title]="inspectorOpen() ? ('inspector.collapse' | t) : ('inspector.expand' | t)"
+          [attr.aria-label]="
+            inspectorOpen() ? ('inspector.collapse' | t) : ('inspector.expand' | t)
+          "
           [class.active]="inspectorOpen()"
           (click)="toggleInspector()"
         >
@@ -204,7 +219,11 @@
     </header>
 
     <div class="terminal-tabs">
-      <div class="tab-strip tabs tabs-border" role="tablist" aria-label="终端标签">
+      <div
+        class="tab-strip tabs tabs-border"
+        role="tablist"
+        [attr.aria-label]="'terminal.tabs' | t"
+      >
         @for (terminal of state.activeWorkspace()?.terminals ?? []; track terminal.id) {
           <button
             [id]="'terminal-tab-' + terminal.id"
@@ -215,7 +234,11 @@
             [class.visible]="isTerminalVisible(terminal.id)"
             [attr.data-status]="terminal.status"
             [attr.aria-selected]="terminal.id === activeTerminalId()"
-            [attr.title]="isTerminalVisible(terminal.id) ? '激活此终端' : '在当前布局中显示此终端'"
+            [attr.title]="
+              isTerminalVisible(terminal.id)
+                ? ('terminal.activate' | t)
+                : ('terminal.showInLayout' | t)
+            "
             (click)="selectTerminal(terminal.id)"
           >
             <i [attr.data-status]="terminal.status"></i>
@@ -226,8 +249,8 @@
         <button
           type="button"
           class="add-tab tab"
-          title="新建终端"
-          aria-label="新建终端"
+          [title]="'terminal.new' | t"
+          [attr.aria-label]="'terminal.new' | t"
           (click)="createTerminal('shell')"
         >
           <app-icon name="plus" [size]="14" />
@@ -238,7 +261,7 @@
         <span>{{ visibleTerminalIds().length }}/{{ visibleTerminalLimit() }}</span>
         <select
           class="select select-bordered select-xs"
-          aria-label="选择要显示的终端"
+          [attr.aria-label]="'terminal.chooseVisible' | t"
           [value]="activeTerminalId() ?? ''"
           (change)="selectTerminalFromPicker($event)"
         >
@@ -250,12 +273,16 @@
         </select>
       </label>
 
-      <div class="terminal-order-controls join" role="group" aria-label="调整终端排序">
+      <div
+        class="terminal-order-controls join"
+        role="group"
+        [attr.aria-label]="'terminal.reorder' | t"
+      >
         <button
           type="button"
           class="btn btn-square btn-ghost btn-xs join-item"
-          title="将当前终端向左移动"
-          aria-label="将当前终端向左移动"
+          [title]="'terminal.moveLeft' | t"
+          [attr.aria-label]="'terminal.moveLeft' | t"
           [disabled]="!canMoveActiveTerminal(-1)"
           (click)="moveActiveTerminal(-1)"
         >
@@ -264,8 +291,8 @@
         <button
           type="button"
           class="btn btn-square btn-ghost btn-xs join-item"
-          title="将当前终端向右移动"
-          aria-label="将当前终端向右移动"
+          [title]="'terminal.moveRight' | t"
+          [attr.aria-label]="'terminal.moveRight' | t"
           [disabled]="!canMoveActiveTerminal(1)"
           (click)="moveActiveTerminal(1)"
         >
@@ -273,24 +300,24 @@
         </button>
       </div>
 
-      <div class="font-size-controls" role="group" aria-label="调整终端字体大小">
+      <div class="font-size-controls" role="group" [attr.aria-label]="'terminal.fontSize' | t">
         <span aria-hidden="true">Aa</span>
         <button
           type="button"
-          title="减小终端字体"
-          aria-label="减小终端字体"
+          [title]="'terminal.fontSmaller' | t"
+          [attr.aria-label]="'terminal.fontSmaller' | t"
           [disabled]="terminalFontSize() <= minTerminalFontSize"
           (click)="adjustTerminalFontSize(-1)"
         >
           −
         </button>
-        <output [attr.aria-label]="'当前终端字号 ' + terminalFontSize()">
+        <output [attr.aria-label]="'terminal.fontSizeCurrent' | t: { size: terminalFontSize() }">
           {{ terminalFontSize() }}
         </output>
         <button
           type="button"
-          title="增大终端字体"
-          aria-label="增大终端字体"
+          [title]="'terminal.fontLarger' | t"
+          [attr.aria-label]="'terminal.fontLarger' | t"
           [disabled]="terminalFontSize() >= maxTerminalFontSize"
           (click)="adjustTerminalFontSize(1)"
         >
@@ -298,11 +325,11 @@
         </button>
       </div>
 
-      <div class="layout-controls join" aria-label="终端布局">
+      <div class="layout-controls join" [attr.aria-label]="'terminal.layout' | t">
         <button
           type="button"
           class="btn btn-square btn-ghost btn-xs join-item"
-          title="单终端"
+          [title]="'terminal.layoutSingle' | t"
           [class.active]="state.activeWorkspace()?.layout === 'single'"
           (click)="changeLayout('single')"
         >
@@ -311,7 +338,7 @@
         <button
           type="button"
           class="btn btn-square btn-ghost btn-xs join-item"
-          title="左右分屏"
+          [title]="'terminal.layoutColumns' | t"
           [class.active]="state.activeWorkspace()?.layout === 'columns'"
           (click)="changeLayout('columns')"
         >
@@ -320,7 +347,7 @@
         <button
           type="button"
           class="btn btn-square btn-ghost btn-xs join-item"
-          title="上下分屏"
+          [title]="'terminal.layoutRows' | t"
           [class.active]="state.activeWorkspace()?.layout === 'rows'"
           (click)="changeLayout('rows')"
         >
@@ -329,42 +356,48 @@
         <button
           type="button"
           class="btn btn-square btn-ghost btn-xs join-item"
-          title="网格布局"
+          [title]="'terminal.layoutGrid' | t"
           [class.active]="state.activeWorkspace()?.layout === 'grid'"
           (click)="changeLayout('grid')"
         >
           <app-icon name="grid" [size]="13" />
         </button>
         @if (state.activeWorkspace()?.layout === 'grid') {
-          <div class="grid-dimensions" aria-label="自定义网格行列数">
+          <div class="grid-dimensions" [attr.aria-label]="'terminal.gridCustom' | t">
             <span
               class="grid-preview"
               aria-hidden="true"
               [style.--preview-columns]="gridColumns()"
               [style.--preview-rows]="gridRows()"
-              [title]="gridColumns() + ' 列 × ' + gridRows() + ' 行'"
+              [title]="'terminal.gridSize' | t: { columns: gridColumns(), rows: gridRows() }"
             >
               @for (_ of gridCells(); track $index) {
                 <i [class.occupied]="$index < visibleTerminalIds().length"></i>
               }
             </span>
 
-            <div class="dimension-stepper" role="group" aria-label="调整网格列数">
-              <span class="dimension-axis">列</span>
+            <div
+              class="dimension-stepper"
+              role="group"
+              [attr.aria-label]="'terminal.gridColumns' | t"
+            >
+              <span class="dimension-axis">{{ 'terminal.gridColumns' | t }}</span>
               <button
                 type="button"
-                aria-label="减少网格列数"
-                title="减少列数"
+                [attr.aria-label]="'terminal.gridDecreaseColumns' | t"
+                [title]="'terminal.gridDecreaseColumns' | t"
                 [disabled]="gridColumns() <= minGridDimension"
                 (click)="adjustGridDimension('columns', -1)"
               >
                 −
               </button>
-              <output aria-label="当前网格列数">{{ gridColumns() }}</output>
+              <output [attr.aria-label]="'terminal.gridCurrentColumns' | t">{{
+                gridColumns()
+              }}</output>
               <button
                 type="button"
-                aria-label="增加网格列数"
-                title="增加列数"
+                [attr.aria-label]="'terminal.gridIncreaseColumns' | t"
+                [title]="'terminal.gridIncreaseColumns' | t"
                 [disabled]="gridColumns() >= maxGridDimension"
                 (click)="adjustGridDimension('columns', 1)"
               >
@@ -375,30 +408,30 @@
             <button
               type="button"
               class="dimension-swap"
-              aria-label="交换网格行列数"
-              title="交换行列数"
+              [attr.aria-label]="'terminal.gridSwap' | t"
+              [title]="'terminal.gridSwap' | t"
               [disabled]="gridColumns() === gridRows()"
               (click)="swapGridDimensions()"
             >
               ×
             </button>
 
-            <div class="dimension-stepper" role="group" aria-label="调整网格行数">
-              <span class="dimension-axis">行</span>
+            <div class="dimension-stepper" role="group" [attr.aria-label]="'terminal.gridRows' | t">
+              <span class="dimension-axis">{{ 'terminal.gridRows' | t }}</span>
               <button
                 type="button"
-                aria-label="减少网格行数"
-                title="减少行数"
+                [attr.aria-label]="'terminal.gridDecreaseRows' | t"
+                [title]="'terminal.gridDecreaseRows' | t"
                 [disabled]="gridRows() <= minGridDimension"
                 (click)="adjustGridDimension('rows', -1)"
               >
                 −
               </button>
-              <output aria-label="当前网格行数">{{ gridRows() }}</output>
+              <output [attr.aria-label]="'terminal.gridCurrentRows' | t">{{ gridRows() }}</output>
               <button
                 type="button"
-                aria-label="增加网格行数"
-                title="增加行数"
+                [attr.aria-label]="'terminal.gridIncreaseRows' | t"
+                [title]="'terminal.gridIncreaseRows' | t"
                 [disabled]="gridRows() >= maxGridDimension"
                 (click)="adjustGridDimension('rows', 1)"
               >
@@ -406,8 +439,8 @@
               </button>
             </div>
 
-            <span class="grid-capacity" title="当前网格最多同时显示的窗口数量">
-              {{ gridCapacity() }} 格
+            <span class="grid-capacity" [title]="'terminal.gridCapacity' | t">
+              {{ 'terminal.gridCells' | t: { count: gridCapacity() } }}
             </span>
           </div>
         }
@@ -424,7 +457,9 @@
         <button
           type="button"
           class="attention-banner-open"
-          [attr.aria-label]="banner.title + '：' + banner.detail + '，跳转到该终端'"
+          [attr.aria-label]="
+            'notice.openTarget' | t: { title: banner.title, detail: banner.detail }
+          "
           (click)="openAttentionBanner()"
         >
           <span class="attention-banner-icon" aria-hidden="true">
@@ -441,8 +476,8 @@
         <button
           type="button"
           class="attention-banner-dismiss btn btn-square btn-ghost btn-xs"
-          aria-label="忽略当前等待提示"
-          title="忽略，直到有新的 Agent 等待"
+          [attr.aria-label]="'notice.dismiss' | t"
+          [title]="'notice.dismiss' | t"
           (click)="dismissAttentionBanner()"
         >
           <app-icon name="x" [size]="13" />
@@ -478,7 +513,7 @@
 
     <footer class="statusbar">
       <span class="connection"><i></i> Desktop Core</span>
-      <span>{{ state.runningAgentCount() }} Agent 活动</span>
+      <span>{{ 'inspector.agentActivity' | t: { count: state.runningAgentCount() } }}</span>
       <span class="status-spacer"></span>
       <span>{{ state.activeWorkspace()?.activeBranch ?? '' }}</span>
       <span>UTF-8</span>
@@ -489,7 +524,7 @@
     <div
       class="sidebar-resizer inspector-resizer"
       role="separator"
-      aria-label="调整 Agent 侧栏宽度"
+      [attr.aria-label]="'inspector.resize' | t"
       aria-orientation="vertical"
       (pointerdown)="startSidebarResize('inspector', $event)"
     ></div>
@@ -583,7 +618,7 @@
     [networkProfiles]="agents.networkProfiles()"
     [accountProfiles]="agents.accountProfiles()"
     [activeWorkspaceId]="state.activeWorkspace()?.id ?? ''"
-    [activeWorkspaceName]="state.activeWorkspace()?.name ?? '当前 Workspace'"
+    [activeWorkspaceName]="state.activeWorkspace()?.name ?? ('common.currentWorkspace' | t)"
     [initialTab]="settingsInitialTab()"
     [initialModelProfileId]="settingsInitialModelProfileId()"
     [networkTestResult]="networkTestResult()"

@@ -1,6 +1,7 @@
 import {
   AfterViewInit,
   Component,
+  computed,
   DestroyRef,
   ElementRef,
   effect,
@@ -13,8 +14,9 @@ import {
 import { FitAddon } from '@xterm/addon-fit';
 import { Terminal } from '@xterm/xterm';
 
+import { I18nService } from '../core/i18n/i18n.service';
+import { TranslatePipe } from '../core/i18n/translate.pipe';
 import {
-  TERMINAL_STATUS_LABELS,
   normalizeTerminalFontSize,
   TerminalSession,
   TerminalStatus,
@@ -27,12 +29,13 @@ import { createTerminalTheme } from './terminal-theme';
 
 @Component({
   selector: 'app-terminal-panel',
-  imports: [IconComponent],
+  imports: [IconComponent, TranslatePipe],
   templateUrl: './terminal-panel.html',
   styleUrl: './terminal-panel.scss',
 })
 export class TerminalPanelComponent implements AfterViewInit {
   private readonly gateway = inject(TerminalGatewayService);
+  private readonly i18n = inject(I18nService);
   private readonly destroyRef = inject(DestroyRef);
   private readonly container = viewChild.required<ElementRef<HTMLDivElement>>('terminal');
   private readonly terminal = new Terminal({
@@ -81,8 +84,13 @@ export class TerminalPanelComponent implements AfterViewInit {
   readonly maximizeRequested = output<string>();
   readonly statusChanged = output<{ terminalId: string; status: TerminalStatus }>();
 
-  protected readonly statusLabels = TERMINAL_STATUS_LABELS;
-  protected readonly runtimeNotice = signal<string | null>(null);
+  private readonly runtimeIssue = signal<TerminalRuntimeIssue>(null);
+  protected readonly runtimeNotice = computed(() => {
+    const issue = this.runtimeIssue();
+    return issue
+      ? this.i18n.t(issue === 'rate-limit' ? 'terminal.rateLimited' : 'terminal.timeout')
+      : null;
+  });
 
   constructor() {
     effect(() => {
@@ -131,7 +139,7 @@ export class TerminalPanelComponent implements AfterViewInit {
     const inputDisposable = this.terminal.onData((data) => {
       if (data.includes('\r')) {
         this.terminal.scrollToBottom();
-        this.runtimeNotice.set(null);
+        this.runtimeIssue.set(null);
         this.lastRuntimeIssue = null;
         this.outputTail = '';
         this.statusChanged.emit({
@@ -169,7 +177,24 @@ export class TerminalPanelComponent implements AfterViewInit {
   }
 
   protected dismissRuntimeNotice(): void {
-    this.runtimeNotice.set(null);
+    this.runtimeIssue.set(null);
+  }
+
+  protected statusLabel(status: TerminalStatus): string {
+    const keys: Record<TerminalStatus, string> = {
+      STARTING: 'status.starting',
+      RUNNING: 'status.running',
+      THINKING: 'status.thinking',
+      WAITING_INPUT: 'status.waitingInput',
+      WAITING_APPROVAL: 'status.waitingApproval',
+      RATE_LIMITED: 'status.rateLimited',
+      IDLE: 'status.idle',
+      COMPLETED: 'status.completed',
+      FAILED: 'status.failed',
+      STOPPED: 'status.stopped',
+      DISCONNECTED: 'status.disconnected',
+    };
+    return this.i18n.t(keys[status]);
   }
 
   private async initializeRuntime(): Promise<void> {
@@ -188,7 +213,7 @@ export class TerminalPanelComponent implements AfterViewInit {
 
       if (this.session().agentType === 'codex' && this.session().command) {
         this.terminal.writeln(
-          '\u001b[38;2;150;157;164mTermexo · 正在启动 Codex CLI（hooks 已自动允许）\u001b[0m',
+          `\u001b[38;2;150;157;164m${this.i18n.t('terminal.codexStarting')}\u001b[0m`,
         );
       }
       await this.gateway.start(
@@ -204,7 +229,7 @@ export class TerminalPanelComponent implements AfterViewInit {
       unlisten = undefined;
       this.statusChanged.emit({ terminalId: this.session().id, status: 'FAILED' });
       this.terminal.writeln(
-        `\u001b[38;2;224;108;117m终端启动失败：${this.errorMessage(error)}\u001b[0m`,
+        `\u001b[38;2;224;108;117m${this.i18n.t('terminal.startFailed', { error: this.errorMessage(error) })}\u001b[0m`,
       );
     }
   }
@@ -294,13 +319,11 @@ export class TerminalPanelComponent implements AfterViewInit {
     }
     this.lastRuntimeIssue = issue;
     if (issue === 'rate-limit') {
-      this.runtimeNotice.set(
-        '供应商返回 429 限流。Claude CLI 可能自动重试，请先等待状态更新，避免重复提交。',
-      );
+      this.runtimeIssue.set('rate-limit');
       this.statusChanged.emit({ terminalId: this.session().id, status: 'RATE_LIMITED' });
       return;
     }
-    this.runtimeNotice.set('Claude 请求超时。可等待 CLI 重试，或检查代理与供应商状态。');
+    this.runtimeIssue.set('timeout');
     this.statusChanged.emit({ terminalId: this.session().id, status: 'WAITING_INPUT' });
   }
 

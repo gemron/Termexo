@@ -1,4 +1,4 @@
-import { Injectable } from '@angular/core';
+import { inject, Injectable } from '@angular/core';
 import { getCurrentWindow, UserAttentionType } from '@tauri-apps/api/window';
 import {
   isPermissionGranted,
@@ -7,10 +7,12 @@ import {
 } from '@tauri-apps/plugin-notification';
 
 import { createDesktopNotification, GlobalTerminalNotice } from '../models/terminal-notifications';
+import { I18nService } from '../i18n/i18n.service';
 import { isTauriRuntime } from './tauri-runtime';
 
 @Injectable({ providedIn: 'root' })
 export class DesktopNotificationService {
+  private readonly i18n = inject(I18nService);
   private readonly appWindow = isTauriRuntime() ? getCurrentWindow() : null;
   private permissionPromise?: Promise<boolean>;
 
@@ -30,7 +32,9 @@ export class DesktopNotificationService {
   }
 
   async notify(notices: readonly GlobalTerminalNotice[]): Promise<void> {
-    const notification = createDesktopNotification(notices);
+    const notification = createDesktopNotification(notices, (key, params) =>
+      this.i18n.t(key, params),
+    );
     const appWindow = this.appWindow;
     if (!notification || !appWindow) {
       return;

@@ -1,5 +1,5 @@
 import { DatePipe } from '@angular/common';
-import { Component, computed, input, output, signal } from '@angular/core';
+import { Component, computed, inject, input, output, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 
 import {
@@ -10,6 +10,8 @@ import {
   type ModelProfile,
   type NativeAgentType,
 } from '../core/models/agent.models';
+import { I18nService } from '../core/i18n/i18n.service';
+import { TranslatePipe } from '../core/i18n/translate.pipe';
 import { IconComponent } from '../shared/icon/icon';
 
 export interface ResumeSessionValue {
@@ -24,16 +26,11 @@ type SessionAgentFilter = 'all' | NativeAgentType;
 
 const AGENT_FILTERS: readonly {
   value: SessionAgentFilter;
-  label: string;
-}[] = [
-  { value: 'all', label: '全部' },
-  { value: 'claude', label: 'Claude' },
-  { value: 'codex', label: 'Codex' },
-];
+}[] = [{ value: 'all' }, { value: 'claude' }, { value: 'codex' }];
 
 @Component({
   selector: 'app-session-center-dialog',
-  imports: [DatePipe, FormsModule, IconComponent],
+  imports: [DatePipe, FormsModule, IconComponent, TranslatePipe],
   template: `
     <div class="backdrop modal modal-open" (mousedown)="cancelled.emit()">
       <section
@@ -47,25 +44,33 @@ const AGENT_FILTERS: readonly {
           <div class="dialog-title">
             <span class="title-icon"><app-icon name="history" [size]="17" /></span>
             <div>
-              <h2 id="session-center-title">Agent 会话中心</h2>
+              <h2 id="session-center-title">{{ 'session.title' | t }}</h2>
               <p>
-                {{ sessions().length }} 个本地会话 ·
-                {{ onlyWorkspace() ? '当前工作区' : '全部项目' }}
+                {{
+                  'session.summary'
+                    | t
+                      : {
+                          count: sessions().length,
+                          scope: onlyWorkspace()
+                            ? ('session.currentWorkspace' | t)
+                            : ('session.allProjects' | t),
+                        }
+                }}
               </p>
             </div>
           </div>
           <button
             type="button"
             class="btn btn-square btn-ghost btn-sm"
-            title="关闭"
-            aria-label="关闭"
+            [title]="'common.close' | t"
+            [attr.aria-label]="'common.close' | t"
             (click)="cancelled.emit()"
           >
             <app-icon name="x" [size]="15" />
           </button>
         </header>
 
-        <div class="agent-health-strip" aria-label="Agent 连接状态">
+        <div class="agent-health-strip" [attr.aria-label]="'session.connectionStatus' | t">
           <article
             class="agent-health card"
             data-agent="claude"
@@ -74,9 +79,9 @@ const AGENT_FILTERS: readonly {
             <span class="agent-health-icon"><app-icon name="bot" [size]="14" /></span>
             <div>
               <strong>Claude Code</strong>
-              <small>{{ installation()?.diagnostic ?? '正在检测本机安装' }}</small>
+              <small>{{ installation()?.diagnostic ?? ('session.detectingLocal' | t) }}</small>
             </div>
-            <code>{{ installation()?.version ?? '未连接' }}</code>
+            <code>{{ installation()?.version ?? ('common.notConnected' | t) }}</code>
           </article>
           <article
             class="agent-health card"
@@ -86,9 +91,9 @@ const AGENT_FILTERS: readonly {
             <span class="agent-health-icon"><app-icon name="bot" [size]="14" /></span>
             <div>
               <strong>Codex CLI</strong>
-              <small>{{ codexInstallation()?.diagnostic ?? '正在检测本机安装' }}</small>
+              <small>{{ codexInstallation()?.diagnostic ?? ('session.detectingLocal' | t) }}</small>
             </div>
-            <code>{{ codexInstallation()?.version ?? '未连接' }}</code>
+            <code>{{ codexInstallation()?.version ?? ('common.notConnected' | t) }}</code>
           </article>
         </div>
 
@@ -97,8 +102,8 @@ const AGENT_FILTERS: readonly {
             <app-icon name="search" [size]="14" />
             <input
               type="search"
-              placeholder="搜索名称、路径、分支、模型或会话 ID"
-              aria-label="搜索 Agent 会话"
+              [placeholder]="'session.searchPlaceholder' | t"
+              [attr.aria-label]="'session.searchAria' | t"
               [ngModel]="search()"
               (ngModelChange)="search.set($event)"
             />
@@ -106,8 +111,8 @@ const AGENT_FILTERS: readonly {
               <button
                 type="button"
                 class="search-clear"
-                title="清除搜索"
-                aria-label="清除搜索"
+                [title]="'common.clearSearch' | t"
+                [attr.aria-label]="'common.clearSearch' | t"
                 (click)="search.set('')"
               >
                 <app-icon name="x" [size]="11" />
@@ -120,14 +125,14 @@ const AGENT_FILTERS: readonly {
               [ngModel]="onlyWorkspace()"
               (ngModelChange)="onlyWorkspace.set($event); refresh()"
             />
-            <span>仅当前工作区</span>
+            <span>{{ 'session.onlyWorkspace' | t }}</span>
           </label>
           <button
             type="button"
             class="icon-action btn btn-square btn-ghost btn-sm"
             [class.spinning]="busy()"
-            title="重新扫描本机会话"
-            aria-label="重新扫描本机会话"
+            [title]="'session.rescan' | t"
+            [attr.aria-label]="'session.rescan' | t"
             [disabled]="busy()"
             (click)="refresh()"
           >
@@ -136,7 +141,11 @@ const AGENT_FILTERS: readonly {
         </div>
 
         <div class="session-filter-bar">
-          <nav class="session-agent-filter tabs tabs-box" role="tablist" aria-label="按 Agent 筛选">
+          <nav
+            class="session-agent-filter tabs tabs-box"
+            role="tablist"
+            [attr.aria-label]="'session.filterAria' | t"
+          >
             @for (filter of agentFilters; track filter.value) {
               <button
                 type="button"
@@ -146,13 +155,16 @@ const AGENT_FILTERS: readonly {
                 [attr.aria-selected]="agentFilter() === filter.value"
                 (click)="agentFilter.set(filter.value)"
               >
-                {{ filter.label }}
+                {{ filterLabel(filter.value) }}
                 <span>{{ countFor(filter.value) }}</span>
               </button>
             }
           </nav>
           <span class="session-result-count">
-            显示 {{ filteredSessions().length }} / {{ sessions().length }}
+            {{
+              'session.resultCount'
+                | t: { visible: filteredSessions().length, total: sessions().length }
+            }}
           </span>
         </div>
 
@@ -160,7 +172,9 @@ const AGENT_FILTERS: readonly {
           <div class="session-error alert alert-error" role="alert">
             <app-icon name="shield" [size]="14" />
             <span>{{ error() }}</span>
-            <button type="button" [disabled]="busy()" (click)="refresh()">重试</button>
+            <button type="button" [disabled]="busy()" (click)="refresh()">
+              {{ 'common.retry' | t }}
+            </button>
           </div>
         }
 
@@ -171,12 +185,12 @@ const AGENT_FILTERS: readonly {
                 <app-icon name="bot" [size]="14" />
               </span>
               <div>
-                <strong>Claude 恢复配置</strong>
-                <small>完整恢复会加载历史上下文；跨供应商请使用顶部模型切换的新会话</small>
+                <strong>{{ 'session.claudeResumeConfig' | t }}</strong>
+                <small>{{ 'session.claudeResumeHelp' | t }}</small>
               </div>
             </div>
             <label>
-              <span>模型 Profile</span>
+              <span>{{ 'launch.modelProfile' | t }}</span>
               <select [ngModel]="resolvedProfileId()" (ngModelChange)="profileId.set($event)">
                 @for (profile of profiles(); track profile.id) {
                   <option [value]="profile.id">{{ profile.name }}</option>
@@ -184,23 +198,28 @@ const AGENT_FILTERS: readonly {
               </select>
             </label>
             <label>
-              <span>MCP Profile</span>
+              <span>{{ 'launch.mcpProfile' | t }}</span>
               <select [ngModel]="mcpProfileId()" (ngModelChange)="mcpProfileId.set($event)">
-                <option value="">Claude 默认配置</option>
+                <option value="">{{ 'session.claudeDefault' | t }}</option>
                 @for (profile of mcpProfiles(); track profile.id) {
                   <option [value]="profile.id">{{ profile.name }}</option>
                 }
               </select>
             </label>
             <label>
-              <span>Claude 登录账号</span>
+              <span>Claude {{ 'launch.loginAccount' | t }}</span>
               <select
                 [ngModel]="resolvedClaudeAccountProfileId()"
                 (ngModelChange)="claudeAccountProfileId.set($event)"
               >
                 @for (profile of claudeAccounts(); track profile.id) {
                   <option [value]="profile.id">
-                    {{ profile.name }} · {{ profile.authenticated ? '已登录' : '未登录' }}
+                    {{ profile.name }} ·
+                    {{
+                      profile.authenticated
+                        ? ('common.authenticated' | t)
+                        : ('common.unauthenticated' | t)
+                    }}
                   </option>
                 }
               </select>
@@ -215,30 +234,35 @@ const AGENT_FILTERS: readonly {
                 <app-icon name="terminal" [size]="14" />
               </span>
               <div>
-                <strong>Codex 恢复配置</strong>
-                <small>保留原生会话 ID，只读使用 rollout 索引</small>
+                <strong>{{ 'session.codexResumeConfig' | t }}</strong>
+                <small>{{ 'session.codexResumeHelp' | t }}</small>
               </div>
             </div>
             <label>
-              <span>ChatGPT 登录账号</span>
+              <span>{{ 'launch.chatgptAccount' | t }}</span>
               <select
                 [ngModel]="resolvedCodexAccountProfileId()"
                 (ngModelChange)="codexAccountProfileId.set($event)"
               >
                 @for (profile of codexAccounts(); track profile.id) {
                   <option [value]="profile.id">
-                    {{ profile.name }} · {{ profile.authenticated ? '已登录' : '未登录' }}
+                    {{ profile.name }} ·
+                    {{
+                      profile.authenticated
+                        ? ('common.authenticated' | t)
+                        : ('common.unauthenticated' | t)
+                    }}
                   </option>
                 }
               </select>
             </label>
             <label>
-              <span>Codex 模型</span>
+              <span>{{ 'launch.codexModel' | t }}</span>
               <input
                 type="text"
                 list="resume-codex-model-suggestions"
-                placeholder="留空沿用会话或配置默认模型"
-                aria-label="恢复 Codex 模型"
+                [placeholder]="'session.codexModelPlaceholder' | t"
+                [attr.aria-label]="'session.codexModelAria' | t"
                 [ngModel]="codexModel()"
                 (ngModelChange)="codexModel.set($event)"
               />
@@ -255,8 +279,8 @@ const AGENT_FILTERS: readonly {
           @if (busy() && sessions().length === 0) {
             <div class="session-loading">
               <app-icon name="refresh" [size]="18" />
-              <strong>正在扫描本机会话</strong>
-              <span>正在读取 Claude 与 Codex 的原生会话索引…</span>
+              <strong>{{ 'session.scanning' | t }}</strong>
+              <span>{{ 'session.scanningHelp' | t }}</span>
             </div>
           } @else {
             @for (session of filteredSessions(); track session.id) {
@@ -266,16 +290,16 @@ const AGENT_FILTERS: readonly {
                 </span>
                 <div class="session-copy">
                   <strong [title]="session.title">{{ session.title }}</strong>
-                  <small [title]="session.projectPath ?? '未知项目'">
-                    {{ session.projectPath ?? '未知项目' }}
+                  <small [title]="session.projectPath ?? ('common.unknownProject' | t)">
+                    {{ session.projectPath ?? ('common.unknownProject' | t) }}
                   </small>
                   <div class="session-metadata">
                     <span class="agent-tag" [attr.data-agent]="session.agentType">
                       {{ agentLabel(session) }}
                     </span>
-                    <span>{{ session.branch ?? '无分支' }}</span>
-                    <span>{{ session.modelName ?? '默认模型' }}</span>
-                    <span>{{ session.messageCount }} 条消息</span>
+                    <span>{{ session.branch ?? ('common.noBranch' | t) }}</span>
+                    <span>{{ session.modelName ?? ('common.defaultModel' | t) }}</span>
+                    <span>{{ 'common.messages' | t: { count: session.messageCount } }}</span>
                     <span class="session-id" [title]="session.nativeSessionId">
                       {{ shortSessionId(session) }}
                     </span>
@@ -293,13 +317,17 @@ const AGENT_FILTERS: readonly {
                   [disabled]="busy() || !installationFor(session)?.healthy"
                   [title]="
                     installationFor(session)?.healthy
-                      ? '恢复此会话'
-                      : agentLabel(session) + ' 当前不可用'
+                      ? ('session.resumeThis' | t)
+                      : ('session.agentUnavailable' | t: { agent: agentLabel(session) })
                   "
                   (click)="resume(session)"
                 >
                   <app-icon name="play" [size]="12" />
-                  {{ installationFor(session)?.healthy ? '恢复' : '不可用' }}
+                  {{
+                    installationFor(session)?.healthy
+                      ? ('terminal.resume' | t)
+                      : ('common.unavailable' | t)
+                  }}
                 </button>
               </article>
             } @empty {
@@ -308,7 +336,9 @@ const AGENT_FILTERS: readonly {
                 <strong>{{ emptyTitle() }}</strong>
                 <span>{{ emptyDescription() }}</span>
                 @if (search()) {
-                  <button type="button" class="secondary" (click)="search.set('')">清除搜索</button>
+                  <button type="button" class="secondary" (click)="search.set('')">
+                    {{ 'common.clearSearch' | t }}
+                  </button>
                 }
               </div>
             }
@@ -316,9 +346,9 @@ const AGENT_FILTERS: readonly {
         </div>
 
         <footer class="session-footer">
-          <span>原生会话文件保持只读，Termexo 不会修改或删除它们。</span>
+          <span>{{ 'session.readOnly' | t }}</span>
           <button type="button" class="secondary btn btn-ghost btn-sm" (click)="cancelled.emit()">
-            关闭
+            {{ 'common.close' | t }}
           </button>
         </footer>
       </section>
@@ -327,6 +357,7 @@ const AGENT_FILTERS: readonly {
   styleUrl: './agent-dialog.scss',
 })
 export class SessionCenterDialogComponent {
+  private readonly i18n = inject(I18nService);
   readonly installation = input<AgentInstallation | null>(null);
   readonly codexInstallation = input<AgentInstallation | null>(null);
   readonly sessions = input<AgentSession[]>([]);
@@ -414,23 +445,31 @@ export class SessionCenterDialogComponent {
   );
   protected readonly emptyTitle = computed(() => {
     if (this.search().trim()) {
-      return '没有匹配的会话';
+      return this.i18n.t('session.noMatch');
     }
     if (this.agentFilter() === 'claude') {
-      return '没有 Claude 会话';
+      return this.i18n.t('session.noClaude');
     }
     if (this.agentFilter() === 'codex') {
-      return '没有 Codex 会话';
+      return this.i18n.t('session.noCodex');
     }
-    return this.onlyWorkspace() ? '当前工作区没有本地会话' : '没有发现本地 Agent 会话';
+    return this.i18n.t(this.onlyWorkspace() ? 'session.noWorkspace' : 'session.noLocal');
   });
   protected readonly emptyDescription = computed(() =>
     this.search().trim()
-      ? '尝试更换关键词、Agent 或扫描范围。'
+      ? this.i18n.t('session.tryFilters')
       : this.onlyWorkspace()
-        ? '关闭“仅当前工作区”可查看其他项目的会话。'
-        : '确认对应 CLI 已安装并产生过可恢复的本地会话。',
+        ? this.i18n.t('session.showOtherProjects')
+        : this.i18n.t('session.verifyCli'),
   );
+
+  protected filterLabel(filter: SessionAgentFilter): string {
+    return filter === 'all'
+      ? this.i18n.t('session.filterAll')
+      : filter === 'claude'
+        ? 'Claude'
+        : 'Codex';
+  }
 
   protected countFor(filter: SessionAgentFilter): number {
     return this.sessionCounts()[filter];

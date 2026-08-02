@@ -1,6 +1,7 @@
-import { Injectable, signal } from '@angular/core';
+import { effect, inject, Injectable, signal } from '@angular/core';
 import { invoke } from '@tauri-apps/api/core';
 
+import { I18nService } from '../i18n/i18n.service';
 import {
   AccountLoginRequest,
   AccountProfile,
@@ -27,22 +28,9 @@ import { isTauriRuntime } from './tauri-runtime';
 const EVENT_POLL_INTERVAL_MS = 1_000;
 const MAX_RECENT_EVENTS = 250;
 
-const BROWSER_INSTALLATION: AgentInstallation = {
-  agentType: 'claude',
-  installed: false,
-  healthy: false,
-  diagnostic: '浏览器预览不连接本机 Claude Code，请运行桌面端。',
-};
-
-const BROWSER_CODEX_INSTALLATION: AgentInstallation = {
-  agentType: 'codex',
-  installed: false,
-  healthy: false,
-  diagnostic: '浏览器预览不连接本机 Codex CLI，请运行桌面端。',
-};
-
 @Injectable({ providedIn: 'root' })
 export class AgentService {
+  private readonly i18n = inject(I18nService);
   private readonly installationState = signal<AgentInstallation | null>(null);
   private readonly codexInstallationState = signal<AgentInstallation | null>(null);
   private readonly sessionItems = signal<AgentSession[]>([]);
@@ -68,6 +56,15 @@ export class AgentService {
   readonly busy = this.busyState.asReadonly();
   readonly error = this.errorState.asReadonly();
 
+  constructor() {
+    effect(() => {
+      this.i18n.activeLanguage();
+      if (this.initialized && !isTauriRuntime()) {
+        this.initializeBrowserPreview();
+      }
+    });
+  }
+
   async initialize(): Promise<void> {
     if (this.initialized) {
       return;
@@ -75,38 +72,7 @@ export class AgentService {
     this.initialized = true;
 
     if (!isTauriRuntime()) {
-      this.installationState.set(BROWSER_INSTALLATION);
-      this.codexInstallationState.set(BROWSER_CODEX_INSTALLATION);
-      this.modelProfileItems.set([
-        {
-          id: 'claude-default',
-          name: 'Claude Sonnet',
-          provider: 'Anthropic',
-          model: 'sonnet',
-          isDefault: true,
-          hasCredential: false,
-        },
-      ]);
-      this.accountProfileItems.set([
-        {
-          id: 'claude-system',
-          name: '系统 Claude 账号',
-          agentType: 'claude',
-          isDefault: true,
-          isSystem: true,
-          authenticated: true,
-          diagnostic: '浏览器预览账号',
-        },
-        {
-          id: 'codex-system',
-          name: '系统 ChatGPT 账号',
-          agentType: 'codex',
-          isDefault: true,
-          isSystem: true,
-          authenticated: true,
-          diagnostic: '浏览器预览账号',
-        },
-      ]);
+      this.initializeBrowserPreview();
       return;
     }
 
@@ -126,7 +92,7 @@ export class AgentService {
 
   async detectClaude(): Promise<void> {
     if (!isTauriRuntime()) {
-      this.installationState.set(BROWSER_INSTALLATION);
+      this.installationState.set(this.browserInstallation('claude'));
       return;
     }
     await this.run(async () => {
@@ -136,7 +102,7 @@ export class AgentService {
 
   async detectCodex(): Promise<void> {
     if (!isTauriRuntime()) {
-      this.codexInstallationState.set(BROWSER_CODEX_INSTALLATION);
+      this.codexInstallationState.set(this.browserInstallation('codex'));
       return;
     }
     await this.run(async () => {
@@ -167,16 +133,18 @@ export class AgentService {
       );
       if (failures.length === results.length) {
         throw new Error(
-          `会话扫描失败：${failures.map((failure) => this.errorMessage(failure.reason)).join('；')}`,
+          this.i18n.t('agent.sessionScanFailed', {
+            error: failures.map((failure) => this.errorMessage(failure.reason)).join('; '),
+          }),
         );
       }
 
       this.sessionItems.set(sessions.sort((left, right) => right.lastUsedAt - left.lastUsedAt));
       if (failures.length > 0) {
         this.errorState.set(
-          `部分 Agent 会话扫描失败：${failures
-            .map((failure) => this.errorMessage(failure.reason))
-            .join('；')}`,
+          this.i18n.t('agent.sessionScanPartial', {
+            error: failures.map((failure) => this.errorMessage(failure.reason)).join('; '),
+          }),
         );
       }
     });
@@ -242,7 +210,7 @@ export class AgentService {
             (profile.workspaceId === request.workspaceId || profile.scope === 'global'),
         )?.id,
         ready: true,
-        diagnostic: '浏览器预览已生成安装计划；桌面端会执行真实 npm 检测与版本验证。',
+        diagnostic: this.i18n.t('agent.browserPlan'),
       };
     }
     return this.runValue(() => invoke<CliOperationPlan>('preview_cli_operation', { request }));
@@ -255,7 +223,7 @@ export class AgentService {
         agentType: request.agentType,
         installed: false,
         healthy: false,
-        diagnostic: '浏览器预览不会修改本机 CLI，请在桌面端执行。',
+        diagnostic: this.i18n.t('agent.browserNoMutation'),
       };
       return {
         success: false,
@@ -346,7 +314,7 @@ export class AgentService {
         profileId,
         healthy: true,
         target: 'browser-preview',
-        message: '浏览器预览已验证 Profile 交互；桌面端会执行真实 TCP 连通性测试。',
+        message: this.i18n.t('agent.browserNetworkTest'),
         latencyMs: 0,
       };
     }
@@ -360,7 +328,7 @@ export class AgentService {
         ...input,
         isSystem: existing?.isSystem ?? false,
         authenticated: existing?.authenticated ?? false,
-        diagnostic: existing?.diagnostic ?? '尚未登录',
+        diagnostic: existing?.diagnostic ?? this.i18n.t('agent.notSignedIn'),
       });
       return;
     }
@@ -388,6 +356,55 @@ export class AgentService {
       await invoke('delete_account_profile', { profileId });
     }
     this.accountProfileItems.update((items) => items.filter((item) => item.id !== profileId));
+  }
+
+  private browserInstallation(agentType: 'claude' | 'codex'): AgentInstallation {
+    const name = agentType === 'claude' ? 'Claude Code' : 'Codex CLI';
+    return {
+      agentType,
+      installed: false,
+      healthy: false,
+      diagnostic: this.i18n.t('agent.browserInstallation', { name }),
+    };
+  }
+
+  private initializeBrowserPreview(): void {
+    this.installationState.set(this.browserInstallation('claude'));
+    this.codexInstallationState.set(this.browserInstallation('codex'));
+    if (this.modelProfileItems().length === 0) {
+      this.modelProfileItems.set([
+        {
+          id: 'claude-default',
+          name: 'Claude Sonnet',
+          provider: 'Anthropic',
+          model: 'sonnet',
+          isDefault: true,
+          hasCredential: false,
+        },
+      ]);
+    }
+    const managedAccounts = this.accountProfileItems().filter((profile) => !profile.isSystem);
+    this.accountProfileItems.set([
+      {
+        id: 'claude-system',
+        name: this.i18n.t('agent.systemAccount', { name: 'Claude' }),
+        agentType: 'claude',
+        isDefault: true,
+        isSystem: true,
+        authenticated: true,
+        diagnostic: this.i18n.t('agent.browserAccount'),
+      },
+      {
+        id: 'codex-system',
+        name: this.i18n.t('agent.systemAccount', { name: 'ChatGPT' }),
+        agentType: 'codex',
+        isDefault: true,
+        isSystem: true,
+        authenticated: true,
+        diagnostic: this.i18n.t('agent.browserAccount'),
+      },
+      ...managedAccounts,
+    ]);
   }
 
   private async loadProfiles(): Promise<void> {

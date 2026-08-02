@@ -28,11 +28,11 @@
 } @else {
   <div class="empty-state">
     <span class="empty-icon"><app-icon name="terminal" [size]="24" /></span>
-    <h2>此工作区还没有终端</h2>
-    <p>创建 Shell 或 Agent 终端开始工作。</p>
+    <h2>{{ 'terminal.emptyTitle' | t }}</h2>
+    <p>{{ 'terminal.emptyDescription' | t }}</p>
     <button type="button" (click)="terminalRequested.emit()">
       <app-icon name="plus" [size]="15" />
-      新建终端
+      {{ 'terminal.new' | t }}
     </button>
   </div>
 }

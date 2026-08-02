@@ -1,6 +1,8 @@
-import { Component, effect, input, output, signal, untracked } from '@angular/core';
+import { Component, effect, inject, input, output, signal, untracked } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 
+import { I18nService } from '../core/i18n/i18n.service';
+import { TranslatePipe } from '../core/i18n/translate.pipe';
 import {
   AccountProfile,
   AccountProfileInput,
@@ -25,7 +27,7 @@ export type SettingsTab = 'diagnostics' | 'cli' | 'accounts' | 'models' | 'mcp' 
 
 @Component({
   selector: 'app-agent-settings-dialog',
-  imports: [FormsModule, IconComponent],
+  imports: [FormsModule, IconComponent, TranslatePipe],
   template: `
     <div class="backdrop modal modal-open" (mousedown)="cancelled.emit()">
       <section
@@ -39,29 +41,29 @@ export type SettingsTab = 'diagnostics' | 'cli' | 'accounts' | 'models' | 'mcp' 
           <div class="dialog-title">
             <span class="title-icon"><app-icon name="settings" [size]="17" /></span>
             <div>
-              <h2 id="agent-settings-title">Agent 与开发环境设置</h2>
-              <p>Agent、模型、MCP、网络与安全凭据</p>
+              <h2 id="agent-settings-title">{{ 'settings.title' | t }}</h2>
+              <p>{{ 'settings.subtitle' | t }}</p>
             </div>
           </div>
           <button
             type="button"
             class="btn btn-square btn-ghost btn-sm"
-            title="关闭"
-            aria-label="关闭"
+            [title]="'common.close' | t"
+            [attr.aria-label]="'common.close' | t"
             (click)="cancelled.emit()"
           >
             <app-icon name="x" [size]="15" />
           </button>
         </header>
 
-        <nav class="settings-tabs tabs tabs-border" aria-label="设置分类">
+        <nav class="settings-tabs tabs tabs-border" [attr.aria-label]="'settings.categories' | t">
           <button
             type="button"
             class="tab"
             [class.active]="tab() === 'diagnostics'"
             (click)="selectTab('diagnostics')"
           >
-            诊断
+            {{ 'settings.tabDiagnostics' | t }}
           </button>
           <button
             type="button"
@@ -69,7 +71,7 @@ export type SettingsTab = 'diagnostics' | 'cli' | 'accounts' | 'models' | 'mcp' 
             [class.active]="tab() === 'cli'"
             (click)="selectTab('cli')"
           >
-            CLI 安装与升级
+            {{ 'settings.tabCli' | t }}
           </button>
           <button
             type="button"
@@ -77,7 +79,7 @@ export type SettingsTab = 'diagnostics' | 'cli' | 'accounts' | 'models' | 'mcp' 
             [class.active]="tab() === 'accounts'"
             (click)="selectTab('accounts')"
           >
-            登录账号
+            {{ 'settings.tabAccounts' | t }}
           </button>
           <button
             type="button"
@@ -85,7 +87,7 @@ export type SettingsTab = 'diagnostics' | 'cli' | 'accounts' | 'models' | 'mcp' 
             [class.active]="tab() === 'models'"
             (click)="selectTab('models')"
           >
-            模型 Profile
+            {{ 'settings.tabModels' | t }}
           </button>
           <button
             type="button"
@@ -93,7 +95,7 @@ export type SettingsTab = 'diagnostics' | 'cli' | 'accounts' | 'models' | 'mcp' 
             [class.active]="tab() === 'mcp'"
             (click)="selectTab('mcp')"
           >
-            MCP Profile
+            {{ 'settings.tabMcp' | t }}
           </button>
           <button
             type="button"
@@ -101,7 +103,7 @@ export type SettingsTab = 'diagnostics' | 'cli' | 'accounts' | 'models' | 'mcp' 
             [class.active]="tab() === 'network'"
             (click)="selectTab('network')"
           >
-            网络与 npm
+            {{ 'settings.tabNetwork' | t }}
           </button>
         </nav>
 
@@ -113,11 +115,15 @@ export type SettingsTab = 'diagnostics' | 'cli' | 'accounts' | 'models' | 'mcp' 
                   <span><app-icon name="shield" [size]="18" /></span>
                   <div>
                     <strong>{{
-                      installation()?.healthy ? 'Claude Code 可用' : 'Claude Code 不可用'
+                      installation()?.healthy
+                        ? ('settings.available' | t: { name: 'Claude Code' })
+                        : ('settings.unavailable' | t: { name: 'Claude Code' })
                     }}</strong>
-                    <small>{{ installation()?.diagnostic ?? '等待检测' }}</small>
+                    <small>{{
+                      installation()?.diagnostic ?? ('settings.awaitingDetection' | t)
+                    }}</small>
                   </div>
-                  <code>{{ installation()?.version ?? '未检测' }}</code>
+                  <code>{{ installation()?.version ?? ('common.notDetected' | t) }}</code>
                 </div>
                 <div
                   class="diagnostic-status alert"
@@ -126,28 +132,32 @@ export type SettingsTab = 'diagnostics' | 'cli' | 'accounts' | 'models' | 'mcp' 
                   <span><app-icon name="terminal" [size]="18" /></span>
                   <div>
                     <strong>{{
-                      codexInstallation()?.healthy ? 'Codex CLI 可用' : 'Codex CLI 不可用'
+                      codexInstallation()?.healthy
+                        ? ('settings.available' | t: { name: 'Codex CLI' })
+                        : ('settings.unavailable' | t: { name: 'Codex CLI' })
                     }}</strong>
-                    <small>{{ codexInstallation()?.diagnostic ?? '等待检测' }}</small>
+                    <small>{{
+                      codexInstallation()?.diagnostic ?? ('settings.awaitingDetection' | t)
+                    }}</small>
                   </div>
-                  <code>{{ codexInstallation()?.version ?? '未检测' }}</code>
+                  <code>{{ codexInstallation()?.version ?? ('common.notDetected' | t) }}</code>
                 </div>
                 <dl>
                   <div>
                     <dt>Claude</dt>
-                    <dd>{{ installation()?.executablePath ?? '未找到' }}</dd>
+                    <dd>{{ installation()?.executablePath ?? ('settings.notFound' | t) }}</dd>
                   </div>
                   <div>
                     <dt>Codex</dt>
-                    <dd>{{ codexInstallation()?.executablePath ?? '未找到' }}</dd>
+                    <dd>{{ codexInstallation()?.executablePath ?? ('settings.notFound' | t) }}</dd>
                   </div>
                   <div>
-                    <dt>凭据存储</dt>
+                    <dt>{{ 'settings.credentialStorage' | t }}</dt>
                     <dd>Windows Credential Manager</dd>
                   </div>
                   <div>
-                    <dt>会话策略</dt>
-                    <dd>只读扫描 Claude JSONL 与 Codex rollout</dd>
+                    <dt>{{ 'settings.sessionPolicy' | t }}</dt>
+                    <dd>{{ 'settings.sessionPolicyValue' | t }}</dd>
                   </div>
                 </dl>
                 <button
@@ -155,7 +165,7 @@ export type SettingsTab = 'diagnostics' | 'cli' | 'accounts' | 'models' | 'mcp' 
                   class="secondary inline-command btn btn-outline btn-sm"
                   (click)="detectRequested.emit()"
                 >
-                  <app-icon name="refresh" [size]="13" />重新检测两个 CLI
+                  <app-icon name="refresh" [size]="13" />{{ 'settings.detectBoth' | t }}
                 </button>
               </section>
             }
@@ -163,13 +173,17 @@ export type SettingsTab = 'diagnostics' | 'cli' | 'accounts' | 'models' | 'mcp' 
               <section class="cli-manager">
                 <div class="cli-manager-intro">
                   <div>
-                    <strong>托管 Agent CLI</strong>
-                    <span>安装前预览官方包、目标版本、npm 与当前生效代理，确认后才会执行。</span>
+                    <strong>{{ 'settings.managedCli' | t }}</strong>
+                    <span>{{ 'settings.managedCliHelp' | t }}</span>
                   </div>
                   <span class="scope-chip">WORKSPACE</span>
                 </div>
 
-                <div class="cli-agent-selector" role="group" aria-label="选择 Agent CLI">
+                <div
+                  class="cli-agent-selector"
+                  role="group"
+                  [attr.aria-label]="'settings.selectAgentCli' | t"
+                >
                   <button
                     type="button"
                     [class.active]="cliAgentType === 'claude'"
@@ -178,7 +192,9 @@ export type SettingsTab = 'diagnostics' | 'cli' | 'accounts' | 'models' | 'mcp' 
                     <span><app-icon name="bot" [size]="16" /></span>
                     <strong>Claude Code</strong>
                     <small>{{
-                      installation()?.healthy ? (installation()?.version ?? '已安装') : '未检测到'
+                      installation()?.healthy
+                        ? (installation()?.version ?? ('settings.installed' | t))
+                        : ('common.notDetected' | t)
                     }}</small>
                   </button>
                   <button
@@ -190,18 +206,18 @@ export type SettingsTab = 'diagnostics' | 'cli' | 'accounts' | 'models' | 'mcp' 
                     <strong>Codex CLI</strong>
                     <small>{{
                       codexInstallation()?.healthy
-                        ? (codexInstallation()?.version ?? '已安装')
-                        : '未检测到'
+                        ? (codexInstallation()?.version ?? ('settings.installed' | t))
+                        : ('common.notDetected' | t)
                     }}</small>
                   </button>
                 </div>
 
                 <div class="cli-version-row">
                   <label>
-                    <span>目标版本或 dist-tag</span>
+                    <span>{{ 'settings.targetVersion' | t }}</span>
                     <input
-                      aria-label="CLI 目标版本"
-                      placeholder="latest、next 或 0.145.0"
+                      [attr.aria-label]="'settings.targetVersionAria' | t"
+                      [placeholder]="'settings.targetVersionPlaceholder' | t"
                       [(ngModel)]="cliTargetVersion"
                       (ngModelChange)="cliConfirmed = false"
                     />
@@ -212,7 +228,7 @@ export type SettingsTab = 'diagnostics' | 'cli' | 'accounts' | 'models' | 'mcp' 
                     [disabled]="busy() || !cliTargetVersion.trim()"
                     (click)="previewCli()"
                   >
-                    <app-icon name="refresh" [size]="13" />生成安装计划
+                    <app-icon name="refresh" [size]="13" />{{ 'settings.generatePlan' | t }}
                   </button>
                 </div>
 
@@ -222,7 +238,11 @@ export type SettingsTab = 'diagnostics' | 'cli' | 'accounts' | 'models' | 'mcp' 
                       <span><app-icon name="shield" [size]="17" /></span>
                       <div>
                         <strong>
-                          {{ cliPlan()?.action === 'install' ? '准备安装' : '准备升级' }}
+                          {{
+                            cliPlan()?.action === 'install'
+                              ? ('settings.prepareInstall' | t)
+                              : ('settings.prepareUpgrade' | t)
+                          }}
                           {{ cliPlan()?.displayName }}
                         </strong>
                         <small>{{ cliPlan()?.diagnostic }}</small>
@@ -231,27 +251,29 @@ export type SettingsTab = 'diagnostics' | 'cli' | 'accounts' | 'models' | 'mcp' 
                     </div>
                     <dl>
                       <div>
-                        <dt>官方 npm 包</dt>
+                        <dt>{{ 'settings.officialPackage' | t }}</dt>
                         <dd>{{ cliPlan()?.packageSpec }}</dd>
                       </div>
                       <div>
-                        <dt>当前版本</dt>
-                        <dd>{{ cliPlan()?.currentVersion ?? '未安装' }}</dd>
+                        <dt>{{ 'settings.currentVersion' | t }}</dt>
+                        <dd>{{ cliPlan()?.currentVersion ?? ('settings.notInstalled' | t) }}</dd>
                       </div>
                       <div>
                         <dt>npm</dt>
                         <dd>
-                          {{ cliPlan()?.npmVersion ?? '不可用' }} ·
-                          {{ cliPlan()?.npmPath ?? '未找到' }}
+                          {{ cliPlan()?.npmVersion ?? ('common.unavailable' | t) }} ·
+                          {{ cliPlan()?.npmPath ?? ('settings.notFound' | t) }}
                         </dd>
                       </div>
                       <div>
-                        <dt>生效代理</dt>
-                        <dd>{{ cliPlan()?.networkProfileName ?? '直连（未选择代理）' }}</dd>
+                        <dt>{{ 'settings.activeProxy' | t }}</dt>
+                        <dd>
+                          {{ cliPlan()?.networkProfileName ?? ('settings.directConnection' | t) }}
+                        </dd>
                       </div>
                       <div>
                         <dt>registry</dt>
-                        <dd>{{ cliPlan()?.npmRegistry ?? 'npm 默认 registry' }}</dd>
+                        <dd>{{ cliPlan()?.npmRegistry ?? ('settings.defaultRegistry' | t) }}</dd>
                       </div>
                     </dl>
                     <code class="cli-command-preview">{{ cliPlan()?.commandPreview }}</code>
@@ -262,24 +284,28 @@ export type SettingsTab = 'diagnostics' | 'cli' | 'accounts' | 'models' | 'mcp' 
                         [(ngModel)]="cliConfirmed"
                         [disabled]="busy() || !cliPlan()?.ready"
                       />
-                      <span>我已确认安装源、目标版本和生效网络配置</span>
+                      <span>{{ 'settings.confirmCliSource' | t }}</span>
                     </label>
                     <div class="cli-actions">
-                      <span>失败时会重新检测原 CLI，并保留完整诊断。</span>
+                      <span>{{ 'settings.cliFailureHelp' | t }}</span>
                       <button
                         type="button"
                         class="primary"
                         [disabled]="busy() || !cliConfirmed || !cliPlan()?.ready"
                         (click)="executeCli()"
                       >
-                        {{ cliPlan()?.action === 'install' ? '确认并安装' : '确认并升级' }}
+                        {{
+                          cliPlan()?.action === 'install'
+                            ? ('settings.confirmInstall' | t)
+                            : ('settings.confirmUpgrade' | t)
+                        }}
                       </button>
                     </div>
                   </div>
                 } @else {
                   <div class="cli-empty-state">
                     <app-icon name="terminal" [size]="18" />
-                    <span>选择 CLI 和目标版本，然后生成安装计划。</span>
+                    <span>{{ 'settings.cliEmpty' | t }}</span>
                   </div>
                 }
 
@@ -316,19 +342,24 @@ export type SettingsTab = 'diagnostics' | 'cli' | 'accounts' | 'models' | 'mcp' 
                       </strong>
                       <small>
                         {{ profile.agentType === 'claude' ? 'Claude Code' : 'ChatGPT / Codex' }}
-                        · {{ profile.authenticated ? '已登录' : '未登录' }}
+                        ·
+                        {{
+                          profile.authenticated
+                            ? ('common.authenticated' | t)
+                            : ('common.unauthenticated' | t)
+                        }}
                       </small>
                     </button>
                   }
                   <button type="button" class="new-profile" (click)="newAccount()">
-                    <app-icon name="plus" [size]="13" />添加隔离账号
+                    <app-icon name="plus" [size]="13" />{{ 'settings.addAccount' | t }}
                   </button>
                 </div>
                 <div class="profile-editor account-editor">
                   <div class="network-intro">
                     <div>
-                      <strong>多账号隔离登录</strong>
-                      <span>每个账号使用独立配置目录；登录凭据不会与其他托管账号混用。</span>
+                      <strong>{{ 'settings.accountIsolation' | t }}</strong>
+                      <span>{{ 'settings.accountIsolationHelp' | t }}</span>
                     </div>
                     <span class="scope-chip">{{
                       accountAgentType === 'claude' ? 'CLAUDE' : 'CHATGPT'
@@ -336,9 +367,12 @@ export type SettingsTab = 'diagnostics' | 'cli' | 'accounts' | 'models' | 'mcp' 
                   </div>
 
                   <div class="two-columns">
-                    <label><span>账号名称</span><input [(ngModel)]="accountName" /></label>
+                    <label
+                      ><span>{{ 'settings.accountName' | t }}</span
+                      ><input [(ngModel)]="accountName"
+                    /></label>
                     <label>
-                      <span>CLI 类型</span>
+                      <span>{{ 'settings.cliType' | t }}</span>
                       <select [(ngModel)]="accountAgentType" [disabled]="accountSystem()">
                         <option value="claude">Claude Code</option>
                         <option value="codex">ChatGPT / Codex</option>
@@ -350,31 +384,38 @@ export type SettingsTab = 'diagnostics' | 'cli' | 'accounts' | 'models' | 'mcp' 
                     <div class="account-status alert" [class.unavailable]="!profile.authenticated">
                       <app-icon [name]="profile.authenticated ? 'check' : 'shield'" [size]="16" />
                       <span>
-                        <strong>{{ profile.authenticated ? '账号已登录' : '账号尚未登录' }}</strong>
+                        <strong>{{
+                          profile.authenticated
+                            ? ('settings.accountSignedIn' | t)
+                            : ('settings.accountNotSignedIn' | t)
+                        }}</strong>
                         <small>{{ profile.diagnostic }}</small>
                       </span>
                     </div>
                     <label>
-                      <span>隔离配置目录</span>
-                      <input readonly [value]="profile.configDir ?? '使用 CLI 当前系统账号目录'" />
+                      <span>{{ 'settings.isolatedConfig' | t }}</span>
+                      <input
+                        readonly
+                        [value]="profile.configDir ?? ('settings.systemAccountFolder' | t)"
+                      />
                     </label>
                   } @else {
                     <div class="account-status alert">
                       <app-icon name="shield" [size]="16" />
                       <span>
-                        <strong>保存后即可登录</strong>
-                        <small>Termexo 会自动创建独立配置目录并隔离凭据。</small>
+                        <strong>{{ 'settings.loginAfterSave' | t }}</strong>
+                        <small>{{ 'settings.loginAfterSaveHelp' | t }}</small>
                       </span>
                     </div>
                   }
 
                   <label class="checkbox-control editor-checkbox">
                     <input type="checkbox" [(ngModel)]="accountDefault" />
-                    <span>设为此 CLI 的默认登录账号</span>
+                    <span>{{ 'settings.defaultAccount' | t }}</span>
                   </label>
 
                   <p class="workspace-binding">
-                    登录会在新终端中打开官方 CLI 流程。删除 Profile 不会删除磁盘凭据目录。
+                    {{ 'settings.accountSafety' | t }}
                   </p>
 
                   <div class="editor-actions account-actions">
@@ -385,7 +426,7 @@ export type SettingsTab = 'diagnostics' | 'cli' | 'accounts' | 'models' | 'mcp' 
                         [disabled]="busy()"
                         (click)="deleteAccountRequested.emit(accountId())"
                       >
-                        <app-icon name="trash" [size]="13" />删除
+                        <app-icon name="trash" [size]="13" />{{ 'common.delete' | t }}
                       </button>
                     }
                     <span></span>
@@ -396,7 +437,7 @@ export type SettingsTab = 'diagnostics' | 'cli' | 'accounts' | 'models' | 'mcp' 
                         [disabled]="busy()"
                         (click)="accountRefreshRequested.emit(accountId())"
                       >
-                        <app-icon name="refresh" [size]="13" />刷新状态
+                        <app-icon name="refresh" [size]="13" />{{ 'settings.refreshStatus' | t }}
                       </button>
                       <button
                         type="button"
@@ -404,7 +445,7 @@ export type SettingsTab = 'diagnostics' | 'cli' | 'accounts' | 'models' | 'mcp' 
                         [disabled]="busy()"
                         (click)="accountLoginRequested.emit(accountId())"
                       >
-                        <app-icon name="terminal" [size]="13" />登录 / 切换
+                        <app-icon name="terminal" [size]="13" />{{ 'settings.loginSwitch' | t }}
                       </button>
                     }
                     <button
@@ -413,7 +454,7 @@ export type SettingsTab = 'diagnostics' | 'cli' | 'accounts' | 'models' | 'mcp' 
                       [disabled]="busy() || !accountName.trim()"
                       (click)="saveAccount()"
                     >
-                      保存账号
+                      {{ 'settings.saveAccount' | t }}
                     </button>
                   </div>
                 </div>
@@ -434,21 +475,26 @@ export type SettingsTab = 'diagnostics' | 'cli' | 'accounts' | 'models' | 'mcp' 
                       @if (profile.baseUrl) {
                         <small class="credential-state" [class.ready]="profile.hasCredential">
                           {{
-                            profile.hasCredential ? 'API Key 已安全保存' : '需要重新输入 API Key'
+                            profile.hasCredential
+                              ? ('settings.keySaved' | t)
+                              : ('settings.keyRequired' | t)
                           }}
                         </small>
                       }
                     </button>
                   }
                   <button type="button" class="new-profile" (click)="newModel()">
-                    <app-icon name="plus" [size]="13" />新建 Profile
+                    <app-icon name="plus" [size]="13" />{{ 'settings.newProfile' | t }}
                   </button>
                 </div>
                 <div class="profile-editor">
                   <div class="two-columns">
-                    <label><span>名称</span><input [(ngModel)]="modelName" /></label>
+                    <label
+                      ><span>{{ 'settings.name' | t }}</span
+                      ><input [(ngModel)]="modelName"
+                    /></label>
                     <label>
-                      <span>模型供应商</span>
+                      <span>{{ 'settings.modelProvider' | t }}</span>
                       <select [ngModel]="modelProvider" (ngModelChange)="selectProvider($event)">
                         @for (preset of providerPresets; track preset.provider) {
                           <option [value]="preset.provider">{{ preset.provider }}</option>
@@ -458,11 +504,17 @@ export type SettingsTab = 'diagnostics' | 'cli' | 'accounts' | 'models' | 'mcp' 
                         }
                       </select>
                     </label>
-                    <label><span>模型</span><input [(ngModel)]="modelNameValue" /></label>
+                    <label
+                      ><span>{{ 'settings.model' | t }}</span
+                      ><input [(ngModel)]="modelNameValue"
+                    /></label>
                   </div>
                   <label>
-                    <span>Anthropic 兼容 Endpoint</span>
-                    <input placeholder="留空使用 Anthropic 官方 Endpoint" [(ngModel)]="baseUrl" />
+                    <span>{{ 'settings.endpoint' | t }}</span>
+                    <input
+                      [placeholder]="'settings.endpointPlaceholder' | t"
+                      [(ngModel)]="baseUrl"
+                    />
                   </label>
                   <label>
                     <span>API Key</span>
@@ -471,10 +523,10 @@ export type SettingsTab = 'diagnostics' | 'cli' | 'accounts' | 'models' | 'mcp' 
                       [disabled]="clearCredential"
                       [placeholder]="
                         hasCredential()
-                          ? '已安全保存，留空表示不修改'
+                          ? ('settings.keySavedPlaceholder' | t)
                           : baseUrl.trim()
-                            ? '第三方 Endpoint 必填'
-                            : '官方 Endpoint 可留空'
+                            ? ('settings.keyThirdPartyRequired' | t)
+                            : ('settings.keyOfficialOptional' | t)
                       "
                       [(ngModel)]="apiKey"
                     />
@@ -483,21 +535,19 @@ export type SettingsTab = 'diagnostics' | 'cli' | 'accounts' | 'models' | 'mcp' 
                     <div class="credential-warning" role="alert">
                       <app-icon name="triangle-alert" [size]="15" />
                       <div>
-                        <strong>此 Profile 尚无可用 API Key</strong>
-                        <span
-                          >请输入并保存后再切换模型。密钥只写入系统安全存储，不会写入数据库。</span
-                        >
+                        <strong>{{ 'settings.profileKeyMissing' | t }}</strong>
+                        <span>{{ 'settings.profileKeyHelp' | t }}</span>
                       </div>
                     </div>
                   }
                   <label class="checkbox-control editor-checkbox">
                     <input type="checkbox" [(ngModel)]="isDefault" />
-                    <span>设为默认 Claude Profile</span>
+                    <span>{{ 'settings.defaultClaudeProfile' | t }}</span>
                   </label>
                   @if (hasCredential()) {
                     <label class="checkbox-control editor-checkbox">
                       <input type="checkbox" [(ngModel)]="clearCredential" />
-                      <span>清除已保存的 API Key</span>
+                      <span>{{ 'settings.clearKey' | t }}</span>
                     </label>
                   }
                   <div class="editor-actions">
@@ -507,7 +557,7 @@ export type SettingsTab = 'diagnostics' | 'cli' | 'accounts' | 'models' | 'mcp' 
                         class="danger"
                         (click)="deleteModelRequested.emit(modelId())"
                       >
-                        <app-icon name="trash" [size]="13" />删除
+                        <app-icon name="trash" [size]="13" />{{ 'common.delete' | t }}
                       </button>
                     }
                     <span></span>
@@ -517,7 +567,7 @@ export type SettingsTab = 'diagnostics' | 'cli' | 'accounts' | 'models' | 'mcp' 
                       [disabled]="busy() || !canSaveModel()"
                       (click)="saveModel()"
                     >
-                      保存 Profile
+                      {{ 'settings.saveProfile' | t }}
                     </button>
                   </div>
                 </div>
@@ -533,17 +583,20 @@ export type SettingsTab = 'diagnostics' | 'cli' | 'accounts' | 'models' | 'mcp' 
                       (click)="editMcp(profile)"
                     >
                       <strong>{{ profile.name }}</strong>
-                      <small>独立 MCP 配置</small>
+                      <small>{{ 'settings.independentMcp' | t }}</small>
                     </button>
                   }
                   <button type="button" class="new-profile" (click)="newMcp()">
-                    <app-icon name="plus" [size]="13" />新建 MCP Profile
+                    <app-icon name="plus" [size]="13" />{{ 'settings.newMcp' | t }}
                   </button>
                 </div>
                 <div class="profile-editor">
-                  <label><span>名称</span><input [(ngModel)]="mcpName" /></label>
+                  <label
+                    ><span>{{ 'settings.name' | t }}</span
+                    ><input [(ngModel)]="mcpName"
+                  /></label>
                   <label class="json-field">
-                    <span>配置 JSON</span>
+                    <span>{{ 'settings.configJson' | t }}</span>
                     <textarea spellcheck="false" [(ngModel)]="mcpConfig"></textarea>
                   </label>
                   <div class="editor-actions">
@@ -553,7 +606,7 @@ export type SettingsTab = 'diagnostics' | 'cli' | 'accounts' | 'models' | 'mcp' 
                         class="danger"
                         (click)="deleteMcpRequested.emit(mcpId())"
                       >
-                        <app-icon name="trash" [size]="13" />删除
+                        <app-icon name="trash" [size]="13" />{{ 'common.delete' | t }}
                       </button>
                     }
                     <span></span>
@@ -563,7 +616,7 @@ export type SettingsTab = 'diagnostics' | 'cli' | 'accounts' | 'models' | 'mcp' 
                       [disabled]="!mcpName.trim() || !mcpConfig.trim()"
                       (click)="saveMcp()"
                     >
-                      保存 MCP Profile
+                      {{ 'settings.saveMcp' | t }}
                     </button>
                   </div>
                 </div>
@@ -580,22 +633,21 @@ export type SettingsTab = 'diagnostics' | 'cli' | 'accounts' | 'models' | 'mcp' 
                     >
                       <strong>{{ profile.name }}</strong>
                       <small>
-                        {{ profile.scope === 'global' ? '全局' : 'Workspace' }}
-                        · {{ profile.enabled ? '已启用' : '已停用' }}
+                        {{ profile.scope === 'global' ? ('settings.global' | t) : 'Workspace' }}
+                        ·
+                        {{ profile.enabled ? ('settings.enabled' | t) : ('settings.disabled' | t) }}
                       </small>
                     </button>
                   }
                   <button type="button" class="new-profile" (click)="newNetwork()">
-                    <app-icon name="plus" [size]="13" />新建代理 Profile
+                    <app-icon name="plus" [size]="13" />{{ 'settings.newProxy' | t }}
                   </button>
                 </div>
                 <div class="profile-editor network-editor">
                   <div class="network-intro">
                     <div>
-                      <strong>开发网络与 npm 代理</strong>
-                      <span
-                        >仅向托管 Agent 和后续 CLI 安装流程注入，不修改系统或全局 npm 配置。</span
-                      >
+                      <strong>{{ 'settings.devNetwork' | t }}</strong>
+                      <span>{{ 'settings.devNetworkHelp' | t }}</span>
                     </div>
                     <span class="scope-chip">{{
                       networkScope === 'global' ? 'GLOBAL' : 'WORKSPACE'
@@ -603,21 +655,26 @@ export type SettingsTab = 'diagnostics' | 'cli' | 'accounts' | 'models' | 'mcp' 
                   </div>
 
                   <div class="two-columns">
-                    <label><span>名称</span><input [(ngModel)]="networkName" /></label>
+                    <label
+                      ><span>{{ 'settings.name' | t }}</span
+                      ><input [(ngModel)]="networkName"
+                    /></label>
                     <label>
-                      <span>作用域</span>
+                      <span>{{ 'settings.scope' | t }}</span>
                       <select [(ngModel)]="networkScope" (ngModelChange)="changeNetworkScope()">
-                        <option value="workspace">当前 Workspace</option>
-                        <option value="global">全局默认</option>
+                        <option value="workspace">{{ 'settings.currentWorkspace' | t }}</option>
+                        <option value="global">{{ 'settings.globalDefault' | t }}</option>
                       </select>
                     </label>
                   </div>
                   @if (networkScope === 'workspace') {
-                    <p class="workspace-binding">绑定：{{ networkWorkspaceLabel() }}</p>
+                    <p class="workspace-binding">
+                      {{ 'settings.boundTo' | t: { name: networkWorkspaceLabel() } }}
+                    </p>
                   }
 
                   <div class="network-section">
-                    <h3>系统与 Agent 代理</h3>
+                    <h3>{{ 'settings.systemAgentProxy' | t }}</h3>
                     <div class="two-columns">
                       <label>
                         <span>HTTP_PROXY</span>
@@ -658,23 +715,26 @@ export type SettingsTab = 'diagnostics' | 'cli' | 'accounts' | 'models' | 'mcp' 
                       </label>
                     </div>
                     <label>
-                      <span>企业 CA 文件</span>
+                      <span>{{ 'settings.enterpriseCa' | t }}</span>
                       <input placeholder="C:\\certs\\internal-ca.pem" [(ngModel)]="npmCaPath" />
                     </label>
                   </div>
 
                   <div class="network-section">
-                    <h3>代理凭据</h3>
+                    <h3>{{ 'settings.proxyCredentials' | t }}</h3>
                     <div class="two-columns">
-                      <label><span>用户名</span><input [(ngModel)]="proxyUsername" /></label>
+                      <label
+                        ><span>{{ 'settings.username' | t }}</span
+                        ><input [(ngModel)]="proxyUsername"
+                      /></label>
                       <label>
-                        <span>密码</span>
+                        <span>{{ 'settings.password' | t }}</span>
                         <input
                           type="password"
                           [placeholder]="
                             hasNetworkCredential()
-                              ? '已安全保存，留空表示不修改'
-                              : '可选，保存到系统凭据库'
+                              ? ('settings.keySavedPlaceholder' | t)
+                              : ('settings.passwordOptional' | t)
                           "
                           [(ngModel)]="proxyPassword"
                         />
@@ -683,7 +743,7 @@ export type SettingsTab = 'diagnostics' | 'cli' | 'accounts' | 'models' | 'mcp' 
                     @if (hasNetworkCredential()) {
                       <label class="checkbox-control editor-checkbox">
                         <input type="checkbox" [(ngModel)]="clearNetworkCredential" />
-                        <span>清除已保存的代理密码</span>
+                        <span>{{ 'settings.clearProxyPassword' | t }}</span>
                       </label>
                     }
                   </div>
@@ -691,11 +751,11 @@ export type SettingsTab = 'diagnostics' | 'cli' | 'accounts' | 'models' | 'mcp' 
                   <div class="network-options">
                     <label class="checkbox-control">
                       <input type="checkbox" [(ngModel)]="networkEnabled" />
-                      <span>启用此 Profile</span>
+                      <span>{{ 'settings.enableProfile' | t }}</span>
                     </label>
                     <label class="checkbox-control">
                       <input type="checkbox" [(ngModel)]="networkDefault" />
-                      <span>设为此作用域默认</span>
+                      <span>{{ 'settings.defaultForScope' | t }}</span>
                     </label>
                     <label class="checkbox-control">
                       <input type="checkbox" [(ngModel)]="npmStrictSsl" />
@@ -730,7 +790,7 @@ export type SettingsTab = 'diagnostics' | 'cli' | 'accounts' | 'models' | 'mcp' 
                         [disabled]="busy()"
                         (click)="deleteNetworkRequested.emit(networkId())"
                       >
-                        <app-icon name="trash" [size]="13" />删除
+                        <app-icon name="trash" [size]="13" />{{ 'common.delete' | t }}
                       </button>
                     }
                     <span></span>
@@ -740,7 +800,7 @@ export type SettingsTab = 'diagnostics' | 'cli' | 'accounts' | 'models' | 'mcp' 
                       [disabled]="busy() || !networkId()"
                       (click)="networkTestRequested.emit(networkId())"
                     >
-                      <app-icon name="radio" [size]="13" />测试连接
+                      <app-icon name="radio" [size]="13" />{{ 'settings.testConnection' | t }}
                     </button>
                     <button
                       type="button"
@@ -748,7 +808,7 @@ export type SettingsTab = 'diagnostics' | 'cli' | 'accounts' | 'models' | 'mcp' 
                       [disabled]="busy() || !canSaveNetwork()"
                       (click)="saveNetwork()"
                     >
-                      保存代理 Profile
+                      {{ 'settings.saveProxy' | t }}
                     </button>
                   </div>
                 </div>
@@ -762,6 +822,7 @@ export type SettingsTab = 'diagnostics' | 'cli' | 'accounts' | 'models' | 'mcp' 
   styleUrl: './agent-dialog.scss',
 })
 export class AgentSettingsDialogComponent {
+  private readonly i18n = inject(I18nService);
   readonly installation = input<AgentInstallation | null>(null);
   readonly codexInstallation = input<AgentInstallation | null>(null);
   readonly modelProfiles = input<ModelProfile[]>([]);
@@ -769,7 +830,7 @@ export class AgentSettingsDialogComponent {
   readonly networkProfiles = input<NetworkProfile[]>([]);
   readonly accountProfiles = input<AccountProfile[]>([]);
   readonly activeWorkspaceId = input('');
-  readonly activeWorkspaceName = input('当前 Workspace');
+  readonly activeWorkspaceName = input('');
   readonly initialTab = input<SettingsTab>('diagnostics');
   readonly initialModelProfileId = input('');
   readonly networkTestResult = input<NetworkTestResult | null>(null);
@@ -813,7 +874,7 @@ export class AgentSettingsDialogComponent {
   protected clearCredential = false;
   protected mcpName = '';
   protected mcpConfig = '{\n  "mcpServers": {}\n}';
-  protected networkName = '当前 Workspace 代理';
+  protected networkName = this.i18n.t('settings.workspaceProxy');
   protected networkScope: NetworkProfileScope = 'workspace';
   protected networkWorkspaceId = '';
   protected networkEnabled = true;
@@ -1058,7 +1119,9 @@ export class AgentSettingsDialogComponent {
 
   protected newNetwork(): void {
     this.networkId.set('');
-    this.networkName = this.activeWorkspaceId() ? '当前 Workspace 代理' : '全局开发代理';
+    this.networkName = this.i18n.t(
+      this.activeWorkspaceId() ? 'settings.workspaceProxy' : 'settings.globalProxy',
+    );
     this.networkScope = this.activeWorkspaceId() ? 'workspace' : 'global';
     this.networkWorkspaceId = this.activeWorkspaceId();
     this.networkEnabled = true;
@@ -1086,7 +1149,7 @@ export class AgentSettingsDialogComponent {
 
   protected networkWorkspaceLabel(): string {
     if (!this.networkWorkspaceId) {
-      return '未选择 Workspace';
+      return this.i18n.t('settings.noWorkspace');
     }
     return this.networkWorkspaceId === this.activeWorkspaceId()
       ? this.activeWorkspaceName()

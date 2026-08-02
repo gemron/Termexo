@@ -1,12 +1,14 @@
 import { Component, inject, output, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 
+import { I18nService } from '../core/i18n/i18n.service';
+import { TranslatePipe } from '../core/i18n/translate.pipe';
 import { DirectoryPickerService } from '../core/services/directory-picker.service';
 import { IconComponent } from '../shared/icon/icon';
 
 @Component({
   selector: 'app-create-workspace-dialog',
-  imports: [FormsModule, IconComponent],
+  imports: [FormsModule, IconComponent, TranslatePipe],
   template: `
     <div class="backdrop modal modal-open" (mousedown)="cancelled.emit()">
       <section
@@ -18,38 +20,38 @@ import { IconComponent } from '../shared/icon/icon';
       >
         <header>
           <div>
-            <h2 id="workspace-dialog-title">新建工作区</h2>
-            <p>关联一个本地项目目录。</p>
+            <h2 id="workspace-dialog-title">{{ 'dialog.workspaceCreateTitle' | t }}</h2>
+            <p>{{ 'dialog.workspaceCreateDescription' | t }}</p>
           </div>
           <button
             type="button"
             class="btn btn-square btn-ghost btn-sm"
-            title="关闭"
-            aria-label="关闭"
+            [title]="'common.close' | t"
+            [attr.aria-label]="'common.close' | t"
             (click)="cancelled.emit()"
           >
             <app-icon name="x" [size]="15" />
           </button>
         </header>
         <label>
-          <span>名称</span>
+          <span>{{ 'dialog.name' | t }}</span>
           <input
             type="text"
             class="input input-bordered input-sm"
-            placeholder="例如：MTS Cloud"
+            [placeholder]="'dialog.nameExample' | t"
             [ngModel]="name()"
             (ngModelChange)="name.set($event)"
             autofocus
           />
         </label>
         <label>
-          <span>项目目录</span>
+          <span>{{ 'dialog.projectDirectory' | t }}</span>
           <div class="directory-field">
             <input
               type="text"
               class="input input-bordered input-sm"
               placeholder="D:\\dev\\project"
-              aria-label="工作空间项目目录"
+              [attr.aria-label]="'dialog.workspaceProjectDirectory' | t"
               [ngModel]="projectPath()"
               (ngModelChange)="projectPath.set($event); directoryError.set(null)"
             />
@@ -60,7 +62,7 @@ import { IconComponent } from '../shared/icon/icon';
               (click)="selectProjectDirectory()"
             >
               <app-icon name="folder" [size]="14" />
-              {{ selectingDirectory() ? '选择中…' : '选择目录' }}
+              {{ selectingDirectory() ? ('common.selecting' | t) : ('common.selectDirectory' | t) }}
             </button>
           </div>
           @if (directoryError(); as error) {
@@ -69,7 +71,7 @@ import { IconComponent } from '../shared/icon/icon';
         </label>
         <footer>
           <button type="button" class="secondary btn btn-ghost btn-sm" (click)="cancelled.emit()">
-            取消
+            {{ 'common.cancel' | t }}
           </button>
           <button
             type="button"
@@ -77,7 +79,7 @@ import { IconComponent } from '../shared/icon/icon';
             [disabled]="!isValid()"
             (click)="submit()"
           >
-            创建工作区
+            {{ 'dialog.createWorkspace' | t }}
           </button>
         </footer>
       </section>
@@ -87,6 +89,7 @@ import { IconComponent } from '../shared/icon/icon';
 })
 export class CreateWorkspaceDialogComponent {
   private readonly directoryPicker = inject(DirectoryPickerService);
+  private readonly i18n = inject(I18nService);
 
   readonly created = output<{ name: string; projectPath: string }>();
   readonly cancelled = output<void>();
@@ -105,7 +108,7 @@ export class CreateWorkspaceDialogComponent {
     try {
       const selected = await this.directoryPicker.select(
         this.projectPath().trim() || undefined,
-        '选择工作空间项目目录',
+        this.i18n.t('dialog.selectWorkspaceDirectory'),
       );
       if (!selected) {
         return;
@@ -116,7 +119,7 @@ export class CreateWorkspaceDialogComponent {
         this.name.set(this.directoryName(selected));
       }
     } catch {
-      this.directoryError.set('无法打开目录选择器，请检查系统权限或手动输入路径。');
+      this.directoryError.set(this.i18n.t('dialog.directoryPickerFailed'));
     } finally {
       this.selectingDirectory.set(false);
     }
@@ -137,6 +140,8 @@ export class CreateWorkspaceDialogComponent {
 
   private directoryName(path: string): string {
     const normalized = path.trim().replace(/[\\/]+$/, '');
-    return normalized.split(/[\\/]/).filter(Boolean).at(-1) ?? '新工作空间';
+    return (
+      normalized.split(/[\\/]/).filter(Boolean).at(-1) ?? this.i18n.t('dialog.newWorkspaceFallback')
+    );
   }
 }

@@ -1,36 +1,39 @@
-import { Component, computed, input } from '@angular/core';
+import { Component, computed, inject, input } from '@angular/core';
 
 import { AgentEvent } from '../core/models/agent.models';
+import { I18nService } from '../core/i18n/i18n.service';
+import { TranslatePipe } from '../core/i18n/translate.pipe';
 import {
   AGENT_LABELS,
-  TERMINAL_STATUS_LABELS,
   TerminalSession,
+  TerminalStatus,
   Workspace,
 } from '../core/models/workspace.models';
 import { IconComponent } from '../shared/icon/icon';
 
 const EVENT_LABELS: Readonly<Record<string, string>> = {
-  'session.started': '会话已启动',
-  'agent.thinking': 'Claude 正在思考',
-  'tool.started': '工具调用开始',
-  'tool.completed': '工具调用完成',
-  'tool.failed': '工具调用失败',
-  'approval.required': '等待权限确认',
-  'user.input.required': '等待用户输入',
-  'agent.rate_limited': '供应商 429 限流',
-  'agent.timeout': 'Claude 请求超时',
-  'task.completed': '任务已完成',
-  'agent.failed': 'Agent 运行失败',
-  'session.ended': '会话已结束',
+  'session.started': 'event.sessionStarted',
+  'agent.thinking': 'event.agentThinking',
+  'tool.started': 'event.toolStarted',
+  'tool.completed': 'event.toolCompleted',
+  'tool.failed': 'event.toolFailed',
+  'approval.required': 'event.approvalRequired',
+  'user.input.required': 'event.inputRequired',
+  'agent.rate_limited': 'event.rateLimited',
+  'agent.timeout': 'event.timeout',
+  'task.completed': 'event.taskCompleted',
+  'agent.failed': 'event.agentFailed',
+  'session.ended': 'event.sessionEnded',
 };
 
 @Component({
   selector: 'app-inspector-panel',
-  imports: [IconComponent],
+  imports: [IconComponent, TranslatePipe],
   templateUrl: './inspector-panel.html',
   styleUrl: './inspector-panel.scss',
 })
 export class InspectorPanelComponent {
+  private readonly i18n = inject(I18nService);
   readonly workspace = input<Workspace | null>(null);
   readonly activeTerminal = input<TerminalSession | null>(null);
   readonly events = input<AgentEvent[]>([]);
@@ -42,10 +45,26 @@ export class InspectorPanelComponent {
   });
 
   protected readonly agentLabels = AGENT_LABELS;
-  protected readonly statusLabels = TERMINAL_STATUS_LABELS;
 
   protected eventLabel(event: AgentEvent): string {
-    return EVENT_LABELS[event.eventType] ?? 'Agent 状态更新';
+    return this.i18n.t(EVENT_LABELS[event.eventType] ?? 'event.updated');
+  }
+
+  protected statusLabel(status: TerminalStatus): string {
+    const keys: Record<TerminalStatus, string> = {
+      STARTING: 'status.starting',
+      RUNNING: 'status.running',
+      THINKING: 'status.thinking',
+      WAITING_INPUT: 'status.waitingInput',
+      WAITING_APPROVAL: 'status.waitingApproval',
+      RATE_LIMITED: 'status.rateLimited',
+      IDLE: 'status.idle',
+      COMPLETED: 'status.completed',
+      FAILED: 'status.failed',
+      STOPPED: 'status.stopped',
+      DISCONNECTED: 'status.disconnected',
+    };
+    return this.i18n.t(keys[status]);
   }
 
   protected eventDetail(event: AgentEvent): string {
@@ -62,11 +81,6 @@ export class InspectorPanelComponent {
   }
 
   protected eventTime(event: AgentEvent): string {
-    return new Date(event.createdAt).toLocaleTimeString('zh-CN', {
-      hour: '2-digit',
-      minute: '2-digit',
-      second: '2-digit',
-      hour12: false,
-    });
+    return this.i18n.formatTime(event.createdAt);
   }
 }

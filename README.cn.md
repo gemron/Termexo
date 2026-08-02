@@ -11,7 +11,7 @@
 </p>
 
 <p align="center">
-  <img alt="Version 0.3.9" src="https://img.shields.io/badge/version-0.3.9-58c7a0">
+  <img alt="Version 0.3.10" src="https://img.shields.io/badge/version-0.3.10-58c7a0">
   <img alt="Windows" src="https://img.shields.io/badge/platform-Windows-0078D4?logo=windows">
   <img alt="Tauri 2" src="https://img.shields.io/badge/Tauri-2-24C8DB?logo=tauri&logoColor=white">
   <img alt="Angular 22" src="https://img.shields.io/badge/Angular-22-DD0031?logo=angular">
@@ -33,9 +33,8 @@ Termexo 把 Claude Code、Codex 和围绕它们运行的终端收进一个可恢
 npx termexo@latest
 ```
 
-> 最新正式版本为 **V0.3.9 会话恢复与状态提醒增强版**。Claude/Codex 会话恢复前会重新
-> 生成启动配置，MiniMax M3 会继续使用正确的供应商环境；等待处理和任务完成状态会通过
-> 应用内常驻提醒、Windows 系统通知和任务栏闪烁及时呈现。
+> 最新正式版本为 **V0.3.10 多语言界面版**。Termexo 默认跟随 Windows 系统语言，也可
+> 随时手动切换；工作空间、终端、会话、通知和设置流程现已支持七种语言。
 
 ![Termexo 多终端网格工作台](website/assets/termexo-workbench.png)
 
@@ -83,6 +82,19 @@ npx termexo@latest
 Termexo 默认只在本地工作：没有 Termexo 账号、云服务或强制同步。工作空间状态保存在本机
 SQLite，密钥保存在 Windows Credential Manager，Claude/Codex 历史会话只读。Agent CLI
 仍会按照你选择的供应商及其隐私政策连接对应模型服务。
+
+界面支持简体中文、英语、西班牙语、法语、德语、日语和韩语。默认自动跟随 Windows
+系统语言，也可通过主工具栏手动切换并跨重启保留选择。
+
+## V0.3.10 更新
+
+- 支持简体中文、英语、西班牙语、法语、德语、日语和韩语七种界面语言。
+- 默认自动匹配操作系统语言；系统语言变化时自动更新，不支持的语言安全回退到英语。
+- 在主工具栏增加紧凑的语言选择器，手动选择立即生效并跨重启保存，也可随时恢复为
+  “跟随系统”。
+- 工作空间、终端布局、Agent 状态、会话中心、模型切换、设置、目录选择、运行诊断、
+  应用内提示、Windows 系统通知和任务栏提醒均接入统一语言服务。
+- 增加语言族匹配、选择持久化、参数插值与文档语言测试，并保持原有桌面 UI 测试全部通过。
 
 ## V0.3.9 更新
 
@@ -346,14 +358,14 @@ flowchart LR
 
 ## 数据与安全
 
-| 数据                | 存储位置                         | 处理原则                          |
-| ------------------- | -------------------------------- | --------------------------------- |
-| Workspace、终端配置 | SQLite                           | 本地持久化                        |
-| Claude/Codex 会话索引 | SQLite                         | 从 Agent 原生会话文件只读解析后 Upsert |
-| Agent 事件          | JSONL spool + SQLite             | 按 `event_key` 去重               |
-| 模型与 MCP Profile  | SQLite                           | API Key 明文不进入数据库          |
-| API Key             | Windows Credential Manager       | 前端只能读取 `hasCredential`      |
-| Agent 原始会话      | Claude/Codex 数据目录            | 只读，不修改、重命名或删除         |
+| 数据                  | 存储位置                   | 处理原则                               |
+| --------------------- | -------------------------- | -------------------------------------- |
+| Workspace、终端配置   | SQLite                     | 本地持久化                             |
+| Claude/Codex 会话索引 | SQLite                     | 从 Agent 原生会话文件只读解析后 Upsert |
+| Agent 事件            | JSONL spool + SQLite       | 按 `event_key` 去重                    |
+| 模型与 MCP Profile    | SQLite                     | API Key 明文不进入数据库               |
+| API Key               | Windows Credential Manager | 前端只能读取 `hasCredential`           |
+| Agent 原始会话        | Claude/Codex 数据目录      | 只读，不修改、重命名或删除             |
 
 为兼容早期安装，数据库文件和部分 Tauri 内部标识仍沿用旧标识；这不影响产品名称
 与新的 `TERMEXO_*` 环境变量。

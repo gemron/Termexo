@@ -10,13 +10,17 @@
   <div class="sidebar-tools">
     <label class="search-field input input-bordered input-sm">
       <app-icon name="search" [size]="14" />
-      <input type="search" aria-label="搜索工作区" placeholder="搜索工作区" />
+      <input
+        type="search"
+        [attr.aria-label]="'workspace.search' | t"
+        [placeholder]="'workspace.search' | t"
+      />
     </label>
     <button
       class="icon-button btn btn-square btn-ghost btn-sm"
       type="button"
-      title="合并当前工作空间"
-      aria-label="合并当前工作空间"
+      [title]="'workspace.mergeCurrent' | t"
+      [attr.aria-label]="'workspace.mergeCurrent' | t"
       [disabled]="workspaces().length < 2 || !activeWorkspaceId()"
       (click)="requestActiveWorkspaceMerge()"
     >
@@ -25,16 +29,16 @@
     <button
       class="icon-button btn btn-square btn-ghost btn-sm"
       type="button"
-      title="新建工作区"
-      aria-label="新建工作区"
+      [title]="'workspace.create' | t"
+      [attr.aria-label]="'workspace.create' | t"
       (click)="createRequested.emit()"
     >
       <app-icon name="plus" [size]="16" />
     </button>
   </div>
 
-  <nav aria-label="工作区">
-    <p class="section-label">工作区</p>
+  <nav [attr.aria-label]="'workspace.section' | t">
+    <p class="section-label">{{ 'workspace.section' | t }}</p>
     <ul class="workspace-list menu menu-sm">
       @for (workspace of workspaces(); track workspace.id) {
         <li class="workspace-entry" [style.--workspace-color]="workspaceColor(workspace)">
@@ -53,13 +57,13 @@
             </span>
           </button>
           <span class="workspace-actions">
-            <span class="workspace-order-actions" aria-label="调整工作区顺序">
+            <span class="workspace-order-actions" [attr.aria-label]="'workspace.reorder' | t">
               <button
                 type="button"
                 class="workspace-order-action"
                 [disabled]="$first"
-                title="上移工作区"
-                aria-label="上移工作区"
+                [title]="'workspace.moveUp' | t"
+                [attr.aria-label]="'workspace.moveUp' | t"
                 (click)="moveRequested.emit({ workspaceId: workspace.id, direction: -1 })"
               >
                 <app-icon name="arrow-up" [size]="10" />
@@ -68,8 +72,8 @@
                 type="button"
                 class="workspace-order-action"
                 [disabled]="$last"
-                title="下移工作区"
-                aria-label="下移工作区"
+                [title]="'workspace.moveDown' | t"
+                [attr.aria-label]="'workspace.moveDown' | t"
                 (click)="moveRequested.emit({ workspaceId: workspace.id, direction: 1 })"
               >
                 <app-icon name="arrow-down" [size]="10" />
@@ -78,8 +82,8 @@
             <button
               type="button"
               class="workspace-action edit"
-              title="编辑工作区"
-              aria-label="编辑工作区"
+              [title]="'workspace.edit' | t"
+              [attr.aria-label]="'workspace.edit' | t"
               (click)="editRequested.emit(workspace.id)"
             >
               <app-icon name="edit" [size]="12" />
@@ -87,8 +91,8 @@
             <button
               type="button"
               class="workspace-action delete"
-              title="删除工作空间"
-              aria-label="删除工作空间"
+              [title]="'workspace.delete' | t"
+              [attr.aria-label]="'workspace.delete' | t"
               (click)="deleteRequested.emit(workspace.id)"
             >
               <app-icon name="trash" [size]="12" />
@@ -97,7 +101,9 @@
               type="button"
               class="workspace-action favorite"
               [class.selected]="workspace.favorite"
-              [attr.aria-label]="workspace.favorite ? '取消收藏' : '收藏'"
+              [attr.aria-label]="
+                workspace.favorite ? ('workspace.unfavorite' | t) : ('workspace.favorite' | t)
+              "
               (click)="favoriteToggled.emit(workspace.id)"
             >
               <app-icon name="star" [size]="13" />
@@ -115,8 +121,8 @@
       (click)="settingsRequested.emit()"
     >
       <app-icon name="settings" [size]="15" />
-      <span>设置</span>
+      <span>{{ 'workspace.settings' | t }}</span>
     </button>
-    <span class="runtime-state"><i></i> 本地运行</span>
+    <span class="runtime-state"><i></i> {{ 'workspace.localRuntime' | t }}</span>
   </footer>
 </aside>

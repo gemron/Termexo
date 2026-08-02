@@ -1,6 +1,7 @@
 import { Component, computed, input, output, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 
+import { TranslatePipe } from '../core/i18n/translate.pipe';
 import { AccountProfile, AgentInstallation } from '../core/models/agent.models';
 import { IconComponent } from '../shared/icon/icon';
 
@@ -14,7 +15,7 @@ const CODEX_MODEL_SUGGESTIONS = ['gpt-5.6-sol', 'gpt-5.6-terra', 'gpt-5.6-luna']
 
 @Component({
   selector: 'app-codex-launch-dialog',
-  imports: [FormsModule, IconComponent],
+  imports: [FormsModule, IconComponent, TranslatePipe],
   template: `
     <div class="backdrop modal modal-open" (mousedown)="cancelled.emit()">
       <section
@@ -28,15 +29,15 @@ const CODEX_MODEL_SUGGESTIONS = ['gpt-5.6-sol', 'gpt-5.6-terra', 'gpt-5.6-luna']
           <div class="dialog-title">
             <span class="title-icon"><app-icon name="terminal" [size]="17" /></span>
             <div>
-              <h2 id="codex-launch-title">新建 Codex 会话</h2>
+              <h2 id="codex-launch-title">{{ 'launch.newCodex' | t }}</h2>
               <p>{{ workingDirectory() }}</p>
             </div>
           </div>
           <button
             type="button"
             class="btn btn-square btn-ghost btn-sm"
-            title="关闭"
-            aria-label="关闭"
+            [title]="'common.close' | t"
+            [attr.aria-label]="'common.close' | t"
             (click)="cancelled.emit()"
           >
             <app-icon name="x" [size]="15" />
@@ -45,24 +46,24 @@ const CODEX_MODEL_SUGGESTIONS = ['gpt-5.6-sol', 'gpt-5.6-terra', 'gpt-5.6-luna']
 
         <div class="installation-line" [class.unavailable]="!installation()?.healthy">
           <i></i>
-          <span>{{ installation()?.diagnostic ?? '正在检测 Codex CLI' }}</span>
+          <span>{{ installation()?.diagnostic ?? ('launch.detectingCodex' | t) }}</span>
           <code>{{ installation()?.version ?? '' }}</code>
         </div>
 
         <div class="form-grid">
           <label class="wide">
-            <span>会话名称</span>
+            <span>{{ 'launch.sessionName' | t }}</span>
             <input
               type="text"
               class="input input-bordered input-sm"
-              placeholder="例如：review-release"
+              [placeholder]="'launch.codexNameExample' | t"
               [ngModel]="name()"
               (ngModelChange)="name.set($event)"
               autofocus
             />
           </label>
           <label class="wide">
-            <span>ChatGPT 登录账号</span>
+            <span>{{ 'launch.chatgptAccount' | t }}</span>
             <select
               class="select select-bordered select-sm"
               [ngModel]="resolvedAccountProfileId()"
@@ -70,19 +71,24 @@ const CODEX_MODEL_SUGGESTIONS = ['gpt-5.6-sol', 'gpt-5.6-terra', 'gpt-5.6-luna']
             >
               @for (profile of codexAccounts(); track profile.id) {
                 <option [value]="profile.id">
-                  {{ profile.name }} · {{ profile.authenticated ? '已登录' : '未登录' }}
+                  {{ profile.name }} ·
+                  {{
+                    profile.authenticated
+                      ? ('common.authenticated' | t)
+                      : ('common.unauthenticated' | t)
+                  }}
                 </option>
               }
             </select>
           </label>
           <label class="wide">
-            <span>Codex 模型</span>
+            <span>{{ 'launch.codexModel' | t }}</span>
             <input
               type="text"
               class="input input-bordered input-sm"
               list="codex-model-suggestions"
-              placeholder="留空使用 Codex 配置的默认模型"
-              aria-label="Codex 模型"
+              [placeholder]="'launch.codexModelPlaceholder' | t"
+              [attr.aria-label]="'launch.codexModel' | t"
               [ngModel]="model()"
               (ngModelChange)="model.set($event)"
             />
@@ -91,13 +97,13 @@ const CODEX_MODEL_SUGGESTIONS = ['gpt-5.6-sol', 'gpt-5.6-terra', 'gpt-5.6-luna']
                 <option [value]="suggestion"></option>
               }
             </datalist>
-            <small>可选择推荐模型，也可输入当前 Codex CLI 支持的任意模型 ID。</small>
+            <small>{{ 'launch.codexModelHelp' | t }}</small>
           </label>
         </div>
 
         <footer>
           <button type="button" class="secondary btn btn-ghost btn-sm" (click)="cancelled.emit()">
-            取消
+            {{ 'common.cancel' | t }}
           </button>
           <button
             type="button"
@@ -105,7 +111,7 @@ const CODEX_MODEL_SUGGESTIONS = ['gpt-5.6-sol', 'gpt-5.6-terra', 'gpt-5.6-luna']
             [disabled]="!canLaunch()"
             (click)="submit()"
           >
-            <app-icon name="play" [size]="13" />启动会话
+            <app-icon name="play" [size]="13" />{{ 'launch.start' | t }}
           </button>
         </footer>
       </section>

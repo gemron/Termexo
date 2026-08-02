@@ -1,6 +1,7 @@
 import { Component, computed, input, output, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 
+import { TranslatePipe } from '../core/i18n/translate.pipe';
 import {
   AccountProfile,
   AgentInstallation,
@@ -18,7 +19,7 @@ export interface ClaudeLaunchDialogValue {
 
 @Component({
   selector: 'app-claude-launch-dialog',
-  imports: [FormsModule, IconComponent],
+  imports: [FormsModule, IconComponent, TranslatePipe],
   template: `
     <div class="backdrop modal modal-open" (mousedown)="cancelled.emit()">
       <section
@@ -32,15 +33,15 @@ export interface ClaudeLaunchDialogValue {
           <div class="dialog-title">
             <span class="title-icon"><app-icon name="bot" [size]="17" /></span>
             <div>
-              <h2 id="claude-launch-title">新建 Claude 会话</h2>
+              <h2 id="claude-launch-title">{{ 'launch.newClaude' | t }}</h2>
               <p>{{ workingDirectory() }}</p>
             </div>
           </div>
           <button
             type="button"
             class="btn btn-square btn-ghost btn-sm"
-            title="关闭"
-            aria-label="关闭"
+            [title]="'common.close' | t"
+            [attr.aria-label]="'common.close' | t"
             (click)="cancelled.emit()"
           >
             <app-icon name="x" [size]="15" />
@@ -49,24 +50,24 @@ export interface ClaudeLaunchDialogValue {
 
         <div class="installation-line" [class.unavailable]="!installation()?.healthy">
           <i></i>
-          <span>{{ installation()?.diagnostic ?? '正在检测 Claude Code' }}</span>
+          <span>{{ installation()?.diagnostic ?? ('launch.detectingClaude' | t) }}</span>
           <code>{{ installation()?.version ?? '' }}</code>
         </div>
 
         <div class="form-grid">
           <label class="wide">
-            <span>会话名称</span>
+            <span>{{ 'launch.sessionName' | t }}</span>
             <input
               type="text"
               class="input input-bordered input-sm"
-              placeholder="例如：auth-refactor"
+              [placeholder]="'launch.claudeNameExample' | t"
               [ngModel]="name()"
               (ngModelChange)="name.set($event)"
               autofocus
             />
           </label>
           <label>
-            <span>模型 Profile</span>
+            <span>{{ 'launch.modelProfile' | t }}</span>
             <select
               class="select select-bordered select-sm"
               [ngModel]="resolvedProfileId()"
@@ -78,7 +79,7 @@ export interface ClaudeLaunchDialogValue {
             </select>
           </label>
           <label>
-            <span>登录账号</span>
+            <span>{{ 'launch.loginAccount' | t }}</span>
             <select
               class="select select-bordered select-sm"
               [ngModel]="resolvedAccountProfileId()"
@@ -86,19 +87,24 @@ export interface ClaudeLaunchDialogValue {
             >
               @for (profile of claudeAccounts(); track profile.id) {
                 <option [value]="profile.id">
-                  {{ profile.name }} · {{ profile.authenticated ? '已登录' : '未登录' }}
+                  {{ profile.name }} ·
+                  {{
+                    profile.authenticated
+                      ? ('common.authenticated' | t)
+                      : ('common.unauthenticated' | t)
+                  }}
                 </option>
               }
             </select>
           </label>
           <label>
-            <span>MCP Profile</span>
+            <span>{{ 'launch.mcpProfile' | t }}</span>
             <select
               class="select select-bordered select-sm"
               [ngModel]="mcpProfileId()"
               (ngModelChange)="mcpProfileId.set($event)"
             >
-              <option value="">使用 Claude 默认配置</option>
+              <option value="">{{ 'launch.claudeDefault' | t }}</option>
               @for (profile of mcpProfiles(); track profile.id) {
                 <option [value]="profile.id">{{ profile.name }}</option>
               }
@@ -108,7 +114,7 @@ export interface ClaudeLaunchDialogValue {
 
         <footer>
           <button type="button" class="secondary btn btn-ghost btn-sm" (click)="cancelled.emit()">
-            取消
+            {{ 'common.cancel' | t }}
           </button>
           <button
             type="button"
@@ -116,7 +122,7 @@ export interface ClaudeLaunchDialogValue {
             [disabled]="!canLaunch()"
             (click)="submit()"
           >
-            <app-icon name="play" [size]="13" />启动会话
+            <app-icon name="play" [size]="13" />{{ 'launch.start' | t }}
           </button>
         </footer>
       </section>

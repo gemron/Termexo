@@ -29,9 +29,11 @@ import {
   normalizeTerminalFontSize,
   normalizeTerminalGridDimension,
   normalizeWorkspaceThemeColor,
-  TERMINAL_STATUS_LABELS,
+  TerminalStatus,
   Workspace,
 } from './core/models/workspace.models';
+import { I18nService } from './core/i18n/i18n.service';
+import { TranslatePipe } from './core/i18n/translate.pipe';
 import {
   collectGlobalTerminalNotices,
   createAttentionBanner,
@@ -62,6 +64,7 @@ import { ModelSwitchDialogComponent } from './dialogs/model-switch-dialog';
 import { ResumeSessionValue, SessionCenterDialogComponent } from './dialogs/session-center-dialog';
 import { InspectorPanelComponent } from './inspector/inspector-panel';
 import { IconComponent } from './shared/icon/icon';
+import { LanguageSelectorComponent } from './shared/language-selector/language-selector';
 import {
   layoutTerminalCapacity,
   resolveVisibleTerminalIds,
@@ -110,10 +113,12 @@ function readStoredWidth(key: string, fallback: number, min: number, max: number
     EditWorkspaceDialogComponent,
     IconComponent,
     InspectorPanelComponent,
+    LanguageSelectorComponent,
     MergeWorkspaceDialogComponent,
     ModelSwitchDialogComponent,
     SessionCenterDialogComponent,
     TerminalWorkbenchComponent,
+    TranslatePipe,
     WorkspaceSidebarComponent,
   ],
   templateUrl: './app.html',
@@ -138,6 +143,7 @@ function readStoredWidth(key: string, fallback: number, min: number, max: number
 export class App {
   protected readonly state = inject(AppStateService);
   protected readonly agents = inject(AgentService);
+  protected readonly i18n = inject(I18nService);
   private readonly directoryPicker = inject(DirectoryPickerService);
   private readonly desktopNotifications = inject(DesktopNotificationService);
   private readonly terminalGateway = inject(TerminalGatewayService);
@@ -224,12 +230,16 @@ export class App {
     const dismissed = this.dismissedNoticeKeys();
     return createAttentionBanner(
       this.globalTerminalNotices().filter((notice) => !dismissed.has(globalNoticeKey(notice))),
+      (key, params) => this.i18n.t(key, params),
     );
   });
   protected readonly globalNoticeSummary = computed(() => {
     const waiting = this.globalWaitingNoticeCount();
     const completed = this.globalCompletedNoticeCount();
-    return [waiting ? `${waiting} 等待` : '', completed ? `${completed} 完成` : '']
+    return [
+      waiting ? this.i18n.t('notice.waitingCount', { count: waiting }) : '',
+      completed ? this.i18n.t('notice.completedCount', { count: completed }) : '',
+    ]
       .filter(Boolean)
       .join(' · ');
   });
@@ -256,7 +266,22 @@ export class App {
   );
   protected readonly gridCapacity = computed(() => this.gridColumns() * this.gridRows());
   protected readonly gridCells = computed(() => Array.from({ length: this.gridCapacity() }));
-  protected readonly statusLabels = TERMINAL_STATUS_LABELS;
+  protected statusLabel(status: TerminalStatus): string {
+    const keys: Record<TerminalStatus, string> = {
+      STARTING: 'status.starting',
+      RUNNING: 'status.running',
+      THINKING: 'status.thinking',
+      WAITING_INPUT: 'status.waitingInput',
+      WAITING_APPROVAL: 'status.waitingApproval',
+      RATE_LIMITED: 'status.rateLimited',
+      IDLE: 'status.idle',
+      COMPLETED: 'status.completed',
+      FAILED: 'status.failed',
+      STOPPED: 'status.stopped',
+      DISCONNECTED: 'status.disconnected',
+    };
+    return this.i18n.t(keys[status]);
+  }
   protected readonly visibleTerminalIds = computed(() => {
     const workspace = this.state.activeWorkspace();
     if (!workspace) {
@@ -303,9 +328,14 @@ export class App {
       const completed = newNotices.filter((notice) => !isWaitingNotice(notice));
       if (completed.length === 1) {
         const notice = completed[0];
-        this.showToast(`${notice.workspaceName} · ${notice.terminalName}：任务已完成`);
+        this.showToast(
+          this.i18n.t('notice.completedToast', {
+            workspace: notice.workspaceName,
+            terminal: notice.terminalName,
+          }),
+        );
       } else if (completed.length > 1) {
-        this.showToast(`${completed.length} 个 Agent 任务已完成`);
+        this.showToast(this.i18n.t('notice.agentsCompleted', { count: completed.length }));
       }
     });
   }
@@ -319,7 +349,7 @@ export class App {
 
     const terminal = this.state.createTerminal({ agentType, workingDirectory });
     if (terminal) {
-      this.showToast(`${terminal.name} 已创建`);
+      this.showToast(this.i18n.t('terminal.created', { name: terminal.name }));
     }
   }
 
@@ -356,7 +386,7 @@ export class App {
     }
     const installation = this.agents.codexInstallation();
     if (!installation?.healthy) {
-      this.showToast(installation?.diagnostic ?? '未检测到 Codex CLI');
+      this.showToast(installation?.diagnostic ?? this.i18n.t('common.codexNotDetected'));
       return;
     }
 
@@ -374,14 +404,14 @@ export class App {
         agentType: 'codex',
         name: value.name || undefined,
         command: launch.command,
-        model: value.model ?? 'Codex 默认模型',
+        model: value.model ?? this.i18n.t('terminal.defaultCodexModel'),
         workingDirectory,
         accountProfileId: value.accountProfileId,
       });
       this.codexLaunchOpen.set(false);
       this.selectedTerminalDirectory.set(null);
       if (terminal) {
-        this.showToast(`${terminal.name} 已启动`);
+        this.showToast(this.i18n.t('terminal.started', { name: terminal.name }));
       }
     } catch (error) {
       this.showToast(this.errorMessage(error));
@@ -433,7 +463,7 @@ export class App {
       this.claudeLaunchOpen.set(false);
       this.selectedTerminalDirectory.set(null);
       if (terminal) {
-        this.showToast(`${terminal.name} 已启动`);
+        this.showToast(this.i18n.t('terminal.started', { name: terminal.name }));
       }
     } catch (error) {
       this.showToast(this.errorMessage(error));
@@ -499,7 +529,7 @@ export class App {
           profile?.name ??
           value.model ??
           value.session.modelName ??
-          (isCodex ? 'Codex 默认模型' : 'Claude Sonnet'),
+          (isCodex ? this.i18n.t('terminal.defaultCodexModel') : 'Claude Sonnet'),
         nativeSessionId: value.session.nativeSessionId,
         workingDirectory: value.session.projectPath ?? workspace.projectPath,
         profileId: isCodex ? undefined : value.profileId,
@@ -508,7 +538,7 @@ export class App {
       });
       this.sessionCenterOpen.set(false);
       if (terminal) {
-        this.showToast(`正在恢复 ${value.session.title}`);
+        this.showToast(this.i18n.t('terminal.resuming', { name: value.session.title }));
       }
     } catch (error) {
       this.showToast(this.errorMessage(error));
@@ -732,7 +762,7 @@ export class App {
     this.state.createWorkspace(value.name, value.projectPath);
     this.mountWorkspace(this.state.activeWorkspace()?.id);
     this.createWorkspaceOpen.set(false);
-    this.showToast(`工作区 ${value.name} 已创建`);
+    this.showToast(this.i18n.t('workspace.created', { name: value.name }));
   }
 
   protected openWorkspaceDelete(workspaceId: string): void {
@@ -763,7 +793,7 @@ export class App {
       );
       const removed = await this.state.deleteWorkspace(workspace.id);
       if (!removed) {
-        throw new Error('工作空间不存在或已被删除');
+        throw new Error(this.i18n.t('workspace.notFound'));
       }
       this.mountedWorkspaceIds.update((workspaceIds) =>
         workspaceIds.filter((workspaceId) => workspaceId !== workspace.id),
@@ -776,9 +806,12 @@ export class App {
       });
       this.terminalMaximized.set(false);
       this.workspacePendingDeletion.set(null);
-      this.showToast(`工作空间 ${workspace.name} 已删除`);
+      this.showToast(this.i18n.t('workspace.deleted', { name: workspace.name }));
     } catch (error) {
-      this.showToast(`删除失败：${this.errorMessage(error)}`, 'attention');
+      this.showToast(
+        this.i18n.t('workspace.deleteFailed', { error: this.errorMessage(error) }),
+        'attention',
+      );
     } finally {
       this.deletingWorkspace.set(false);
     }
@@ -807,7 +840,7 @@ export class App {
       .workspaces()
       .find((workspace) => workspace.id === targetWorkspaceId);
     if (!targetWorkspace) {
-      this.showToast('目标工作空间不存在或已被删除', 'attention');
+      this.showToast(this.i18n.t('workspace.mergeTargetNotFound'), 'attention');
       return;
     }
 
@@ -818,7 +851,7 @@ export class App {
         targetWorkspaceId,
       );
       if (!mergedWorkspace) {
-        throw new Error('来源或目标工作空间不存在');
+        throw new Error(this.i18n.t('workspace.mergeEndpointsNotFound'));
       }
 
       this.mountedWorkspaceIds.update((workspaceIds) =>
@@ -841,9 +874,17 @@ export class App {
       });
       this.terminalMaximized.set(false);
       this.workspacePendingMerge.set(null);
-      this.showToast(`工作空间 ${sourceWorkspace.name} 已合并到 ${targetWorkspace.name}`);
+      this.showToast(
+        this.i18n.t('workspace.merged', {
+          source: sourceWorkspace.name,
+          target: targetWorkspace.name,
+        }),
+      );
     } catch (error) {
-      this.showToast(`合并失败：${this.errorMessage(error)}`, 'attention');
+      this.showToast(
+        this.i18n.t('workspace.mergeFailed', { error: this.errorMessage(error) }),
+        'attention',
+      );
     } finally {
       this.mergingWorkspace.set(false);
     }
@@ -899,7 +940,7 @@ export class App {
   protected saveWorkspaceAppearance(value: WorkspaceAppearanceValue): void {
     if (this.state.updateWorkspaceAppearance(value.workspaceId, value.name, value.themeColor)) {
       this.editingWorkspaceId.set(null);
-      this.showToast(`工作区 ${value.name} 已更新`);
+      this.showToast(this.i18n.t('workspace.updated', { name: value.name }));
     }
   }
 
@@ -914,7 +955,7 @@ export class App {
       workspace?.terminals.filter((terminal) => terminal.agentType === 'claude') ?? [];
     if (!profile || terminals.length === 0) {
       this.modelSwitchOpen.set(false);
-      this.showToast(profile ? '当前 Workspace 没有 Claude Code 终端' : '模型 Profile 不存在');
+      this.showToast(this.i18n.t(profile ? 'profile.noClaudeTerminals' : 'profile.notFound'));
       return;
     }
     if (profile.baseUrl && !profile.hasCredential) {
@@ -943,7 +984,9 @@ export class App {
               terminal.mcpProfileId,
             )
           ) {
-            throw new Error(`Claude 终端 ${terminal.name} 已不存在`);
+            throw new Error(
+              this.i18n.t('restore.terminalMissing', { agent: 'Claude', name: terminal.name }),
+            );
           }
         }),
       );
@@ -954,8 +997,12 @@ export class App {
       this.modelSwitchOpen.set(false);
       this.showToast(
         failures.length > 0
-          ? `${switched} 个已切换，${failures.length} 个失败：${this.errorMessage(failures[0].reason)}`
-          : `${switched} 个 Claude Code 终端已切换到 ${profile.name}，已使用新会话避免重复加载上下文`,
+          ? this.i18n.t('profile.switchPartial', {
+              switched,
+              failed: failures.length,
+              error: this.errorMessage(failures[0].reason),
+            })
+          : this.i18n.t('profile.switched', { count: switched, name: profile.name }),
       );
     } finally {
       this.launchingClaude.set(false);
@@ -965,7 +1012,7 @@ export class App {
   protected async saveModelProfile(input: ModelProfileInput): Promise<void> {
     try {
       await this.agents.saveModelProfile(input);
-      this.showToast('模型 Profile 已保存');
+      this.showToast(this.i18n.t('profile.saved'));
     } catch (error) {
       this.showToast(this.errorMessage(error));
     }
@@ -980,7 +1027,7 @@ export class App {
   protected async saveAccountProfile(input: AccountProfileInput): Promise<void> {
     try {
       await this.agents.saveAccountProfile(input);
-      this.showToast('登录账号已保存');
+      this.showToast(this.i18n.t('account.saved'));
     } catch (error) {
       this.showToast(this.errorMessage(error));
     }
@@ -989,7 +1036,7 @@ export class App {
   protected async deleteAccountProfile(profileId: string): Promise<void> {
     try {
       await this.agents.deleteAccountProfile(profileId);
-      this.showToast('账号 Profile 已移除，磁盘凭据目录已保留');
+      this.showToast(this.i18n.t('account.removed'));
     } catch (error) {
       this.showToast(this.errorMessage(error));
     }
@@ -999,7 +1046,7 @@ export class App {
     try {
       await this.agents.refreshAccountProfile(profileId);
       const profile = this.agents.accountProfiles().find((item) => item.id === profileId);
-      this.showToast(profile?.diagnostic ?? '账号状态已刷新');
+      this.showToast(profile?.diagnostic ?? this.i18n.t('account.refreshed'));
     } catch (error) {
       this.showToast(this.errorMessage(error));
     }
@@ -1025,14 +1072,14 @@ export class App {
       const terminal = this.state.createTerminal({
         id: terminalId,
         agentType: profile.agentType,
-        name: `${profile.name} 登录`,
+        name: this.i18n.t('account.loginName', { name: profile.name }),
         command: launch.command,
-        model: '账号登录',
+        model: this.i18n.t('account.loginModel'),
         workingDirectory,
       });
       this.settingsOpen.set(false);
       if (terminal) {
-        this.showToast(`已打开 ${profile.name} 官方登录流程`);
+        this.showToast(this.i18n.t('account.loginOpened', { name: profile.name }));
       }
     } catch (error) {
       this.showToast(this.errorMessage(error));
@@ -1042,7 +1089,7 @@ export class App {
   protected async deleteModelProfile(profileId: string): Promise<void> {
     try {
       await this.agents.deleteModelProfile(profileId);
-      this.showToast('模型 Profile 已删除');
+      this.showToast(this.i18n.t('profile.deleted'));
     } catch (error) {
       this.showToast(this.errorMessage(error));
     }
@@ -1051,7 +1098,7 @@ export class App {
   protected async saveMcpProfile(input: McpProfileInput): Promise<void> {
     try {
       await this.agents.saveMcpProfile(input);
-      this.showToast('MCP Profile 已保存');
+      this.showToast(this.i18n.t('mcp.saved'));
     } catch (error) {
       this.showToast(this.errorMessage(error));
     }
@@ -1060,7 +1107,7 @@ export class App {
   protected async deleteMcpProfile(profileId: string): Promise<void> {
     try {
       await this.agents.deleteMcpProfile(profileId);
-      this.showToast('MCP Profile 已删除');
+      this.showToast(this.i18n.t('mcp.deleted'));
     } catch (error) {
       this.showToast(this.errorMessage(error));
     }
@@ -1070,7 +1117,7 @@ export class App {
     try {
       await this.agents.saveNetworkProfile(input);
       this.networkTestResult.set(null);
-      this.showToast('网络代理 Profile 已保存');
+      this.showToast(this.i18n.t('network.saved'));
     } catch (error) {
       this.showToast(this.errorMessage(error));
     }
@@ -1080,7 +1127,7 @@ export class App {
     try {
       await this.agents.deleteNetworkProfile(profileId);
       this.networkTestResult.set(null);
-      this.showToast('网络代理 Profile 已删除');
+      this.showToast(this.i18n.t('network.deleted'));
     } catch (error) {
       this.showToast(this.errorMessage(error));
     }
@@ -1119,7 +1166,7 @@ export class App {
 
   protected async detectAgentInstallations(): Promise<void> {
     await Promise.all([this.agents.detectClaude(), this.agents.detectCodex()]);
-    this.showToast('Claude Code 与 Codex CLI 检测已完成');
+    this.showToast(this.i18n.t('agent.detectionComplete'));
   }
 
   protected async executeCliOperation(request: CliOperationRequest): Promise<void> {
@@ -1165,7 +1212,9 @@ export class App {
     try {
       return await this.directoryPicker.select(workspace.projectPath);
     } catch (error) {
-      this.showToast(`选择目录失败：${this.errorMessage(error)}`);
+      this.showToast(
+        this.i18n.t('terminal.selectDirectoryFailed', { error: this.errorMessage(error) }),
+      );
       return null;
     }
   }
@@ -1176,7 +1225,7 @@ export class App {
     this.modelSwitchOpen.set(false);
     this.selectedTerminalDirectory.set(null);
     this.openSettings('models', profileId);
-    this.showToast(`模型 Profile「${profileName}」需要重新输入并保存 API Key`, 'attention');
+    this.showToast(this.i18n.t('profile.credentialRequired', { name: profileName }), 'attention');
   }
 
   private async initialize(): Promise<void> {
@@ -1206,10 +1255,10 @@ export class App {
         const profile =
           profiles.find((candidate) => candidate.id === terminal.profileId) ?? defaultProfile;
         if (!profile) {
-          throw new Error(`Claude 终端 ${terminal.name} 没有可用的模型 Profile`);
+          throw new Error(this.i18n.t('restore.noModelProfile', { name: terminal.name }));
         }
         if (profile.baseUrl && !profile.hasCredential) {
-          throw new Error(`模型 Profile「${profile.name}」的 API Key 不存在或已失效`);
+          throw new Error(this.i18n.t('restore.invalidCredential', { name: profile.name }));
         }
 
         const launch = await this.agents.prepareLaunch({
@@ -1226,13 +1275,15 @@ export class App {
             model: profile.name,
           })
         ) {
-          throw new Error(`Claude 终端 ${terminal.name} 已不存在`);
+          throw new Error(
+            this.i18n.t('restore.terminalMissing', { agent: 'Claude', name: terminal.name }),
+          );
         }
       }),
     );
     const failed = results.filter((result) => result.status === 'rejected').length;
     if (failed > 0) {
-      this.showToast(`${failed} 个 Claude 终端未能恢复模型配置，请重新启动对应终端`, 'attention');
+      this.showToast(this.i18n.t('restore.claudeFailed', { count: failed }), 'attention');
     }
   }
 
@@ -1255,17 +1306,23 @@ export class App {
           workspaceId,
           sessionId: terminal.nativeSessionId,
           model:
-            terminal.model && !terminal.model.includes('默认模型') ? terminal.model : undefined,
+            terminal.model &&
+            !terminal.model.includes('默认模型') &&
+            !terminal.model.toLowerCase().includes('default model')
+              ? terminal.model
+              : undefined,
           accountProfileId: terminal.accountProfileId,
         });
         if (!this.state.updateRestoredTerminalLaunch(terminal.id, launch.command)) {
-          throw new Error(`Codex 终端 ${terminal.name} 已不存在`);
+          throw new Error(
+            this.i18n.t('restore.terminalMissing', { agent: 'Codex', name: terminal.name }),
+          );
         }
       }),
     );
     const failed = results.filter((result) => result.status === 'rejected').length;
     if (failed > 0) {
-      this.showToast(`${failed} 个 Codex 终端未能恢复状态跟踪，请重新启动对应终端`, 'attention');
+      this.showToast(this.i18n.t('restore.codexFailed', { count: failed }), 'attention');
     }
   }
 

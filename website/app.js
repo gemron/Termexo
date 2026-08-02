@@ -84,6 +84,9 @@ const translations = {
     featureStatusTitle: "Know the moment it needs you",
     featureStatusBody:
       "Waiting, thinking, needs approval, done, failed — shown in the tab, the panel, and the taskbar, across every project at once.",
+    featureLanguageTitle: "Works in your language",
+    featureLanguageBody:
+      "Follow Windows automatically or switch between Chinese, English, Spanish, French, German, Japanese, and Korean at any time.",
     featureQuotaTitle: "See your quota before you burn it",
     featureQuotaBody:
       "Check how much of your plan is left and when it resets, before you decide which model to send the next task to.",
@@ -98,7 +101,7 @@ const translations = {
     planned: "PLANNED",
     roadmap02Title: "Run several agents side by side",
     roadmap02Body:
-      "Claude and Codex detection, separate logins, resume, custom grids, model profiles, and everything saved locally.",
+      "Claude and Codex detection, separate logins, resume, custom grids, model profiles, seven interface languages, and everything saved locally.",
     roadmap04Title: "Accounts, installs, and networks",
     roadmap04Body:
       "Install or upgrade the CLIs in one click, keep several logins apart, set up proxies for a company network, and watch how much plan quota is left.",
@@ -203,6 +206,9 @@ const translations = {
     featureStatusTitle: "需要你的那一刻就知道",
     featureStatusBody:
       "运行中、思考中、等授权、已完成、失败——标签、面板和任务栏同时告诉你，跨项目一起看。",
+    featureLanguageTitle: "用你熟悉的语言工作",
+    featureLanguageBody:
+      "自动跟随 Windows，也可随时切换简体中文、英语、西班牙语、法语、德语、日语和韩语。",
     featureQuotaTitle: "额度烧完之前就知道",
     featureQuotaBody:
       "在决定把下一个任务交给哪个模型之前，先看清套餐还剩多少、什么时候重置。",
@@ -217,7 +223,7 @@ const translations = {
     planned: "计划中",
     roadmap02Title: "几个 Agent 并排干活",
     roadmap02Body:
-      "识别 Claude 与 Codex、多个登录账号互不干扰、恢复会话、自定义网格、模型 Profile，全部存在本地。",
+      "识别 Claude 与 Codex、多个登录账号互不干扰、恢复会话、自定义网格、模型 Profile、七种界面语言，全部存在本地。",
     roadmap04Title: "账号、安装和网络",
     roadmap04Body:
       "一键装好或升级 CLI，多个登录账号分开管理，为公司内网配代理，并盯住套餐还剩多少额度。",
