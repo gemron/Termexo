@@ -920,9 +920,20 @@ button:disabled {
     font: 10px/1 var(--mono);
   }
 
+  // An unavailable CLI must not keep the success palette: the icon and version badge carry
+  // the state as strongly as the card background does.
   &.unavailable {
     border-color: color-mix(in oklab, var(--color-warning) 42%, var(--border));
     background: var(--warning-soft);
+
+    > span {
+      color: var(--color-warning);
+      background: var(--warning-soft);
+    }
+
+    code {
+      color: var(--color-warning);
+    }
   }
 }
 
@@ -950,6 +961,73 @@ button:disabled {
     text-overflow: ellipsis;
     white-space: nowrap;
     font: 10px/1 var(--mono);
+  }
+}
+
+.update-panel {
+  display: grid;
+  margin-top: 18px;
+  padding-top: 15px;
+  gap: 10px;
+  border-top: 1px solid var(--border);
+
+  small {
+    color: var(--text-muted);
+    font-size: 10px;
+    line-height: 1.5;
+  }
+}
+
+.update-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+
+  strong {
+    font-size: 11px;
+  }
+
+  code {
+    color: var(--text-secondary);
+    font: 10px/1 var(--mono);
+  }
+}
+
+.update-available {
+  color: var(--color-warning);
+}
+
+.update-error {
+  color: var(--color-error);
+}
+
+.update-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+// Extends .checkbox-control, which centres a single line. This one wraps a title plus help
+// text, so the box aligns to the first line instead of the block's midpoint.
+.update-auto {
+  align-items: start;
+  cursor: pointer;
+
+  input {
+    flex-shrink: 0;
+    margin-top: 2px;
+  }
+
+  strong {
+    display: block;
+    font-size: 11px;
+    font-weight: 500;
+  }
+
+  small {
+    display: block;
+    margin-top: 3px;
   }
 }
 

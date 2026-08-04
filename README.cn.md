@@ -11,7 +11,7 @@
 </p>
 
 <p align="center">
-  <img alt="Version 0.3.12" src="https://img.shields.io/badge/version-0.3.12-58c7a0">
+  <img alt="Version 0.3.13" src="https://img.shields.io/badge/version-0.3.13-58c7a0">
   <img alt="Windows" src="https://img.shields.io/badge/platform-Windows-0078D4?logo=windows">
   <img alt="Tauri 2" src="https://img.shields.io/badge/Tauri-2-24C8DB?logo=tauri&logoColor=white">
   <img alt="Angular 22" src="https://img.shields.io/badge/Angular-22-DD0031?logo=angular">
@@ -33,8 +33,8 @@ Termexo 把 Claude Code、Codex 和围绕它们运行的终端收进一个可恢
 npx termexo@latest
 ```
 
-> 最新正式版本为 **V0.3.12 修复版**。终端的模型配置现在能真正跨重启保留，第三方模型不再
-> 退回原生默认模型；通过 npm 运行时也能收到 Windows 系统通知。
+> 最新正式版本为 **V0.3.13**。新增应用更新检查：启动时与运行期间定时比对 GitHub 上的最新
+> 发布，有新版本时通过应用内提示和系统通知告知，可在设置中关闭。
 
 ![Termexo 多终端网格工作台](website/assets/termexo-workbench.png)
 
@@ -85,6 +85,16 @@ SQLite，密钥保存在 Windows Credential Manager，Claude/Codex 历史会话�
 
 界面支持简体中文、英语、西班牙语、法语、德语、日语和韩语。默认自动跟随 Windows
 系统语言，也可通过主工具栏手动切换并跨重启保留选择。
+
+## V0.3.13 更新
+
+- 新增应用更新检查：启动时检查一次，之后每 6 小时定时比对 GitHub 上的最新发布；发现新版本
+  时通过应用内提示与 Windows 系统通知告知，并可一键打开下载页面。同一版本只提醒一次。
+- 更新检查可在「设置 → 诊断」中关闭，关闭后立即停止后台请求。检查失败不会打扰用户，仅在
+  手动检查时报告错误。
+- 修复顶部工具栏在窄窗口下与右侧窗口按钮重叠的问题，同时保持工具栏在宽屏下居中。
+- 优化「诊断」与「CLI 安装与升级」两个设置面板：CLI 不可用时不再沿用表示成功的绿色配色，
+  正文字号上调以改善可读性，选中的 Agent 卡片辨识更清晰，窄窗口下的信息栅格更早折行。
 
 ## V0.3.12 更新
 

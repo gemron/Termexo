@@ -4,4 +4,5 @@ pub mod config;
 pub mod hooks;
 pub mod notification;
 pub mod terminal;
+pub mod update;
 pub mod workspace;

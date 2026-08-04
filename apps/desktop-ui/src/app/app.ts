@@ -46,6 +46,7 @@ import { AgentService } from './core/services/agent.service';
 import { AppStateService } from './core/services/app-state.service';
 import { DirectoryPickerService } from './core/services/directory-picker.service';
 import { DesktopNotificationService } from './core/services/desktop-notification.service';
+import { UpdateCheck, UpdateService } from './core/services/update.service';
 import { TerminalGatewayService } from './core/services/terminal-gateway.service';
 import { AgentSettingsDialogComponent, SettingsTab } from './dialogs/agent-settings-dialog';
 import {
@@ -144,6 +145,7 @@ export class App {
   protected readonly state = inject(AppStateService);
   protected readonly agents = inject(AgentService);
   protected readonly i18n = inject(I18nService);
+  protected readonly updates = inject(UpdateService);
   private readonly directoryPicker = inject(DirectoryPickerService);
   private readonly desktopNotifications = inject(DesktopNotificationService);
   private readonly terminalGateway = inject(TerminalGatewayService);
@@ -944,6 +946,35 @@ export class App {
     }
   }
 
+  /** Manual check from the settings panel, which reports both outcomes as a toast. */
+  protected async checkForUpdate(): Promise<void> {
+    try {
+      const result = await this.updates.check();
+      if (!result) {
+        return;
+      }
+      this.showToast(
+        result.updateAvailable
+          ? this.i18n.t('update.available', { version: result.latestVersion })
+          : this.i18n.t('update.upToDate'),
+        result.updateAvailable ? 'attention' : 'success',
+      );
+    } catch (error) {
+      this.showToast(
+        `${this.i18n.t('update.failed')}: ${this.errorMessage(error)}`,
+        'attention',
+      );
+    }
+  }
+
+  protected async openReleasePage(): Promise<void> {
+    try {
+      await this.updates.openReleasePage();
+    } catch (error) {
+      this.showToast(this.errorMessage(error), 'attention');
+    }
+  }
+
   protected saveWorkspaceAppearance(value: WorkspaceAppearanceValue): void {
     if (this.state.updateWorkspaceAppearance(value.workspaceId, value.name, value.themeColor)) {
       this.editingWorkspaceId.set(null);
@@ -1264,6 +1295,45 @@ export class App {
     await this.refreshRestoredClaudeLaunches();
     await this.refreshRestoredCodexLaunches();
     this.mountWorkspace(this.state.activeWorkspace()?.id);
+    void this.notifyWhenUpdateAvailable();
+  }
+
+  /**
+   * Surfaces a published update once per version, then keeps checking periodically so a window
+   * left open for days still learns about a release.
+   *
+   * The checks stay silent on failure: a machine that cannot reach GitHub never sees an error
+   * it did not ask for.
+   */
+  private async notifyWhenUpdateAvailable(): Promise<void> {
+    await this.updates.checkOnStartup();
+    if (this.updates.shouldNotify()) {
+      const result = this.updates.result();
+      if (result) {
+        this.announceUpdate(result);
+      }
+    }
+    this.updates.startPeriodicChecks((result) => this.announceUpdate(result));
+  }
+
+  /**
+   * Announces a release through both an in-app toast and a desktop notification, because a
+   * periodic check usually fires while the user is working in another window.
+   */
+  private announceUpdate(result: UpdateCheck): void {
+    const title = this.i18n.t('update.available', { version: result.latestVersion });
+    this.showToast(title, 'attention');
+    void this.desktopNotifications
+      .notifyMessage(
+        title,
+        this.i18n.t('update.availableBody', {
+          current: result.currentVersion,
+          latest: result.latestVersion,
+        }),
+      )
+      .catch(() => undefined);
+    // Announcing once per version keeps a long session from repeating the same prompt.
+    this.updates.dismissCurrentResult();
   }
 
   private async refreshRestoredClaudeLaunches(): Promise<void> {

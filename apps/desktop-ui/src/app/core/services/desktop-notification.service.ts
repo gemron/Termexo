@@ -47,21 +47,33 @@ export class DesktopNotificationService {
         : UserAttentionType.Informational;
     void appWindow.requestUserAttention(attentionType).catch(() => undefined);
 
+    await this.send(notification.title, notification.body);
+  }
+
+  /**
+   * Raises a desktop notification that does not come from a terminal, such as a published
+   * update. No taskbar flash: nothing here blocks the user's work.
+   */
+  async notifyMessage(title: string, body: string): Promise<void> {
+    if (!this.appWindow) {
+      return;
+    }
+    await this.send(title, body);
+  }
+
+  private async send(title: string, body: string): Promise<void> {
     if (!(await this.ensurePermission())) {
       // 无通知权限时降级为系统对话框
-      void this.showDialogFallback(notification.title, notification.body);
+      void this.showDialogFallback(title, body);
       return;
     }
 
     try {
       // 走自有命令而非通知插件：插件会丢弃投递结果，失败时无法降级
-      await invoke('show_desktop_notification', {
-        title: notification.title,
-        body: notification.body,
-      });
+      await invoke('show_desktop_notification', { title, body });
     } catch {
       // Toast 投递失败（例如 AUMID 未注册），降级为系统对话框
-      void this.showDialogFallback(notification.title, notification.body);
+      void this.showDialogFallback(title, body);
     }
   }
 

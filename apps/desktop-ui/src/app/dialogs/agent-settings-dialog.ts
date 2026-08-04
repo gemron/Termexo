@@ -22,6 +22,7 @@ import {
   ProviderPreset,
   PROVIDER_PRESETS,
 } from '../core/models/agent.models';
+import { UpdateCheck } from '../core/services/update.service';
 import { IconComponent } from '../shared/icon/icon';
 
 export type SettingsTab = 'diagnostics' | 'cli' | 'accounts' | 'models' | 'mcp' | 'network';
@@ -168,6 +169,57 @@ export type SettingsTab = 'diagnostics' | 'cli' | 'accounts' | 'models' | 'mcp' 
                 >
                   <app-icon name="refresh" [size]="13" />{{ 'settings.detectBoth' | t }}
                 </button>
+
+                <div class="update-panel">
+                  <div class="update-header">
+                    <strong>{{ 'update.section' | t }}</strong>
+                    <code>{{ updateResult()?.currentVersion ?? '' }}</code>
+                  </div>
+                  @if (updateError(); as failure) {
+                    <small class="update-error">{{ 'update.failed' | t }}: {{ failure }}</small>
+                  } @else if (updateResult(); as result) {
+                    @if (result.updateAvailable) {
+                      <small class="update-available">{{
+                        'update.availableBody'
+                          | t: { current: result.currentVersion, latest: result.latestVersion }
+                      }}</small>
+                    } @else {
+                      <small>{{ 'update.upToDate' | t }}</small>
+                    }
+                  }
+                  <div class="update-actions">
+                    <button
+                      type="button"
+                      class="secondary inline-command btn btn-outline btn-sm"
+                      [disabled]="updateChecking()"
+                      (click)="updateCheckRequested.emit()"
+                    >
+                      <app-icon name="refresh" [size]="13" />{{
+                        (updateChecking() ? 'update.checking' : 'update.check') | t
+                      }}
+                    </button>
+                    @if (updateResult()?.updateAvailable) {
+                      <button
+                        type="button"
+                        class="primary btn btn-primary btn-sm"
+                        (click)="updateDownloadRequested.emit()"
+                      >
+                        {{ 'update.download' | t }}
+                      </button>
+                    }
+                  </div>
+                  <label class="checkbox-control update-auto">
+                    <input
+                      type="checkbox"
+                      [checked]="autoCheckUpdates()"
+                      (change)="autoCheckChanged.emit($any($event.target).checked)"
+                    />
+                    <span>
+                      <strong>{{ 'update.autoCheck' | t }}</strong>
+                      <small>{{ 'update.autoCheckHelp' | t }}</small>
+                    </span>
+                  </label>
+                </div>
               </section>
             }
             @case ('cli') {
@@ -859,8 +911,15 @@ export class AgentSettingsDialogComponent {
   readonly cliPlan = input<CliOperationPlan | null>(null);
   readonly cliResult = input<CliOperationResult | null>(null);
   readonly busy = input(false);
+  readonly updateResult = input<UpdateCheck | null>(null);
+  readonly updateChecking = input(false);
+  readonly updateError = input<string | null>(null);
+  readonly autoCheckUpdates = input(true);
   readonly cancelled = output<void>();
   readonly detectRequested = output<void>();
+  readonly updateCheckRequested = output<void>();
+  readonly updateDownloadRequested = output<void>();
+  readonly autoCheckChanged = output<boolean>();
   readonly cliPreviewRequested = output<CliOperationRequest>();
   readonly cliExecuteRequested = output<CliOperationRequest>();
   readonly modelSaved = output<ModelProfileInput>();

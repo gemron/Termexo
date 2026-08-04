@@ -8,6 +8,7 @@ mod hooks;
 mod network;
 mod notification;
 mod pty;
+mod update;
 
 use std::fs;
 
@@ -101,6 +102,8 @@ pub fn run() {
             commands::config::delete_account_profile,
             commands::config::validate_claude_profile,
             commands::notification::show_desktop_notification,
+            commands::update::check_for_update,
+            commands::update::open_release_page,
             commands::hooks::prepare_claude_runtime,
             commands::hooks::sync_agent_events,
             commands::hooks::list_agent_events,

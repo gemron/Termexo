@@ -127,7 +127,9 @@ app-inspector-panel {
   height: 52px;
   min-width: 0;
   min-height: 0;
-  grid-template-columns: minmax(150px, 1fr) auto minmax(70px, 1fr);
+  // Equal side columns keep the toolbar centred, but the right one may never fall below its
+  // own content width — that floor is what stops the window tools overlapping the toolbar.
+  grid-template-columns: minmax(0, 1fr) auto minmax(min-content, 1fr);
   align-items: center;
   padding: 0;
   overflow: visible;
@@ -167,6 +169,9 @@ app-inspector-panel {
 .window-tools {
   display: flex;
   align-items: center;
+  // Neither cluster may give up width to its neighbour; overlapping buttons are worse than a
+  // truncated workspace title.
+  flex-shrink: 0;
 }
 
 .toolbar {
@@ -976,10 +981,6 @@ app-inspector-panel {
 }
 
 @media (max-width: 1120px) {
-  .topbar {
-    grid-template-columns: minmax(110px, 1fr) auto 65px;
-  }
-
   .tool-button > span {
     display: none;
   }

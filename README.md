@@ -11,7 +11,7 @@
 </p>
 
 <p align="center">
-  <img alt="Version 0.3.12" src="https://img.shields.io/badge/version-0.3.12-58c7a0">
+  <img alt="Version 0.3.13" src="https://img.shields.io/badge/version-0.3.13-58c7a0">
   <img alt="Windows" src="https://img.shields.io/badge/platform-Windows-0078D4?logo=windows">
   <img alt="Tauri 2" src="https://img.shields.io/badge/Tauri-2-24C8DB?logo=tauri&logoColor=white">
   <img alt="Angular 22" src="https://img.shields.io/badge/Angular-22-DD0031?logo=angular">
@@ -34,9 +34,9 @@ Run the complete Windows app with one command—no Termexo account or server req
 npx termexo@latest
 ```
 
-> The latest published release is **V0.3.12, a fix release**. Terminal model profiles now really
-> do survive a restart instead of falling back to the native default, and Windows notifications
-> work when Termexo runs from npm.
+> The latest published release is **V0.3.13**. Termexo now checks for its own updates — on
+> launch and periodically while running — and tells you through an in-app notice and a Windows
+> notification when a new release is published. You can switch the checks off in settings.
 
 ![Termexo multi-terminal grid workbench](website/assets/termexo-workbench.png)
 
@@ -93,6 +93,19 @@ you configure under their own terms and privacy policies.
 The interface is available in Simplified Chinese, English, Spanish, French, German, Japanese,
 and Korean. It follows the Windows language automatically, or you can choose a language from
 the main toolbar and keep that choice across restarts.
+
+## V0.3.13 Updates
+
+- Add update checks: once at launch, then every 6 hours against the latest GitHub release. A
+  published update raises an in-app notice and a Windows notification, and the download page is
+  one click away. Each version is announced only once.
+- Update checks can be switched off under Settings → Diagnostics, which stops the background
+  requests immediately. Failed checks stay silent; only a manual check reports an error.
+- Fix the top toolbar overlapping the window buttons in narrow windows, while keeping the
+  toolbar centred on wide ones.
+- Refine the Diagnostics and CLI panels: an unavailable CLI no longer keeps the success palette,
+  body text is larger, the selected agent card reads more clearly, and the detail grids collapse
+  earlier in narrow windows.
 
 ## V0.3.12 Updates
 
