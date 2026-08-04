@@ -26,6 +26,7 @@ pub struct ModelProfile {
     pub model: String,
     pub base_url: Option<String>,
     pub credential_target: Option<String>,
+    pub api_protocol: String,
     pub is_default: bool,
     pub has_credential: bool,
 }
@@ -41,7 +42,13 @@ pub struct ModelProfileInput {
     pub api_key: Option<String>,
     #[serde(default)]
     pub clear_credential: bool,
+    #[serde(default = "default_api_protocol")]
+    pub api_protocol: String,
     pub is_default: bool,
+}
+
+fn default_api_protocol() -> String {
+    "anthropic".into()
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

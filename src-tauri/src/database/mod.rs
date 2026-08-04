@@ -14,6 +14,7 @@ const INITIAL_MIGRATION: &str = include_str!("../../migrations/0001_initial.sql"
 const AGENT_MIGRATION: &str = include_str!("../../migrations/0002_agent_sessions.sql");
 const NETWORK_MIGRATION: &str = include_str!("../../migrations/0003_network_profiles.sql");
 const ACCOUNT_MIGRATION: &str = include_str!("../../migrations/0004_account_profiles.sql");
+const API_PROTOCOL_MIGRATION: &str = include_str!("../../migrations/0005_api_protocol.sql");
 const LEGACY_MINIMAX_M3_MODEL: &str = "MiniMax-M3[1m]";
 const MINIMAX_M3_MODEL: &str = "MiniMax-M3";
 
@@ -84,6 +85,7 @@ impl WorkspaceDatabase {
         connection.execute_batch(AGENT_MIGRATION)?;
         connection.execute_batch(NETWORK_MIGRATION)?;
         connection.execute_batch(ACCOUNT_MIGRATION)?;
+        run_api_protocol_migration(&connection)?;
         migrate_legacy_minimax_m3_model(&connection)?;
         ensure_default_profile(&connection)?;
         Ok(Self {
@@ -334,7 +336,8 @@ impl WorkspaceDatabase {
             .map_err(|_| DatabaseError::LockPoisoned)?;
         let mut statement = connection.prepare(
             "SELECT
-                 id, name, provider, model, base_url, credential_target, is_default
+                 id, name, provider, model, base_url, credential_target,
+                 api_protocol, is_default
              FROM model_profiles
              ORDER BY is_default DESC, name",
         )?;
@@ -353,7 +356,7 @@ impl WorkspaceDatabase {
             .map_err(|_| DatabaseError::LockPoisoned)?;
         let mut statement = connection.prepare(
             "SELECT
-                 id, name, provider, model, base_url, credential_target, is_default
+                 id, name, provider, model, base_url, credential_target, api_protocol, is_default
              FROM model_profiles
              WHERE id = ?1",
         )?;
@@ -373,15 +376,16 @@ impl WorkspaceDatabase {
         connection.execute(
             "INSERT INTO model_profiles (
                  id, name, provider, model, base_url, credential_target,
-                 is_default, created_at, updated_at
+                 api_protocol, is_default, created_at, updated_at
              )
-             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?8)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?9)
              ON CONFLICT(id) DO UPDATE SET
                  name = excluded.name,
                  provider = excluded.provider,
                  model = excluded.model,
                  base_url = excluded.base_url,
                  credential_target = excluded.credential_target,
+                 api_protocol = excluded.api_protocol,
                  is_default = excluded.is_default,
                  updated_at = excluded.updated_at",
             params![
@@ -391,6 +395,7 @@ impl WorkspaceDatabase {
                 profile.model,
                 profile.base_url,
                 profile.credential_target,
+                profile.api_protocol,
                 profile.is_default,
                 now,
             ],
@@ -713,9 +718,18 @@ fn ensure_default_profile(connection: &Connection) -> Result<(), DatabaseError> 
         let now = unix_timestamp_millis();
         connection.execute(
             "INSERT INTO model_profiles (
-                 id, name, provider, model, is_default, created_at, updated_at
+                 id, name, provider, model, api_protocol, is_default, created_at, updated_at
              )
-             VALUES ('claude-default', 'Claude Sonnet', 'Anthropic', 'sonnet', 1, ?1, ?1)",
+             VALUES ('claude-default', 'Claude Sonnet', 'Anthropic', 'sonnet',
+                     'anthropic', 1, ?1, ?1)",
+            [now],
+        )?;
+        connection.execute(
+            "INSERT INTO model_profiles (
+                 id, name, provider, model, api_protocol, is_default, created_at, updated_at
+             )
+             VALUES ('codex-default', 'GPT-5.6 Sol', 'OpenAI', 'gpt-5.6-sol',
+                     'openai', 0, ?1, ?1)",
             [now],
         )?;
     }
@@ -749,7 +763,8 @@ fn model_profile_from_row(row: &rusqlite::Row<'_>) -> rusqlite::Result<ModelProf
         base_url: row.get(4)?,
         has_credential: credential_target.is_some(),
         credential_target,
-        is_default: row.get(6)?,
+        api_protocol: row.get(6)?,
+        is_default: row.get(7)?,
     })
 }
 
@@ -797,6 +812,21 @@ fn unix_timestamp_millis() -> i64 {
         .duration_since(UNIX_EPOCH)
         .map(|duration| duration.as_millis() as i64)
         .unwrap_or_default()
+}
+
+fn run_api_protocol_migration(connection: &Connection) -> Result<(), DatabaseError> {
+    if let Err(error) = connection.execute_batch(API_PROTOCOL_MIGRATION) {
+        match error {
+            rusqlite::Error::SqliteFailure(
+                _,
+                Some(ref message),
+            ) if message.contains("duplicate column") => {
+                // Column already exists — migration is a no-op
+            }
+            other => return Err(other.into()),
+        }
+    }
+    Ok(())
 }
 
 #[cfg(test)]
@@ -939,6 +969,7 @@ mod tests {
             model: "sonnet".into(),
             base_url: Some("https://gateway.example.com".into()),
             credential_target: Some("model-profile:profile-1".into()),
+            api_protocol: "anthropic".into(),
             is_default: true,
             has_credential: true,
         };

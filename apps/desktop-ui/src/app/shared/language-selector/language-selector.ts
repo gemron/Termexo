@@ -30,17 +30,19 @@ import { IconComponent } from '../icon/icon';
       display: inline-flex;
       min-width: 0;
     }
+    /* Mirrors .window-tools button so the selector reads as a peer of the flat
+       icon buttons, not a raised island with its own border and fill. */
     .language-selector {
       position: relative;
       display: inline-flex;
       align-items: center;
       gap: 5px;
-      height: 30px;
-      padding: 0 8px;
-      border: 1px solid color-mix(in srgb, var(--color-base-content) 14%, transparent);
-      border-radius: 7px;
-      color: color-mix(in srgb, var(--color-base-content) 78%, transparent);
-      background: color-mix(in srgb, var(--color-base-200) 88%, transparent);
+      height: 28px;
+      padding: 0 6px;
+      border: 0;
+      border-radius: 3px;
+      color: var(--text-muted);
+      background: transparent;
       cursor: pointer;
     }
     select {
@@ -49,6 +51,16 @@ import { IconComponent } from '../icon/icon';
       width: 100%;
       opacity: 0;
       cursor: pointer;
+      color-scheme: dark;
+      // Windows WebView2 renders the native <option> popup light even with
+      // color-scheme: dark inherited from :root, so the select and each option
+      // carry explicit surface/text colors to keep the dropdown in theme.
+      background-color: var(--surface-1);
+      color: var(--text);
+    }
+    option {
+      background-color: var(--surface-1);
+      color: var(--text);
     }
     span {
       min-width: 18px;
@@ -57,8 +69,8 @@ import { IconComponent } from '../icon/icon';
       text-align: center;
     }
     .language-selector:hover {
-      border-color: var(--color-primary);
-      color: var(--color-primary);
+      color: var(--text);
+      background: var(--surface-2);
     }
   `,
 })

@@ -82,6 +82,7 @@ pub fn save_model_profile(
             .filter(|value| !value.is_empty()),
         has_credential: credential_target.is_some(),
         credential_target,
+        api_protocol: input.api_protocol,
         is_default: input.is_default,
     };
     if profile.base_url.is_some() && !profile.has_credential {

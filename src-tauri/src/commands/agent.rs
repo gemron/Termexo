@@ -147,6 +147,7 @@ pub struct PrepareCodexLaunchRequest {
     pub workspace_id: Option<String>,
     pub session_id: Option<String>,
     pub model: Option<String>,
+    pub profile_id: Option<String>,
     pub account_profile_id: Option<String>,
 }
 
@@ -241,8 +242,32 @@ pub fn prepare_codex_launch(
     launch_environment: State<'_, LaunchEnvironmentStore>,
     hooks: State<'_, HookEventStore>,
 ) -> Result<AgentLaunchSpec, String> {
+    let profiles = database
+        .list_model_profiles()
+        .map_err(|error| error.to_string())?;
+    let profile = request
+        .profile_id
+        .as_deref()
+        .and_then(|profile_id| profiles.iter().find(|profile| profile.id == profile_id))
+        .or_else(|| profiles.iter().find(|profile| profile.is_default && profile.api_protocol == "openai"))
+        .cloned();
     let mut environment =
         account_profile_environment(&database, request.account_profile_id.as_deref(), "codex")?;
+    environment.extend(profile_environment(profile.as_ref()));
+    if let Some(profile) = profile.as_ref() {
+        if let Some(target) = profile.credential_target.as_deref() {
+            let token = credentials
+                .get_optional(target)
+                .map_err(|error| error.to_string())?
+                .ok_or_else(|| {
+                    format!(
+                        "模型 Profile「{}」的 API Key 不存在或已失效，请在设置中重新输入并保存。",
+                        profile.name
+                    )
+                })?;
+            environment.insert("OPENAI_API_KEY".into(), token);
+        }
+    }
     environment.extend(network_environment(
         &database,
         &credentials,
@@ -258,10 +283,18 @@ pub fn prepare_codex_launch(
     launch_environment
         .put(request.terminal_id.clone(), environment)
         .map_err(|error| error.to_string())?;
+    let effective_model = request
+        .model
+        .filter(|value| !value.trim().is_empty())
+        .or_else(|| {
+            profile
+                .as_ref()
+                .map(|profile| profile.model.clone())
+        });
     CodexCliAdapter::new()
         .build_launch_command(&CodexLaunchOptions {
             session_id: request.session_id,
-            model: request.model,
+            model: effective_model,
             notify_config: Some(notify_config),
             hook_configs,
         })
@@ -346,10 +379,17 @@ fn network_environment(
 }
 
 fn profile_environment(profile: Option<&ModelProfile>) -> HashMap<String, String> {
-    let mut environment = HashMap::new();
     let Some(profile) = profile else {
-        return environment;
+        return HashMap::new();
     };
+    match profile.api_protocol.as_str() {
+        "openai" => openai_profile_environment(profile),
+        _ => anthropic_profile_environment(profile),
+    }
+}
+
+fn anthropic_profile_environment(profile: &ModelProfile) -> HashMap<String, String> {
+    let mut environment = HashMap::new();
     let Some(base_url) = profile
         .base_url
         .as_deref()
@@ -391,6 +431,27 @@ fn profile_environment(profile: Option<&ModelProfile>) -> HashMap<String, String
     environment
 }
 
+fn openai_profile_environment(profile: &ModelProfile) -> HashMap<String, String> {
+    let mut environment = HashMap::new();
+    let Some(base_url) = profile
+        .base_url
+        .as_deref()
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+    else {
+        return environment;
+    };
+
+    environment.insert("OPENAI_BASE_URL".into(), base_url.into());
+    environment.insert("API_TIMEOUT_MS".into(), "3000000".into());
+
+    let model = profile.model.trim();
+    if !model.is_empty() {
+        environment.insert("OPENAI_MODEL".into(), model.into());
+    }
+    environment
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -404,6 +465,7 @@ mod tests {
             model: "deepseek-v4-pro[1m]".into(),
             base_url: Some("https://api.deepseek.com/anthropic".into()),
             credential_target: Some("profile:deepseek".into()),
+            api_protocol: "anthropic".into(),
             is_default: false,
             has_credential: true,
         };
@@ -447,6 +509,7 @@ mod tests {
             model: "sonnet".into(),
             base_url: None,
             credential_target: None,
+            api_protocol: "anthropic".into(),
             is_default: true,
             has_credential: false,
         };
@@ -463,6 +526,7 @@ mod tests {
             model: "MiniMax-M3".into(),
             base_url: Some("https://api.minimaxi.com/anthropic".into()),
             credential_target: Some("profile:minimax".into()),
+            api_protocol: "anthropic".into(),
             is_default: false,
             has_credential: true,
         };
@@ -488,5 +552,54 @@ mod tests {
                 .map(String::as_str),
             Some("1000000")
         );
+    }
+
+    #[test]
+    fn maps_openai_compatible_profile_to_codex_environment() {
+        let profile = ModelProfile {
+            id: "openai-codex".into(),
+            name: "GPT-5.6 Sol".into(),
+            provider: "OpenAI".into(),
+            model: "gpt-5.6-sol".into(),
+            base_url: Some("https://api.openai.com/v1".into()),
+            credential_target: Some("profile:openai-codex".into()),
+            api_protocol: "openai".into(),
+            is_default: true,
+            has_credential: true,
+        };
+
+        let environment = profile_environment(Some(&profile));
+
+        assert_eq!(
+            environment.get("OPENAI_BASE_URL").map(String::as_str),
+            Some("https://api.openai.com/v1")
+        );
+        assert_eq!(
+            environment.get("OPENAI_MODEL").map(String::as_str),
+            Some("gpt-5.6-sol")
+        );
+        assert_eq!(
+            environment.get("API_TIMEOUT_MS").map(String::as_str),
+            Some("3000000")
+        );
+        assert!(environment.get("ANTHROPIC_BASE_URL").is_none());
+        assert!(environment.get("ANTHROPIC_MODEL").is_none());
+    }
+
+    #[test]
+    fn leaves_official_openai_environment_untouched() {
+        let profile = ModelProfile {
+            id: "codex-default".into(),
+            name: "GPT-5.6 Sol".into(),
+            provider: "OpenAI".into(),
+            model: "gpt-5.6-sol".into(),
+            base_url: None,
+            credential_target: None,
+            api_protocol: "openai".into(),
+            is_default: true,
+            has_credential: false,
+        };
+
+        assert!(profile_environment(Some(&profile)).is_empty());
     }
 }

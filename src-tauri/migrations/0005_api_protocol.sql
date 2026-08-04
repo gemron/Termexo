@@ -1,0 +1,1 @@
+ALTER TABLE model_profiles ADD COLUMN api_protocol TEXT NOT NULL DEFAULT 'anthropic';

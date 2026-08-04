@@ -14,6 +14,7 @@ const CUSTOM_PROFILE: ModelProfile = {
   provider: 'Anthropic',
   model: 'claude-sonnet-4-6',
   baseUrl: 'https://api.example.test',
+  apiProtocol: 'anthropic',
   isDefault: true,
   hasCredential: true,
 };
@@ -94,7 +95,8 @@ describe('AgentSettingsDialogComponent', () => {
 
     clickButton('模型 Profile');
     clickButton('新建 Profile');
-    const provider = root.querySelector<HTMLSelectElement>('.profile-editor select');
+    const selects = root.querySelectorAll<HTMLSelectElement>('.profile-editor select');
+    const provider = selects[1]; // second select is provider, first is apiProtocol
     expect(provider).toBeTruthy();
     provider!.value = 'DeepSeek';
     provider!.dispatchEvent(new Event('change'));
@@ -122,6 +124,7 @@ describe('AgentSettingsDialogComponent', () => {
       provider: 'MiniMax',
       model: 'MiniMax-M3',
       baseUrl: 'https://api.minimaxi.com/anthropic',
+      apiProtocol: 'anthropic',
       isDefault: false,
       hasCredential: false,
     };

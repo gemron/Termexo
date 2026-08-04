@@ -7,7 +7,6 @@ import {
   AccountProfile,
   AccountProfileInput,
   AgentInstallation,
-  CLAUDE_PROVIDER_PRESETS,
   CliOperationPlan,
   CliOperationRequest,
   CliOperationResult,
@@ -20,6 +19,8 @@ import {
   NetworkProfileScope,
   NetworkTestResult,
   NativeAgentType,
+  ProviderPreset,
+  PROVIDER_PRESETS,
 } from '../core/models/agent.models';
 import { IconComponent } from '../shared/icon/icon';
 
@@ -492,11 +493,28 @@ export type SettingsTab = 'diagnostics' | 'cli' | 'accounts' | 'models' | 'mcp' 
                     <label
                       ><span>{{ 'settings.name' | t }}</span
                       ><input [(ngModel)]="modelName"
-                    /></label>
+                    /><small class="model-type-label">{{
+                        modelName && modelProvider && !baseUrl.trim() && (
+                          (modelApiProtocol === 'anthropic' && modelProvider === 'Anthropic') ||
+                          (modelApiProtocol === 'openai' && (modelProvider === 'OpenAI' || modelProvider === 'ChatGPT'))
+                        )
+                          ? ('settings.nativeModel' | t)
+                          : ('settings.thirdPartyModel' | t)
+                      }}</small></label>
+                    <label>
+                      <span>{{ 'settings.apiProtocol' | t }}</span>
+                      <select
+                        [ngModel]="modelApiProtocol"
+                        (ngModelChange)="changeApiProtocol($event)"
+                      >
+                        <option value="anthropic">{{ 'settings.protocolAnthropic' | t }}</option>
+                        <option value="openai">{{ 'settings.protocolOpenAI' | t }}</option>
+                      </select>
+                    </label>
                     <label>
                       <span>{{ 'settings.modelProvider' | t }}</span>
                       <select [ngModel]="modelProvider" (ngModelChange)="selectProvider($event)">
-                        @for (preset of providerPresets; track preset.provider) {
+                        @for (preset of filteredPresets(); track preset.provider) {
                           <option [value]="preset.provider">{{ preset.provider }}</option>
                         }
                         @if (!isPresetProvider(modelProvider)) {
@@ -542,7 +560,11 @@ export type SettingsTab = 'diagnostics' | 'cli' | 'accounts' | 'models' | 'mcp' 
                   }
                   <label class="checkbox-control editor-checkbox">
                     <input type="checkbox" [(ngModel)]="isDefault" />
-                    <span>{{ 'settings.defaultClaudeProfile' | t }}</span>
+                    <span>{{
+                      modelApiProtocol === 'anthropic'
+                        ? ('settings.defaultClaudeProfile' | t)
+                        : ('settings.defaultCodexProfile' | t)
+                    }}</span>
                   </label>
                   @if (hasCredential()) {
                     <label class="checkbox-control editor-checkbox">
@@ -861,13 +883,14 @@ export class AgentSettingsDialogComponent {
   protected readonly accountId = signal('');
   protected readonly accountSystem = signal(false);
   protected readonly hasNetworkCredential = signal(false);
-  protected readonly providerPresets = CLAUDE_PROVIDER_PRESETS;
+  protected readonly allPresets = PROVIDER_PRESETS;
   protected cliAgentType: NativeAgentType = 'claude';
   protected cliTargetVersion = 'latest';
   protected cliConfirmed = false;
   protected modelName = 'Claude Sonnet';
   protected modelProvider = 'Anthropic';
   protected modelNameValue = 'sonnet';
+  protected modelApiProtocol: 'anthropic' | 'openai' = 'anthropic';
   protected baseUrl = '';
   protected apiKey = '';
   protected isDefault = true;
@@ -1008,6 +1031,7 @@ export class AgentSettingsDialogComponent {
     this.modelName = profile.name;
     this.modelProvider = profile.provider;
     this.modelNameValue = profile.model;
+    this.modelApiProtocol = profile.apiProtocol;
     this.baseUrl = profile.baseUrl ?? '';
     this.apiKey = '';
     this.isDefault = profile.isDefault;
@@ -1017,6 +1041,7 @@ export class AgentSettingsDialogComponent {
 
   protected newModel(): void {
     this.modelId.set('');
+    this.modelApiProtocol = 'anthropic';
     this.selectProvider('Anthropic');
     this.apiKey = '';
     this.isDefault = false;
@@ -1038,13 +1063,16 @@ export class AgentSettingsDialogComponent {
       baseUrl: this.baseUrl.trim() || undefined,
       apiKey: this.apiKey || undefined,
       clearCredential: this.clearCredential,
+      apiProtocol: this.modelApiProtocol,
       isDefault: this.isDefault,
     });
   }
 
   protected selectProvider(provider: string): void {
     this.modelProvider = provider;
-    const preset = this.providerPresets.find((item) => item.provider === provider);
+    const preset = this.allPresets.find(
+      (item) => item.provider === provider && item.apiProtocol === this.modelApiProtocol,
+    );
     if (!preset) {
       return;
     }
@@ -1053,8 +1081,29 @@ export class AgentSettingsDialogComponent {
     this.baseUrl = preset.baseUrl;
   }
 
+  protected changeApiProtocol(protocol: 'anthropic' | 'openai'): void {
+    this.modelApiProtocol = protocol;
+    const currentPreset = this.allPresets.find(
+      (item) => item.provider === this.modelProvider && item.apiProtocol === protocol,
+    );
+    if (currentPreset) {
+      this.selectProvider(currentPreset.provider);
+    } else {
+      const firstPreset = this.filteredPresets()[0];
+      if (firstPreset) {
+        this.selectProvider(firstPreset.provider);
+      }
+    }
+  }
+
+  protected filteredPresets(): readonly ProviderPreset[] {
+    return this.allPresets.filter((item) => item.apiProtocol === this.modelApiProtocol);
+  }
+
   protected isPresetProvider(provider: string): boolean {
-    return this.providerPresets.some((item) => item.provider === provider);
+    return this.allPresets.some(
+      (item) => item.provider === provider && item.apiProtocol === this.modelApiProtocol,
+    );
   }
 
   protected modelCredentialMissing(): boolean {

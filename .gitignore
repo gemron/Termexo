@@ -16,6 +16,7 @@ packages/termexo/vendor/
 
 # Editors and operating systems
 .codegraph/
+.playwright-mcp/
 .idea/
 .vscode/
 .DS_Store

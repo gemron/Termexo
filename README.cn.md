@@ -11,7 +11,7 @@
 </p>
 
 <p align="center">
-  <img alt="Version 0.3.10" src="https://img.shields.io/badge/version-0.3.10-58c7a0">
+  <img alt="Version 0.3.11" src="https://img.shields.io/badge/version-0.3.11-58c7a0">
   <img alt="Windows" src="https://img.shields.io/badge/platform-Windows-0078D4?logo=windows">
   <img alt="Tauri 2" src="https://img.shields.io/badge/Tauri-2-24C8DB?logo=tauri&logoColor=white">
   <img alt="Angular 22" src="https://img.shields.io/badge/Angular-22-DD0031?logo=angular">
@@ -33,8 +33,8 @@ Termexo 把 Claude Code、Codex 和围绕它们运行的终端收进一个可恢
 npx termexo@latest
 ```
 
-> 最新正式版本为 **V0.3.10 多语言界面版**。Termexo 默认跟随 Windows 系统语言，也可
-> 随时手动切换；工作空间、终端、会话、通知和设置流程现已支持七种语言。
+> 最新正式版本为 **V0.3.11 会话中心版**。恢复会话时会保留其上次使用的模型配置，第三方
+> 模型不再在重启后退回原生默认模型；会话中心的界面也重新以会话列表为主体。
 
 ![Termexo 多终端网格工作台](website/assets/termexo-workbench.png)
 
@@ -85,6 +85,14 @@ SQLite，密钥保存在 Windows Credential Manager，Claude/Codex 历史会话�
 
 界面支持简体中文、英语、西班牙语、法语、德语、日语和韩语。默认自动跟随 Windows
 系统语言，也可通过主工具栏手动切换并跨重启保留选择。
+
+## V0.3.11 更新
+
+- 恢复会话时保留该会话上次使用的模型配置，第三方模型不再在重启后退回原生默认模型；在恢复配置中
+  手动选择的模型仍然优先。
+- 重构会话中心的信息层级，让会话列表成为主体：Agent 健康状态收敛为一行状态栏，搜索与筛选合并到
+  同一行工具栏，恢复配置折叠为可展开面板并在折叠时显示当前生效的模型。
+- 修复 Codex 恢复配置的栅格错位问题（"Codex 模型"字段此前会单独换行且与其他字段不对齐）。
 
 ## V0.3.10 更新
 

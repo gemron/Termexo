@@ -5,6 +5,7 @@ import {
   requestPermission,
   sendNotification,
 } from '@tauri-apps/plugin-notification';
+import { message } from '@tauri-apps/plugin-dialog';
 
 import { createDesktopNotification, GlobalTerminalNotice } from '../models/terminal-notifications';
 import { I18nService } from '../i18n/i18n.service';
@@ -50,13 +51,25 @@ export class DesktopNotificationService {
     void appWindow.requestUserAttention(attentionType).catch(() => undefined);
 
     if (!(await this.ensurePermission())) {
+      // 无通知权限时降级为系统对话框
+      void this.showDialogFallback(notification.title, notification.body);
       return;
     }
 
     try {
       sendNotification({ title: notification.title, body: notification.body });
     } catch {
-      // Native notifications are best-effort; the in-app notice remains available.
+      // Toast 通知失败（常见于未安装→无 AUMID），降级为系统对话框
+      void this.showDialogFallback(notification.title, notification.body);
+    }
+  }
+
+  /** 使用系统对话框作为 Toast 通知的降级方案 */
+  private async showDialogFallback(title: string, body: string): Promise<void> {
+    try {
+      await message(`${title}\n\n${body}`, { title: 'Termexo', kind: 'info' });
+    } catch {
+      // 对话框也失败时静默忽略——in-app 通知仍然可用
     }
   }
 

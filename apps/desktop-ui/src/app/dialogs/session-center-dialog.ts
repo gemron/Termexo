@@ -6,6 +6,8 @@ import {
   type AccountProfile,
   type AgentInstallation,
   type AgentSession,
+  CODEX_MODEL_SUGGESTIONS,
+  isNativeModel,
   type McpProfile,
   type ModelProfile,
   type NativeAgentType,
@@ -22,7 +24,20 @@ export interface ResumeSessionValue {
   model?: string;
 }
 
+/** Profiles a previous run of a session used, or null when it never ran here. */
+export type SessionLaunchProfiles = {
+  profileId?: string;
+  mcpProfileId?: string;
+  accountProfileId?: string;
+} | null;
+
 type SessionAgentFilter = 'all' | NativeAgentType;
+
+/** Health strip entries, in the order the agents are presented throughout the app. */
+const AGENT_HEALTH_ENTRIES: readonly { agentType: NativeAgentType; name: string }[] = [
+  { agentType: 'claude', name: 'Claude Code' },
+  { agentType: 'codex', name: 'Codex CLI' },
+];
 
 const AGENT_FILTERS: readonly {
   value: SessionAgentFilter;
@@ -71,30 +86,21 @@ const AGENT_FILTERS: readonly {
         </header>
 
         <div class="agent-health-strip" [attr.aria-label]="'session.connectionStatus' | t">
-          <article
-            class="agent-health card"
-            data-agent="claude"
-            [class.unavailable]="!installation()?.healthy"
-          >
-            <span class="agent-health-icon"><app-icon name="bot" [size]="14" /></span>
-            <div>
-              <strong>Claude Code</strong>
-              <small>{{ installation()?.diagnostic ?? ('session.detectingLocal' | t) }}</small>
-            </div>
-            <code>{{ installation()?.version ?? ('common.notConnected' | t) }}</code>
-          </article>
-          <article
-            class="agent-health card"
-            data-agent="codex"
-            [class.unavailable]="!codexInstallation()?.healthy"
-          >
-            <span class="agent-health-icon"><app-icon name="bot" [size]="14" /></span>
-            <div>
-              <strong>Codex CLI</strong>
-              <small>{{ codexInstallation()?.diagnostic ?? ('session.detectingLocal' | t) }}</small>
-            </div>
-            <code>{{ codexInstallation()?.version ?? ('common.notConnected' | t) }}</code>
-          </article>
+          @for (health of agentHealth(); track health.agentType) {
+            <article
+              class="agent-health"
+              [attr.data-agent]="health.agentType"
+              [class.unavailable]="!health.installation?.healthy"
+            >
+              <span class="agent-health-icon">
+                <app-icon [name]="health.agentType === 'codex' ? 'terminal' : 'bot'" [size]="13" />
+              </span>
+              <strong>{{ health.name }}</strong>
+              <code [title]="health.installation?.diagnostic ?? ''">
+                {{ health.installation?.version ?? ('common.notConnected' | t) }}
+              </code>
+            </article>
+          }
         </div>
 
         <div class="session-toolbar">
@@ -119,30 +125,8 @@ const AGENT_FILTERS: readonly {
               </button>
             }
           </label>
-          <label class="scope-control">
-            <input
-              type="checkbox"
-              [ngModel]="onlyWorkspace()"
-              (ngModelChange)="onlyWorkspace.set($event); refresh()"
-            />
-            <span>{{ 'session.onlyWorkspace' | t }}</span>
-          </label>
-          <button
-            type="button"
-            class="icon-action btn btn-square btn-ghost btn-sm"
-            [class.spinning]="busy()"
-            [title]="'session.rescan' | t"
-            [attr.aria-label]="'session.rescan' | t"
-            [disabled]="busy()"
-            (click)="refresh()"
-          >
-            <app-icon name="refresh" [size]="14" />
-          </button>
-        </div>
-
-        <div class="session-filter-bar">
           <nav
-            class="session-agent-filter tabs tabs-box"
+            class="session-agent-filter"
             role="tablist"
             [attr.aria-label]="'session.filterAria' | t"
           >
@@ -160,12 +144,25 @@ const AGENT_FILTERS: readonly {
               </button>
             }
           </nav>
-          <span class="session-result-count">
-            {{
-              'session.resultCount'
-                | t: { visible: filteredSessions().length, total: sessions().length }
-            }}
-          </span>
+          <label class="scope-control">
+            <input
+              type="checkbox"
+              [ngModel]="onlyWorkspace()"
+              (ngModelChange)="onlyWorkspace.set($event); refresh()"
+            />
+            <span>{{ 'session.onlyWorkspace' | t }}</span>
+          </label>
+          <button
+            type="button"
+            class="icon-action"
+            [class.spinning]="busy()"
+            [title]="'session.rescan' | t"
+            [attr.aria-label]="'session.rescan' | t"
+            [disabled]="busy()"
+            (click)="refresh()"
+          >
+            <app-icon name="refresh" [size]="14" />
+          </button>
         </div>
 
         @if (error()) {
@@ -178,100 +175,121 @@ const AGENT_FILTERS: readonly {
           </div>
         }
 
-        @if (showsClaudeOptions()) {
-          <div class="resume-options">
-            <div class="resume-options-copy">
-              <span class="session-agent" data-agent="claude">
-                <app-icon name="bot" [size]="14" />
-              </span>
-              <div>
-                <strong>{{ 'session.claudeResumeConfig' | t }}</strong>
-                <small>{{ 'session.claudeResumeHelp' | t }}</small>
-              </div>
-            </div>
-            <label>
-              <span>{{ 'launch.modelProfile' | t }}</span>
-              <select [ngModel]="resolvedProfileId()" (ngModelChange)="profileId.set($event)">
-                @for (profile of profiles(); track profile.id) {
-                  <option [value]="profile.id">{{ profile.name }}</option>
-                }
-              </select>
-            </label>
-            <label>
-              <span>{{ 'launch.mcpProfile' | t }}</span>
-              <select [ngModel]="mcpProfileId()" (ngModelChange)="mcpProfileId.set($event)">
-                <option value="">{{ 'session.claudeDefault' | t }}</option>
-                @for (profile of mcpProfiles(); track profile.id) {
-                  <option [value]="profile.id">{{ profile.name }}</option>
-                }
-              </select>
-            </label>
-            <label>
-              <span>Claude {{ 'launch.loginAccount' | t }}</span>
-              <select
-                [ngModel]="resolvedClaudeAccountProfileId()"
-                (ngModelChange)="claudeAccountProfileId.set($event)"
-              >
-                @for (profile of claudeAccounts(); track profile.id) {
-                  <option [value]="profile.id">
-                    {{ profile.name }} ·
-                    {{
-                      profile.authenticated
-                        ? ('common.authenticated' | t)
-                        : ('common.unauthenticated' | t)
-                    }}
-                  </option>
-                }
-              </select>
-            </label>
-          </div>
-        }
+        @if (showsClaudeOptions() || showsCodexOptions()) {
+          <div class="resume-config" [class.expanded]="optionsExpanded()">
+            <button
+              type="button"
+              class="resume-config-toggle"
+              [attr.aria-expanded]="optionsExpanded()"
+              aria-controls="resume-config-panel"
+              (click)="optionsExpanded.set(!optionsExpanded())"
+            >
+              <app-icon name="settings" [size]="13" />
+              <strong>{{ 'session.resumeConfig' | t }}</strong>
+              <small>{{ configSummary() }}</small>
+              <app-icon class="resume-config-chevron" name="chevron-down" [size]="13" />
+            </button>
 
-        @if (showsCodexOptions()) {
-          <div class="resume-options codex-resume-options">
-            <div class="resume-options-copy">
-              <span class="session-agent" data-agent="codex">
-                <app-icon name="terminal" [size]="14" />
-              </span>
-              <div>
-                <strong>{{ 'session.codexResumeConfig' | t }}</strong>
-                <small>{{ 'session.codexResumeHelp' | t }}</small>
-              </div>
-            </div>
-            <label>
-              <span>{{ 'launch.chatgptAccount' | t }}</span>
-              <select
-                [ngModel]="resolvedCodexAccountProfileId()"
-                (ngModelChange)="codexAccountProfileId.set($event)"
-              >
-                @for (profile of codexAccounts(); track profile.id) {
-                  <option [value]="profile.id">
-                    {{ profile.name }} ·
-                    {{
-                      profile.authenticated
-                        ? ('common.authenticated' | t)
-                        : ('common.unauthenticated' | t)
-                    }}
-                  </option>
+            @if (optionsExpanded()) {
+              <div id="resume-config-panel" class="resume-config-panel">
+                @if (showsClaudeOptions()) {
+                  <section class="resume-options">
+                    <h3>
+                      <span class="session-agent" data-agent="claude">
+                        <app-icon name="bot" [size]="13" />
+                      </span>
+                      <span>
+                        <strong>{{ 'session.claudeResumeConfig' | t }}</strong>
+                        <small>{{ 'session.claudeResumeHelp' | t }}</small>
+                      </span>
+                    </h3>
+                    <label>
+                      <span>{{ 'launch.modelProfile' | t }}</span>
+                      <select
+                        [ngModel]="resolvedProfileId()"
+                        (ngModelChange)="profileId.set($event)"
+                      >
+                        @for (profile of anthropicProfiles(); track profile.id) {
+                          <option [value]="profile.id">{{ profileLabel(profile) }}</option>
+                        }
+                      </select>
+                    </label>
+                    <label>
+                      <span>{{ 'launch.mcpProfile' | t }}</span>
+                      <select [ngModel]="mcpProfileId()" (ngModelChange)="mcpProfileId.set($event)">
+                        <option value="">{{ 'session.claudeDefault' | t }}</option>
+                        @for (profile of mcpProfiles(); track profile.id) {
+                          <option [value]="profile.id">{{ profile.name }}</option>
+                        }
+                      </select>
+                    </label>
+                    <label>
+                      <span>Claude {{ 'launch.loginAccount' | t }}</span>
+                      <select
+                        [ngModel]="resolvedClaudeAccountProfileId()"
+                        (ngModelChange)="claudeAccountProfileId.set($event)"
+                      >
+                        @for (profile of claudeAccounts(); track profile.id) {
+                          <option [value]="profile.id">{{ accountLabel(profile) }}</option>
+                        }
+                      </select>
+                    </label>
+                  </section>
                 }
-              </select>
-            </label>
-            <label>
-              <span>{{ 'launch.codexModel' | t }}</span>
-              <input
-                type="text"
-                list="resume-codex-model-suggestions"
-                [placeholder]="'session.codexModelPlaceholder' | t"
-                [attr.aria-label]="'session.codexModelAria' | t"
-                [ngModel]="codexModel()"
-                (ngModelChange)="codexModel.set($event)"
-              />
-              <datalist id="resume-codex-model-suggestions">
-                <option value="gpt-5.6-sol"></option>
-                <option value="gpt-5.6-terra"></option>
-                <option value="gpt-5.6-luna"></option>
-              </datalist>
-            </label>
+
+                @if (showsCodexOptions()) {
+                  <section class="resume-options">
+                    <h3>
+                      <span class="session-agent" data-agent="codex">
+                        <app-icon name="terminal" [size]="13" />
+                      </span>
+                      <span>
+                        <strong>{{ 'session.codexResumeConfig' | t }}</strong>
+                        <small>{{ 'session.codexResumeHelp' | t }}</small>
+                      </span>
+                    </h3>
+                    <label>
+                      <span>{{ 'launch.modelProfile' | t }}</span>
+                      <select
+                        [ngModel]="resolvedCodexProfileId()"
+                        (ngModelChange)="codexProfileId.set($event)"
+                      >
+                        @for (profile of openaiProfiles(); track profile.id) {
+                          <option [value]="profile.id">{{ profileLabel(profile) }}</option>
+                        }
+                      </select>
+                    </label>
+                    <label>
+                      <span>{{ 'launch.chatgptAccount' | t }}</span>
+                      <select
+                        [ngModel]="resolvedCodexAccountProfileId()"
+                        (ngModelChange)="codexAccountProfileId.set($event)"
+                      >
+                        @for (profile of codexAccounts(); track profile.id) {
+                          <option [value]="profile.id">{{ accountLabel(profile) }}</option>
+                        }
+                      </select>
+                    </label>
+                    <label>
+                      <span>{{ 'launch.codexModel' | t }}</span>
+                      <input
+                        type="text"
+                        list="resume-codex-model-suggestions"
+                        [placeholder]="'session.codexModelPlaceholder' | t"
+                        [attr.aria-label]="'session.codexModelAria' | t"
+                        [ngModel]="codexModel()"
+                        (ngModelChange)="codexModel.set($event)"
+                      />
+                      <datalist id="resume-codex-model-suggestions">
+                        @for (suggestion of codexModelSuggestions; track suggestion) {
+                          <option [value]="suggestion"></option>
+                        }
+                      </datalist>
+                    </label>
+                  </section>
+                }
+              </div>
+            }
           </div>
         }
 
@@ -284,7 +302,7 @@ const AGENT_FILTERS: readonly {
             </div>
           } @else {
             @for (session of filteredSessions(); track session.id) {
-              <article class="session-row card" [attr.data-agent]="session.agentType">
+              <article class="session-row" [attr.data-agent]="session.agentType">
                 <span class="session-agent" [attr.data-agent]="session.agentType">
                   <app-icon name="bot" [size]="15" />
                 </span>
@@ -297,7 +315,9 @@ const AGENT_FILTERS: readonly {
                     <span class="agent-tag" [attr.data-agent]="session.agentType">
                       {{ agentLabel(session) }}
                     </span>
-                    <span>{{ session.branch ?? ('common.noBranch' | t) }}</span>
+                    <span class="session-branch">{{
+                      session.branch ?? ('common.noBranch' | t)
+                    }}</span>
                     <span>{{ session.modelName ?? ('common.defaultModel' | t) }}</span>
                     <span>{{ 'common.messages' | t: { count: session.messageCount } }}</span>
                     <span class="session-id" [title]="session.nativeSessionId">
@@ -313,7 +333,7 @@ const AGENT_FILTERS: readonly {
                 </time>
                 <button
                   type="button"
-                  class="resume-button btn btn-primary btn-sm"
+                  class="resume-button"
                   [disabled]="busy() || !installationFor(session)?.healthy"
                   [title]="
                     installationFor(session)?.healthy
@@ -346,8 +366,14 @@ const AGENT_FILTERS: readonly {
         </div>
 
         <footer class="session-footer">
-          <span>{{ 'session.readOnly' | t }}</span>
-          <button type="button" class="secondary btn btn-ghost btn-sm" (click)="cancelled.emit()">
+          <span class="session-result-count">
+            {{
+              'session.resultCount'
+                | t: { visible: filteredSessions().length, total: sessions().length }
+            }}
+          </span>
+          <span class="session-read-only">{{ 'session.readOnly' | t }}</span>
+          <button type="button" class="secondary" (click)="cancelled.emit()">
             {{ 'common.close' | t }}
           </button>
         </footer>
@@ -367,6 +393,10 @@ export class SessionCenterDialogComponent {
   readonly projectPath = input('');
   readonly busy = input(false);
   readonly error = input<string | null>(null);
+  /** Resolves the profiles a session last ran with, so resuming keeps them. */
+  readonly sessionLaunchProfiles = input<(nativeSessionId: string) => SessionLaunchProfiles>(
+    () => null,
+  );
   readonly refreshed = output<string | undefined>();
   readonly resumed = output<ResumeSessionValue>();
   readonly cancelled = output<void>();
@@ -374,12 +404,27 @@ export class SessionCenterDialogComponent {
   protected readonly search = signal('');
   protected readonly onlyWorkspace = signal(true);
   protected readonly agentFilter = signal<SessionAgentFilter>('all');
+  protected readonly optionsExpanded = signal(false);
+  protected readonly codexModelSuggestions = CODEX_MODEL_SUGGESTIONS;
   protected readonly profileId = signal('');
   protected readonly mcpProfileId = signal('');
   protected readonly claudeAccountProfileId = signal('');
+  protected readonly anthropicProfiles = computed(() =>
+    this.profiles().filter((profile) => profile.apiProtocol === 'anthropic'),
+  );
+  protected readonly openaiProfiles = computed(() =>
+    this.profiles().filter((profile) => profile.apiProtocol === 'openai'),
+  );
   protected readonly codexAccountProfileId = signal('');
+  protected readonly codexProfileId = signal('');
   protected readonly codexModel = signal('');
   protected readonly agentFilters = AGENT_FILTERS;
+  protected readonly agentHealth = computed(() =>
+    AGENT_HEALTH_ENTRIES.map((entry) => ({
+      ...entry,
+      installation: entry.agentType === 'codex' ? this.codexInstallation() : this.installation(),
+    })),
+  );
   protected readonly sessionCounts = computed(() => {
     const sessions = this.sessions();
     return {
@@ -391,8 +436,8 @@ export class SessionCenterDialogComponent {
   protected readonly resolvedProfileId = computed(
     () =>
       this.profileId() ||
-      this.profiles().find((profile) => profile.isDefault)?.id ||
-      this.profiles()[0]?.id ||
+      this.anthropicProfiles().find((profile) => profile.isDefault)?.id ||
+      this.anthropicProfiles()[0]?.id ||
       '',
   );
   protected readonly claudeAccounts = computed(() =>
@@ -413,6 +458,13 @@ export class SessionCenterDialogComponent {
       this.codexAccountProfileId() ||
       this.codexAccounts().find((profile) => profile.isDefault)?.id ||
       this.codexAccounts()[0]?.id ||
+      '',
+  );
+  protected readonly resolvedCodexProfileId = computed(
+    () =>
+      this.codexProfileId() ||
+      this.openaiProfiles().find((profile) => profile.isDefault)?.id ||
+      this.openaiProfiles()[0]?.id ||
       '',
   );
   protected readonly filteredSessions = computed(() => {
@@ -443,6 +495,21 @@ export class SessionCenterDialogComponent {
   protected readonly showsCodexOptions = computed(
     () => this.agentFilter() !== 'claude' && this.sessionCounts().codex > 0,
   );
+  /** Keeps the active model profiles visible while the configuration panel is collapsed. */
+  protected readonly configSummary = computed(() => {
+    const nameOf = (profiles: ModelProfile[], id: string) =>
+      profiles.find((profile) => profile.id === id)?.name ?? '';
+    const names: string[] = [];
+    if (this.showsClaudeOptions()) {
+      names.push(nameOf(this.anthropicProfiles(), this.resolvedProfileId()));
+    }
+    if (this.showsCodexOptions()) {
+      names.push(
+        this.codexModel().trim() || nameOf(this.openaiProfiles(), this.resolvedCodexProfileId()),
+      );
+    }
+    return names.filter(Boolean).join(' · ');
+  });
   protected readonly emptyTitle = computed(() => {
     if (this.search().trim()) {
       return this.i18n.t('session.noMatch');
@@ -479,15 +546,24 @@ export class SessionCenterDialogComponent {
     this.refreshed.emit(this.onlyWorkspace() ? this.projectPath() : undefined);
   }
 
+  /**
+   * Resumes with the profiles the session last ran with, so a third-party model
+   * survives a restart. An explicit pick in the settings panel overrides them.
+   */
   protected resume(session: AgentSession): void {
     const isClaude = session.agentType === 'claude';
+    const previous = this.sessionLaunchProfiles()(session.nativeSessionId);
+    const picked = isClaude ? this.profileId() : this.codexProfileId();
+    const fallback = isClaude ? this.resolvedProfileId() : this.resolvedCodexProfileId();
     this.resumed.emit({
       session,
-      profileId: isClaude ? this.resolvedProfileId() || undefined : undefined,
-      mcpProfileId: isClaude ? this.mcpProfileId() || undefined : undefined,
-      accountProfileId: isClaude
-        ? session.accountProfileId || this.resolvedClaudeAccountProfileId() || undefined
-        : session.accountProfileId || this.resolvedCodexAccountProfileId() || undefined,
+      profileId: picked || previous?.profileId || fallback || undefined,
+      mcpProfileId: isClaude ? this.mcpProfileId() || previous?.mcpProfileId : undefined,
+      accountProfileId:
+        session.accountProfileId ||
+        previous?.accountProfileId ||
+        (isClaude ? this.resolvedClaudeAccountProfileId() : this.resolvedCodexAccountProfileId()) ||
+        undefined,
       model: isClaude ? undefined : this.codexModel().trim() || session.modelName || undefined,
     });
   }
@@ -497,7 +573,10 @@ export class SessionCenterDialogComponent {
   }
 
   protected agentLabel(session: AgentSession): string {
-    return session.agentType === 'codex' ? 'Codex CLI' : 'Claude Code';
+    return (
+      AGENT_HEALTH_ENTRIES.find((entry) => entry.agentType === session.agentType)?.name ??
+      session.agentType
+    );
   }
 
   protected shortSessionId(session: AgentSession): string {
@@ -506,5 +585,17 @@ export class SessionCenterDialogComponent {
 
   protected sessionDateTime(session: AgentSession): string {
     return new Date(session.lastUsedAt).toISOString();
+  }
+
+  /** Model profiles read as "name · model", with native profiles called out. */
+  protected profileLabel(profile: ModelProfile): string {
+    const base =
+      profile.name === profile.model ? profile.name : `${profile.name} · ${profile.model}`;
+    return isNativeModel(profile) ? `${base} (${this.i18n.t('settings.nativeModel')})` : base;
+  }
+
+  protected accountLabel(profile: AccountProfile): string {
+    const state = profile.authenticated ? 'common.authenticated' : 'common.unauthenticated';
+    return `${profile.name} · ${this.i18n.t(state)}`;
   }
 }

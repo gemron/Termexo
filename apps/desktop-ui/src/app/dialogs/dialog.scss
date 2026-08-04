@@ -123,6 +123,45 @@
   margin-top: 14px;
 }
 
+.session-agent-filter {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  margin-top: 14px;
+
+  button {
+    display: flex;
+    height: 27px;
+    align-items: center;
+    gap: 6px;
+    padding: 0 9px;
+    border: 1px solid transparent;
+    color: var(--text-secondary);
+    background: transparent;
+
+    span {
+      min-width: 17px;
+      padding: 2px 4px;
+      border-radius: 8px;
+      color: var(--text-muted);
+      font: 9px/1 var(--mono);
+      text-align: center;
+      background: var(--surface-2);
+    }
+
+    &.active {
+      border-color: color-mix(in oklab, var(--color-primary) 52%, var(--border));
+      color: var(--color-primary);
+      background: var(--primary-soft);
+
+      span {
+        color: var(--color-primary);
+        background: color-mix(in oklab, var(--color-primary) 20%, var(--surface-2));
+      }
+    }
+  }
+}
+
 .profile-option {
   display: grid;
   min-width: 0;

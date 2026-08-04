@@ -378,6 +378,7 @@ export class AgentService {
           name: 'Claude Sonnet',
           provider: 'Anthropic',
           model: 'sonnet',
+          apiProtocol: 'anthropic',
           isDefault: true,
           hasCredential: false,
         },

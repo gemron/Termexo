@@ -60,7 +60,7 @@ import {
   WorkspaceAppearanceValue,
 } from './dialogs/edit-workspace-dialog';
 import { MergeWorkspaceDialogComponent } from './dialogs/merge-workspace-dialog';
-import { ModelSwitchDialogComponent } from './dialogs/model-switch-dialog';
+import { ModelSwitchDialogComponent, ModelSwitchValue } from './dialogs/model-switch-dialog';
 import { ResumeSessionValue, SessionCenterDialogComponent } from './dialogs/session-center-dialog';
 import { InspectorPanelComponent } from './inspector/inspector-panel';
 import { IconComponent } from './shared/icon/icon';
@@ -200,6 +200,9 @@ export class App {
   protected readonly layoutRevision = signal(0);
   protected readonly launchingClaude = signal(false);
   protected readonly launchingCodex = signal(false);
+  /** Stable reference so the session center input does not change every check. */
+  protected readonly sessionLaunchProfiles = (nativeSessionId: string) =>
+    this.state.findSessionLaunchProfiles(nativeSessionId);
   protected readonly selectedTerminalDirectory = signal<string | null>(null);
   protected readonly toastMessage = signal<string | null>(null);
   protected readonly toastTone = signal<'success' | 'attention'>('success');
@@ -393,10 +396,14 @@ export class App {
     const terminalId = crypto.randomUUID();
     this.launchingCodex.set(true);
     try {
+      const profile = value.profileId
+        ? this.agents.modelProfiles().find((item) => item.id === value.profileId)
+        : undefined;
       const launch = await this.agents.prepareCodexLaunch({
         terminalId,
         workspaceId: workspace.id,
         model: value.model,
+        profileId: value.profileId,
         accountProfileId: value.accountProfileId,
       });
       const terminal = this.state.createTerminal({
@@ -404,8 +411,9 @@ export class App {
         agentType: 'codex',
         name: value.name || undefined,
         command: launch.command,
-        model: value.model ?? this.i18n.t('terminal.defaultCodexModel'),
+        model: profile?.name ?? value.model ?? this.i18n.t('terminal.defaultCodexModel'),
         workingDirectory,
+        profileId: value.profileId,
         accountProfileId: value.accountProfileId,
       });
       this.codexLaunchOpen.set(false);
@@ -493,9 +501,7 @@ export class App {
       return;
     }
 
-    const profile = isCodex
-      ? undefined
-      : this.agents.modelProfiles().find((item) => item.id === value.profileId);
+    const profile = this.agents.modelProfiles().find((item) => item.id === value.profileId);
     if (profile?.baseUrl && !profile.hasCredential) {
       this.openModelCredentialSettings(profile.id, profile.name);
       return;
@@ -510,6 +516,7 @@ export class App {
             workspaceId: workspace.id,
             sessionId: value.session.nativeSessionId,
             model: value.model,
+            profileId: value.profileId,
             accountProfileId: value.accountProfileId,
           })
         : await this.agents.prepareLaunch({
@@ -532,8 +539,8 @@ export class App {
           (isCodex ? this.i18n.t('terminal.defaultCodexModel') : 'Claude Sonnet'),
         nativeSessionId: value.session.nativeSessionId,
         workingDirectory: value.session.projectPath ?? workspace.projectPath,
-        profileId: isCodex ? undefined : value.profileId,
-        mcpProfileId: isCodex ? undefined : value.mcpProfileId,
+        profileId: value.profileId,
+        mcpProfileId: !isCodex ? value.mcpProfileId : undefined,
         accountProfileId: value.accountProfileId,
       });
       this.sessionCenterOpen.set(false);
@@ -944,18 +951,28 @@ export class App {
     }
   }
 
-  protected async switchModels(profileId: string): Promise<void> {
-    if (this.launchingClaude()) {
+  protected async switchModels(value: ModelSwitchValue): Promise<void> {
+    const isClaude = value.apiProtocol === 'anthropic';
+    if (isClaude ? this.launchingClaude() : this.launchingCodex()) {
       return;
     }
 
     const workspace = this.state.activeWorkspace();
-    const profile = this.agents.modelProfiles().find((item) => item.id === profileId);
+    const profile = this.agents.modelProfiles().find((item) => item.id === value.profileId);
+    const agentType = isClaude ? 'claude' : 'codex';
     const terminals =
-      workspace?.terminals.filter((terminal) => terminal.agentType === 'claude') ?? [];
+      workspace?.terminals.filter((terminal) => terminal.agentType === agentType) ?? [];
     if (!profile || terminals.length === 0) {
       this.modelSwitchOpen.set(false);
-      this.showToast(this.i18n.t(profile ? 'profile.noClaudeTerminals' : 'profile.notFound'));
+      this.showToast(
+        this.i18n.t(
+          profile
+            ? isClaude
+              ? 'profile.noClaudeTerminals'
+              : 'profile.noCodexTerminals'
+            : 'profile.notFound',
+        ),
+      );
       return;
     }
     if (profile.baseUrl && !profile.hasCredential) {
@@ -963,29 +980,39 @@ export class App {
       return;
     }
 
-    this.launchingClaude.set(true);
+    (isClaude ? this.launchingClaude : this.launchingCodex).set(true);
     try {
       const results = await Promise.allSettled(
         terminals.map(async (terminal) => {
-          const launch = await this.agents.prepareLaunch({
-            terminalId: terminal.id,
-            workspaceId: workspace?.id,
-            profileId,
-            mcpProfileId: terminal.mcpProfileId,
-            accountProfileId: terminal.accountProfileId,
-          });
+          const launch = isClaude
+            ? await this.agents.prepareLaunch({
+                terminalId: terminal.id,
+                workspaceId: workspace?.id,
+                profileId: value.profileId,
+                mcpProfileId: terminal.mcpProfileId,
+                accountProfileId: terminal.accountProfileId,
+              })
+            : await this.agents.prepareCodexLaunch({
+                terminalId: terminal.id,
+                workspaceId: workspace?.id,
+                profileId: value.profileId,
+                accountProfileId: terminal.accountProfileId,
+              });
           await this.terminalGateway.close(terminal.id).catch(() => undefined);
           if (
             !this.state.restartTerminalWithProfile(
               terminal.id,
               launch.command,
               profile.name,
-              profileId,
-              terminal.mcpProfileId,
+              value.profileId,
+              isClaude ? terminal.mcpProfileId : undefined,
             )
           ) {
             throw new Error(
-              this.i18n.t('restore.terminalMissing', { agent: 'Claude', name: terminal.name }),
+              this.i18n.t('restore.terminalMissing', {
+                agent: isClaude ? 'Claude' : 'Codex',
+                name: terminal.name,
+              }),
             );
           }
         }),
@@ -1002,10 +1029,13 @@ export class App {
               failed: failures.length,
               error: this.errorMessage(failures[0].reason),
             })
-          : this.i18n.t('profile.switched', { count: switched, name: profile.name }),
+          : this.i18n.t(isClaude ? 'profile.switched' : 'profile.switchedCodex', {
+              count: switched,
+              name: profile.name,
+            }),
       );
     } finally {
-      this.launchingClaude.set(false);
+      (isClaude ? this.launchingClaude : this.launchingCodex).set(false);
     }
   }
 
@@ -1299,21 +1329,32 @@ export class App {
       return;
     }
 
+    const profiles = this.agents.modelProfiles();
     const results = await Promise.allSettled(
       restoredCodexTerminals.map(async ({ workspaceId, terminal }) => {
+        const profile = terminal.profileId
+          ? profiles.find((candidate) => candidate.id === terminal.profileId)
+          : undefined;
         const launch = await this.agents.prepareCodexLaunch({
           terminalId: terminal.id,
           workspaceId,
           sessionId: terminal.nativeSessionId,
+          profileId: profile?.id,
           model:
             terminal.model &&
             !terminal.model.includes('默认模型') &&
-            !terminal.model.toLowerCase().includes('default model')
+            !terminal.model.toLowerCase().includes('default model') &&
+            !profile
               ? terminal.model
               : undefined,
           accountProfileId: terminal.accountProfileId,
         });
-        if (!this.state.updateRestoredTerminalLaunch(terminal.id, launch.command)) {
+        if (
+          !this.state.updateRestoredTerminalLaunch(terminal.id, launch.command, {
+            profileId: profile?.id,
+            model: profile?.name ?? terminal.model,
+          })
+        ) {
           throw new Error(
             this.i18n.t('restore.terminalMissing', { agent: 'Codex', name: terminal.name }),
           );

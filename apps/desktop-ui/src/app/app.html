@@ -585,6 +585,7 @@
 @if (codexLaunchOpen()) {
   <app-codex-launch-dialog
     [installation]="agents.codexInstallation()"
+    [profiles]="agents.modelProfiles()"
     [accountProfiles]="agents.accountProfiles()"
     [workingDirectory]="selectedTerminalDirectory() ?? ''"
     (launched)="launchCodex($event)"
@@ -603,6 +604,7 @@
     [projectPath]="state.activeWorkspace()?.projectPath ?? ''"
     [busy]="agents.busy() || launchingClaude() || launchingCodex()"
     [error]="agents.error()"
+    [sessionLaunchProfiles]="sessionLaunchProfiles"
     (refreshed)="refreshSessions($event)"
     (resumed)="resumeAgent($event)"
     (cancelled)="sessionCenterOpen.set(false)"
@@ -650,9 +652,11 @@
 
 @if (modelSwitchOpen()) {
   <app-model-switch-dialog
-    [agentCount]="state.claudeTerminalCount()"
+    [agentCount]="state.agentCountFor('claude')"
+    [claudeCount]="state.claudeTerminalCount()"
+    [codexCount]="state.codexTerminalCount()"
     [profiles]="agents.modelProfiles()"
-    [busy]="launchingClaude()"
+    [busy]="launchingClaude() || launchingCodex()"
     (confirmed)="switchModels($event)"
     (cancelled)="modelSwitchOpen.set(false)"
   />

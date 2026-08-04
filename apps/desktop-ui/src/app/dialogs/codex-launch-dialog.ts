@@ -2,16 +2,21 @@ import { Component, computed, input, output, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 
 import { TranslatePipe } from '../core/i18n/translate.pipe';
-import { AccountProfile, AgentInstallation } from '../core/models/agent.models';
+import {
+  AccountProfile,
+  AgentInstallation,
+  CODEX_MODEL_SUGGESTIONS,
+  isNativeModel,
+  ModelProfile,
+} from '../core/models/agent.models';
 import { IconComponent } from '../shared/icon/icon';
 
 export interface CodexLaunchDialogValue {
   name: string;
   model?: string;
+  profileId?: string;
   accountProfileId?: string;
 }
-
-const CODEX_MODEL_SUGGESTIONS = ['gpt-5.6-sol', 'gpt-5.6-terra', 'gpt-5.6-luna'] as const;
 
 @Component({
   selector: 'app-codex-launch-dialog',
@@ -62,6 +67,23 @@ const CODEX_MODEL_SUGGESTIONS = ['gpt-5.6-sol', 'gpt-5.6-terra', 'gpt-5.6-luna']
               autofocus
             />
           </label>
+          <label>
+            <span>{{ 'launch.modelProfile' | t }}</span>
+            <select
+              class="select select-bordered select-sm"
+              [ngModel]="resolvedProfileId()"
+              (ngModelChange)="onProfileChange($event)"
+            >
+              @for (profile of codexProfiles(); track profile.id) {
+                <option [value]="profile.id">
+                  {{ profile.name }} · {{ profile.model }}
+                  @if (isNativeModel(profile)) {
+                    ({{ 'settings.nativeModel' | t }})
+                  }
+                </option>
+              }
+            </select>
+          </label>
           <label class="wide">
             <span>{{ 'launch.chatgptAccount' | t }}</span>
             <select
@@ -80,6 +102,9 @@ const CODEX_MODEL_SUGGESTIONS = ['gpt-5.6-sol', 'gpt-5.6-terra', 'gpt-5.6-luna']
                 </option>
               }
             </select>
+            @if (selectedAccount() && !selectedAccount()?.authenticated) {
+              <small class="account-warning">{{ 'launch.accountNotAuthenticated' | t }}</small>
+            }
           </label>
           <label class="wide">
             <span>{{ 'launch.codexModel' | t }}</span>
@@ -121,6 +146,7 @@ const CODEX_MODEL_SUGGESTIONS = ['gpt-5.6-sol', 'gpt-5.6-terra', 'gpt-5.6-luna']
 })
 export class CodexLaunchDialogComponent {
   readonly installation = input<AgentInstallation | null>(null);
+  readonly profiles = input<ModelProfile[]>([]);
   readonly accountProfiles = input<AccountProfile[]>([]);
   readonly workingDirectory = input('');
   readonly launched = output<CodexLaunchDialogValue>();
@@ -128,10 +154,17 @@ export class CodexLaunchDialogComponent {
 
   protected readonly name = signal('');
   protected readonly model = signal('');
+  protected readonly profileId = signal('');
   protected readonly accountProfileId = signal('');
   protected readonly modelSuggestions = CODEX_MODEL_SUGGESTIONS;
   protected readonly codexAccounts = computed(() =>
     this.accountProfiles().filter((profile) => profile.agentType === 'codex'),
+  );
+  protected readonly selectedAccount = computed(() =>
+    this.codexAccounts().find((profile) => profile.id === this.resolvedAccountProfileId()),
+  );
+  protected readonly codexProfiles = computed(() =>
+    this.profiles().filter((profile) => profile.apiProtocol === 'openai'),
   );
   protected readonly resolvedAccountProfileId = computed(
     () =>
@@ -140,9 +173,28 @@ export class CodexLaunchDialogComponent {
       this.codexAccounts()[0]?.id ||
       '',
   );
+  protected readonly resolvedProfileId = computed(
+    () =>
+      this.profileId() ||
+      this.codexProfiles().find((profile) => profile.isDefault)?.id ||
+      this.codexProfiles()[0]?.id ||
+      '',
+  );
   protected readonly canLaunch = computed(
     () => Boolean(this.installation()?.healthy) && Boolean(this.resolvedAccountProfileId()),
   );
+
+  protected isNativeModel(profile: ModelProfile): boolean {
+    return isNativeModel(profile);
+  }
+
+  protected onProfileChange(profileId: string): void {
+    this.profileId.set(profileId);
+    const profile = this.codexProfiles().find((p) => p.id === profileId);
+    if (profile && !this.model().trim()) {
+      this.model.set(profile.model);
+    }
+  }
 
   protected submit(): void {
     if (!this.canLaunch()) {
@@ -151,6 +203,7 @@ export class CodexLaunchDialogComponent {
     this.launched.emit({
       name: this.name().trim(),
       model: this.model().trim() || undefined,
+      profileId: this.resolvedProfileId() || undefined,
       accountProfileId: this.resolvedAccountProfileId() || undefined,
     });
   }

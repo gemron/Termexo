@@ -61,8 +61,20 @@ const DEFAULT_PROFILE: ModelProfile = {
   name: 'Claude Sonnet',
   provider: 'Anthropic',
   model: 'sonnet',
+  apiProtocol: 'anthropic',
   isDefault: true,
   hasCredential: false,
+};
+
+const THIRD_PARTY_PROFILE: ModelProfile = {
+  id: 'glm-4-6',
+  name: 'GLM 5.2',
+  provider: 'GLM',
+  model: 'glm-5.2[1m]',
+  baseUrl: 'https://open.bigmodel.cn/api/anthropic',
+  apiProtocol: 'anthropic',
+  isDefault: false,
+  hasCredential: true,
 };
 
 describe('SessionCenterDialogComponent', () => {
@@ -140,6 +152,44 @@ describe('SessionCenterDialogComponent', () => {
       accountProfileId: undefined,
       model: 'gpt-5.6-codex',
     });
+  });
+
+  it('resumes with the profile the session last ran with, not the default', () => {
+    fixture.componentRef.setInput('profiles', [DEFAULT_PROFILE, THIRD_PARTY_PROFILE]);
+    fixture.componentRef.setInput('sessionLaunchProfiles', (nativeSessionId: string) =>
+      nativeSessionId === 'claude-native-session' ? { profileId: 'glm-4-6' } : null,
+    );
+    fixture.detectChanges();
+
+    const resumed: ResumeSessionValue[] = [];
+    component.resumed.subscribe((value) => resumed.push(value));
+
+    clickResumeFor('完善会话中心');
+
+    expect(resumed[0].profileId).toBe('glm-4-6');
+  });
+
+  it('lets an explicit profile pick override the previously used one', async () => {
+    fixture.componentRef.setInput('profiles', [DEFAULT_PROFILE, THIRD_PARTY_PROFILE]);
+    fixture.componentRef.setInput('sessionLaunchProfiles', () => ({ profileId: 'glm-4-6' }));
+    fixture.detectChanges();
+
+    root.querySelector<HTMLButtonElement>('.resume-config-toggle')!.click();
+    fixture.detectChanges();
+    await fixture.whenStable();
+
+    const select = root.querySelector<HTMLSelectElement>('.resume-options select');
+    select!.value = 'claude-default';
+    select!.dispatchEvent(new Event('change'));
+    fixture.detectChanges();
+    await fixture.whenStable();
+
+    const resumed: ResumeSessionValue[] = [];
+    component.resumed.subscribe((value) => resumed.push(value));
+
+    clickResumeFor('完善会话中心');
+
+    expect(resumed[0].profileId).toBe('claude-default');
   });
 
   function clickButton(label: string): void {

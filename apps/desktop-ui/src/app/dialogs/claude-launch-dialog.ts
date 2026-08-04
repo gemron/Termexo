@@ -5,6 +5,7 @@ import { TranslatePipe } from '../core/i18n/translate.pipe';
 import {
   AccountProfile,
   AgentInstallation,
+  isNativeModel,
   McpProfile,
   ModelProfile,
 } from '../core/models/agent.models';
@@ -73,8 +74,8 @@ export interface ClaudeLaunchDialogValue {
               [ngModel]="resolvedProfileId()"
               (ngModelChange)="profileId.set($event)"
             >
-              @for (profile of profiles(); track profile.id) {
-                <option [value]="profile.id">{{ profile.name }} · {{ profile.model }}</option>
+              @for (profile of claudeProfiles(); track profile.id) {
+                <option [value]="profile.id">{{ profile.name }} · {{ profile.model }}@if (isNativeModel(profile)) { ({{ 'settings.nativeModel' | t }}) }</option>
               }
             </select>
           </label>
@@ -96,6 +97,9 @@ export interface ClaudeLaunchDialogValue {
                 </option>
               }
             </select>
+            @if (selectedAccount() && !selectedAccount()?.authenticated) {
+              <small class="account-warning">{{ 'launch.accountNotAuthenticated' | t }}</small>
+            }
           </label>
           <label>
             <span>{{ 'launch.mcpProfile' | t }}</span>
@@ -146,6 +150,12 @@ export class ClaudeLaunchDialogComponent {
   protected readonly claudeAccounts = computed(() =>
     this.accountProfiles().filter((profile) => profile.agentType === 'claude'),
   );
+  protected readonly selectedAccount = computed(() =>
+    this.claudeAccounts().find((profile) => profile.id === this.resolvedAccountProfileId()),
+  );
+  protected readonly claudeProfiles = computed(() =>
+    this.profiles().filter((profile) => profile.apiProtocol === 'anthropic'),
+  );
   protected readonly resolvedAccountProfileId = computed(
     () =>
       this.accountProfileId() ||
@@ -156,13 +166,17 @@ export class ClaudeLaunchDialogComponent {
   protected readonly resolvedProfileId = computed(
     () =>
       this.profileId() ||
-      this.profiles().find((profile) => profile.isDefault)?.id ||
-      this.profiles()[0]?.id ||
+      this.claudeProfiles().find((profile) => profile.isDefault)?.id ||
+      this.claudeProfiles()[0]?.id ||
       '',
   );
   protected readonly canLaunch = computed(
     () => Boolean(this.installation()?.healthy) && Boolean(this.resolvedProfileId()),
   );
+
+  protected isNativeModel(profile: ModelProfile): boolean {
+    return isNativeModel(profile);
+  }
 
   protected submit(): void {
     if (!this.canLaunch()) {

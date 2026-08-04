@@ -158,6 +158,19 @@
   }
 }
 
+.account-warning {
+  color: var(--color-warning);
+  font-size: 9px;
+  margin-top: 2px;
+}
+
+.model-type-label {
+  color: var(--text-muted);
+  font-size: 9px;
+  font-weight: 500;
+  margin-left: 4px;
+}
+
 input,
 select,
 textarea {
@@ -226,35 +239,6 @@ button:disabled {
   opacity: 0.45;
 }
 
-.session-toolbar {
-  display: grid;
-  grid-template-columns: minmax(220px, 1fr) auto 30px;
-  align-items: center;
-  gap: 9px;
-  padding: 10px 14px;
-  border-bottom: 1px solid var(--border);
-}
-
-.dialog-search {
-  display: flex;
-  height: 31px;
-  align-items: center;
-  gap: 7px;
-  padding: 0 9px;
-  border: 1px solid var(--border-strong);
-  border-radius: var(--radius-field);
-  color: var(--text-muted);
-  background: var(--surface-inset);
-
-  input {
-    width: 100%;
-    height: auto;
-    padding: 0;
-    border: 0;
-    background: transparent;
-  }
-}
-
 .checkbox-control {
   display: flex;
   align-items: center;
@@ -268,80 +252,10 @@ button:disabled {
   }
 }
 
-.icon-action {
-  display: grid;
-  width: 30px;
-  height: 30px;
-  place-items: center;
-  border: 1px solid var(--border-strong);
-  border-radius: var(--radius-field);
-  color: var(--text-secondary);
-  background: var(--surface-2);
-}
-
-.resume-options {
-  display: grid;
-  grid-template-columns: 180px 180px repeat(2, minmax(100px, 1fr));
-  align-items: end;
-  gap: 10px;
-  padding: 9px 14px;
-  border-bottom: 1px solid var(--border);
-  background: var(--surface-1);
-}
-
-.installation-badge {
-  display: flex;
-  height: 34px;
-  align-items: center;
-  justify-content: flex-end;
-  gap: 6px;
-  color: var(--color-success);
-  font: 10px/1 var(--mono);
-
-  i {
-    width: 6px;
-    height: 6px;
-    border-radius: 50%;
-    background: var(--color-success);
-  }
-
-  &.unavailable {
-    color: var(--color-warning);
-
-    i {
-      background: var(--color-warning);
-    }
-  }
-}
-
-.session-list {
-  min-height: 220px;
-  overflow: auto;
-}
-
-.session-row {
-  display: grid;
-  min-height: 70px;
-  grid-template-columns: 30px minmax(0, 1fr) 92px 70px;
-  align-items: center;
-  gap: 10px;
-  padding: 9px 14px;
-  border-bottom: 1px solid var(--border);
-
-  &:hover {
-    background: var(--surface-2);
-  }
-
-  time {
-    color: var(--text-muted);
-    font: 9px/1 var(--mono);
-  }
-}
-
 .session-agent {
   display: grid;
-  width: 30px;
-  height: 30px;
+  width: 26px;
+  height: 26px;
   place-items: center;
   border-radius: var(--radius-selector);
   color: var(--color-primary);
@@ -351,45 +265,6 @@ button:disabled {
 .session-agent[data-agent='codex'] {
   color: var(--color-info);
   background: var(--info-soft);
-}
-
-.session-copy {
-  min-width: 0;
-
-  strong,
-  small {
-    display: block;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
-
-  strong {
-    font-size: 11px;
-    font-weight: 620;
-  }
-
-  small {
-    margin-top: 4px;
-    color: var(--text-muted);
-    font: 9px/1.25 var(--mono);
-  }
-
-  div {
-    display: flex;
-    gap: 9px;
-    margin-top: 6px;
-    color: var(--text-secondary);
-    font-size: 9px;
-  }
-}
-
-.resume-button {
-  height: 27px;
-  padding: 0 9px;
-  border: 1px solid color-mix(in oklab, var(--color-primary) 52%, var(--border));
-  color: var(--color-primary-content);
-  background: var(--color-primary);
 }
 
 .dialog-empty {
@@ -412,6 +287,13 @@ button:disabled {
   }
 }
 
+/* ---------------------------------------------------------------------------
+   Session center
+
+   Row-first layout: the header, health strip, and toolbar are compressed to
+   fixed-height chrome so the scrollable session list keeps the vertical space.
+   --------------------------------------------------------------------------- */
+
 .session-center {
   display: flex;
   width: min(980px, 100%);
@@ -419,65 +301,47 @@ button:disabled {
   flex-direction: column;
 }
 
+/* Health reads as a status line, not as cards competing with the session rows. */
 .agent-health-strip {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 8px;
-  padding: 10px 14px;
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  padding: 7px 17px;
   border-bottom: 1px solid var(--border);
   background: var(--surface-inset);
 }
 
 .agent-health {
-  display: grid;
+  display: flex;
   min-width: 0;
-  grid-template-columns: 30px minmax(0, 1fr) auto;
   align-items: center;
-  gap: 9px;
-  padding: 8px 10px;
-  border: 1px solid color-mix(in oklab, var(--color-success) 32%, var(--border));
-  border-radius: var(--radius-field);
-  background: var(--success-soft);
+  gap: 7px;
 
-  strong,
-  small {
-    display: block;
+  strong {
+    color: var(--text-secondary);
+    font-size: 10px;
+    font-weight: 580;
+    white-space: nowrap;
+  }
+
+  code {
     overflow: hidden;
+    color: var(--color-success);
+    font: 9px/1 var(--mono);
     text-overflow: ellipsis;
     white-space: nowrap;
   }
 
-  strong {
-    color: var(--text-primary);
-    font-size: 11px;
-  }
-
-  small {
-    margin-top: 3px;
-    color: var(--color-success);
-    font-size: 9px;
-  }
-
-  code {
-    color: var(--color-success);
-    font: 9px/1 var(--mono);
-  }
-
-  &.unavailable {
-    border-color: color-mix(in oklab, var(--color-warning) 42%, var(--border));
-    background: var(--warning-soft);
-
-    small,
-    code {
-      color: var(--color-warning);
-    }
+  &.unavailable code {
+    color: var(--color-warning);
   }
 }
 
 .agent-health-icon {
   display: grid;
-  width: 30px;
-  height: 30px;
+  width: 22px;
+  height: 22px;
+  flex: 0 0 22px;
   place-items: center;
   border-radius: var(--radius-selector);
   color: var(--color-success);
@@ -489,18 +353,51 @@ button:disabled {
   background: var(--info-soft);
 }
 
+.agent-health.unavailable .agent-health-icon {
+  color: var(--color-warning);
+  background: var(--warning-soft);
+}
+
+/* Search, agent filter, scope, and rescan share one row of chrome. */
+.session-toolbar {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto 30px;
+  align-items: center;
+  gap: 9px;
+  padding: 9px 17px;
+  border-bottom: 1px solid var(--border);
+}
+
 .dialog-search {
   position: relative;
+  display: flex;
+  height: 30px;
+  align-items: center;
+  gap: 7px;
+  padding: 0 9px;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-field);
+  color: var(--text-muted);
+  background: var(--surface-inset);
+
+  input {
+    width: 100%;
+    height: auto;
+    padding: 0;
+    border: 0;
+    background: transparent;
+  }
 }
 
 .search-clear {
   display: grid;
-  width: 20px;
-  height: 20px;
-  flex: 0 0 20px;
+  width: 19px;
+  height: 19px;
+  flex: 0 0 19px;
   place-items: center;
   padding: 0;
   border: 0;
+  border-radius: var(--radius-selector);
   color: var(--text-muted);
   background: transparent;
 
@@ -515,7 +412,7 @@ button:disabled {
   height: 30px;
   align-items: center;
   gap: 7px;
-  padding: 0 9px;
+  padding: 0 10px;
   border: 1px solid var(--border-strong);
   border-radius: var(--radius-field);
   color: var(--text-secondary);
@@ -531,58 +428,64 @@ button:disabled {
   }
 }
 
-.session-filter-bar {
-  display: flex;
-  min-height: 39px;
-  align-items: center;
-  justify-content: space-between;
-  gap: 10px;
-  padding: 5px 14px;
-  border-bottom: 1px solid var(--border);
-}
-
 .session-agent-filter {
   display: flex;
   align-items: center;
-  gap: 3px;
+  gap: 2px;
+  padding: 2px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-field);
+  background: var(--surface-inset);
 
   button {
     display: flex;
-    height: 27px;
+    height: 24px;
     align-items: center;
     gap: 6px;
-    padding: 0 9px;
-    border: 1px solid transparent;
-    color: var(--text-secondary);
+    padding: 0 10px;
+    border: 0;
+    border-radius: calc(var(--radius-field) - 3px);
+    color: var(--text-muted);
+    font-size: 10px;
+    font-weight: 580;
+    white-space: nowrap;
     background: transparent;
 
     span {
-      min-width: 17px;
-      padding: 2px 4px;
-      border-radius: 8px;
-      color: var(--text-muted);
+      color: inherit;
       font: 9px/1 var(--mono);
-      text-align: center;
-      background: var(--surface-2);
+      opacity: 0.72;
+    }
+
+    &:hover:not(.active) {
+      color: var(--text-secondary);
     }
 
     &.active {
-      border-color: color-mix(in oklab, var(--color-primary) 52%, var(--border));
-      color: var(--color-primary);
-      background: var(--primary-soft);
-
-      span {
-        color: var(--color-primary);
-        background: color-mix(in oklab, var(--color-primary) 20%, var(--surface-2));
-      }
+      color: var(--color-primary-content);
+      background: var(--color-primary);
     }
   }
 }
 
-.session-result-count {
-  color: var(--text-muted);
-  font: 9px/1 var(--mono);
-  white-space: nowrap;
+.icon-action {
+  display: grid;
+  width: 30px;
+  height: 30px;
+  place-items: center;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-field);
+  color: var(--text-secondary);
+  background: var(--surface-raised);
+
+  &:hover:not(:disabled) {
+    color: var(--text);
+    background: var(--surface-2);
+  }
+}
+
+.icon-action.spinning app-icon {
+  animation: session-center-spin 900ms linear infinite;
 }
 
 .session-error {
@@ -590,7 +493,7 @@ button:disabled {
   grid-template-columns: auto minmax(0, 1fr) auto;
   align-items: center;
   gap: 8px;
-  padding: 8px 14px;
+  padding: 8px 17px;
   border-bottom: 1px solid color-mix(in oklab, var(--color-error) 42%, var(--border));
   color: var(--color-error);
   font-size: 10px;
@@ -600,59 +503,110 @@ button:disabled {
     height: 24px;
     padding: 0 8px;
     border: 1px solid color-mix(in oklab, var(--color-error) 48%, var(--border));
+    border-radius: var(--radius-field);
     color: var(--color-error);
     background: color-mix(in oklab, var(--color-error) 18%, var(--surface-2));
   }
 }
 
-.resume-options {
-  grid-template-columns: minmax(180px, 1fr) repeat(3, minmax(140px, 190px));
-  align-items: center;
+/* Resume settings collapse by default: they are set once, the list is browsed. */
+.resume-config {
+  border-bottom: 1px solid var(--border);
+  background: var(--surface-1);
 }
 
-.codex-resume-options {
-  grid-template-columns: minmax(220px, 1fr) repeat(2, minmax(170px, 220px));
-  border-top: 1px solid var(--border);
-}
-
-.resume-options-copy {
-  display: flex;
-  min-width: 0;
+.resume-config-toggle {
+  display: grid;
+  width: 100%;
+  min-height: 34px;
+  grid-template-columns: auto auto minmax(0, 1fr) auto;
   align-items: center;
-  gap: 9px;
+  gap: 8px;
+  padding: 0 17px;
+  border: 0;
+  color: var(--text-muted);
+  text-align: left;
+  background: transparent;
 
-  strong,
-  small {
-    display: block;
+  &:hover {
+    color: var(--text-secondary);
+    background: var(--surface-2);
   }
 
   strong {
-    color: var(--text-primary);
-    font-size: 11px;
+    color: var(--text-secondary);
+    font-size: 10px;
+    font-weight: 580;
+    white-space: nowrap;
   }
 
   small {
-    margin-top: 4px;
+    overflow: hidden;
     color: var(--text-muted);
-    font-size: 9px;
+    font: 9px/1 var(--mono);
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
 }
 
-.codex-resume-note {
-  display: flex;
-  min-height: 39px;
-  align-items: center;
-  gap: 8px;
-  padding: 7px 14px;
-  border-bottom: 1px solid var(--border);
-  color: var(--color-info);
-  font-size: 10px;
-  background: var(--info-soft);
+.resume-config-chevron {
+  color: var(--text-muted);
+  transition: transform 160ms ease;
+}
+
+.resume-config.expanded .resume-config-chevron {
+  transform: rotate(180deg);
+}
+
+.resume-config-panel {
+  padding: 2px 17px 13px;
+  border-top: 1px solid var(--border);
+}
+
+.resume-options {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  align-items: end;
+  gap: 10px 12px;
+  padding-top: 12px;
+
+  & + & {
+    margin-top: 12px;
+    border-top: 1px solid var(--border);
+  }
+
+  h3 {
+    display: flex;
+    min-width: 0;
+    grid-column: 1 / -1;
+    align-items: center;
+    gap: 8px;
+    margin: 0;
+
+    strong,
+    small {
+      display: block;
+    }
+
+    strong {
+      color: var(--text-primary);
+      font-size: 10px;
+      font-weight: 620;
+    }
+
+    small {
+      margin-top: 3px;
+      color: var(--text-muted);
+      font-size: 9px;
+      line-height: 1.4;
+    }
+  }
 }
 
 .session-list {
   min-height: 180px;
   flex: 1;
+  overflow: auto;
   overscroll-behavior: contain;
 }
 
@@ -680,23 +634,70 @@ button:disabled {
   }
 }
 
+/* The row is the product: a left accent rail marks the agent, and Resume only
+   asserts itself on hover so a long list stays calm. */
 .session-row {
-  border-left: 2px solid transparent;
+  display: grid;
+  min-height: 62px;
+  grid-template-columns: 26px minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: 11px;
+  padding: 10px 17px;
+  border-bottom: 1px solid var(--border);
+  box-shadow: inset 2px 0 transparent;
   transition:
-    border-color 120ms ease,
-    background 120ms ease;
+    background 130ms ease,
+    box-shadow 130ms ease;
 
   &:hover {
-    border-left-color: var(--color-primary);
+    background: var(--surface-2);
+    box-shadow: inset 2px 0 var(--color-primary);
+  }
+
+  &[data-agent='codex']:hover {
+    box-shadow: inset 2px 0 var(--color-info);
+  }
+
+  time {
+    color: var(--text-muted);
+    font: 9px/1 var(--mono);
+    white-space: nowrap;
   }
 }
 
-.session-copy .session-metadata {
+.session-copy {
+  min-width: 0;
+
+  > strong,
+  > small {
+    display: block;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  > strong {
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: 0.004em;
+  }
+
+  > small {
+    margin-top: 3px;
+    color: var(--text-muted);
+    font: 9px/1.25 var(--mono);
+  }
+}
+
+.session-metadata {
   display: flex;
   min-width: 0;
   align-items: center;
-  gap: 8px;
+  gap: 7px;
+  margin-top: 6px;
   overflow: hidden;
+  color: var(--text-muted);
+  font-size: 9px;
 
   > span {
     overflow: hidden;
@@ -705,12 +706,30 @@ button:disabled {
   }
 }
 
+/* Dot separators carry the grouping so the row needs no extra chrome.
+   Drawn as a bullet rather than generated text so screen readers skip them. */
+.session-metadata > span + span::before {
+  display: inline-block;
+  width: 2px;
+  height: 2px;
+  margin-right: 7px;
+  border-radius: 50%;
+  vertical-align: middle;
+  background: color-mix(in oklab, var(--text-muted) 60%, transparent);
+  content: '';
+}
+
+.session-branch {
+  color: var(--text-secondary);
+  font-family: var(--mono);
+}
+
 .agent-tag {
   flex: 0 0 auto;
-  padding: 2px 5px;
+  padding: 2px 6px;
   border-radius: var(--radius-selector);
   color: var(--color-primary);
-  font: 9px/1 var(--mono);
+  font: 9px/1.5 var(--mono);
   background: var(--primary-soft);
 }
 
@@ -726,23 +745,53 @@ button:disabled {
 
 .resume-button {
   display: flex;
+  height: 27px;
   align-items: center;
   justify-content: center;
   gap: 5px;
+  padding: 0 11px;
+  border: 1px solid color-mix(in oklab, var(--color-primary) 34%, var(--border));
+  border-radius: var(--radius-field);
+  color: var(--color-primary);
+  font-size: 11px;
+  font-weight: 600;
   white-space: nowrap;
+  background: var(--primary-soft);
+
+  &:not(:disabled):hover,
+  .session-row:hover &:not(:disabled) {
+    border-color: var(--color-primary);
+    color: var(--color-primary-content);
+    background: var(--color-primary);
+  }
 }
 
-.icon-action.spinning app-icon {
-  animation: session-center-spin 900ms linear infinite;
-}
-
-.session-footer {
+.agent-dialog > .session-footer {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
   align-items: center;
-  justify-content: space-between !important;
+  gap: 12px;
 
-  span {
+  .session-result-count {
+    color: var(--text-secondary);
+    font: 9px/1 var(--mono);
+    white-space: nowrap;
+  }
+
+  .session-read-only {
+    overflow: hidden;
     color: var(--text-muted);
     font-size: 9px;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  button {
+    height: 29px;
+    padding: 0 13px;
+    border-radius: var(--radius-field);
+    font-size: 11px;
+    font-weight: 600;
   }
 }
 
@@ -1042,43 +1091,54 @@ button:disabled {
     grid-template-columns: 150px minmax(0, 1fr);
   }
 
+  .session-center {
+    height: calc(100vh - 20px);
+  }
+
   .session-row {
-    grid-template-columns: 30px minmax(0, 1fr) 66px;
+    grid-template-columns: 26px minmax(0, 1fr) auto;
+    padding: 10px 13px;
 
     time {
       display: none;
     }
   }
 
-  .session-center {
-    height: calc(100vh - 20px);
+  .agent-health-strip,
+  .resume-config-toggle,
+  .resume-config-panel,
+  .session-toolbar,
+  .session-error {
+    padding-right: 13px;
+    padding-left: 13px;
   }
 
-  .agent-health-strip {
-    grid-template-columns: 1fr;
-  }
-
+  /* Search keeps the first row; filter and scope share the second. */
   .session-toolbar {
     grid-template-columns: minmax(0, 1fr) 30px;
   }
 
-  .scope-control {
-    grid-column: 1 / -1;
+  .session-agent-filter {
+    grid-column: 1;
     grid-row: 2;
+    justify-self: start;
   }
 
-  .session-filter-bar {
-    align-items: flex-start;
-    flex-direction: column;
+  .scope-control {
+    grid-column: 2 / -1;
+    grid-row: 2;
+    justify-self: end;
   }
 
-  .session-copy .session-metadata {
-    > span:not(.agent-tag):not(.session-id) {
+  .session-metadata > span:not(.agent-tag):not(.session-branch) {
+    display: none;
+  }
+
+  .agent-dialog > .session-footer {
+    grid-template-columns: minmax(0, 1fr) auto;
+
+    .session-read-only {
       display: none;
     }
-  }
-
-  .session-footer span {
-    display: none;
   }
 }

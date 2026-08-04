@@ -51,6 +51,18 @@ export class AppStateService {
       this.activeWorkspace()?.terminals.filter((terminal) => terminal.agentType === 'claude')
         .length ?? 0,
   );
+  readonly codexTerminalCount = computed(
+    () =>
+      this.activeWorkspace()?.terminals.filter((terminal) => terminal.agentType === 'codex')
+        .length ?? 0,
+  );
+
+  agentCountFor(agentType: 'claude' | 'codex'): number {
+    return (
+      this.activeWorkspace()?.terminals.filter((terminal) => terminal.agentType === agentType)
+        .length ?? 0
+    );
+  }
 
   async initialize(): Promise<void> {
     const storedWorkspaces = await this.repository.list();
@@ -344,6 +356,31 @@ export class AppStateService {
     return true;
   }
 
+  /**
+   * Profiles the given native session last ran with, across every workspace.
+   *
+   * Native transcripts carry no Termexo profile, so resuming a session would
+   * otherwise fall back to the default (native) model. Terminals persist the
+   * profiles they launched with, which makes them the record of that choice.
+   */
+  findSessionLaunchProfiles(
+    nativeSessionId: string,
+  ): Pick<TerminalSession, 'profileId' | 'mcpProfileId' | 'accountProfileId'> | null {
+    const terminal = this.workspaceItems()
+      .slice()
+      .sort((left, right) => right.lastOpenedAt - left.lastOpenedAt)
+      .flatMap((workspace) => workspace.terminals)
+      .find((item) => item.nativeSessionId === nativeSessionId && item.profileId);
+    if (!terminal) {
+      return null;
+    }
+    return {
+      profileId: terminal.profileId,
+      mcpProfileId: terminal.mcpProfileId,
+      accountProfileId: terminal.accountProfileId,
+    };
+  }
+
   applyAgentEvent(event: AgentEvent): void {
     const status = EVENT_STATUS[event.eventType];
     const workspace = this.workspaceItems().find((item) =>
@@ -378,7 +415,7 @@ export class AppStateService {
   ): boolean {
     const workspace = this.activeWorkspace();
     const terminal = workspace?.terminals.find((item) => item.id === terminalId);
-    if (!workspace || terminal?.agentType !== 'claude') {
+    if (!workspace || !terminal || terminal.agentType === 'shell') {
       return false;
     }
 
@@ -390,7 +427,8 @@ export class AppStateService {
             command,
             model,
             profileId,
-            mcpProfileId,
+            mcpProfileId:
+              terminal.agentType === 'claude' ? (mcpProfileId ?? terminal.mcpProfileId) : undefined,
             nativeSessionId: undefined,
             status: 'STARTING' as const,
             runtimeRevision: (terminal.runtimeRevision ?? 0) + 1,

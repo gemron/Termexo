@@ -11,7 +11,7 @@
 </p>
 
 <p align="center">
-  <img alt="Version 0.3.10" src="https://img.shields.io/badge/version-0.3.10-58c7a0">
+  <img alt="Version 0.3.11" src="https://img.shields.io/badge/version-0.3.11-58c7a0">
   <img alt="Windows" src="https://img.shields.io/badge/platform-Windows-0078D4?logo=windows">
   <img alt="Tauri 2" src="https://img.shields.io/badge/Tauri-2-24C8DB?logo=tauri&logoColor=white">
   <img alt="Angular 22" src="https://img.shields.io/badge/Angular-22-DD0031?logo=angular">
@@ -34,9 +34,9 @@ Run the complete Windows app with one command—no Termexo account or server req
 npx termexo@latest
 ```
 
-> The latest published release is **V0.3.10, the multilingual interface update**. Termexo now
-> follows the Windows language automatically, can be switched manually at any time, and presents
-> its workspace, terminal, session, notification, and settings workflows in seven languages.
+> The latest published release is **V0.3.11, the session center update**. Resuming a session now
+> keeps the model profile it last ran with, so third-party models survive a restart, and the
+> session center puts the session list first instead of the settings above it.
 
 ![Termexo multi-terminal grid workbench](website/assets/termexo-workbench.png)
 
@@ -93,6 +93,17 @@ you configure under their own terms and privacy policies.
 The interface is available in Simplified Chinese, English, Spanish, French, German, Japanese,
 and Korean. It follows the Windows language automatically, or you can choose a language from
 the main toolbar and keep that choice across restarts.
+
+## V0.3.11 Updates
+
+- Keep the model profile a session last ran with when resuming it, so a third-party model no longer
+  falls back to the native default after restarting the app. An explicit pick in the resume settings
+  still wins.
+- Rebuild the session center around the session list: agent health collapses into a status line,
+  search and filters share one toolbar row, and the resume settings fold into an expandable panel
+  that summarizes the active profiles while collapsed.
+- Fix the Codex resume settings grid, where the model field wrapped onto its own row out of
+  alignment with the rest of the form.
 
 ## V0.3.10 Updates
 
