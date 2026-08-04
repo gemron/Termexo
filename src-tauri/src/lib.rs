@@ -6,6 +6,7 @@ mod config;
 mod database;
 mod hooks;
 mod network;
+mod notification;
 mod pty;
 
 use std::fs;
@@ -46,6 +47,21 @@ pub fn run() {
             let app_data_dir = app.path().app_data_dir()?;
             fs::create_dir_all(&app_data_dir)?;
 
+            // Without a registered AppUserModelID Windows silently drops every toast, which is
+            // what happens when Termexo runs from the npm package instead of an installer.
+            // `icons/` is not bundled as a resource, so a missing file just means the toast
+            // falls back to the default shell icon.
+            let icon = app
+                .path()
+                .resolve("icons/128x128.png", tauri::path::BaseDirectory::Resource)
+                .ok()
+                .filter(|path| path.exists());
+            if let Err(error) =
+                notification::register_toast_identity(app.config(), icon.as_deref())
+            {
+                tracing::warn!("{error}");
+            }
+
             let database = WorkspaceDatabase::open(app_data_dir.join("agentdock.db"))?;
             let hooks = HookEventStore::new(&app_data_dir)?;
             app.manage(database);
@@ -84,6 +100,7 @@ pub fn run() {
             commands::config::refresh_account_profile,
             commands::config::delete_account_profile,
             commands::config::validate_claude_profile,
+            commands::notification::show_desktop_notification,
             commands::hooks::prepare_claude_runtime,
             commands::hooks::sync_agent_events,
             commands::hooks::list_agent_events,

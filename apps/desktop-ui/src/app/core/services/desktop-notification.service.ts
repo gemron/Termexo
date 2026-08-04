@@ -1,10 +1,7 @@
 import { inject, Injectable } from '@angular/core';
+import { invoke } from '@tauri-apps/api/core';
 import { getCurrentWindow, UserAttentionType } from '@tauri-apps/api/window';
-import {
-  isPermissionGranted,
-  requestPermission,
-  sendNotification,
-} from '@tauri-apps/plugin-notification';
+import { isPermissionGranted, requestPermission } from '@tauri-apps/plugin-notification';
 import { message } from '@tauri-apps/plugin-dialog';
 
 import { createDesktopNotification, GlobalTerminalNotice } from '../models/terminal-notifications';
@@ -57,9 +54,13 @@ export class DesktopNotificationService {
     }
 
     try {
-      sendNotification({ title: notification.title, body: notification.body });
+      // 走自有命令而非通知插件：插件会丢弃投递结果，失败时无法降级
+      await invoke('show_desktop_notification', {
+        title: notification.title,
+        body: notification.body,
+      });
     } catch {
-      // Toast 通知失败（常见于未安装→无 AUMID），降级为系统对话框
+      // Toast 投递失败（例如 AUMID 未注册），降级为系统对话框
       void this.showDialogFallback(notification.title, notification.body);
     }
   }

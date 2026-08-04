@@ -71,6 +71,8 @@ pub struct TerminalSession {
     pub branch: String,
     pub command: Option<String>,
     pub native_session_id: Option<String>,
+    pub profile_id: Option<String>,
+    pub mcp_profile_id: Option<String>,
     pub account_profile_id: Option<String>,
 }
 
@@ -882,6 +884,57 @@ mod tests {
         let stored_after_delete = database.list().unwrap();
         assert_eq!(stored_after_delete.len(), 1);
         assert_eq!(stored_after_delete[0].id, first_workspace.id);
+    }
+
+    #[test]
+    fn keeps_terminal_launch_profiles_across_snapshots() {
+        let database = WorkspaceDatabase {
+            connection: Mutex::new(Connection::open_in_memory().unwrap()),
+        };
+        database
+            .connection
+            .lock()
+            .unwrap()
+            .execute_batch(&format!(
+                "{INITIAL_MIGRATION}\n{AGENT_MIGRATION}\n{NETWORK_MIGRATION}\n{ACCOUNT_MIGRATION}"
+            ))
+            .unwrap();
+
+        let workspace = Workspace {
+            id: "workspace-1".into(),
+            name: "Termexo".into(),
+            theme_color: "#58c7a0".into(),
+            sort_order: 0,
+            project_path: "D:\\dev\\termexo".into(),
+            project_type: "Angular + Rust".into(),
+            active_branch: "main".into(),
+            favorite: false,
+            last_opened_at: 10,
+            layout: "single".into(),
+            grid_columns: 2,
+            grid_rows: 2,
+            terminals: vec![TerminalSession {
+                id: "terminal-1".into(),
+                name: "Claude 1".into(),
+                working_directory: "D:\\dev\\termexo".into(),
+                shell: "powershell".into(),
+                agent_type: "claude".into(),
+                status: "RUNNING".into(),
+                model: "GLM 4.6".into(),
+                branch: "main".into(),
+                command: Some("claude".into()),
+                native_session_id: Some("session-1".into()),
+                profile_id: Some("glm-4-6".into()),
+                mcp_profile_id: Some("mcp-1".into()),
+                account_profile_id: Some("account-1".into()),
+            }],
+        };
+
+        database.save(&workspace).unwrap();
+        let stored = database.list().unwrap();
+
+        assert_eq!(stored[0].terminals[0].profile_id.as_deref(), Some("glm-4-6"));
+        assert_eq!(stored[0].terminals[0].mcp_profile_id.as_deref(), Some("mcp-1"));
     }
 
     #[test]

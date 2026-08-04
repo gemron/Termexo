@@ -11,7 +11,7 @@
 </p>
 
 <p align="center">
-  <img alt="Version 0.3.11" src="https://img.shields.io/badge/version-0.3.11-58c7a0">
+  <img alt="Version 0.3.12" src="https://img.shields.io/badge/version-0.3.12-58c7a0">
   <img alt="Windows" src="https://img.shields.io/badge/platform-Windows-0078D4?logo=windows">
   <img alt="Tauri 2" src="https://img.shields.io/badge/Tauri-2-24C8DB?logo=tauri&logoColor=white">
   <img alt="Angular 22" src="https://img.shields.io/badge/Angular-22-DD0031?logo=angular">
@@ -34,9 +34,9 @@ Run the complete Windows app with one command—no Termexo account or server req
 npx termexo@latest
 ```
 
-> The latest published release is **V0.3.11, the session center update**. Resuming a session now
-> keeps the model profile it last ran with, so third-party models survive a restart, and the
-> session center puts the session list first instead of the settings above it.
+> The latest published release is **V0.3.12, a fix release**. Terminal model profiles now really
+> do survive a restart instead of falling back to the native default, and Windows notifications
+> work when Termexo runs from npm.
 
 ![Termexo multi-terminal grid workbench](website/assets/termexo-workbench.png)
 
@@ -93,6 +93,17 @@ you configure under their own terms and privacy policies.
 The interface is available in Simplified Chinese, English, Spanish, French, German, Japanese,
 and Korean. It follows the Windows language automatically, or you can choose a language from
 the main toolbar and keep that choice across restarts.
+
+## V0.3.12 Updates
+
+- Fix terminal model profiles being lost on restart. The backend snapshot struct was missing the
+  `profileId` and `mcpProfileId` fields, so switching to a third-party model and reopening the
+  window fell back to the native default. The session model persistence V0.3.11 announced never
+  actually worked; it does now.
+- Fix missing Windows notifications when Termexo runs from npm. The app registers its
+  AppUserModelID at startup, so toasts are delivered even without an installer.
+- Report notification delivery failures instead of swallowing them, so a failed toast falls back
+  to a system dialog.
 
 ## V0.3.11 Updates
 

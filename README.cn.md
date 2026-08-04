@@ -11,7 +11,7 @@
 </p>
 
 <p align="center">
-  <img alt="Version 0.3.11" src="https://img.shields.io/badge/version-0.3.11-58c7a0">
+  <img alt="Version 0.3.12" src="https://img.shields.io/badge/version-0.3.12-58c7a0">
   <img alt="Windows" src="https://img.shields.io/badge/platform-Windows-0078D4?logo=windows">
   <img alt="Tauri 2" src="https://img.shields.io/badge/Tauri-2-24C8DB?logo=tauri&logoColor=white">
   <img alt="Angular 22" src="https://img.shields.io/badge/Angular-22-DD0031?logo=angular">
@@ -33,8 +33,8 @@ Termexo 把 Claude Code、Codex 和围绕它们运行的终端收进一个可恢
 npx termexo@latest
 ```
 
-> 最新正式版本为 **V0.3.11 会话中心版**。恢复会话时会保留其上次使用的模型配置，第三方
-> 模型不再在重启后退回原生默认模型；会话中心的界面也重新以会话列表为主体。
+> 最新正式版本为 **V0.3.12 修复版**。终端的模型配置现在能真正跨重启保留，第三方模型不再
+> 退回原生默认模型；通过 npm 运行时也能收到 Windows 系统通知。
 
 ![Termexo 多终端网格工作台](website/assets/termexo-workbench.png)
 
@@ -85,6 +85,15 @@ SQLite，密钥保存在 Windows Credential Manager，Claude/Codex 历史会话�
 
 界面支持简体中文、英语、西班牙语、法语、德语、日语和韩语。默认自动跟随 Windows
 系统语言，也可通过主工具栏手动切换并跨重启保留选择。
+
+## V0.3.12 更新
+
+- 修复终端模型配置无法跨重启保留的问题：后端快照结构此前缺少 `profileId` 与 `mcpProfileId`
+  两个字段，切换到第三方模型后重开窗口会退回原生默认模型。V0.3.11 声称的会话模型保留功能
+  因此从未真正生效，现已修复。
+- 修复通过 npm 运行时收不到 Windows 系统通知的问题：应用启动时会注册 AppUserModelID，
+  未经安装器安装的运行方式也能正常投递系统通知。
+- 系统通知投递失败时会如实回传错误并降级为系统对话框，此前失败会被静默忽略。
 
 ## V0.3.11 更新
 

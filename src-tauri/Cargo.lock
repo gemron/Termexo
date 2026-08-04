@@ -3862,7 +3862,7 @@ dependencies = [
 
 [[package]]
 name = "termexo"
-version = "0.3.11"
+version = "0.3.12"
 dependencies = [
  "keyring",
  "portable-pty",
@@ -3873,10 +3873,12 @@ dependencies = [
  "tauri-build",
  "tauri-plugin-dialog",
  "tauri-plugin-notification",
+ "tauri-winrt-notification",
  "thiserror 2.0.19",
  "tracing",
  "tracing-subscriber",
  "url",
+ "windows",
 ]
 
 [[package]]
