@@ -41,7 +41,7 @@
   "bugs": {
     "url": "https://github.com/gemron/Termexo/issues"
   },
-  "license": "UNLICENSED",
+  "license": "MIT",
   "publishConfig": {
     "access": "public",
     "registry": "https://registry.npmjs.org/"

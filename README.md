@@ -486,5 +486,4 @@ current release scope and add tests for behavior changes.
 
 ## License
 
-This repository does not currently declare an open-source license. Until one is added,
-do not assume permission to copy, modify, or redistribute the project.
+Released under the [MIT License](LICENSE).
