@@ -302,6 +302,15 @@ export interface NetworkTestResult {
   latencyMs: number;
 }
 
+/** Outcome of importing an exported proxy file. */
+export interface ImportSummary {
+  imported: number;
+  /** Profiles whose password has to be re-entered, since files never carry credentials. */
+  needsPassword: string[];
+  /** Reasons for entries that were rejected instead of imported. */
+  skipped: string[];
+}
+
 export const EVENT_STATUS: Readonly<Record<string, TerminalStatus>> = {
   'session.started': 'RUNNING',
   'agent.thinking': 'THINKING',

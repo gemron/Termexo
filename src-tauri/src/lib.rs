@@ -34,10 +34,12 @@ pub fn capture_codex_hook_event_from_cli() -> Result<(), String> {
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
+    // The library compiles as `termexo_lib`, so a `termexo=info` filter alone would drop every
+    // event this crate emits — including the proxy diagnostics.
     tracing_subscriber::fmt()
         .with_env_filter(
             tracing_subscriber::EnvFilter::try_from_default_env()
-                .unwrap_or_else(|_| "termexo=info".into()),
+                .unwrap_or_else(|_| "termexo=info,termexo_lib=info".into()),
         )
         .init();
 
@@ -96,6 +98,9 @@ pub fn run() {
             commands::config::save_network_profile,
             commands::config::delete_network_profile,
             commands::config::test_network_profile,
+            commands::network_export::export_network_profiles,
+            commands::network_export::write_network_profile_export,
+            commands::network_export::import_network_profiles,
             commands::config::list_account_profiles,
             commands::config::save_account_profile,
             commands::config::refresh_account_profile,

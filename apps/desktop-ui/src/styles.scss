@@ -136,6 +136,14 @@
   }
 }
 
+.field-hint {
+  display: block;
+  margin-top: 4px;
+  color: var(--text-muted);
+  font-size: 9px;
+  line-height: 1.45;
+}
+
 .network-options {
   display: flex;
   flex-wrap: wrap;

@@ -216,6 +216,7 @@ pub fn prepare_claude_launch(
         request.workspace_id.as_deref(),
     )?);
     let claude_config_dir = environment.get("CLAUDE_CONFIG_DIR").map(PathBuf::from);
+    log_proxy_environment(&environment);
     launch_environment
         .put(request.terminal_id, environment)
         .map_err(|error| error.to_string())?;
@@ -280,6 +281,7 @@ pub fn prepare_codex_launch(
     let hook_configs = hooks
         .codex_hook_configs()
         .map_err(|error| error.to_string())?;
+    log_proxy_environment(&environment);
     launch_environment
         .put(request.terminal_id.clone(), environment)
         .map_err(|error| error.to_string())?;
@@ -356,6 +358,66 @@ fn account_profile_environment(
     }
     account::prepare_managed_directory(profile)?;
     Ok(account::environment(profile))
+}
+
+/// Records the proxy-related variables a terminal will start with.
+///
+/// A proxy that works in a plain terminal but stalls inside Termexo is a difference in the
+/// injected environment, and guessing at that difference is slower than reading it. Credentials
+/// are masked so the log stays safe to share.
+fn log_proxy_environment(environment: &HashMap<String, String>) {
+    let mut entries = environment
+        .iter()
+        .filter(|(key, _)| {
+            let key = key.to_ascii_uppercase();
+            key.ends_with("_PROXY") || key.starts_with("NPM_CONFIG_") || key == "NODE_EXTRA_CA_CERTS"
+        })
+        .map(|(key, value)| format!("{key}={}", mask_credentials(value)))
+        .collect::<Vec<_>>();
+    if entries.is_empty() {
+        return;
+    }
+    entries.sort();
+    let line = entries.join(" ");
+    tracing::info!(target: "termexo::proxy", "launch proxy env: {line}");
+    // The GUI has no console, so the same line goes to a file the user can hand over.
+    append_proxy_diagnostic(&line);
+}
+
+/// Appends one diagnostic line to `proxy-diagnostics.log` in the app data directory.
+///
+/// Written with plain `std::fs` rather than through Tauri's path API so the caller does not
+/// need an `AppHandle`; failures are ignored because diagnostics must never block a launch.
+fn append_proxy_diagnostic(line: &str) {
+    let Some(directory) = dirs_app_data() else {
+        return;
+    };
+    let _ = std::fs::create_dir_all(&directory);
+    let path = directory.join("proxy-diagnostics.log");
+    if let Ok(mut file) = std::fs::OpenOptions::new()
+        .create(true)
+        .append(true)
+        .open(path)
+    {
+        use std::io::Write;
+        let _ = writeln!(file, "{line}");
+    }
+}
+
+/// Resolves the same app data directory Tauri uses for `dev.agentdock.desktop`.
+fn dirs_app_data() -> Option<PathBuf> {
+    std::env::var_os("APPDATA").map(|base| PathBuf::from(base).join("dev.agentdock.desktop"))
+}
+
+/// Replaces any `user:password@` portion of a URL with `***`.
+fn mask_credentials(value: &str) -> String {
+    let Some((scheme, rest)) = value.split_once("://") else {
+        return value.to_owned();
+    };
+    match rest.split_once('@') {
+        Some((_, host)) => format!("{scheme}://***@{host}"),
+        None => value.to_owned(),
+    }
 }
 
 fn network_environment(

@@ -1,5 +1,6 @@
 import { effect, inject, Injectable, signal } from '@angular/core';
 import { invoke } from '@tauri-apps/api/core';
+import { open as openDialog, save } from '@tauri-apps/plugin-dialog';
 
 import { I18nService } from '../i18n/i18n.service';
 import {
@@ -15,6 +16,7 @@ import {
   CliOperationRequest,
   CliOperationResult,
   CodexLaunchRequest,
+  ImportSummary,
   McpProfile,
   McpProfileInput,
   ModelProfile,
@@ -319,6 +321,58 @@ export class AgentService {
       };
     }
     return invoke<NetworkTestResult>('test_network_profile', { profileId });
+  }
+
+  /**
+   * Asks for a destination and writes every proxy profile there as JSON.
+   *
+   * Returns null when the user cancels the dialog. Passwords stay in Credential Manager: the
+   * backend builds the document without them, so an exported file is safe to share.
+   */
+  async exportNetworkProfiles(): Promise<{ count: number; path: string } | null> {
+    if (!isTauriRuntime()) {
+      // Browser preview has no filesystem to write to.
+      return null;
+    }
+    const path = await save({
+      defaultPath: 'termexo-proxy-profiles.json',
+      filters: [{ name: 'JSON', extensions: ['json'] }],
+    });
+    if (!path) {
+      return null;
+    }
+    const contents = await invoke<string>('export_network_profiles', { profileId: null });
+    await invoke('write_network_profile_export', { path, contents });
+    return { count: this.networkProfileItems().length, path };
+  }
+
+  /**
+   * Reads an exported file and adds the profiles it describes.
+   *
+   * Imported profiles arrive as new records without a password — the file never carries one —
+   * so `needsPassword` lists the ones still waiting for credentials.
+   */
+  async importNetworkProfiles(): Promise<ImportSummary | null> {
+    if (!isTauriRuntime()) {
+      return null;
+    }
+    const selected = await openDialog({
+      multiple: false,
+      directory: false,
+      filters: [{ name: 'JSON', extensions: ['json'] }],
+    });
+    const path = Array.isArray(selected) ? selected[0] : selected;
+    if (!path) {
+      return null;
+    }
+    const summary = await invoke<ImportSummary>('import_network_profiles', { path });
+    // Imported rows come straight from the database, so the list is refetched rather than patched.
+    await this.refreshNetworkProfiles();
+    return summary;
+  }
+
+  private async refreshNetworkProfiles(): Promise<void> {
+    this.networkProfileItems.set(await invoke<NetworkProfile[]>('list_network_profiles'));
   }
 
   async saveAccountProfile(input: AccountProfileInput): Promise<void> {

@@ -11,7 +11,7 @@
 </p>
 
 <p align="center">
-  <img alt="Version 0.3.13" src="https://img.shields.io/badge/version-0.3.13-58c7a0">
+  <img alt="Version 0.3.14" src="https://img.shields.io/badge/version-0.3.14-58c7a0">
   <img alt="Windows" src="https://img.shields.io/badge/platform-Windows-0078D4?logo=windows">
   <img alt="Tauri 2" src="https://img.shields.io/badge/Tauri-2-24C8DB?logo=tauri&logoColor=white">
   <img alt="Angular 22" src="https://img.shields.io/badge/Angular-22-DD0031?logo=angular">
@@ -33,8 +33,8 @@ Termexo 把 Claude Code、Codex 和围绕它们运行的终端收进一个可恢
 npx termexo@latest
 ```
 
-> 最新正式版本为 **V0.3.13**。新增应用更新检查：启动时与运行期间定时比对 GitHub 上的最新
-> 发布，有新版本时通过应用内提示和系统通知告知，可在设置中关闭。
+> 最新正式版本为 **V0.3.14**。修复了代理地址误填 `https://` 导致 Agent 发消息卡死的问题，
+> 并新增代理配置的导入导出（不含密码）。
 
 ![Termexo 多终端网格工作台](website/assets/termexo-workbench.png)
 
@@ -85,6 +85,17 @@ SQLite，密钥保存在 Windows Credential Manager，Claude/Codex 历史会话�
 
 界面支持简体中文、英语、西班牙语、法语、德语、日语和韩语。默认自动跟随 Windows
 系统语言，也可通过主工具栏手动切换并跨重启保留选择。
+
+## V0.3.14 更新
+
+- 修复代理地址填成 `https://` 开头时 Agent 发送消息一直卡住的问题。代理 URL 的协议表示
+  「如何连接代理」而非「代理转发什么流量」，`https://` 会要求先与代理端口完成 TLS 握手，
+  普通代理不支持，请求便一直挂起直到超时。现在保存时直接拦截并给出改好的地址。
+- 代理连通性测试不再只做 TCP 握手：会通过代理发起 `CONNECT` 并验证隧道能否真正到达模型
+  端点，可区分「需要身份验证（407）」「目标被拒绝」「隧道假通」等情况。
+- 新增代理配置导入导出。导出文件**不包含密码**，也不包含仅在本机有效的凭据标识；导入的
+  Profile 一律新建、不覆盖同名配置、不自动设为默认，并沿用与手动保存相同的校验。
+- 填写 `NO_PROXY` 时同步设置 npm 的 `noproxy`，避免 npm 自身配置优先级更高而绕过排除列表。
 
 ## V0.3.13 更新
 

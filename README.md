@@ -11,7 +11,7 @@
 </p>
 
 <p align="center">
-  <img alt="Version 0.3.13" src="https://img.shields.io/badge/version-0.3.13-58c7a0">
+  <img alt="Version 0.3.14" src="https://img.shields.io/badge/version-0.3.14-58c7a0">
   <img alt="Windows" src="https://img.shields.io/badge/platform-Windows-0078D4?logo=windows">
   <img alt="Tauri 2" src="https://img.shields.io/badge/Tauri-2-24C8DB?logo=tauri&logoColor=white">
   <img alt="Angular 22" src="https://img.shields.io/badge/Angular-22-DD0031?logo=angular">
@@ -34,9 +34,9 @@ Run the complete Windows app with one command—no Termexo account or server req
 npx termexo@latest
 ```
 
-> The latest published release is **V0.3.13**. Termexo now checks for its own updates — on
-> launch and periodically while running — and tells you through an in-app notice and a Windows
-> notification when a new release is published. You can switch the checks off in settings.
+> The latest published release is **V0.3.14**. It fixes agents hanging when a proxy address was
+> entered with an `https://` scheme, and adds import/export for proxy profiles (passwords stay
+> behind).
 
 ![Termexo multi-terminal grid workbench](website/assets/termexo-workbench.png)
 
@@ -93,6 +93,22 @@ you configure under their own terms and privacy policies.
 The interface is available in Simplified Chinese, English, Spanish, French, German, Japanese,
 and Korean. It follows the Windows language automatically, or you can choose a language from
 the main toolbar and keep that choice across restarts.
+
+## V0.3.14 Updates
+
+- Fix agents hanging on every message when a proxy was entered as `https://`. A proxy URL's
+  scheme says how to *reach the proxy*, not what it forwards: `https://` asks the client to
+  complete a TLS handshake with the proxy port, which ordinary proxies drop, so requests stall
+  until they time out. Saving now rejects it and suggests the corrected address.
+- Proxy connectivity tests go beyond a TCP handshake: they issue a `CONNECT` through the proxy
+  and verify the tunnel actually reaches the model endpoint, distinguishing authentication
+  required (407), a refused destination, and a tunnel that opens but leads nowhere.
+- Add import/export for proxy profiles. Exported files carry **no passwords** and no
+  machine-local credential handles; imported profiles are always created fresh, never overwrite
+  a profile of the same name, never become the default, and pass the same validation as a
+  manual save.
+- Setting `NO_PROXY` now also sets npm's `noproxy`, since npm's own config outranks the
+  environment variable and would otherwise bypass the exclusion list.
 
 ## V0.3.13 Updates
 

@@ -757,6 +757,7 @@ export type SettingsTab = 'diagnostics' | 'cli' | 'accounts' | 'models' | 'mcp' 
                       <label>
                         <span>HTTPS_PROXY</span>
                         <input placeholder="http://proxy.internal:8080" [(ngModel)]="httpsProxy" />
+                        <small class="field-hint">{{ 'settings.httpsProxyHint' | t }}</small>
                       </label>
                       <label>
                         <span>ALL_PROXY / SOCKS</span>
@@ -765,6 +766,7 @@ export type SettingsTab = 'diagnostics' | 'cli' | 'accounts' | 'models' | 'mcp' 
                       <label>
                         <span>NO_PROXY</span>
                         <input placeholder="localhost,.internal.example" [(ngModel)]="noProxy" />
+                        <small class="field-hint">{{ 'settings.noProxyHint' | t }}</small>
                       </label>
                     </div>
                   </div>
@@ -871,6 +873,24 @@ export type SettingsTab = 'diagnostics' | 'cli' | 'accounts' | 'models' | 'mcp' 
                     <button
                       type="button"
                       class="secondary"
+                      [disabled]="busy()"
+                      [title]="'settings.importProxyHint' | t"
+                      (click)="networkImportRequested.emit()"
+                    >
+                      <app-icon name="upload" [size]="13" />{{ 'settings.importProxy' | t }}
+                    </button>
+                    <button
+                      type="button"
+                      class="secondary"
+                      [disabled]="busy() || networkProfiles().length === 0"
+                      [title]="'settings.exportProxyHint' | t"
+                      (click)="networkExportRequested.emit()"
+                    >
+                      <app-icon name="download" [size]="13" />{{ 'settings.exportProxy' | t }}
+                    </button>
+                    <button
+                      type="button"
+                      class="secondary"
                       [disabled]="busy() || !networkId()"
                       (click)="networkTestRequested.emit(networkId())"
                     >
@@ -929,6 +949,8 @@ export class AgentSettingsDialogComponent {
   readonly networkSaved = output<NetworkProfileInput>();
   readonly deleteNetworkRequested = output<string>();
   readonly networkTestRequested = output<string>();
+  readonly networkExportRequested = output<void>();
+  readonly networkImportRequested = output<void>();
   readonly accountSaved = output<AccountProfileInput>();
   readonly deleteAccountRequested = output<string>();
   readonly accountLoginRequested = output<string>();

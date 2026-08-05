@@ -1213,6 +1213,56 @@ export class App {
     }
   }
 
+  /** Exports every proxy profile to a file the user picks. Passwords are never written. */
+  protected async exportNetworkProfiles(): Promise<void> {
+    try {
+      const result = await this.agents.exportNetworkProfiles();
+      if (!result) {
+        return;
+      }
+      this.showToast(this.i18n.t('settings.exportProxyDone', result));
+    } catch (error) {
+      this.showToast(
+        `${this.i18n.t('settings.exportProxyFailed')}: ${this.errorMessage(error)}`,
+        'attention',
+      );
+    }
+  }
+
+  /**
+   * Imports proxy profiles from an exported file.
+   *
+   * The toast names how many arrived and which ones still need a password, because the file
+   * never carries credentials and those profiles will not authenticate until one is entered.
+   */
+  protected async importNetworkProfiles(): Promise<void> {
+    try {
+      const summary = await this.agents.importNetworkProfiles();
+      if (!summary) {
+        return;
+      }
+      const parts = [this.i18n.t('settings.importProxyDone', { count: summary.imported })];
+      if (summary.needsPassword.length > 0) {
+        parts.push(
+          this.i18n.t('settings.importProxyNeedsPassword', {
+            names: summary.needsPassword.join('、'),
+          }),
+        );
+      }
+      if (summary.skipped.length > 0) {
+        parts.push(
+          this.i18n.t('settings.importProxySkipped', { count: summary.skipped.length }),
+        );
+      }
+      this.showToast(parts.join(' '), summary.skipped.length > 0 ? 'attention' : 'success');
+    } catch (error) {
+      this.showToast(
+        `${this.i18n.t('settings.importProxyFailed')}: ${this.errorMessage(error)}`,
+        'attention',
+      );
+    }
+  }
+
   protected async previewCliOperation(request: CliOperationRequest): Promise<void> {
     this.cliOperationPlan.set(null);
     this.cliOperationResult.set(null);

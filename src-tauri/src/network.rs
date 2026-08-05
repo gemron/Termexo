@@ -1,4 +1,5 @@
 use std::collections::HashMap;
+use std::io::{Read, Write};
 use std::net::{TcpStream, ToSocketAddrs};
 use std::time::{Duration, Instant};
 
@@ -8,6 +9,12 @@ use url::Url;
 use crate::config::NetworkProfile;
 
 const CONNECT_TIMEOUT: Duration = Duration::from_secs(3);
+/// Budget for the proxy to answer a CONNECT request once the socket is open.
+const TUNNEL_TIMEOUT: Duration = Duration::from_secs(5);
+/// Endpoint the tunnel probe asks for. Reaching the proxy is not the same as the proxy being
+/// able to reach the model API, and it is the second one that decides whether an agent works.
+const PROBE_HOST: &str = "api.anthropic.com";
+const PROBE_PORT: u16 = 443;
 const PROXY_SCHEMES: &[&str] = &["http", "https", "socks4", "socks5", "socks5h"];
 const HTTP_SCHEMES: &[&str] = &["http", "https"];
 
@@ -40,6 +47,16 @@ pub fn validate_profile(profile: &NetworkProfile) -> Result<(), String> {
         }
         "global" | "workspace" => {}
         _ => return Err("代理作用域必须是 global 或 workspace".into()),
+    }
+
+    for (label, value) in [
+        ("HTTP 代理", profile.http_proxy.as_deref()),
+        ("HTTPS 代理", profile.https_proxy.as_deref()),
+        ("ALL_PROXY", profile.all_proxy.as_deref()),
+    ] {
+        if let Some(value) = trimmed(value) {
+            reject_tls_proxy_scheme(label, value)?;
+        }
     }
 
     for (label, value, schemes) in [
@@ -110,6 +127,9 @@ pub fn profile_environment(
     if let Some(value) = trimmed(profile.no_proxy.as_deref()) {
         environment.insert("NO_PROXY".into(), value.into());
         environment.insert("no_proxy".into(), value.into());
+        // npm reads NO_PROXY too, but its own `noproxy` config wins when both are present —
+        // leaving it unset would let an explicit NPM_CONFIG_PROXY capture excluded hosts.
+        environment.insert("NPM_CONFIG_NOPROXY".into(), value.into());
     }
 
     if let Some(value) = trimmed(profile.npm_registry.as_deref()) {
@@ -196,12 +216,18 @@ pub fn test_profile(
     for address in addresses {
         match TcpStream::connect_timeout(&address, CONNECT_TIMEOUT) {
             Ok(stream) => {
-                drop(stream);
+                // An HTTP proxy that accepts the socket may still refuse to tunnel — it can
+                // demand credentials or block the destination. Agents would then hang until
+                // their request timeout, so the probe has to go one step further.
+                let (healthy, message) = match probe_http_tunnel(stream, &parsed) {
+                    Some(result) => result,
+                    None => (true, "TCP 连通性测试通过".to_owned()),
+                };
                 return Ok(NetworkTestResult {
                     profile_id: profile.id.clone(),
-                    healthy: true,
+                    healthy,
                     target: display_target,
-                    message: "TCP 连通性测试通过".into(),
+                    message,
                     latency_ms: started.elapsed().as_millis(),
                 });
             }
@@ -214,6 +240,151 @@ pub fn test_profile(
         last_error
             .map(|error| error.to_string())
             .unwrap_or_else(|| "未知错误".into())
+    ))
+}
+
+/// Asks an HTTP proxy to open a tunnel to the model API and reports what it answered.
+///
+/// Returns `None` when the target is not an HTTP proxy (SOCKS, or a plain registry URL), where
+/// a successful socket is all this probe can establish.
+fn probe_http_tunnel(mut stream: TcpStream, proxy: &Url) -> Option<(bool, String)> {
+    if !HTTP_SCHEMES.contains(&proxy.scheme()) {
+        return None;
+    }
+    stream.set_read_timeout(Some(TUNNEL_TIMEOUT)).ok()?;
+    stream.set_write_timeout(Some(TUNNEL_TIMEOUT)).ok()?;
+
+    let request = format!(
+        "CONNECT {PROBE_HOST}:{PROBE_PORT} HTTP/1.1\r\nHost: {PROBE_HOST}:{PROBE_PORT}\r\n\r\n"
+    );
+    if stream.write_all(request.as_bytes()).is_err() {
+        return Some((false, format!("代理未响应 CONNECT {PROBE_HOST} 请求")));
+    }
+
+    let mut buffer = [0u8; 256];
+    let read = match stream.read(&mut buffer) {
+        Ok(0) => return Some((false, "代理在收到 CONNECT 请求后立即关闭了连接".into())),
+        Ok(read) => read,
+        Err(_) => {
+            return Some((
+                false,
+                format!("代理在 {} 秒内没有回应 CONNECT 请求", TUNNEL_TIMEOUT.as_secs()),
+            ))
+        }
+    };
+    let status_line = String::from_utf8_lossy(&buffer[..read])
+        .lines()
+        .next()
+        .unwrap_or_default()
+        .trim()
+        .to_owned();
+
+    // "200" anywhere in the status line means the tunnel is open; proxies word it differently
+    // ("200 Connection established", "200 OK").
+    if status_line.contains(" 200") {
+        return Some(match probe_tunnel_reaches_destination(&mut stream) {
+            Ok(()) => (
+                true,
+                format!("代理可访问 {PROBE_HOST}，Agent 请求可以正常发出"),
+            ),
+            Err(reason) => (
+                false,
+                format!(
+                    "代理已建立隧道但无法到达 {PROBE_HOST}：{reason}。\
+                     Agent 发送消息时会一直等待直到超时"
+                ),
+            ),
+        });
+    }
+    if status_line.contains(" 407") {
+        return Some((
+            false,
+            "代理要求身份验证（407），请在 Profile 中填写代理用户名与密码".into(),
+        ));
+    }
+    Some((
+        false,
+        format!("代理拒绝连接 {PROBE_HOST}：{status_line}。Agent 发送消息时会一直等待直到超时"),
+    ))
+}
+
+/// Confirms the opened tunnel actually carries traffic to the destination.
+///
+/// Proxies that route by rule (Clash and friends) answer `200` before they resolve the target,
+/// so the status line alone cannot distinguish a working route from a dead one. Sending a real
+/// TLS ClientHello and waiting for the server's response is what settles it.
+fn probe_tunnel_reaches_destination(stream: &mut TcpStream) -> Result<(), String> {
+    stream
+        .write_all(&tls_client_hello(PROBE_HOST))
+        .map_err(|error| format!("无法通过隧道发送数据（{error}）"))?;
+
+    let mut buffer = [0u8; 8];
+    match stream.read(&mut buffer) {
+        // 0x16 is a handshake record and 0x15 an alert. Either one is a TLS server answering,
+        // which is all this probe needs: the deliberately minimal ClientHello offers one legacy
+        // cipher suite, so a strict endpoint replying "handshake_failure" still proves the
+        // tunnel carries traffic end to end.
+        Ok(read) if read > 0 && matches!(buffer[0], 0x16 | 0x15) => Ok(()),
+        Ok(0) => Err("隧道被立即关闭，目标不可达".into()),
+        Ok(_) => Err("目标返回了非 TLS 响应".into()),
+        Err(_) => Err(format!("{} 秒内没有收到目标响应", TUNNEL_TIMEOUT.as_secs())),
+    }
+}
+
+/// Builds a minimal TLS 1.2 ClientHello carrying `host` as SNI.
+///
+/// Hand-rolled rather than pulled from a TLS crate because the probe only needs the server to
+/// say something back — no certificate validation, no session, no handshake completion.
+fn tls_client_hello(host: &str) -> Vec<u8> {
+    let host = host.as_bytes();
+    let mut extensions = Vec::new();
+    // server_name extension (RFC 6066)
+    extensions.extend_from_slice(&[0x00, 0x00]);
+    extensions.extend_from_slice(&((host.len() + 5) as u16).to_be_bytes());
+    extensions.extend_from_slice(&((host.len() + 3) as u16).to_be_bytes());
+    extensions.push(0x00);
+    extensions.extend_from_slice(&(host.len() as u16).to_be_bytes());
+    extensions.extend_from_slice(host);
+
+    let mut body = Vec::new();
+    body.extend_from_slice(&[0x03, 0x03]); // client_version TLS 1.2
+    body.extend_from_slice(&[0x00; 32]); // random
+    body.push(0x00); // session_id
+    body.extend_from_slice(&[0x00, 0x02, 0x00, 0x2f]); // one cipher suite
+    body.extend_from_slice(&[0x01, 0x00]); // null compression
+    body.extend_from_slice(&(extensions.len() as u16).to_be_bytes());
+    body.extend_from_slice(&extensions);
+
+    let mut handshake = vec![0x01]; // ClientHello
+    let length = body.len();
+    handshake.extend_from_slice(&[(length >> 16) as u8, (length >> 8) as u8, length as u8]);
+    handshake.extend_from_slice(&body);
+
+    let mut record = vec![0x16, 0x03, 0x01]; // handshake record, TLS 1.0 framing
+    record.extend_from_slice(&(handshake.len() as u16).to_be_bytes());
+    record.extend_from_slice(&handshake);
+    record
+}
+
+/// Rejects `https://` proxy addresses, which almost never mean what the user intended.
+///
+/// The scheme of a proxy URL says how to *reach the proxy*, not what it forwards: `https://`
+/// asks the client to complete a TLS handshake with the proxy port itself. Ordinary proxies
+/// speak plain HTTP there, so the handshake hangs and the agent looks frozen — HTTPS traffic
+/// already tunnels correctly through an `http://` proxy via CONNECT.
+fn reject_tls_proxy_scheme(label: &str, value: &str) -> Result<(), String> {
+    let Ok(parsed) = Url::parse(value) else {
+        // A malformed URL is reported by validate_url with a better message.
+        return Ok(());
+    };
+    if parsed.scheme() != "https" {
+        return Ok(());
+    }
+    let corrected = format!("http://{}", value.trim_start_matches("https://"));
+    Err(format!(
+        "{label}不能使用 https:// 开头。代理地址的协议表示「如何连接代理」而不是「代理转发什么流量」，\
+         https:// 会要求先与代理端口完成 TLS 握手，普通代理不支持，Agent 会一直等待直到超时。\
+         请改为 {corrected}——HTTPS 请求仍会通过 CONNECT 正常走该代理。"
     ))
 }
 
@@ -275,14 +446,19 @@ fn proxy_url_with_credentials(
     password: Option<&str>,
 ) -> Result<String, String> {
     let mut parsed = Url::parse(value).map_err(|error| format!("代理地址无效：{error}"))?;
-    if let Some(username) = username.map(str::trim).filter(|value| !value.is_empty()) {
-        parsed
-            .set_username(username)
-            .map_err(|_| "代理用户名无法写入 URL".to_owned())?;
-        parsed
-            .set_password(password.filter(|value| !value.is_empty()))
-            .map_err(|_| "代理密码无法写入 URL".to_owned())?;
-    }
+    let Some(username) = username.map(str::trim).filter(|value| !value.is_empty()) else {
+        // No credentials to add, so the address is passed through exactly as entered.
+        // `Url::to_string` normalises `http://host:8080` into `http://host:8080/`, and that
+        // trailing slash makes some HTTP clients treat the proxy as having a path — requests
+        // then stall instead of failing fast. Only rewrite when there is something to write.
+        return Ok(value.trim().to_owned());
+    };
+    parsed
+        .set_username(username)
+        .map_err(|_| "代理用户名无法写入 URL".to_owned())?;
+    parsed
+        .set_password(password.filter(|value| !value.is_empty()))
+        .map_err(|_| "代理密码无法写入 URL".to_owned())?;
     Ok(parsed.to_string())
 }
 
@@ -313,10 +489,57 @@ mod tests {
             environment.get("NO_PROXY").map(String::as_str),
             Some("localhost,.internal.example")
         );
+        // npm's own noproxy takes precedence over NO_PROXY, so both have to carry the list.
+        assert_eq!(
+            environment.get("NPM_CONFIG_NOPROXY").map(String::as_str),
+            Some("localhost,.internal.example")
+        );
         assert_eq!(
             environment.get("NPM_CONFIG_STRICT_SSL").map(String::as_str),
             Some("false")
         );
+    }
+
+    #[test]
+    fn passes_a_proxy_without_credentials_through_unchanged() {
+        // `http://host:8080/` is not the same address to every HTTP client: the trailing slash
+        // reads as a path and makes requests stall, which is why the entered value is kept.
+        let mut profile = test_network_profile();
+        profile.proxy_username = None;
+        profile.https_proxy = Some("http://proxy.corp.example:8080".into());
+        profile.http_proxy = Some("http://proxy.corp.example:8080".into());
+
+        let environment = profile_environment(&profile, None).unwrap();
+
+        assert_eq!(
+            environment.get("HTTPS_PROXY").map(String::as_str),
+            Some("http://proxy.corp.example:8080")
+        );
+        assert_eq!(
+            environment.get("http_proxy").map(String::as_str),
+            Some("http://proxy.corp.example:8080")
+        );
+    }
+
+    #[test]
+    fn rejects_a_proxy_declared_over_tls() {
+        // `https://host:7890` makes the client attempt a TLS handshake with the proxy port
+        // itself, which plain proxies drop — the agent then hangs until its request times out.
+        let mut profile = test_network_profile();
+        profile.https_proxy = Some("https://127.0.0.1:7890".into());
+
+        let error = validate_profile(&profile).unwrap_err();
+
+        assert!(error.contains("https://"));
+        assert!(error.contains("http://127.0.0.1:7890"));
+    }
+
+    #[test]
+    fn keeps_accepting_an_http_proxy_for_https_traffic() {
+        let mut profile = test_network_profile();
+        profile.https_proxy = Some("http://127.0.0.1:7890".into());
+
+        assert!(validate_profile(&profile).is_ok());
     }
 
     #[test]
@@ -329,19 +552,109 @@ mod tests {
             .contains("不能在 URL 中保存账号密码"));
     }
 
-    #[test]
-    fn tests_a_reachable_local_proxy_endpoint() {
+    /// Runs a one-shot proxy answering CONNECT with `response`, then optionally replying to the
+    /// tunnelled TLS ClientHello with `tunnel_reply`.
+    fn spawn_proxy(
+        response: &'static str,
+        tunnel_reply: Option<&'static [u8]>,
+    ) -> (String, thread::JoinHandle<()>) {
         let listener = TcpListener::bind("127.0.0.1:0").unwrap();
         let address = listener.local_addr().unwrap();
-        let accepted = thread::spawn(move || listener.accept().unwrap());
+        let handle = thread::spawn(move || {
+            let (mut stream, _) = listener.accept().unwrap();
+            let mut buffer = [0u8; 128];
+            let _ = stream.read(&mut buffer);
+            let _ = stream.write_all(response.as_bytes());
+            if let Some(reply) = tunnel_reply {
+                let mut hello = [0u8; 512];
+                let _ = stream.read(&mut hello);
+                let _ = stream.write_all(reply);
+            }
+        });
+        (format!("http://{address}"), handle)
+    }
+
+    /// First bytes of a TLS ServerHello record.
+    const TLS_SERVER_HELLO: &[u8] = &[0x16, 0x03, 0x03, 0x00, 0x2a];
+    /// A fatal handshake_failure alert, which real endpoints send when they reject the probe's
+    /// single legacy cipher suite. The tunnel is still proven to work.
+    const TLS_HANDSHAKE_ALERT: &[u8] = &[0x15, 0x03, 0x03, 0x00, 0x02, 0x02, 0x28];
+
+    #[test]
+    fn reports_a_proxy_that_opens_the_tunnel_as_healthy() {
+        let (proxy, handle) = spawn_proxy(
+            "HTTP/1.1 200 Connection established\r\n\r\n",
+            Some(TLS_SERVER_HELLO),
+        );
         let mut profile = test_network_profile();
-        profile.https_proxy = Some(format!("http://{address}"));
+        profile.https_proxy = Some(proxy.clone());
 
         let result = test_profile(&profile, None).unwrap();
 
         assert!(result.healthy);
-        assert_eq!(result.target, format!("http://{address}"));
-        drop(accepted.join().unwrap());
+        assert_eq!(result.target, proxy);
+        assert!(result.message.contains(PROBE_HOST));
+        handle.join().unwrap();
+    }
+
+    #[test]
+    fn accepts_a_destination_that_rejects_the_probe_handshake() {
+        // api.anthropic.com answers the minimal ClientHello with handshake_failure. That is a
+        // reachable endpoint, not a broken proxy.
+        let (proxy, handle) = spawn_proxy(
+            "HTTP/1.1 200 Connection established\r\n\r\n",
+            Some(TLS_HANDSHAKE_ALERT),
+        );
+        let mut profile = test_network_profile();
+        profile.https_proxy = Some(proxy);
+
+        let result = test_profile(&profile, None).unwrap();
+
+        assert!(result.healthy);
+        handle.join().unwrap();
+    }
+
+    #[test]
+    fn rejects_a_tunnel_that_never_reaches_the_destination() {
+        // Rule-based proxies answer 200 before resolving the target, so a dead route looks
+        // identical to a working one until the tunnel is actually used.
+        let (proxy, handle) = spawn_proxy("HTTP/1.1 200 Connection established\r\n\r\n", None);
+        let mut profile = test_network_profile();
+        profile.https_proxy = Some(proxy);
+
+        let result = test_profile(&profile, None).unwrap();
+
+        assert!(!result.healthy);
+        assert!(result.message.contains("无法到达"));
+        handle.join().unwrap();
+    }
+
+    #[test]
+    fn reports_a_proxy_demanding_authentication() {
+        // Reaching this proxy succeeds, so the old TCP-only probe called it healthy while
+        // agents hung on every request.
+        let (proxy, handle) = spawn_proxy("HTTP/1.1 407 Proxy Authentication Required\r\n\r\n", None);
+        let mut profile = test_network_profile();
+        profile.https_proxy = Some(proxy);
+
+        let result = test_profile(&profile, None).unwrap();
+
+        assert!(!result.healthy);
+        assert!(result.message.contains("407"));
+        handle.join().unwrap();
+    }
+
+    #[test]
+    fn reports_a_proxy_that_refuses_the_destination() {
+        let (proxy, handle) = spawn_proxy("HTTP/1.1 403 Forbidden\r\n\r\n", None);
+        let mut profile = test_network_profile();
+        profile.https_proxy = Some(proxy);
+
+        let result = test_profile(&profile, None).unwrap();
+
+        assert!(!result.healthy);
+        assert!(result.message.contains("403"));
+        handle.join().unwrap();
     }
 
     fn test_network_profile() -> NetworkProfile {
