@@ -164,6 +164,8 @@ export class TerminalPanelComponent implements AfterViewInit {
     terminalContainer.addEventListener('wheel', this.stopWheelPropagation, { passive: true });
     terminalContainer.addEventListener('mousedown', this.suppressRightButtonReport, true);
     terminalContainer.addEventListener('contextmenu', this.handleContextMenu);
+    terminalContainer.addEventListener('compositionstart', this.anchorComposition, true);
+    terminalContainer.addEventListener('focusin', this.anchorComposition);
     this.fitTerminal();
     this.scheduleFit();
     if (this.active() && this.visible()) {
@@ -193,6 +195,8 @@ export class TerminalPanelComponent implements AfterViewInit {
       this.resizeObserver?.disconnect();
       terminalContainer.removeEventListener('mousedown', this.suppressRightButtonReport, true);
       terminalContainer.removeEventListener('contextmenu', this.handleContextMenu);
+      terminalContainer.removeEventListener('compositionstart', this.anchorComposition, true);
+      terminalContainer.removeEventListener('focusin', this.anchorComposition);
       terminalContainer.removeEventListener('wheel', this.prepareWheelInteraction, true);
       terminalContainer.removeEventListener('wheel', this.stopWheelPropagation);
       this.resizeCoordinator.dispose();
@@ -337,6 +341,33 @@ export class TerminalPanelComponent implements AfterViewInit {
     event.preventDefault();
     void this.gateway.write(this.session(), sequence);
     return false;
+  };
+
+  /**
+   * Anchors the IME to the caret when xterm has left its helper textarea parked off-screen.
+   *
+   * That textarea is what Windows measures to place the candidate window, and xterm moves it only
+   * when the cursor moves inside the viewport — before that it sits thousands of pixels to the
+   * left with no size. Composing while it is still parked, on a terminal that has just opened or
+   * one scrolled away from its cursor, leaves Windows without a caret rect, so the candidate
+   * window drops into a screen corner instead of following the text. Positioning from the public
+   * cursor coordinates reproduces xterm's own placement exactly.
+   */
+  private readonly anchorComposition = (): void => {
+    const host = this.container().nativeElement;
+    const textarea = host.querySelector<HTMLTextAreaElement>('.xterm-helper-textarea');
+    const screen = host.querySelector<HTMLElement>('.xterm-screen');
+    if (!textarea || !screen || textarea.getBoundingClientRect().left >= 0) {
+      return;
+    }
+    // The screen element is sized to exactly cols x rows, so it yields the true cell size.
+    const cellWidth = screen.clientWidth / Math.max(this.terminal.cols, 1);
+    const cellHeight = screen.clientHeight / Math.max(this.terminal.rows, 1);
+    const cursor = this.terminal.buffer.active;
+    textarea.style.left = `${cursor.cursorX * cellWidth}px`;
+    textarea.style.top = `${cursor.cursorY * cellHeight}px`;
+    textarea.style.width = `${cellWidth}px`;
+    textarea.style.height = `${cellHeight}px`;
   };
 
   /**

@@ -276,9 +276,17 @@ app-inspector-panel {
     border-bottom: 1px solid var(--border);
     background: color-mix(in srgb, var(--surface-2) 72%, transparent);
 
+    // Lets the title ellipsize instead of squeezing the actions beside it.
+    > div:first-child {
+      min-width: 0;
+    }
+
     strong,
     small {
       display: block;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
     }
 
     strong {
@@ -292,7 +300,8 @@ app-inspector-panel {
       font-size: 9px;
     }
 
-    button {
+    // Only the icon buttons are square; a labelled one beside them keeps its own width.
+    button.btn-square {
       display: grid;
       width: 25px;
       height: 25px;
@@ -308,6 +317,36 @@ app-inspector-panel {
   gap: 3px;
   overflow: auto;
   padding: 6px;
+}
+
+.global-notice-actions {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  gap: 2px;
+
+  // The label is short but must never wrap onto a second line beside the close button.
+  > .btn {
+    white-space: nowrap;
+  }
+}
+
+.global-notice-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 2px;
+
+  // The clear button only surfaces on the row it belongs to, so the list stays quiet at rest.
+  .global-notice-clear {
+    color: var(--text-muted);
+    opacity: 0;
+  }
+
+  &:hover .global-notice-clear,
+  .global-notice-clear:focus-visible {
+    opacity: 1;
+  }
 }
 
 .global-notice-item {

@@ -36,6 +36,7 @@ import {
 import { I18nService } from './core/i18n/i18n.service';
 import { TranslatePipe } from './core/i18n/translate.pipe';
 import {
+  clearedNoticeStatus,
   collectGlobalTerminalNotices,
   createAttentionBanner,
   globalNoticeKey,
@@ -960,6 +961,25 @@ export class App {
 
     this.dismissNoticeKeys([globalNoticeKey(banner.target)]);
     this.openGlobalTerminalNotice(banner.target);
+  }
+
+  /**
+   * Clears one terminal's notice by returning it to a status that no longer asks for attention.
+   *
+   * Each agent event is applied once, so a cleared status stays cleared until the agent reports
+   * something new — which is what makes this useful for a notice the user has already handled in
+   * the terminal itself.
+   */
+  protected clearTerminalNotice(notice: GlobalTerminalNotice): void {
+    this.state.updateTerminalStatus(notice.terminalId, clearedNoticeStatus(notice.status));
+  }
+
+  /** Clears every notice at once, for a batch that has already been dealt with. */
+  protected clearAllTerminalNotices(): void {
+    for (const notice of this.globalTerminalNotices()) {
+      this.clearTerminalNotice(notice);
+    }
+    this.globalNoticeOpen.set(false);
   }
 
   protected dismissAttentionBanner(): void {

@@ -11,7 +11,7 @@
 </p>
 
 <p align="center">
-  <img alt="Version 0.3.16" src="https://img.shields.io/badge/version-0.3.16-58c7a0">
+  <img alt="Version 0.3.17" src="https://img.shields.io/badge/version-0.3.17-58c7a0">
   <img alt="Windows" src="https://img.shields.io/badge/platform-Windows-0078D4?logo=windows">
   <img alt="Tauri 2" src="https://img.shields.io/badge/Tauri-2-24C8DB?logo=tauri&logoColor=white">
   <img alt="Angular 22" src="https://img.shields.io/badge/Angular-22-DD0031?logo=angular">
@@ -33,8 +33,8 @@ Termexo 把 Claude Code、Codex 和围绕它们运行的终端收进一个可恢
 npx termexo@latest
 ```
 
-> 最新正式版本为 **V0.3.16**。修复右键在 Claude Code 中粘贴两遍——Claude 会开启鼠标上报，
-> 因而也收到了这次右键并自行粘贴了一份，与 Termexo 自己的粘贴叠加。
+> 最新正式版本为 **V0.3.17**。修复中文输入法候选框跑到屏幕角落，并支持一键清除
+> 「等待输入」等待处理状态。
 
 ![Termexo 多终端网格工作台](website/assets/termexo-workbench.png)
 
@@ -85,6 +85,17 @@ SQLite，密钥保存在 Windows Credential Manager，Claude/Codex 历史会话�
 
 界面支持简体中文、英语、西班牙语、法语、德语、日语和韩语。默认自动跟随 Windows
 系统语言，也可通过主工具栏手动切换并跨重启保留选择。
+
+## V0.3.17 更新
+
+- 修复中文等输入法的候选框跑到屏幕右下角、另有一个小框停在左上角的问题。输入法靠 xterm 那个
+  隐藏 textarea 定位，而 xterm 只在光标于视口内移动时才同步它的位置，在此之前它停在屏幕外
+  （`left: -9999em`，尺寸 0×0）。终端刚打开、或往上滚动看输出导致光标离开视口时开始输入，
+  Windows 就拿不到光标矩形，只能把候选框放到屏幕角落。现在开始合成或终端获得焦点时，若发现
+  它仍停在屏幕外，就按光标坐标重新定位。
+- 「等待输入」「等待授权」「任务已完成」等待处理状态支持清除：全局提示面板中每条可单独清除，
+  也可一次全部清除。清除后等待类状态回到「运行中」、已完成回到「空闲」，铃铛、提示横幅与
+  终端标题栏同步消失；Agent 有新变化时会重新提示。
 
 ## V0.3.16 更新
 

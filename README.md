@@ -11,7 +11,7 @@
 </p>
 
 <p align="center">
-  <img alt="Version 0.3.16" src="https://img.shields.io/badge/version-0.3.16-58c7a0">
+  <img alt="Version 0.3.17" src="https://img.shields.io/badge/version-0.3.17-58c7a0">
   <img alt="Windows" src="https://img.shields.io/badge/platform-Windows-0078D4?logo=windows">
   <img alt="Tauri 2" src="https://img.shields.io/badge/Tauri-2-24C8DB?logo=tauri&logoColor=white">
   <img alt="Angular 22" src="https://img.shields.io/badge/Angular-22-DD0031?logo=angular">
@@ -34,9 +34,8 @@ Run the complete Windows app with one command—no Termexo account or server req
 npx termexo@latest
 ```
 
-> The latest published release is **V0.3.16**. It stops right-click from pasting twice in Claude
-> Code, which turns on mouse reporting and so received the click and pasted the clipboard itself
-> on top of Termexo's own paste.
+> The latest published release is **V0.3.17**. It keeps the IME candidate window on the caret
+> instead of a screen corner, and lets you clear a terminal's waiting status.
 
 ![Termexo multi-terminal grid workbench](website/assets/termexo-workbench.png)
 
@@ -93,6 +92,19 @@ you configure under their own terms and privacy policies.
 The interface is available in Simplified Chinese, English, Spanish, French, German, Japanese,
 and Korean. It follows the Windows language automatically, or you can choose a language from
 the main toolbar and keep that choice across restarts.
+
+## V0.3.17 Updates
+
+- Fix the IME candidate window appearing in a screen corner, with a second small box pinned to the
+  top-left. The IME anchors to xterm's hidden textarea, which xterm moves only once the cursor
+  moves inside the viewport — before that it sits off-screen (`left: -9999em`, zero-sized). Typing
+  on a terminal that has just opened, or one scrolled away from its cursor, left Windows without a
+  caret rect. Termexo now re-anchors it from the cursor coordinates when a composition starts or
+  the terminal takes focus.
+- Waiting statuses can be cleared. Each entry in the global notice panel has a clear button, and
+  the header clears them all at once. A waiting terminal returns to Running and a completed one to
+  Idle, so the bell, the attention banner, and the terminal header all settle together; the agent
+  raises a fresh notice when something changes.
 
 ## V0.3.16 Updates
 

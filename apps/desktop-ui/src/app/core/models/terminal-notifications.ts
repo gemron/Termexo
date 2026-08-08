@@ -70,6 +70,16 @@ export function isWaitingNotice(notice: GlobalTerminalNotice): boolean {
   return notice.status !== 'COMPLETED';
 }
 
+/**
+ * The status a terminal falls back to once the user clears its notice.
+ *
+ * Clearing records that the notice has been dealt with, not that the terminal changed: one that
+ * was blocking is still alive and running, while a completed one has nothing left in flight.
+ */
+export function clearedNoticeStatus(status: GlobalTerminalNoticeStatus): TerminalStatus {
+  return status === 'COMPLETED' ? 'IDLE' : 'RUNNING';
+}
+
 export function collectGlobalTerminalNotices(
   workspaces: readonly Workspace[],
 ): GlobalTerminalNotice[] {

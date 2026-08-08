@@ -1,5 +1,6 @@
 import { Workspace } from './workspace.models';
 import {
+  clearedNoticeStatus,
   collectGlobalTerminalNotices,
   createAttentionBanner,
   createDesktopNotification,
@@ -28,6 +29,25 @@ const workspace = (
     model: 'Claude Sonnet',
     branch: 'main',
   })),
+});
+
+describe('clearedNoticeStatus', () => {
+  it('leaves a blocked terminal running, since clearing only acknowledges the notice', () => {
+    expect(clearedNoticeStatus('WAITING_INPUT')).toBe('RUNNING');
+    expect(clearedNoticeStatus('WAITING_APPROVAL')).toBe('RUNNING');
+  });
+
+  it('parks a finished terminal as idle, because it has nothing left in flight', () => {
+    expect(clearedNoticeStatus('COMPLETED')).toBe('IDLE');
+  });
+
+  it('produces statuses that no longer raise a notice', () => {
+    const cleared = (['WAITING_INPUT', 'WAITING_APPROVAL', 'COMPLETED'] as const).map(
+      clearedNoticeStatus,
+    );
+
+    expect(collectGlobalTerminalNotices([workspace('one', cleared)])).toEqual([]);
+  });
 });
 
 describe('collectGlobalTerminalNotices', () => {
