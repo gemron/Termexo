@@ -56,8 +56,12 @@ export interface CliOperationPlan {
   packageName: string;
   targetVersion: string;
   packageSpec: string;
-  action: 'install' | 'upgrade';
+  /** `reinstall` when the installed version already matches the resolved one. */
+  action: 'install' | 'upgrade' | 'reinstall';
   currentVersion?: string;
+  /** Version the registry resolves the target to, when it could be queried. */
+  resolvedVersion?: string;
+  upToDate: boolean;
   npmPath?: string;
   npmVersion?: string;
   commandPreview: string;

@@ -22,6 +22,8 @@
         (closeRequested)="terminalClosed.emit($event)"
         (maximizeRequested)="terminalMaximizeRequested.emit($event)"
         (statusChanged)="terminalStatusChanged.emit($event)"
+        (renameRequested)="terminalRenamed.emit($event)"
+        (modelSwitchRequested)="terminalModelSwitchRequested.emit($event)"
       />
     }
   </div>

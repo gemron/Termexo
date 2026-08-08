@@ -1002,6 +1002,12 @@ button:disabled {
   color: var(--color-error);
 }
 
+.update-npm-note {
+  color: var(--text-muted);
+  font-size: 10px;
+  line-height: 1.5;
+}
+
 .update-actions {
   display: flex;
   flex-wrap: wrap;

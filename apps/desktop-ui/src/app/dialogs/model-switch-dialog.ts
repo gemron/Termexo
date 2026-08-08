@@ -38,30 +38,37 @@ export interface ModelSwitchValue {
           </button>
         </header>
 
-        <nav class="session-agent-filter tabs tabs-box" role="tablist" [attr.aria-label]="'session.filterAria' | t">
-          <button
-            type="button"
-            role="tab"
-            class="tab"
-            [class.active]="agentType() === 'claude'"
-            [attr.aria-selected]="agentType() === 'claude'"
-            (click)="agentType.set('claude')"
+        <!-- A single-terminal switch has its agent type fixed by that terminal. -->
+        @if (!lockedAgentType()) {
+          <nav
+            class="session-agent-filter tabs tabs-box"
+            role="tablist"
+            [attr.aria-label]="'session.filterAria' | t"
           >
-            {{ 'modelSwitch.claudeTab' | t }}
-            <span>{{ claudeCount() }}</span>
-          </button>
-          <button
-            type="button"
-            role="tab"
-            class="tab"
-            [class.active]="agentType() === 'codex'"
-            [attr.aria-selected]="agentType() === 'codex'"
-            (click)="agentType.set('codex')"
-          >
-            {{ 'modelSwitch.codexTab' | t }}
-            <span>{{ codexCount() }}</span>
-          </button>
-        </nav>
+            <button
+              type="button"
+              role="tab"
+              class="tab"
+              [class.active]="agentType() === 'claude'"
+              [attr.aria-selected]="agentType() === 'claude'"
+              (click)="agentTypeValue.set('claude')"
+            >
+              {{ 'modelSwitch.claudeTab' | t }}
+              <span>{{ claudeCount() }}</span>
+            </button>
+            <button
+              type="button"
+              role="tab"
+              class="tab"
+              [class.active]="agentType() === 'codex'"
+              [attr.aria-selected]="agentType() === 'codex'"
+              (click)="agentTypeValue.set('codex')"
+            >
+              {{ 'modelSwitch.codexTab' | t }}
+              <span>{{ codexCount() }}</span>
+            </button>
+          </nav>
+        }
 
         <div class="profile-list">
           @for (profile of filteredProfiles(); track profile.id) {
@@ -92,7 +99,7 @@ export interface ModelSwitchValue {
             <strong>{{ 'modelSwitch.cliUnchanged' | t }}</strong><span>CLI {{ agentType() === 'codex' ? 'Codex CLI' : 'Claude Code' }}</span>
           </div>
           <div>
-            <strong>{{ agentCount() }}</strong
+            <strong>{{ singleTerminalName() ? 1 : agentCount() }}</strong
             ><span>{{ 'modelSwitch.terminalsRestart' | t }}</span>
           </div>
           <div>
@@ -125,10 +132,15 @@ export class ModelSwitchDialogComponent {
   readonly codexCount = input(0);
   readonly profiles = input<ModelProfile[]>([]);
   readonly busy = input(false);
+  /** Name of the single terminal being switched; empty for a batch switch. */
+  readonly singleTerminalName = input('');
+  /** Fixes the agent type, hiding the tabs when the target terminal already decides it. */
+  readonly lockedAgentType = input<NativeAgentType | null>(null);
   readonly confirmed = output<ModelSwitchValue>();
   readonly cancelled = output<void>();
   readonly selectedProfileId = signal('');
-  readonly agentType = signal<NativeAgentType>('claude');
+  protected readonly agentTypeValue = signal<NativeAgentType>('claude');
+  readonly agentType = computed(() => this.lockedAgentType() ?? this.agentTypeValue());
 
   protected readonly anthropicProfiles = computed(() =>
     this.profiles().filter((profile) => profile.apiProtocol === 'anthropic'),
@@ -146,11 +158,16 @@ export class ModelSwitchDialogComponent {
       this.filteredProfiles()[0]?.id ||
       '',
   );
-  protected readonly description = computed(() =>
-    this.agentType() === 'codex'
+  protected readonly description = computed(() => {
+    // A single-terminal switch names the terminal, so the scope is unmistakable.
+    const name = this.singleTerminalName();
+    if (name) {
+      return this.i18nService.t('terminal.switchOneTitle', { name });
+    }
+    return this.agentType() === 'codex'
       ? this.i18n('modelSwitch.codexDescription')
-      : this.i18n('modelSwitch.description'),
-  );
+      : this.i18n('modelSwitch.description');
+  });
   protected readonly emptyTitle = computed(() => {
     if (this.agentType() === 'codex') {
       return this.i18n('modelSwitch.codexEmpty');

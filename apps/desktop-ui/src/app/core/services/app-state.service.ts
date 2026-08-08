@@ -329,6 +329,15 @@ export class AppStateService {
     this.updateTerminal(terminalId, (terminal) => ({ ...terminal, status }));
   }
 
+  /** Renames a terminal, ignoring a blank name so a tab can never lose its label. */
+  renameTerminal(terminalId: string, name: string): void {
+    const trimmed = name.trim();
+    if (!trimmed) {
+      return;
+    }
+    this.updateTerminal(terminalId, (terminal) => ({ ...terminal, name: trimmed }));
+  }
+
   updateRestoredTerminalLaunch(
     terminalId: string,
     command: string,

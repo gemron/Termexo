@@ -34,6 +34,8 @@ export class TerminalWorkbenchComponent {
   readonly terminalMaximizeRequested = output<string>();
   readonly terminalRequested = output<void>();
   readonly terminalStatusChanged = output<{ terminalId: string; status: TerminalStatus }>();
+  readonly terminalRenamed = output<{ terminalId: string; name: string }>();
+  readonly terminalModelSwitchRequested = output<string>();
 
   protected readonly renderedGridColumns = computed(() =>
     Math.min(

@@ -36,8 +36,13 @@ pub struct CliOperationPlan {
     pub package_name: String,
     pub target_version: String,
     pub package_spec: String,
+    /// `install`, `upgrade`, or `reinstall` when the installed version already matches.
     pub action: String,
     pub current_version: Option<String>,
+    /// Version the registry resolves `target_version` to, when it could be queried.
+    pub resolved_version: Option<String>,
+    /// True when the installed version already equals the resolved one.
+    pub up_to_date: bool,
     pub npm_path: Option<String>,
     pub npm_version: Option<String>,
     pub command_preview: String,
@@ -90,26 +95,55 @@ pub fn build_operation_plan(
         .as_deref()
         .and_then(|path| read_npm_version(path).ok());
     let ready = npm_path.is_some() && npm_version.is_some();
-    let action = if installation.installed {
-        "upgrade"
-    } else {
-        "install"
+
+    // Ask the registry what the requested tag resolves to. Without this an already-current CLI
+    // still reads as "upgrade", because being installed was the only thing checked.
+    let resolved_version = npm_path.as_deref().and_then(|path| {
+        read_published_version(path, &package_spec, network_profile).ok()
+    });
+    let installed_version = installation.version.as_deref().map(extract_version);
+    let up_to_date = match (installed_version.as_deref(), resolved_version.as_deref()) {
+        (Some(installed), Some(resolved)) => installed == resolved,
+        _ => false,
     };
-    let diagnostic = if ready {
-        format!(
-            "已检测到 npm {}，可{} {}。",
-            npm_version.as_deref().unwrap_or_default(),
-            if action == "install" {
-                "安装"
-            } else {
-                "升级"
-            },
-            definition.display_name
-        )
-    } else if npm_path.is_some() {
-        "已找到 npm，但版本检测失败；请先修复 Node.js/npm 环境。".into()
+    let action = if !installation.installed {
+        "install"
+    } else if up_to_date {
+        "reinstall"
     } else {
-        "未检测到 npm；请先安装 Node.js 与 npm。".into()
+        "upgrade"
+    };
+
+    let diagnostic = if !ready {
+        if npm_path.is_some() {
+            "已找到 npm，但版本检测失败；请先修复 Node.js/npm 环境。".into()
+        } else {
+            "未检测到 npm；请先安装 Node.js 与 npm。".into()
+        }
+    } else if up_to_date {
+        format!(
+            "{} 已是最新版本 {}，无需升级。如需修复安装可继续执行。",
+            definition.display_name,
+            resolved_version.as_deref().unwrap_or_default()
+        )
+    } else {
+        match (&resolved_version, action) {
+            (Some(resolved), "upgrade") => format!(
+                "可将 {} 从 {} 升级到 {}。",
+                definition.display_name,
+                installed_version.as_deref().unwrap_or("未知版本"),
+                resolved
+            ),
+            (Some(resolved), _) => {
+                format!("可安装 {} {}。", definition.display_name, resolved)
+            }
+            (None, _) => format!(
+                "已检测到 npm {}，可{} {}。（无法查询远端版本，可能是网络或代理问题）",
+                npm_version.as_deref().unwrap_or_default(),
+                if action == "install" { "安装" } else { "升级" },
+                definition.display_name
+            ),
+        }
     };
 
     Ok(CliOperationPlan {
@@ -120,6 +154,8 @@ pub fn build_operation_plan(
         package_spec: package_spec.clone(),
         action: action.into(),
         current_version: installation.version,
+        resolved_version,
+        up_to_date,
         npm_path: npm_path.map(|path| path.to_string_lossy().into_owned()),
         npm_version,
         command_preview: format!("npm install --global {package_spec} --no-fund --no-audit"),
@@ -284,6 +320,68 @@ fn find_npm_executable() -> Option<PathBuf> {
     candidates.into_iter().find(|path| path.is_file())
 }
 
+/// Asks the registry which version `package_spec` resolves to.
+///
+/// A dist-tag like `latest` says nothing about whether an upgrade is needed, so the concrete
+/// version behind it has to be looked up before the plan can claim one is available.
+fn read_published_version(
+    npm_path: &Path,
+    package_spec: &str,
+    network_profile: Option<&NetworkProfile>,
+) -> Result<String, String> {
+    // The lookup goes through the same registry and proxy the install would use.
+    let mut environment = HashMap::new();
+    if let Some(profile) = network_profile {
+        if let Ok(profile_environment) = crate::network::profile_environment(profile, None) {
+            environment.extend(profile_environment);
+        }
+    }
+
+    let result = run_npm_command(
+        npm_path,
+        &["view", package_spec, "version"],
+        &environment,
+        VERSION_TIMEOUT,
+    )?;
+    if !result.success {
+        return Err(result.stderr);
+    }
+    // `npm view` prints one bare version for a single match, so the last non-empty line is it.
+    let version = result
+        .stdout
+        .lines()
+        .map(str::trim)
+        .filter(|line| !line.is_empty())
+        .next_back()
+        .unwrap_or_default();
+    if version.is_empty() {
+        Err("npm 未返回可用的版本号。".into())
+    } else {
+        Ok(version.to_owned())
+    }
+}
+
+/// Pulls the bare version out of a CLI's `--version` output.
+///
+/// The two CLIs place it differently — Claude prints `2.1.224 (Claude Code)` and Codex prints
+/// `codex-cli 0.147.0` — so the first token that actually looks like a version is taken rather
+/// than the first token. Getting this wrong makes every comparison fail and offers an upgrade
+/// that is not needed.
+fn extract_version(reported: &str) -> String {
+    reported
+        .split_whitespace()
+        .map(|token| token.trim_start_matches('v'))
+        .find(|token| {
+            let mut characters = token.chars();
+            characters.next().is_some_and(|first| first.is_ascii_digit())
+                && token
+                    .chars()
+                    .all(|character| character.is_ascii_digit() || ".-+".contains(character))
+        })
+        .unwrap_or_else(|| reported.trim())
+        .to_owned()
+}
+
 fn read_npm_version(path: &Path) -> Result<String, String> {
     let result = run_npm_command(path, &["--version"], &HashMap::new(), VERSION_TIMEOUT)?;
     if !result.success {
@@ -435,6 +533,24 @@ mod tests {
             "0.145.0"
         );
         assert_eq!(normalize_target_version(Some("next")).unwrap(), "next");
+    }
+
+    #[test]
+    fn extracts_the_bare_version_from_cli_output() {
+        // The real outputs of both CLIs, which put the version in different positions.
+        assert_eq!(extract_version("2.1.224 (Claude Code)"), "2.1.224");
+        assert_eq!(extract_version("codex-cli 0.147.0"), "0.147.0");
+        assert_eq!(extract_version("0.45.0"), "0.45.0");
+        assert_eq!(extract_version("  1.2.3  "), "1.2.3");
+        assert_eq!(extract_version("v2.0.1"), "2.0.1");
+        assert_eq!(extract_version("1.0.0-beta.1"), "1.0.0-beta.1");
+    }
+
+    #[test]
+    fn version_extraction_falls_back_to_the_whole_string() {
+        // Without a version-looking token the value is kept as-is, so the comparison simply
+        // fails to match rather than silently claiming the CLI is current.
+        assert_eq!(extract_version("unknown build"), "unknown build");
     }
 
     #[test]

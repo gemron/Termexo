@@ -93,7 +93,7 @@
           type="button"
           class="tool-button btn btn-ghost btn-sm join-item"
           [title]="'terminal.switchClaudeModel' | t"
-          (click)="modelSwitchOpen.set(true)"
+          (click)="openBatchModelSwitch()"
         >
           <app-icon name="zap" [size]="14" />
           <span>{{ 'terminal.claudeModel' | t }}</span>
@@ -506,6 +506,8 @@
             (terminalMaximizeRequested)="toggleTerminalMaximize($event)"
             (terminalRequested)="createTerminal('shell')"
             (terminalStatusChanged)="state.updateTerminalStatus($event.terminalId, $event.status)"
+            (terminalRenamed)="state.renameTerminal($event.terminalId, $event.name)"
+            (terminalModelSwitchRequested)="openSingleModelSwitch($event)"
           />
         }
       }
@@ -629,11 +631,13 @@
     [busy]="agents.busy()"
     [updateResult]="updates.result()"
     [updateChecking]="updates.checking()"
+    [updateInstalling]="updateInstalling()"
     [updateError]="updates.error()"
     [autoCheckUpdates]="updates.autoCheckEnabled()"
     (detectRequested)="detectAgentInstallations()"
     (updateCheckRequested)="checkForUpdate()"
     (updateDownloadRequested)="openReleasePage()"
+    (updateNpmRequested)="installUpdateViaNpm()"
     (autoCheckChanged)="updates.setAutoCheckEnabled($event)"
     (cliPreviewRequested)="previewCliOperation($event)"
     (cliExecuteRequested)="executeCliOperation($event)"
@@ -666,8 +670,10 @@
     [codexCount]="state.codexTerminalCount()"
     [profiles]="agents.modelProfiles()"
     [busy]="launchingClaude() || launchingCodex()"
+    [singleTerminalName]="modelSwitchTerminalName()"
+    [lockedAgentType]="modelSwitchAgentType()"
     (confirmed)="switchModels($event)"
-    (cancelled)="modelSwitchOpen.set(false)"
+    (cancelled)="closeModelSwitch()"
   />
 }
 

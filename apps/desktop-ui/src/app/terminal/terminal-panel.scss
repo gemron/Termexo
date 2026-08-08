@@ -126,6 +126,28 @@ header {
     text-overflow: ellipsis;
     white-space: nowrap;
   }
+
+  .terminal-name {
+    cursor: text;
+  }
+}
+
+// Sized to match the title it replaces, so the header does not shift while renaming.
+.terminal-rename {
+  width: 180px;
+  height: 22px;
+  padding: 0 6px;
+  border: 1px solid color-mix(in srgb, var(--accent) 52%, var(--border));
+  border-radius: var(--radius-field);
+  color: var(--text);
+  background: var(--surface-inset);
+  font-size: 12px;
+  font-weight: 620;
+
+  &:focus {
+    outline: 0;
+    border-color: var(--accent);
+  }
 }
 
 .agent-icon {
@@ -232,6 +254,32 @@ header {
     font: 10px/1 var(--mono);
     text-overflow: ellipsis;
     white-space: nowrap;
+  }
+
+  // Overrides the square icon-button sizing below, which would crush the model label.
+  .model-chip {
+    display: flex;
+    width: auto;
+    height: 22px;
+    align-items: center;
+    gap: 3px;
+    max-width: 150px;
+    margin-right: 3px;
+    padding: 0 6px;
+    color: var(--text-muted);
+    cursor: pointer;
+
+    > span {
+      overflow: hidden;
+      font: 10px/1 var(--mono);
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    &:hover {
+      color: var(--text);
+      background: var(--surface-2);
+    }
   }
 
   button {

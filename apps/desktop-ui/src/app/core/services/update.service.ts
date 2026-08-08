@@ -10,6 +10,8 @@ export interface UpdateCheck {
   releaseNotes?: string;
   releaseUrl: string;
   publishedAt?: string;
+  /** True when this build runs from a global npm install and can update itself. */
+  installedViaNpm: boolean;
 }
 
 const AUTO_CHECK_STORAGE_KEY = 'termexo.autoCheckUpdates';
@@ -137,6 +139,19 @@ export class UpdateService implements OnDestroy {
       return;
     }
     await invoke('open_release_page', { url: this.resultValue()?.releaseUrl });
+  }
+
+  /**
+   * Installs the newest npm release and relaunches.
+   *
+   * Windows locks the running executable, so the install happens after Termexo exits — the app
+   * closes as part of this call and the new build starts on its own.
+   */
+  async updateViaNpm(): Promise<void> {
+    if (!isTauriRuntime()) {
+      return;
+    }
+    await invoke('update_via_npm');
   }
 
   /** True when an update is published and the user has not dismissed that exact version. */

@@ -111,6 +111,7 @@ describe('UpdateService', () => {
         latestVersion: '0.4.0',
         updateAvailable: true,
         releaseUrl: 'https://github.com/gemron/Termexo/releases/tag/v0.4.0',
+        installedViaNpm: false,
       };
       vi.spyOn(service, 'check').mockImplementation(async () => {
         (service as unknown as { resultValue: { set: (v: unknown) => void } }).resultValue.set(

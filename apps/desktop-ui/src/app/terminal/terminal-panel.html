@@ -17,13 +17,46 @@
       >
         <i class="status-light"></i>
       </span>
-      <strong>{{ session().name }}</strong>
+      @if (renaming()) {
+        <input
+          #renameInput
+          class="terminal-rename input input-xs"
+          type="text"
+          [value]="session().name"
+          [attr.aria-label]="'terminal.rename' | t"
+          (click)="$event.stopPropagation()"
+          (mousedown)="$event.stopPropagation()"
+          (keydown.enter)="commitRename(renameInput.value)"
+          (keydown.escape)="renaming.set(false)"
+          (blur)="commitRename(renameInput.value)"
+        />
+      } @else {
+        <strong
+          class="terminal-name"
+          [title]="'terminal.renameHint' | t"
+          (dblclick)="$event.stopPropagation(); startRename()"
+        >
+          {{ session().name }}
+        </strong>
+      }
       <span class="status-label" aria-live="polite" [attr.data-status]="session().status">
         {{ statusLabel(session().status) }}
       </span>
     </div>
     <div class="terminal-meta">
-      <span>{{ session().model }}</span>
+      @if (session().agentType !== 'shell') {
+        <button
+          type="button"
+          class="model-chip"
+          [title]="'terminal.switchThisModel' | t"
+          (click)="$event.stopPropagation(); modelSwitchRequested.emit(session().id)"
+        >
+          <span>{{ session().model }}</span>
+          <app-icon name="chevron-down" [size]="11" />
+        </button>
+      } @else {
+        <span>{{ session().model }}</span>
+      }
       <button
         type="button"
         class="btn btn-square btn-ghost btn-xs"

@@ -202,6 +202,9 @@ export class AgentService {
         packageSpec: `${packageName}@${targetVersion}`,
         action: installation?.installed ? 'upgrade' : 'install',
         currentVersion: installation?.version,
+        // Browser preview cannot reach the registry, so no version is resolved and the plan
+        // never claims to be current.
+        upToDate: false,
         npmPath: 'browser-preview/npm',
         npmVersion: 'preview',
         commandPreview: `npm install --global ${packageName}@${targetVersion} --no-fund --no-audit`,

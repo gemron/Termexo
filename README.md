@@ -11,7 +11,7 @@
 </p>
 
 <p align="center">
-  <img alt="Version 0.3.14" src="https://img.shields.io/badge/version-0.3.14-58c7a0">
+  <img alt="Version 0.3.15" src="https://img.shields.io/badge/version-0.3.15-58c7a0">
   <img alt="Windows" src="https://img.shields.io/badge/platform-Windows-0078D4?logo=windows">
   <img alt="Tauri 2" src="https://img.shields.io/badge/Tauri-2-24C8DB?logo=tauri&logoColor=white">
   <img alt="Angular 22" src="https://img.shields.io/badge/Angular-22-DD0031?logo=angular">
@@ -34,9 +34,9 @@ Run the complete Windows app with one command—no Termexo account or server req
 npx termexo@latest
 ```
 
-> The latest published release is **V0.3.14**. It fixes agents hanging when a proxy address was
-> entered with an `https://` scheme, and adds import/export for proxy profiles (passwords stay
-> behind).
+> The latest published release is **V0.3.15**. It fixes Shift+Tab doing nothing inside agents
+> and right-click paste inserting text twice, and adds terminal renaming plus per-terminal model
+> switching.
 
 ![Termexo multi-terminal grid workbench](website/assets/termexo-workbench.png)
 
@@ -93,6 +93,24 @@ you configure under their own terms and privacy policies.
 The interface is available in Simplified Chinese, English, Spanish, French, German, Japanese,
 and Korean. It follows the Windows language automatically, or you can choose a language from
 the main toolbar and keep that choice across restarts.
+
+## V0.3.15 Updates
+
+- Fix Shift+Tab doing nothing in Claude Code and other agents. xterm emits no input for that
+  combination, so the key never reached the terminal; Termexo now sends the reverse-tab sequence
+  (CSI Z) and stops the browser from treating it as focus navigation.
+- Fix right-click paste inserting the text twice. Paste previously came from the native WebView2
+  menu and the agent handled it again; Termexo now owns the right-click — copy when there is a
+  selection, paste when there is not, written exactly once.
+- Rename a terminal by double-clicking its title. Enter saves, Escape cancels.
+- The model name in each agent terminal's header is now a button that switches only that
+  terminal. The toolbar button becomes "Switch all", making the batch scope explicit.
+- The agent menu closes on an outside click or Escape.
+- CLI upgrade checks query the published version before comparing, so an already-current CLI no
+  longer offers an upgrade — only "Reinstall anyway" — and installs show a progress indicator.
+- Builds installed through npm can update themselves: Termexo closes, npm installs the new
+  version, and the app reopens. Windows locks a running executable, so the install has to happen
+  after the app exits. Installer builds still open the release page.
 
 ## V0.3.14 Updates
 

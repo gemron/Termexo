@@ -11,7 +11,7 @@
 </p>
 
 <p align="center">
-  <img alt="Version 0.3.14" src="https://img.shields.io/badge/version-0.3.14-58c7a0">
+  <img alt="Version 0.3.15" src="https://img.shields.io/badge/version-0.3.15-58c7a0">
   <img alt="Windows" src="https://img.shields.io/badge/platform-Windows-0078D4?logo=windows">
   <img alt="Tauri 2" src="https://img.shields.io/badge/Tauri-2-24C8DB?logo=tauri&logoColor=white">
   <img alt="Angular 22" src="https://img.shields.io/badge/Angular-22-DD0031?logo=angular">
@@ -33,8 +33,8 @@ Termexo 把 Claude Code、Codex 和围绕它们运行的终端收进一个可恢
 npx termexo@latest
 ```
 
-> 最新正式版本为 **V0.3.14**。修复了代理地址误填 `https://` 导致 Agent 发消息卡死的问题，
-> 并新增代理配置的导入导出（不含密码）。
+> 最新正式版本为 **V0.3.15**。修复 Shift+Tab 在 Agent 中无响应、右键粘贴内容重复，
+> 并支持双击重命名终端、单个终端单独切换模型。
 
 ![Termexo 多终端网格工作台](website/assets/termexo-workbench.png)
 
@@ -85,6 +85,21 @@ SQLite，密钥保存在 Windows Credential Manager，Claude/Codex 历史会话�
 
 界面支持简体中文、英语、西班牙语、法语、德语、日语和韩语。默认自动跟随 Windows
 系统语言，也可通过主工具栏手动切换并跨重启保留选择。
+
+## V0.3.15 更新
+
+- 修复 Shift+Tab 在 Claude Code 等 Agent 中无响应的问题。xterm 不会为该组合键发送任何内容，
+  终端因此收不到按键；现在补发反向制表符序列（CSI Z），并阻止浏览器将其当作焦点切换。
+- 修复右键粘贴时内容重复的问题。此前依赖 WebView2 的原生菜单粘贴，Agent 会再处理一次；
+  现在由 Termexo 接管右键：有选区则复制，无选区则粘贴，只写入一次。
+- 终端标题支持双击重命名，Enter 保存、Esc 取消。
+- 每个 Agent 终端标题栏的模型名可点击，单独切换该终端的模型；顶部按钮改为「批量切换」，
+  明确表示一次切换全部同类终端。
+- 顶部 Agent 选择菜单支持点击空白处或按 Esc 关闭。
+- CLI 升级检查会先查询 npm 上的实际版本再比较：已是最新时不再提示可升级，仅提供「仍要重新
+  安装」；安装过程中显示进度动画。
+- 通过 npm 安装的版本可在应用内一键更新：Termexo 关闭后由 npm 安装新版本并自动重新打开。
+  Windows 会锁定运行中的程序文件，因此更新必须在退出后进行。安装器安装的版本仍引导到发布页面。
 
 ## V0.3.14 更新
 

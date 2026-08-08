@@ -23,6 +23,7 @@ import {
 } from '../core/models/workspace.models';
 import { TerminalGatewayService } from '../core/services/terminal-gateway.service';
 import { IconComponent } from '../shared/icon/icon';
+import { terminalKeySequence } from './terminal-key-sequences';
 import { TerminalResizeCoordinator } from './terminal-resize-coordinator';
 import { detectTerminalRuntimeIssue, TerminalRuntimeIssue } from './terminal-runtime-diagnostics';
 import { createTerminalTheme } from './terminal-theme';
@@ -83,6 +84,34 @@ export class TerminalPanelComponent implements AfterViewInit {
   readonly closeRequested = output<string>();
   readonly maximizeRequested = output<string>();
   readonly statusChanged = output<{ terminalId: string; status: TerminalStatus }>();
+  readonly renameRequested = output<{ terminalId: string; name: string }>();
+  readonly modelSwitchRequested = output<string>();
+
+  protected readonly renaming = signal(false);
+
+  protected startRename(): void {
+    this.renaming.set(true);
+    // The input only exists after this render, so focusing waits for it to be in the DOM.
+    setTimeout(() => {
+      const input = this.container()
+        .nativeElement.closest('.terminal-panel')
+        ?.querySelector<HTMLInputElement>('.terminal-rename');
+      input?.focus();
+      input?.select();
+    });
+  }
+
+  /** Applies a rename, ignoring an empty name or one that did not change. */
+  protected commitRename(value: string): void {
+    if (!this.renaming()) {
+      return;
+    }
+    this.renaming.set(false);
+    const name = value.trim();
+    if (name && name !== this.session().name) {
+      this.renameRequested.emit({ terminalId: this.session().id, name });
+    }
+  }
 
   private readonly runtimeIssue = signal<TerminalRuntimeIssue>(null);
   protected readonly runtimeNotice = computed(() => {
@@ -121,6 +150,7 @@ export class TerminalPanelComponent implements AfterViewInit {
 
   ngAfterViewInit(): void {
     this.viewReady = true;
+    this.terminal.attachCustomKeyEventHandler(this.handleCustomKey);
     this.terminal.loadAddon(this.fitAddon);
     const terminalContainer = this.container().nativeElement;
     this.terminal.open(terminalContainer);
@@ -129,6 +159,7 @@ export class TerminalPanelComponent implements AfterViewInit {
       passive: true,
     });
     terminalContainer.addEventListener('wheel', this.stopWheelPropagation, { passive: true });
+    terminalContainer.addEventListener('contextmenu', this.handleContextMenu);
     this.fitTerminal();
     this.scheduleFit();
     if (this.active() && this.visible()) {
@@ -156,6 +187,7 @@ export class TerminalPanelComponent implements AfterViewInit {
     this.destroyRef.onDestroy(() => {
       inputDisposable.dispose();
       this.resizeObserver?.disconnect();
+      terminalContainer.removeEventListener('contextmenu', this.handleContextMenu);
       terminalContainer.removeEventListener('wheel', this.prepareWheelInteraction, true);
       terminalContainer.removeEventListener('wheel', this.stopWheelPropagation);
       this.resizeCoordinator.dispose();
@@ -285,6 +317,56 @@ export class TerminalPanelComponent implements AfterViewInit {
   private readonly prepareWheelInteraction = (): void => {
     this.activateTerminal();
   };
+
+  /**
+   * Writes sequences xterm does not produce, then stops it from handling the event.
+   *
+   * Returning false also prevents the browser from treating Shift+Tab as focus navigation,
+   * which would move focus out of the terminal entirely.
+   */
+  private readonly handleCustomKey = (event: KeyboardEvent): boolean => {
+    const sequence = terminalKeySequence(event);
+    if (!sequence) {
+      return true;
+    }
+    event.preventDefault();
+    void this.gateway.write(this.session(), sequence);
+    return false;
+  };
+
+  /**
+   * Handles right-click as copy-or-paste, the convention terminals on Windows follow.
+   *
+   * The native WebView2 menu is suppressed: letting it paste as well delivers the text twice,
+   * once through the menu and once through this handler.
+   */
+  private readonly handleContextMenu = (event: MouseEvent): void => {
+    event.preventDefault();
+    const selection = this.terminal.getSelection();
+    if (selection) {
+      void navigator.clipboard.writeText(selection).catch(() => undefined);
+      this.terminal.clearSelection();
+      return;
+    }
+    void this.pasteFromClipboard();
+  };
+
+  /**
+   * Writes clipboard text straight to the PTY.
+   *
+   * `terminal.paste()` would echo the text locally as well as sending it, so the agent would
+   * see it once and the screen would show it twice.
+   */
+  private async pasteFromClipboard(): Promise<void> {
+    try {
+      const text = await navigator.clipboard.readText();
+      if (text) {
+        await this.gateway.write(this.session(), text);
+      }
+    } catch {
+      // Clipboard access can be denied; typing still works, so this stays silent.
+    }
+  }
 
   private scheduleActivation(): void {
     if (this.activationFrame !== undefined) {

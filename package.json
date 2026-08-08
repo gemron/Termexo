@@ -1,6 +1,6 @@
 {
   "name": "termexo",
-  "version": "0.3.14",
+  "version": "0.3.15",
   "description": "Local-first workspace for AI coding agents, models, and terminals",
   "private": true,
   "license": "MIT",

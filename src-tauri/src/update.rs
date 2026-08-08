@@ -18,6 +18,9 @@ pub const RELEASES_PAGE: &str = "https://github.com/gemron/Termexo/releases/late
 const USER_AGENT: &str = "Termexo-Updater";
 const REQUEST_TIMEOUT: Duration = Duration::from_secs(10);
 
+/// npm package that ships the desktop executable.
+pub const NPM_PACKAGE: &str = "termexo";
+
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct UpdateCheck {
@@ -27,6 +30,20 @@ pub struct UpdateCheck {
     pub release_notes: Option<String>,
     pub release_url: String,
     pub published_at: Option<String>,
+    /// True when this build runs out of a global npm install, where `npm install -g` updates it.
+    pub installed_via_npm: bool,
+}
+
+/// Reports whether the running executable came from a global npm install.
+///
+/// The npm wrapper stores the binary under `node_modules/termexo/vendor/<platform>/`, a layout
+/// no installer produces, so the path is what distinguishes the two distribution channels.
+pub fn is_npm_installation() -> bool {
+    let Ok(executable) = std::env::current_exe() else {
+        return false;
+    };
+    let path = executable.to_string_lossy().replace('\\', "/");
+    path.contains("/node_modules/termexo/vendor/")
 }
 
 #[derive(Debug, Deserialize)]
@@ -122,6 +139,7 @@ pub async fn check_for_update(current_version: &str) -> Result<UpdateCheck, Stri
             release_notes: None,
             release_url: RELEASES_PAGE.to_owned(),
             published_at: None,
+            installed_via_npm: is_npm_installation(),
         });
     }
 
@@ -133,6 +151,7 @@ pub async fn check_for_update(current_version: &str) -> Result<UpdateCheck, Stri
         release_notes: release.body.filter(|notes| !notes.trim().is_empty()),
         release_url: release.html_url.unwrap_or_else(|| RELEASES_PAGE.to_owned()),
         published_at: release.published_at,
+        installed_via_npm: is_npm_installation(),
     })
 }
 
@@ -164,6 +183,17 @@ mod tests {
     fn treats_missing_components_as_zero() {
         assert!(!is_update_available("0.4.0", "0.4"));
         assert!(is_update_available("0.4", "0.4.1"));
+    }
+
+    #[test]
+    fn recognizes_only_the_npm_wrapper_layout() {
+        // The check runs on the real current_exe, so this pins the path shape it looks for.
+        let npm_path = "C:/Users/x/AppData/Roaming/npm/node_modules/termexo/vendor/win32-x64/termexo.exe";
+        let installed_path = "C:/Program Files/Termexo/termexo.exe";
+        assert!(npm_path.replace('\\', "/").contains("/node_modules/termexo/vendor/"));
+        assert!(!installed_path
+            .replace('\\', "/")
+            .contains("/node_modules/termexo/vendor/"));
     }
 
     #[test]

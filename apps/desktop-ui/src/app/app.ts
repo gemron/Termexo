@@ -15,6 +15,7 @@ import {
   CliOperationResult,
   McpProfileInput,
   ModelProfileInput,
+  NativeAgentType,
   NetworkProfileInput,
   NetworkTestResult,
 } from './core/models/agent.models';
@@ -167,6 +168,20 @@ export class App {
   protected readonly settingsInitialTab = signal<SettingsTab>('diagnostics');
   protected readonly settingsInitialModelProfileId = signal('');
   protected readonly modelSwitchOpen = signal(false);
+  /** Terminal the switch applies to; null means every terminal of that agent type. */
+  protected readonly modelSwitchTerminalId = signal<string | null>(null);
+  /** Agent type to preselect when the switch targets one terminal. */
+  protected readonly modelSwitchAgentType = signal<NativeAgentType | null>(null);
+  /** Name of the single target, so the dialog can say which terminal it will change. */
+  protected readonly modelSwitchTerminalName = computed(() => {
+    const terminalId = this.modelSwitchTerminalId();
+    if (!terminalId) {
+      return '';
+    }
+    return (
+      this.state.activeWorkspace()?.terminals.find((item) => item.id === terminalId)?.name ?? ''
+    );
+  });
   protected readonly agentMenuOpen = signal(false);
   protected readonly workspaceSidebarOpen = signal(
     readStoredBoolean('termexo.workspaceSidebarOpen', true),
@@ -202,6 +217,7 @@ export class App {
   protected readonly layoutRevision = signal(0);
   protected readonly launchingClaude = signal(false);
   protected readonly launchingCodex = signal(false);
+  protected readonly updateInstalling = signal(false);
   /** Stable reference so the session center input does not change every check. */
   protected readonly sessionLaunchProfiles = (nativeSessionId: string) =>
     this.state.findSessionLaunchProfiles(nativeSessionId);
@@ -729,6 +745,28 @@ export class App {
     this.layoutRevision.update((revision) => revision + 1);
   }
 
+  /**
+   * Closes the agent menu when the click lands outside it.
+   *
+   * Registered on the document rather than a backdrop element so the menu also closes when the
+   * click goes to a terminal, which has no overlay to catch it.
+   */
+  @HostListener('document:pointerdown', ['$event'])
+  protected closeAgentMenuOnOutsideClick(event: PointerEvent): void {
+    if (!this.agentMenuOpen()) {
+      return;
+    }
+    const target = event.target as HTMLElement | null;
+    if (!target?.closest('.menu-anchor')) {
+      this.agentMenuOpen.set(false);
+    }
+  }
+
+  @HostListener('document:keydown.escape')
+  protected closeAgentMenuOnEscape(): void {
+    this.agentMenuOpen.set(false);
+  }
+
   @HostListener('window:keydown', ['$event'])
   protected restoreMaximizedView(event: KeyboardEvent): void {
     if (event.key !== 'Escape' || !event.shiftKey) {
@@ -967,6 +1005,27 @@ export class App {
     }
   }
 
+  /**
+   * Installs the newest npm build. The app closes so npm can overwrite the executable Windows
+   * currently has locked, then the new build starts on its own.
+   */
+  protected async installUpdateViaNpm(): Promise<void> {
+    if (this.updateInstalling()) {
+      return;
+    }
+    this.updateInstalling.set(true);
+    this.showToast(this.i18n.t('update.installStarting'), 'attention');
+    try {
+      await this.updates.updateViaNpm();
+    } catch (error) {
+      this.updateInstalling.set(false);
+      this.showToast(
+        `${this.i18n.t('update.installFailed')}: ${this.errorMessage(error)}`,
+        'attention',
+      );
+    }
+  }
+
   protected async openReleasePage(): Promise<void> {
     try {
       await this.updates.openReleasePage();
@@ -982,6 +1041,33 @@ export class App {
     }
   }
 
+  /** Opens the switcher scoped to one terminal, preselecting its agent type. */
+  protected openSingleModelSwitch(terminalId: string): void {
+    const terminal = this.state
+      .activeWorkspace()
+      ?.terminals.find((item) => item.id === terminalId);
+    if (!terminal || terminal.agentType === 'shell') {
+      return;
+    }
+    this.modelSwitchTerminalId.set(terminalId);
+    this.modelSwitchAgentType.set(terminal.agentType);
+    this.modelSwitchOpen.set(true);
+  }
+
+  /** Closes the switcher and clears its scope, so the next open starts as a batch switch. */
+  protected closeModelSwitch(): void {
+    this.modelSwitchOpen.set(false);
+    this.modelSwitchTerminalId.set(null);
+    this.modelSwitchAgentType.set(null);
+  }
+
+  /** Opens the switcher for every terminal of the chosen agent type. */
+  protected openBatchModelSwitch(): void {
+    this.modelSwitchTerminalId.set(null);
+    this.modelSwitchAgentType.set(null);
+    this.modelSwitchOpen.set(true);
+  }
+
   protected async switchModels(value: ModelSwitchValue): Promise<void> {
     const isClaude = value.apiProtocol === 'anthropic';
     if (isClaude ? this.launchingClaude() : this.launchingCodex()) {
@@ -991,10 +1077,14 @@ export class App {
     const workspace = this.state.activeWorkspace();
     const profile = this.agents.modelProfiles().find((item) => item.id === value.profileId);
     const agentType = isClaude ? 'claude' : 'codex';
-    const terminals =
-      workspace?.terminals.filter((terminal) => terminal.agentType === agentType) ?? [];
+    // A single-terminal switch reuses this whole flow, narrowed to one target.
+    const targetId = this.modelSwitchTerminalId();
+    const terminals = (workspace?.terminals ?? []).filter(
+      (terminal) =>
+        terminal.agentType === agentType && (targetId === null || terminal.id === targetId),
+    );
     if (!profile || terminals.length === 0) {
-      this.modelSwitchOpen.set(false);
+      this.closeModelSwitch();
       this.showToast(
         this.i18n.t(
           profile
@@ -1052,7 +1142,7 @@ export class App {
       const failures = results.filter(
         (result): result is PromiseRejectedResult => result.status === 'rejected',
       );
-      this.modelSwitchOpen.set(false);
+      this.closeModelSwitch();
       this.showToast(
         failures.length > 0
           ? this.i18n.t('profile.switchPartial', {
@@ -1333,7 +1423,7 @@ export class App {
   private openModelCredentialSettings(profileId: string, profileName: string): void {
     this.claudeLaunchOpen.set(false);
     this.sessionCenterOpen.set(false);
-    this.modelSwitchOpen.set(false);
+    this.closeModelSwitch();
     this.selectedTerminalDirectory.set(null);
     this.openSettings('models', profileId);
     this.showToast(this.i18n.t('profile.credentialRequired', { name: profileName }), 'attention');

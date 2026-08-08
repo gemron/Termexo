@@ -198,16 +198,35 @@ export type SettingsTab = 'diagnostics' | 'cli' | 'accounts' | 'models' | 'mcp' 
                         (updateChecking() ? 'update.checking' : 'update.check') | t
                       }}
                     </button>
-                    @if (updateResult()?.updateAvailable) {
-                      <button
-                        type="button"
-                        class="primary btn btn-primary btn-sm"
-                        (click)="updateDownloadRequested.emit()"
-                      >
-                        {{ 'update.download' | t }}
-                      </button>
+                    @if (updateResult(); as result) {
+                      @if (result.updateAvailable) {
+                        <!-- An npm build can replace itself; an installed one goes to the page. -->
+                        @if (result.installedViaNpm) {
+                          <button
+                            type="button"
+                            class="primary btn btn-primary btn-sm"
+                            [disabled]="updateInstalling()"
+                            (click)="updateNpmRequested.emit()"
+                          >
+                            @if (updateInstalling()) {
+                              <span class="cli-spinner" aria-hidden="true"></span>
+                            }
+                            {{ (updateInstalling() ? 'update.installing' : 'update.install') | t }}
+                          </button>
+                        }
+                        <button
+                          type="button"
+                          class="secondary inline-command btn btn-outline btn-sm"
+                          (click)="updateDownloadRequested.emit()"
+                        >
+                          {{ 'update.download' | t }}
+                        </button>
+                      }
                     }
                   </div>
+                  @if (updateResult()?.updateAvailable && updateResult()?.installedViaNpm) {
+                    <small class="update-npm-note">{{ 'update.installHint' | t }}</small>
+                  }
                   <label class="checkbox-control update-auto">
                     <input
                       type="checkbox"
@@ -286,21 +305,23 @@ export type SettingsTab = 'diagnostics' | 'cli' | 'accounts' | 'models' | 'mcp' 
                 </div>
 
                 @if (cliPlanMatches()) {
-                  <div class="cli-plan" [class.unavailable]="!cliPlan()?.ready">
+                  <div
+                    class="cli-plan"
+                    [class.unavailable]="!cliPlan()?.ready"
+                    [class.up-to-date]="cliPlan()?.upToDate"
+                  >
                     <div class="cli-plan-heading">
-                      <span><app-icon name="shield" [size]="17" /></span>
+                      <span>
+                        <app-icon [name]="cliPlan()?.upToDate ? 'check' : 'shield'" [size]="17" />
+                      </span>
                       <div>
                         <strong>
-                          {{
-                            cliPlan()?.action === 'install'
-                              ? ('settings.prepareInstall' | t)
-                              : ('settings.prepareUpgrade' | t)
-                          }}
+                          {{ planHeadline() }}
                           {{ cliPlan()?.displayName }}
                         </strong>
                         <small>{{ cliPlan()?.diagnostic }}</small>
                       </div>
-                      <code>{{ cliPlan()?.targetVersion }}</code>
+                      <code>{{ cliPlan()?.resolvedVersion ?? cliPlan()?.targetVersion }}</code>
                     </div>
                     <dl>
                       <div>
@@ -311,6 +332,12 @@ export type SettingsTab = 'diagnostics' | 'cli' | 'accounts' | 'models' | 'mcp' 
                         <dt>{{ 'settings.currentVersion' | t }}</dt>
                         <dd>{{ cliPlan()?.currentVersion ?? ('settings.notInstalled' | t) }}</dd>
                       </div>
+                      @if (cliPlan()?.resolvedVersion) {
+                        <div>
+                          <dt>{{ 'settings.latestVersion' | t }}</dt>
+                          <dd>{{ cliPlan()?.resolvedVersion }}</dd>
+                        </div>
+                      }
                       <div>
                         <dt>npm</dt>
                         <dd>
@@ -347,13 +374,24 @@ export type SettingsTab = 'diagnostics' | 'cli' | 'accounts' | 'models' | 'mcp' 
                         [disabled]="busy() || !cliConfirmed || !cliPlan()?.ready"
                         (click)="executeCli()"
                       >
-                        {{
-                          cliPlan()?.action === 'install'
-                            ? ('settings.confirmInstall' | t)
-                            : ('settings.confirmUpgrade' | t)
-                        }}
+                        @if (busy()) {
+                          <span class="cli-spinner" aria-hidden="true"></span>
+                        }
+                        {{ confirmLabel() }}
                       </button>
                     </div>
+
+                    @if (busy()) {
+                      <!-- npm reports no percentage, so the bar animates rather than fills. -->
+                      <div
+                        class="cli-progress"
+                        role="progressbar"
+                        [attr.aria-label]="'settings.cliRunning' | t"
+                      >
+                        <i></i>
+                      </div>
+                      <small class="cli-progress-note">{{ 'settings.cliRunningHelp' | t }}</small>
+                    }
                   </div>
                 } @else {
                   <div class="cli-empty-state">
@@ -933,12 +971,14 @@ export class AgentSettingsDialogComponent {
   readonly busy = input(false);
   readonly updateResult = input<UpdateCheck | null>(null);
   readonly updateChecking = input(false);
+  readonly updateInstalling = input(false);
   readonly updateError = input<string | null>(null);
   readonly autoCheckUpdates = input(true);
   readonly cancelled = output<void>();
   readonly detectRequested = output<void>();
   readonly updateCheckRequested = output<void>();
   readonly updateDownloadRequested = output<void>();
+  readonly updateNpmRequested = output<void>();
   readonly autoCheckChanged = output<boolean>();
   readonly cliPreviewRequested = output<CliOperationRequest>();
   readonly cliExecuteRequested = output<CliOperationRequest>();
@@ -1089,6 +1129,30 @@ export class AgentSettingsDialogComponent {
       this.cliExecuteRequested.emit({ ...this.cliRequest(), confirmed: true });
       this.cliConfirmed = false;
     }
+  }
+
+  /** Heading verb: an already-current CLI must not read as an available upgrade. */
+  protected planHeadline(): string {
+    const action = this.cliPlan()?.action;
+    if (action === 'install') {
+      return this.i18n.t('settings.prepareInstall');
+    }
+    return this.i18n.t(
+      action === 'reinstall' ? 'settings.prepareReinstall' : 'settings.prepareUpgrade',
+    );
+  }
+
+  protected confirmLabel(): string {
+    if (this.busy()) {
+      return this.i18n.t('settings.cliRunning');
+    }
+    const action = this.cliPlan()?.action;
+    if (action === 'install') {
+      return this.i18n.t('settings.confirmInstall');
+    }
+    return this.i18n.t(
+      action === 'reinstall' ? 'settings.confirmReinstall' : 'settings.confirmUpgrade',
+    );
   }
 
   protected cliPlanMatches(): boolean {
