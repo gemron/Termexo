@@ -11,7 +11,7 @@
 </p>
 
 <p align="center">
-  <img alt="Version 0.3.15" src="https://img.shields.io/badge/version-0.3.15-58c7a0">
+  <img alt="Version 0.3.16" src="https://img.shields.io/badge/version-0.3.16-58c7a0">
   <img alt="Windows" src="https://img.shields.io/badge/platform-Windows-0078D4?logo=windows">
   <img alt="Tauri 2" src="https://img.shields.io/badge/Tauri-2-24C8DB?logo=tauri&logoColor=white">
   <img alt="Angular 22" src="https://img.shields.io/badge/Angular-22-DD0031?logo=angular">
@@ -34,9 +34,9 @@ Run the complete Windows app with one command—no Termexo account or server req
 npx termexo@latest
 ```
 
-> The latest published release is **V0.3.15**. It fixes Shift+Tab doing nothing inside agents
-> and right-click paste inserting text twice, and adds terminal renaming plus per-terminal model
-> switching.
+> The latest published release is **V0.3.16**. It stops right-click from pasting twice in Claude
+> Code, which turns on mouse reporting and so received the click and pasted the clipboard itself
+> on top of Termexo's own paste.
 
 ![Termexo multi-terminal grid workbench](website/assets/termexo-workbench.png)
 
@@ -93,6 +93,15 @@ you configure under their own terms and privacy policies.
 The interface is available in Simplified Chinese, English, Spanish, French, German, Japanese,
 and Korean. It follows the Windows language automatically, or you can choose a language from
 the main toolbar and keep that choice across restarts.
+
+## V0.3.16 Updates
+
+- Fix right-click pasting twice in Claude Code. Claude turns on mouse reporting (`?1000h`), so
+  xterm forwarded the right button to it and Claude read the clipboard and pasted a copy of its
+  own on top of Termexo's. Codex leaves mouse reporting off, which is why only Claude doubled the
+  text. The right button is now stopped before it reaches xterm and Termexo alone acts on it —
+  copy with a selection, paste without one. No TUI receives the right button any more, matching
+  the Windows terminal convention Termexo already follows.
 
 ## V0.3.15 Updates
 

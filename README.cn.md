@@ -11,7 +11,7 @@
 </p>
 
 <p align="center">
-  <img alt="Version 0.3.15" src="https://img.shields.io/badge/version-0.3.15-58c7a0">
+  <img alt="Version 0.3.16" src="https://img.shields.io/badge/version-0.3.16-58c7a0">
   <img alt="Windows" src="https://img.shields.io/badge/platform-Windows-0078D4?logo=windows">
   <img alt="Tauri 2" src="https://img.shields.io/badge/Tauri-2-24C8DB?logo=tauri&logoColor=white">
   <img alt="Angular 22" src="https://img.shields.io/badge/Angular-22-DD0031?logo=angular">
@@ -33,8 +33,8 @@ Termexo 把 Claude Code、Codex 和围绕它们运行的终端收进一个可恢
 npx termexo@latest
 ```
 
-> 最新正式版本为 **V0.3.15**。修复 Shift+Tab 在 Agent 中无响应、右键粘贴内容重复，
-> 并支持双击重命名终端、单个终端单独切换模型。
+> 最新正式版本为 **V0.3.16**。修复右键在 Claude Code 中粘贴两遍——Claude 会开启鼠标上报，
+> 因而也收到了这次右键并自行粘贴了一份，与 Termexo 自己的粘贴叠加。
 
 ![Termexo 多终端网格工作台](website/assets/termexo-workbench.png)
 
@@ -85,6 +85,14 @@ SQLite，密钥保存在 Windows Credential Manager，Claude/Codex 历史会话�
 
 界面支持简体中文、英语、西班牙语、法语、德语、日语和韩语。默认自动跟随 Windows
 系统语言，也可通过主工具栏手动切换并跨重启保留选择。
+
+## V0.3.16 更新
+
+- 修复右键在 Claude Code 中把内容粘贴两遍的问题。Claude 会开启鼠标上报（`?1000h`），
+  xterm 便把右键按下也发给了它，Claude 读取剪贴板自行粘贴一份，与 Termexo 的粘贴叠加成两份。
+  Codex 不开启鼠标上报，所以只有 Claude 会重复。现在右键在到达 xterm 之前就被拦下，
+  只由 Termexo 处理：有选区则复制，无选区则粘贴。代价是任何 TUI 都不再收到右键，
+  这与 Termexo 一贯遵循的 Windows 终端惯例一致。
 
 ## V0.3.15 更新
 

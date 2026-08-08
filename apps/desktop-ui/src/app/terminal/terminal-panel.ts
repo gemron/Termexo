@@ -28,6 +28,9 @@ import { TerminalResizeCoordinator } from './terminal-resize-coordinator';
 import { detectTerminalRuntimeIssue, TerminalRuntimeIssue } from './terminal-runtime-diagnostics';
 import { createTerminalTheme } from './terminal-theme';
 
+/** `MouseEvent.button` value for the right button. */
+const RIGHT_MOUSE_BUTTON = 2;
+
 @Component({
   selector: 'app-terminal-panel',
   imports: [IconComponent, TranslatePipe],
@@ -159,6 +162,7 @@ export class TerminalPanelComponent implements AfterViewInit {
       passive: true,
     });
     terminalContainer.addEventListener('wheel', this.stopWheelPropagation, { passive: true });
+    terminalContainer.addEventListener('mousedown', this.suppressRightButtonReport, true);
     terminalContainer.addEventListener('contextmenu', this.handleContextMenu);
     this.fitTerminal();
     this.scheduleFit();
@@ -187,6 +191,7 @@ export class TerminalPanelComponent implements AfterViewInit {
     this.destroyRef.onDestroy(() => {
       inputDisposable.dispose();
       this.resizeObserver?.disconnect();
+      terminalContainer.removeEventListener('mousedown', this.suppressRightButtonReport, true);
       terminalContainer.removeEventListener('contextmenu', this.handleContextMenu);
       terminalContainer.removeEventListener('wheel', this.prepareWheelInteraction, true);
       terminalContainer.removeEventListener('wheel', this.stopWheelPropagation);
@@ -332,6 +337,26 @@ export class TerminalPanelComponent implements AfterViewInit {
     event.preventDefault();
     void this.gateway.write(this.session(), sequence);
     return false;
+  };
+
+  /**
+   * Keeps the right button away from xterm so this component alone acts on it.
+   *
+   * Agents that switch on mouse reporting — Claude Code sends `?1000h` — otherwise receive the
+   * click through xterm and paste the clipboard themselves, landing the text a second time next
+   * to {@link handleContextMenu}. Capturing above xterm stops the press before it is encoded, and
+   * xterm only reports the release of a press it handled, so this covers the whole gesture.
+   * Activating here stands in for the focus xterm would have taken on the same event.
+   */
+  private readonly suppressRightButtonReport = (event: MouseEvent): void => {
+    if (event.button !== RIGHT_MOUSE_BUTTON) {
+      return;
+    }
+    // Preventing the default and focusing is the pair xterm applied before it was cut out of the
+    // gesture; keeping it stops the browser from starting a selection of its own.
+    event.preventDefault();
+    event.stopPropagation();
+    this.activateTerminal();
   };
 
   /**
