@@ -168,8 +168,8 @@ pub fn import_network_profiles(
     path: String,
     database: State<'_, WorkspaceDatabase>,
 ) -> Result<ImportSummary, String> {
-    let contents = std::fs::read_to_string(&path)
-        .map_err(|error| format!("无法读取导入文件：{error}"))?;
+    let contents =
+        std::fs::read_to_string(&path).map_err(|error| format!("无法读取导入文件：{error}"))?;
     let document = serde_json::from_str::<NetworkProfileImport>(&contents)
         .map_err(|error| format!("导入文件不是有效的 JSON：{error}"))?;
     if let Some(version) = document.version {
@@ -215,7 +215,10 @@ pub fn import_network_profiles(
     }
 
     if summary.imported == 0 {
-        return Err(format!("没有导入任何 Profile。{}", summary.skipped.join("；")));
+        return Err(format!(
+            "没有导入任何 Profile。{}",
+            summary.skipped.join("；")
+        ));
     }
     Ok(summary)
 }
@@ -365,8 +368,9 @@ mod tests {
 
     #[test]
     fn export_omits_empty_optional_fields() {
-        let json = serde_json::to_string(&ExportedNetworkProfile::from(&profile_with_credentials()))
-            .unwrap();
+        let json =
+            serde_json::to_string(&ExportedNetworkProfile::from(&profile_with_credentials()))
+                .unwrap();
 
         assert!(!json.contains("allProxy"));
         assert!(!json.contains("npmCaPath"));
@@ -446,7 +450,8 @@ mod tests {
 
     #[test]
     fn import_applies_defaults_for_omitted_fields() {
-        let profile = import_entry(r#"{"name":"Minimal","httpProxy":"http://proxy:8080"}"#).unwrap();
+        let profile =
+            import_entry(r#"{"name":"Minimal","httpProxy":"http://proxy:8080"}"#).unwrap();
 
         assert!(profile.enabled);
         assert!(profile.npm_strict_ssl);
@@ -494,7 +499,8 @@ mod tests {
     #[test]
     fn rejects_a_document_from_a_newer_format() {
         let document =
-            serde_json::from_str::<NetworkProfileImport>(r#"{"version":99,"profiles":[]}"#).unwrap();
+            serde_json::from_str::<NetworkProfileImport>(r#"{"version":99,"profiles":[]}"#)
+                .unwrap();
 
         assert!(document.version.unwrap() > EXPORT_VERSION);
     }

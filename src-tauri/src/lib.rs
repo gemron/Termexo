@@ -8,6 +8,8 @@ mod hooks;
 mod network;
 mod notification;
 mod pty;
+mod quota;
+mod system_proxy;
 mod update;
 
 use std::fs;
@@ -17,6 +19,7 @@ use tauri::Manager;
 use crate::cli::CliOperationManager;
 use crate::config::{CredentialStore, LaunchEnvironmentStore};
 use crate::database::WorkspaceDatabase;
+use crate::commands::quota::QuotaCache;
 use crate::hooks::HookEventStore;
 use crate::pty::PtyManager;
 
@@ -59,8 +62,7 @@ pub fn run() {
                 .resolve("icons/128x128.png", tauri::path::BaseDirectory::Resource)
                 .ok()
                 .filter(|path| path.exists());
-            if let Err(error) =
-                notification::register_toast_identity(app.config(), icon.as_deref())
+            if let Err(error) = notification::register_toast_identity(app.config(), icon.as_deref())
             {
                 tracing::warn!("{error}");
             }
@@ -73,6 +75,7 @@ pub fn run() {
             app.manage(LaunchEnvironmentStore::default());
             app.manage(hooks);
             app.manage(PtyManager::default());
+            app.manage(QuotaCache::default());
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
@@ -98,6 +101,7 @@ pub fn run() {
             commands::config::save_network_profile,
             commands::config::delete_network_profile,
             commands::config::test_network_profile,
+            commands::config::discover_system_proxy,
             commands::network_export::export_network_profiles,
             commands::network_export::write_network_profile_export,
             commands::network_export::import_network_profiles,
@@ -113,6 +117,7 @@ pub fn run() {
             commands::hooks::prepare_claude_runtime,
             commands::hooks::sync_agent_events,
             commands::hooks::list_agent_events,
+            commands::quota::get_provider_quotas,
             commands::workspace::list_workspaces,
             commands::workspace::save_workspace,
             commands::workspace::delete_workspace,

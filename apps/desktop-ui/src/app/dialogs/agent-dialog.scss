@@ -147,6 +147,13 @@
 
 .form-grid label,
 .resume-options label,
+// A checkbox and its wording belong on one line; the grid below is for stacked fields.
+.profile-editor label.checkbox-control {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
 .profile-editor label {
   display: grid;
   gap: 6px;
@@ -1048,6 +1055,36 @@ button:disabled {
   border-right: 1px solid var(--border);
   background: var(--surface-1);
 
+  // Providers head their own profiles, so the list reads as a grouped catalogue.
+  .provider-group {
+    margin: 10px 0 3px;
+    padding: 0 9px;
+    color: var(--text-muted);
+    font-size: 9px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+
+    &:first-child {
+      margin-top: 0;
+    }
+  }
+
+  .agent-badges {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+    margin-top: 3px;
+
+    em {
+      padding: 1px 5px;
+      border-radius: 999px;
+      color: var(--text-secondary);
+      background: var(--surface-2);
+      font-size: 9px;
+      font-style: normal;
+    }
+  }
+
   button {
     width: 100%;
     padding: 9px;
@@ -1098,6 +1135,31 @@ button:disabled {
     margin-top: 6px;
     border-top: 1px solid var(--border);
     color: var(--color-primary);
+  }
+}
+
+.preset-source {
+  display: block;
+  margin: -4px 0 10px;
+  color: var(--text-muted);
+  font-size: 10px;
+  overflow-wrap: anywhere;
+}
+
+/** One agent's half of a provider, dimmed while that agent is switched off. */
+.agent-endpoint {
+  margin: 0 0 12px;
+  padding: 10px 11px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-field);
+  background: var(--surface-1);
+
+  > .checkbox-control {
+    margin-bottom: 9px;
+  }
+
+  &.disabled .two-columns {
+    opacity: 0.45;
   }
 }
 

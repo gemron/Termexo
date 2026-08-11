@@ -2,6 +2,7 @@ use std::collections::HashMap;
 use std::path::PathBuf;
 
 use serde::Deserialize;
+use serde_json::{json, Value};
 use tauri::State;
 
 use crate::account;
@@ -9,9 +10,9 @@ use crate::agent::{
     AgentAdapter, AgentInstallation, AgentLaunchSpec, AgentSession, ClaudeCodeAdapter,
     ClaudeLaunchOptions, CodexCliAdapter, CodexLaunchOptions,
 };
-use crate::config::{CredentialStore, LaunchEnvironmentStore, ModelProfile};
+use crate::config::{AgentProtocol, CredentialStore, LaunchEnvironmentStore, ModelProfile};
 use crate::database::WorkspaceDatabase;
-use crate::hooks::HookEventStore;
+use crate::hooks::{toml_literal, HookEventStore};
 use crate::network;
 
 #[tauri::command]
@@ -170,12 +171,9 @@ pub fn prepare_claude_launch(
     let profiles = database
         .list_model_profiles()
         .map_err(|error| error.to_string())?;
-    let profile = request
-        .profile_id
-        .as_deref()
-        .and_then(|profile_id| profiles.iter().find(|profile| profile.id == profile_id))
-        .or_else(|| profiles.iter().find(|profile| profile.is_default))
-        .cloned();
+    let profile = select_profile(&profiles, request.profile_id.as_deref(), |profile| {
+        profile.claude_enabled
+    });
     let runtime = hooks
         .prepare_claude_runtime(&request.terminal_id)
         .map_err(|error| error.to_string())?;
@@ -195,7 +193,7 @@ pub fn prepare_claude_launch(
     };
     let mut environment =
         account_profile_environment(&database, request.account_profile_id.as_deref(), "claude")?;
-    environment.extend(profile_environment(profile.as_ref()));
+    environment.extend(claude_profile_environment(profile.as_ref()));
     if let Some(profile) = profile.as_ref() {
         if let Some(target) = profile.credential_target.as_deref() {
             let token = credentials
@@ -228,7 +226,7 @@ pub fn prepare_claude_launch(
         .build_launch_command(&ClaudeLaunchOptions {
             session_id: request.session_id,
             name: request.name,
-            model: profile.map(|profile| profile.model),
+            model: profile.map(|profile| profile.claude_model),
             settings_path: Some(runtime.settings_path),
             mcp_config_path,
         })
@@ -246,15 +244,12 @@ pub fn prepare_codex_launch(
     let profiles = database
         .list_model_profiles()
         .map_err(|error| error.to_string())?;
-    let profile = request
-        .profile_id
-        .as_deref()
-        .and_then(|profile_id| profiles.iter().find(|profile| profile.id == profile_id))
-        .or_else(|| profiles.iter().find(|profile| profile.is_default && profile.api_protocol == "openai"))
-        .cloned();
+    let profile = select_profile(&profiles, request.profile_id.as_deref(), |profile| {
+        profile.codex_enabled
+    });
     let mut environment =
         account_profile_environment(&database, request.account_profile_id.as_deref(), "codex")?;
-    environment.extend(profile_environment(profile.as_ref()));
+
     if let Some(profile) = profile.as_ref() {
         if let Some(target) = profile.credential_target.as_deref() {
             let token = credentials
@@ -281,24 +276,34 @@ pub fn prepare_codex_launch(
     let hook_configs = hooks
         .codex_hook_configs()
         .map_err(|error| error.to_string())?;
+    let effective_model = request
+        .model
+        .filter(|value| !value.trim().is_empty())
+        .or_else(|| profile.as_ref().map(|profile| profile.codex_model.clone()));
+    let mut provider_configs = codex_provider_configs(profile.as_ref())?;
+    if let (Some(profile), Some(model)) = (profile.as_ref(), effective_model.as_deref()) {
+        if let Some(metadata) = codex_model_metadata(profile, model) {
+            let catalog_path = hooks
+                .write_codex_model_catalog(&request.terminal_id, &metadata.catalog)
+                .map_err(|error| error.to_string())?;
+            provider_configs.push(format!(
+                "model_catalog_json={}",
+                toml_literal(&catalog_path).map_err(|error| error.to_string())?
+            ));
+            provider_configs.push(format!("model_context_window={}", metadata.context_window));
+        }
+    }
     log_proxy_environment(&environment);
     launch_environment
         .put(request.terminal_id.clone(), environment)
         .map_err(|error| error.to_string())?;
-    let effective_model = request
-        .model
-        .filter(|value| !value.trim().is_empty())
-        .or_else(|| {
-            profile
-                .as_ref()
-                .map(|profile| profile.model.clone())
-        });
     CodexCliAdapter::new()
         .build_launch_command(&CodexLaunchOptions {
             session_id: request.session_id,
             model: effective_model,
             notify_config: Some(notify_config),
             hook_configs,
+            provider_configs,
         })
         .map_err(|error| error.to_string())
 }
@@ -370,7 +375,9 @@ fn log_proxy_environment(environment: &HashMap<String, String>) {
         .iter()
         .filter(|(key, _)| {
             let key = key.to_ascii_uppercase();
-            key.ends_with("_PROXY") || key.starts_with("NPM_CONFIG_") || key == "NODE_EXTRA_CA_CERTS"
+            key.ends_with("_PROXY")
+                || key.starts_with("NPM_CONFIG_")
+                || key == "NODE_EXTRA_CA_CERTS"
         })
         .map(|(key, value)| format!("{key}={}", mask_credentials(value)))
         .collect::<Vec<_>>();
@@ -420,7 +427,7 @@ fn mask_credentials(value: &str) -> String {
     }
 }
 
-fn network_environment(
+pub(crate) fn network_environment(
     database: &WorkspaceDatabase,
     credentials: &CredentialStore,
     workspace_id: Option<&str>,
@@ -440,24 +447,205 @@ fn network_environment(
     network::profile_environment(&profile, password.as_deref())
 }
 
-fn profile_environment(profile: Option<&ModelProfile>) -> HashMap<String, String> {
+/// Picks the profile an agent should launch with, ignoring any that is switched off for it.
+///
+/// An explicit choice still has to be enabled: a profile the user turned off for this agent has no
+/// endpoint for it, so honouring the request would launch against the other protocol's URL. The
+/// default profile wins the fallback, and failing that the first profile that serves this agent.
+fn select_profile(
+    profiles: &[ModelProfile],
+    requested_id: Option<&str>,
+    serves_agent: impl Fn(&ModelProfile) -> bool,
+) -> Option<ModelProfile> {
+    let usable = |profile: &&ModelProfile| serves_agent(profile);
+    requested_id
+        .and_then(|profile_id| {
+            profiles
+                .iter()
+                .find(|profile| profile.id == profile_id)
+                .filter(usable)
+        })
+        .or_else(|| {
+            profiles
+                .iter()
+                .find(|profile| profile.is_default)
+                .filter(usable)
+        })
+        .or_else(|| profiles.iter().find(usable))
+        .cloned()
+}
+
+/// Claude reads its provider from the environment, so the profile becomes env vars.
+fn claude_profile_environment(profile: Option<&ModelProfile>) -> HashMap<String, String> {
     let Some(profile) = profile else {
         return HashMap::new();
     };
-    match profile.api_protocol.as_str() {
-        "openai" => openai_profile_environment(profile),
-        _ => anthropic_profile_environment(profile),
-    }
+    let Some((model, base_url)) = profile.endpoint(AgentProtocol::Anthropic) else {
+        return HashMap::new();
+    };
+    anthropic_profile_environment(profile, model, base_url)
 }
 
-fn anthropic_profile_environment(profile: &ModelProfile) -> HashMap<String, String> {
+/// Codex provider id Termexo declares its overrides under.
+const CODEX_PROVIDER_ID: &str = "termexo";
+
+const CODEX_RESPONSES_WIRE_API: &str = "responses";
+
+/// Points Codex at a compatible provider through `-c` overrides.
+///
+/// Codex reads neither `OPENAI_BASE_URL` nor `OPENAI_MODEL` — it resolves providers from its own
+/// config, so an endpoint only takes effect when it arrives as a TOML override. Literal strings
+/// survive the Windows npm `.cmd` shim, the same reason the hook overrides use them. The key stays
+/// in the environment and is named here, so it never appears on the command line.
+fn codex_provider_configs(profile: Option<&ModelProfile>) -> Result<Vec<String>, String> {
+    let official_provider = format!(
+        "model_provider={}",
+        toml_literal("openai").map_err(|error| error.to_string())?
+    );
+    let Some(profile) = profile else {
+        // A raw-model launch is an official Codex launch. Never let it inherit a third-party
+        // provider from a user config layer or a previously restored terminal.
+        return Ok(vec![official_provider]);
+    };
+    if !profile.codex_enabled {
+        return Ok(vec![official_provider]);
+    }
+    let quote = |value: &str| toml_literal(value).map_err(|error| error.to_string());
+    let Some((_, base_url)) = profile.endpoint(AgentProtocol::OpenAi) else {
+        return Ok(vec![official_provider]);
+    };
+    let Some(base_url) = base_url.map(str::trim).filter(|value| !value.is_empty()) else {
+        // A prior third-party session records its model provider. Make the official selection an
+        // explicit override so a resume or terminal restart cannot carry `termexo` forward.
+        return Ok(vec![official_provider]);
+    };
+    Ok(vec![
+        format!("model_provider={}", quote(CODEX_PROVIDER_ID)?),
+        format!(
+            "model_providers.{CODEX_PROVIDER_ID}.name={}",
+            quote(&profile.name)?
+        ),
+        format!(
+            "model_providers.{CODEX_PROVIDER_ID}.base_url={}",
+            quote(base_url)?
+        ),
+        format!(
+            "model_providers.{CODEX_PROVIDER_ID}.env_key={}",
+            quote("OPENAI_API_KEY")?
+        ),
+        format!(
+            "model_providers.{CODEX_PROVIDER_ID}.wire_api={}",
+            quote(CODEX_RESPONSES_WIRE_API)?
+        ),
+    ])
+}
+
+struct CodexModelMetadata {
+    catalog: Value,
+    context_window: u64,
+}
+
+/// Codex only knows metadata for its built-in models. Provider-specific catalog entries keep the
+/// CLI from falling back to generic context, reasoning, modality, and tool settings.
+fn codex_model_metadata(profile: &ModelProfile, model: &str) -> Option<CodexModelMetadata> {
+    let model = model.trim();
+    let normalized_model = model.to_ascii_lowercase();
+    let (description, default_reasoning_level, reasoning_levels, context_window, input_modalities) =
+        if profile.provider.eq_ignore_ascii_case("MiniMax") && normalized_model == "minimax-m3" {
+            (
+                "MiniMax",
+                "high",
+                &[("none", "Think-Off"), ("high", "Deep")][..],
+                1_000_000,
+                &["text", "image"][..],
+            )
+        } else if profile.provider.eq_ignore_ascii_case("DeepSeek")
+            && normalized_model.starts_with("deepseek-v4")
+        {
+            (
+                "DeepSeek",
+                "high",
+                &[
+                    ("high", "High reasoning effort"),
+                    ("xhigh", "Maximum reasoning effort"),
+                ][..],
+                1_000_000,
+                &["text"][..],
+            )
+        } else if profile.provider.eq_ignore_ascii_case("GLM") && normalized_model == "glm-5.2" {
+            (
+                "GLM",
+                "max",
+                &[
+                    ("none", "Thinking disabled"),
+                    ("minimal", "Minimal reasoning effort"),
+                    ("low", "Low reasoning effort"),
+                    ("medium", "Medium reasoning effort"),
+                    ("high", "High reasoning effort"),
+                    ("xhigh", "Extra high reasoning effort"),
+                    ("max", "Maximum reasoning effort"),
+                ][..],
+                1_000_000,
+                &["text"][..],
+            )
+        } else if profile.provider.eq_ignore_ascii_case("Kimi") && normalized_model == "kimi-k3" {
+            (
+                "Kimi",
+                "max",
+                &[
+                    ("low", "Low reasoning effort"),
+                    ("high", "High reasoning effort"),
+                    ("max", "Maximum reasoning effort"),
+                ][..],
+                1_048_576,
+                &["text", "image"][..],
+            )
+        } else {
+            return None;
+        };
+    let supported_reasoning_levels = reasoning_levels
+        .iter()
+        .map(|(effort, description)| json!({ "effort": effort, "description": description }))
+        .collect::<Vec<_>>();
+    let default_reasoning_summary = if description == "MiniMax" {
+        "none"
+    } else {
+        "auto"
+    };
+
+    Some(CodexModelMetadata {
+        context_window,
+        catalog: json!({
+            "models": [{
+                "slug": model,
+                "display_name": model,
+                "description": description,
+                "default_reasoning_level": default_reasoning_level,
+                "supported_reasoning_levels": supported_reasoning_levels,
+                "shell_type": "shell_command",
+                "visibility": "list",
+                "supported_in_api": true,
+                "priority": 0,
+                "base_instructions": format!("You are Codex, a coding agent based on {model}. You and the user share the same workspace and collaborate to achieve the user's goals."),
+                "supports_reasoning_summaries": true,
+                "default_reasoning_summary": default_reasoning_summary,
+                "support_verbosity": false,
+                "truncation_policy": { "mode": "bytes", "limit": 10000 },
+                "supports_parallel_tool_calls": true,
+                "experimental_supported_tools": [],
+                "input_modalities": input_modalities
+            }]
+        }),
+    })
+}
+
+fn anthropic_profile_environment(
+    profile: &ModelProfile,
+    model: &str,
+    base_url: Option<&str>,
+) -> HashMap<String, String> {
     let mut environment = HashMap::new();
-    let Some(base_url) = profile
-        .base_url
-        .as_deref()
-        .map(str::trim)
-        .filter(|value| !value.is_empty())
-    else {
+    let Some(base_url) = base_url.map(str::trim).filter(|value| !value.is_empty()) else {
         return environment;
     };
 
@@ -468,7 +656,7 @@ fn anthropic_profile_environment(profile: &ModelProfile) -> HashMap<String, Stri
         "1".into(),
     );
 
-    let model = profile.model.trim();
+    let model = model.trim();
     if !model.is_empty() {
         for key in [
             "ANTHROPIC_MODEL",
@@ -493,46 +681,38 @@ fn anthropic_profile_environment(profile: &ModelProfile) -> HashMap<String, Stri
     environment
 }
 
-fn openai_profile_environment(profile: &ModelProfile) -> HashMap<String, String> {
-    let mut environment = HashMap::new();
-    let Some(base_url) = profile
-        .base_url
-        .as_deref()
-        .map(str::trim)
-        .filter(|value| !value.is_empty())
-    else {
-        return environment;
-    };
-
-    environment.insert("OPENAI_BASE_URL".into(), base_url.into());
-    environment.insert("API_TIMEOUT_MS".into(), "3000000".into());
-
-    let model = profile.model.trim();
-    if !model.is_empty() {
-        environment.insert("OPENAI_MODEL".into(), model.into());
-    }
-    environment
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
 
+    /// A provider serving both agents, which is how the presets configure one.
+    fn profile(id: &str, provider: &str) -> ModelProfile {
+        ModelProfile {
+            id: id.into(),
+            name: provider.into(),
+            provider: provider.into(),
+            credential_target: Some(format!("profile:{id}")),
+            is_default: false,
+            has_credential: true,
+            claude_enabled: true,
+            claude_model: String::new(),
+            claude_base_url: None,
+            codex_enabled: true,
+            codex_model: String::new(),
+            codex_base_url: None,
+            plan_alert_threshold: 80,
+        }
+    }
+
     #[test]
     fn maps_anthropic_compatible_profile_to_claude_environment() {
         let profile = ModelProfile {
-            id: "deepseek".into(),
-            name: "DeepSeek V4 Pro".into(),
-            provider: "DeepSeek".into(),
-            model: "deepseek-v4-pro[1m]".into(),
-            base_url: Some("https://api.deepseek.com/anthropic".into()),
-            credential_target: Some("profile:deepseek".into()),
-            api_protocol: "anthropic".into(),
-            is_default: false,
-            has_credential: true,
+            claude_model: "deepseek-v4-pro[1m]".into(),
+            claude_base_url: Some("https://api.deepseek.com/anthropic".into()),
+            ..profile("deepseek", "DeepSeek")
         };
 
-        let environment = profile_environment(Some(&profile));
+        let environment = claude_profile_environment(Some(&profile));
 
         assert_eq!(
             environment.get("ANTHROPIC_BASE_URL").map(String::as_str),
@@ -565,35 +745,24 @@ mod tests {
     #[test]
     fn leaves_official_anthropic_environment_untouched() {
         let profile = ModelProfile {
-            id: "claude-default".into(),
-            name: "Claude Sonnet".into(),
-            provider: "Anthropic".into(),
-            model: "sonnet".into(),
-            base_url: None,
+            claude_model: "sonnet".into(),
             credential_target: None,
-            api_protocol: "anthropic".into(),
-            is_default: true,
             has_credential: false,
+            ..profile("claude-default", "Anthropic")
         };
 
-        assert!(profile_environment(Some(&profile)).is_empty());
+        assert!(claude_profile_environment(Some(&profile)).is_empty());
     }
 
     #[test]
     fn maps_minimax_profile_to_current_claude_compatibility_environment() {
         let profile = ModelProfile {
-            id: "minimax".into(),
-            name: "MiniMax M3".into(),
-            provider: "MiniMax".into(),
-            model: "MiniMax-M3".into(),
-            base_url: Some("https://api.minimaxi.com/anthropic".into()),
-            credential_target: Some("profile:minimax".into()),
-            api_protocol: "anthropic".into(),
-            is_default: false,
-            has_credential: true,
+            claude_model: "MiniMax-M3".into(),
+            claude_base_url: Some("https://api.minimaxi.com/anthropic".into()),
+            ..profile("minimax", "MiniMax")
         };
 
-        let environment = profile_environment(Some(&profile));
+        let environment = claude_profile_environment(Some(&profile));
 
         assert_eq!(
             environment.get("ANTHROPIC_BASE_URL").map(String::as_str),
@@ -617,51 +786,279 @@ mod tests {
     }
 
     #[test]
-    fn maps_openai_compatible_profile_to_codex_environment() {
+    fn declares_a_responses_provider_as_toml_overrides() {
         let profile = ModelProfile {
-            id: "openai-codex".into(),
-            name: "GPT-5.6 Sol".into(),
-            provider: "OpenAI".into(),
-            model: "gpt-5.6-sol".into(),
-            base_url: Some("https://api.openai.com/v1".into()),
-            credential_target: Some("profile:openai-codex".into()),
-            api_protocol: "openai".into(),
-            is_default: true,
-            has_credential: true,
+            name: "DeepSeek".into(),
+            codex_model: "deepseek-v4".into(),
+            codex_base_url: Some("https://api.deepseek.com/v1".into()),
+            ..profile("deepseek", "DeepSeek")
         };
 
-        let environment = profile_environment(Some(&profile));
+        let configs = codex_provider_configs(Some(&profile)).unwrap();
 
-        assert_eq!(
-            environment.get("OPENAI_BASE_URL").map(String::as_str),
-            Some("https://api.openai.com/v1")
-        );
-        assert_eq!(
-            environment.get("OPENAI_MODEL").map(String::as_str),
-            Some("gpt-5.6-sol")
-        );
-        assert_eq!(
-            environment.get("API_TIMEOUT_MS").map(String::as_str),
-            Some("3000000")
-        );
-        assert!(environment.get("ANTHROPIC_BASE_URL").is_none());
-        assert!(environment.get("ANTHROPIC_MODEL").is_none());
+        // Codex ignores OPENAI_BASE_URL, so the endpoint only lands through these overrides.
+        assert!(configs
+            .iter()
+            .any(|config| config.starts_with("model_provider=")));
+        assert!(configs
+            .iter()
+            .any(|config| config.contains("base_url=")
+                && config.contains("https://api.deepseek.com/v1")));
+        assert!(configs
+            .iter()
+            .any(|config| config.contains("env_key=") && config.contains("OPENAI_API_KEY")));
+        assert!(configs
+            .iter()
+            .any(|config| config.contains("wire_api=") && config.contains("responses")));
+        // Literal TOML strings are what survive the Windows npm `.cmd` shim.
+        assert!(configs.iter().all(|config| config.contains("'''")));
     }
 
     #[test]
-    fn leaves_official_openai_environment_untouched() {
+    fn uses_responses_for_every_supported_third_party_preset() {
+        for (provider, model, base_url) in [
+            ("DeepSeek", "deepseek-v4", "https://api.deepseek.com/v1"),
+            ("MiniMax", "MiniMax-M3", "https://api.minimaxi.com/v1"),
+            ("GLM", "glm-5.2", "https://open.bigmodel.cn/api/paas/v4"),
+            ("Kimi", "kimi-k3", "https://api.moonshot.cn/v1"),
+        ] {
+            let profile = ModelProfile {
+                name: provider.into(),
+                codex_model: model.into(),
+                codex_base_url: Some(base_url.into()),
+                ..profile(&provider.to_ascii_lowercase(), provider)
+            };
+
+            let configs = codex_provider_configs(Some(&profile)).unwrap();
+
+            assert!(configs
+                .iter()
+                .any(|config| config.contains("wire_api=") && config.contains("responses")));
+        }
+    }
+
+    #[test]
+    fn supplies_the_official_minimax_m3_codex_metadata() {
         let profile = ModelProfile {
-            id: "codex-default".into(),
-            name: "GPT-5.6 Sol".into(),
-            provider: "OpenAI".into(),
-            model: "gpt-5.6-sol".into(),
-            base_url: None,
-            credential_target: None,
-            api_protocol: "openai".into(),
-            is_default: true,
-            has_credential: false,
+            codex_model: "MiniMax-M3".into(),
+            codex_base_url: Some("https://api.minimaxi.com/v1".into()),
+            ..profile("minimax", "MiniMax")
         };
 
-        assert!(profile_environment(Some(&profile)).is_empty());
+        let metadata = codex_model_metadata(&profile, "MiniMax-M3").unwrap();
+        let model = &metadata.catalog["models"][0];
+
+        assert_eq!(metadata.context_window, 1_000_000);
+        assert_eq!(model["slug"], "MiniMax-M3");
+        assert_eq!(model["default_reasoning_level"], "high");
+        assert_eq!(model["truncation_policy"]["limit"], 10000);
+        assert_eq!(model["input_modalities"], json!(["text", "image"]));
+    }
+
+    #[test]
+    fn does_not_override_metadata_for_other_codex_models() {
+        let profile = ModelProfile {
+            codex_model: "MiniMax-M3".into(),
+            codex_base_url: Some("https://api.minimaxi.com/v1".into()),
+            ..profile("minimax", "MiniMax")
+        };
+
+        assert!(codex_model_metadata(&profile, "MiniMax-M2.5").is_none());
+        let openai = ModelProfile {
+            provider: "OpenAI".into(),
+            ..profile
+        };
+        assert!(codex_model_metadata(&openai, "MiniMax-M3").is_none());
+    }
+
+    #[test]
+    fn supplies_provider_specific_metadata_for_other_codex_models() {
+        for (provider, model_name, context_window, default_effort, modalities) in [
+            (
+                "DeepSeek",
+                "deepseek-v4",
+                1_000_000,
+                "high",
+                json!(["text"]),
+            ),
+            ("GLM", "glm-5.2", 1_000_000, "max", json!(["text"])),
+            (
+                "Kimi",
+                "kimi-k3",
+                1_048_576,
+                "max",
+                json!(["text", "image"]),
+            ),
+        ] {
+            let profile = ModelProfile {
+                codex_model: model_name.into(),
+                codex_base_url: Some("https://example.com/v1".into()),
+                ..profile(&provider.to_ascii_lowercase(), provider)
+            };
+
+            let metadata = codex_model_metadata(&profile, model_name).unwrap();
+            let model = &metadata.catalog["models"][0];
+
+            assert_eq!(metadata.context_window, context_window);
+            assert_eq!(model["slug"], model_name);
+            assert_eq!(model["default_reasoning_level"], default_effort);
+            assert_eq!(model["input_modalities"], modalities);
+        }
+    }
+
+    #[test]
+    fn accepts_current_deepseek_v4_model_ids() {
+        let profile = ModelProfile {
+            codex_model: "deepseek-v4-pro".into(),
+            codex_base_url: Some("https://api.deepseek.com/v1".into()),
+            ..profile("deepseek", "DeepSeek")
+        };
+
+        for model_name in ["deepseek-v4", "deepseek-v4-pro", "deepseek-v4-flash"] {
+            let metadata = codex_model_metadata(&profile, model_name).unwrap();
+            assert_eq!(metadata.catalog["models"][0]["slug"], model_name);
+        }
+    }
+
+    #[test]
+    fn keeps_a_responses_provider_on_the_current_codex_wire_api() {
+        let profile = ModelProfile {
+            name: "SCNet".into(),
+            codex_model: "DeepSeek-V4".into(),
+            codex_base_url: Some("https://api.scnet.cn/api/llm/v1".into()),
+            ..profile("scnet", "SCNet")
+        };
+
+        let configs = codex_provider_configs(Some(&profile)).unwrap();
+
+        assert!(configs
+            .iter()
+            .any(|config| config.contains("wire_api=") && config.contains("responses")));
+    }
+
+    #[test]
+    fn explicitly_restores_codex_to_its_built_in_provider_without_an_endpoint() {
+        let official = ModelProfile {
+            codex_model: "gpt-5.6-sol".into(),
+            ..profile("codex-default", "OpenAI")
+        };
+
+        let configs = codex_provider_configs(Some(&official)).unwrap();
+
+        assert_eq!(configs, vec!["model_provider='''openai'''".to_owned()]);
+        assert!(!configs.iter().any(|config| config.contains("termexo")));
+        assert!(!configs
+            .iter()
+            .any(|config| config.contains("model_catalog_json")));
+        assert_eq!(
+            codex_provider_configs(None).unwrap(),
+            vec!["model_provider='''openai'''".to_owned()]
+        );
+    }
+
+    #[test]
+    fn restores_the_official_provider_when_the_profile_is_switched_off_for_codex() {
+        let claude_only = ModelProfile {
+            codex_enabled: false,
+            codex_model: "kimi-k3".into(),
+            codex_base_url: Some("https://api.moonshot.cn/v1".into()),
+            ..profile("kimi", "Kimi")
+        };
+
+        assert_eq!(
+            codex_provider_configs(Some(&claude_only)).unwrap(),
+            vec!["model_provider='''openai'''".to_owned()]
+        );
+    }
+
+    #[test]
+    fn serves_each_agent_the_endpoint_meant_for_its_protocol() {
+        let profile = ModelProfile {
+            claude_model: "deepseek-v4-pro[1m]".into(),
+            claude_base_url: Some("https://api.deepseek.com/anthropic".into()),
+            codex_model: "deepseek-v4".into(),
+            codex_base_url: Some("https://api.deepseek.com/v1".into()),
+            ..profile("deepseek", "DeepSeek")
+        };
+
+        let claude = claude_profile_environment(Some(&profile));
+        let codex = codex_provider_configs(Some(&profile)).unwrap();
+
+        assert_eq!(
+            claude.get("ANTHROPIC_BASE_URL").map(String::as_str),
+            Some("https://api.deepseek.com/anthropic")
+        );
+        assert!(codex
+            .iter()
+            .any(|config| config.contains("https://api.deepseek.com/v1")));
+        // Neither agent may be handed the other's endpoint, which answers a different protocol.
+        assert!(!claude
+            .values()
+            .any(|value| value.contains("api.deepseek.com/v1")));
+        assert!(!codex
+            .iter()
+            .any(|config| config.contains("api.deepseek.com/anthropic")));
+    }
+
+    #[test]
+    fn contributes_nothing_for_an_agent_the_profile_is_switched_off_for() {
+        let profile = ModelProfile {
+            claude_model: "kimi-k3".into(),
+            claude_base_url: Some("https://api.moonshot.cn/anthropic".into()),
+            codex_enabled: false,
+            codex_model: "kimi-k3".into(),
+            codex_base_url: Some("https://api.moonshot.cn/v1".into()),
+            ..profile("kimi", "Kimi")
+        };
+
+        assert_eq!(
+            codex_provider_configs(Some(&profile)).unwrap(),
+            vec!["model_provider='''openai'''".to_owned()]
+        );
+        assert!(!claude_profile_environment(Some(&profile)).is_empty());
+    }
+
+    #[test]
+    fn skips_a_requested_profile_that_does_not_serve_the_agent() {
+        let claude_only = ModelProfile {
+            claude_model: "sonnet".into(),
+            codex_enabled: false,
+            ..profile("claude-only", "Anthropic")
+        };
+        let codex_capable = ModelProfile {
+            codex_model: "gpt-5.6-sol".into(),
+            claude_enabled: false,
+            ..profile("codex-capable", "OpenAI")
+        };
+        let profiles = vec![claude_only, codex_capable];
+
+        let chosen = select_profile(&profiles, Some("claude-only"), |profile| {
+            profile.codex_enabled
+        });
+
+        // Falling back beats launching Codex against an Anthropic endpoint.
+        assert_eq!(
+            chosen.map(|profile| profile.id),
+            Some("codex-capable".into())
+        );
+    }
+
+    #[test]
+    fn prefers_the_default_profile_when_none_was_requested() {
+        let profiles = vec![
+            ModelProfile {
+                claude_model: "kimi-k3".into(),
+                ..profile("kimi", "Kimi")
+            },
+            ModelProfile {
+                claude_model: "glm-5.2[1m]".into(),
+                is_default: true,
+                ..profile("glm", "GLM")
+            },
+        ];
+
+        let chosen = select_profile(&profiles, None, |profile| profile.claude_enabled);
+
+        assert_eq!(chosen.map(|profile| profile.id), Some("glm".into()));
     }
 }

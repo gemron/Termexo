@@ -7,11 +7,31 @@ import { isTauriRuntime } from './tauri-runtime';
 
 interface TerminalOutputEvent {
   terminalId: string;
+  runtimeRevision: number;
   data: string;
+}
+
+/** Emitted once when a terminal's process ends, however it ended. */
+export interface TerminalExitEvent {
+  terminalId: string;
+  runtimeRevision: number;
+  exitCode: number;
+  success: boolean;
+}
+
+type TerminalRuntimeEvent = Pick<TerminalExitEvent, 'terminalId' | 'runtimeRevision'>;
+
+/** Prevents delayed events from a replaced PTY from affecting its successor with the same id. */
+export function terminalEventMatchesSession(
+  event: TerminalRuntimeEvent,
+  session: Pick<TerminalSession, 'id' | 'runtimeRevision'>,
+): boolean {
+  return event.terminalId === session.id && event.runtimeRevision === (session.runtimeRevision ?? 0);
 }
 
 interface TerminalStartRequest {
   terminalId: string;
+  runtimeRevision: number;
   shell: string;
   workingDirectory: string;
   command?: string;
@@ -25,10 +45,17 @@ export class TerminalGatewayService {
   private readonly browserListeners = new Map<string, (data: string) => void>();
   private readonly browserLines = new Map<string, string>();
 
-  async connect(terminalId: string, onOutput: (data: string) => void): Promise<UnlistenFn> {
+  async connect(
+    terminalId: string,
+    runtimeRevision: number,
+    onOutput: (data: string) => void,
+  ): Promise<UnlistenFn> {
     if (isTauriRuntime()) {
       return listen<TerminalOutputEvent>('terminal-output', (event) => {
-        if (event.payload.terminalId === terminalId) {
+        if (
+          event.payload.terminalId === terminalId &&
+          event.payload.runtimeRevision === runtimeRevision
+        ) {
           onOutput(event.payload.data);
         }
       });
@@ -41,9 +68,24 @@ export class TerminalGatewayService {
     };
   }
 
+  /**
+   * Listens for terminals whose process ended.
+   *
+   * This is the only signal that a launch failed: a missing executable, a rejected key, or a CLI
+   * that exits at once all leave a terminal that produced no output and never will.
+   */
+  async onExit(handler: (event: TerminalExitEvent) => void): Promise<UnlistenFn> {
+    if (!isTauriRuntime()) {
+      // The emulated browser shell has no process to outlive.
+      return () => {};
+    }
+    return listen<TerminalExitEvent>('terminal-exit', (event) => handler(event.payload));
+  }
+
   async start(session: TerminalSession, cols: number, rows: number): Promise<void> {
     const request: TerminalStartRequest = {
       terminalId: session.id,
+      runtimeRevision: session.runtimeRevision ?? 0,
       shell: session.shell,
       workingDirectory: session.workingDirectory,
       command: session.command,

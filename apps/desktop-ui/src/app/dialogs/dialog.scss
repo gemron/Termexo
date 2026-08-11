@@ -165,7 +165,7 @@
 .profile-option {
   display: grid;
   min-width: 0;
-  grid-template-columns: 8px minmax(0, 1fr) 18px;
+  grid-template-columns: 8px minmax(0, 1fr) minmax(18px, auto);
   align-items: center;
   gap: 10px;
   padding: 9px;
@@ -178,6 +178,13 @@
   &.selected {
     border-color: color-mix(in oklab, var(--color-primary) 62%, var(--border));
     background: var(--primary-soft);
+  }
+
+  &.current {
+    cursor: not-allowed;
+    border-color: color-mix(in oklab, var(--color-primary) 30%, var(--border));
+    background: var(--surface-2);
+    opacity: 0.78;
   }
 
   > i {
@@ -200,6 +207,16 @@
     margin-top: 4px;
     color: var(--text-muted);
     font: 10px/1.35 var(--sans);
+  }
+
+  .current-tag {
+    padding: 3px 6px;
+    border-radius: 999px;
+    color: var(--color-primary);
+    background: var(--primary-soft);
+    font-size: 9px;
+    line-height: 1;
+    white-space: nowrap;
   }
 }
 

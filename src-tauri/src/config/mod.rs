@@ -17,18 +17,54 @@ pub enum ConfigError {
     LockPoisoned,
 }
 
+/// One provider's credentials plus the endpoint each agent reaches it through.
+///
+/// A provider answers Claude over the Anthropic protocol and Codex over the OpenAI one, usually at
+/// different paths on the same host, so both sides live here and either can be switched off. The
+/// API key is shared: it is the provider that issues it, not the protocol.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ModelProfile {
     pub id: String,
     pub name: String,
     pub provider: String,
-    pub model: String,
-    pub base_url: Option<String>,
     pub credential_target: Option<String>,
-    pub api_protocol: String,
     pub is_default: bool,
     pub has_credential: bool,
+    pub claude_enabled: bool,
+    pub claude_model: String,
+    pub claude_base_url: Option<String>,
+    pub codex_enabled: bool,
+    pub codex_model: String,
+    pub codex_base_url: Option<String>,
+    /// Percentage of the provider-reported allowance at which the UI warns. The allowance itself
+    /// is never stored — it is read live from the provider.
+    pub plan_alert_threshold: u8,
+}
+
+impl ModelProfile {
+    /// The model and base URL this profile offers an agent, or `None` when it is switched off.
+    pub fn endpoint(&self, agent: AgentProtocol) -> Option<(&str, Option<&str>)> {
+        let (enabled, model, base_url) = match agent {
+            AgentProtocol::Anthropic => (
+                self.claude_enabled,
+                &self.claude_model,
+                &self.claude_base_url,
+            ),
+            AgentProtocol::OpenAi => (self.codex_enabled, &self.codex_model, &self.codex_base_url),
+        };
+        if !enabled {
+            return None;
+        }
+        Some((model.as_str(), base_url.as_deref()))
+    }
+}
+
+/// Which wire protocol an agent speaks to the provider.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum AgentProtocol {
+    Anthropic,
+    OpenAi,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -37,18 +73,31 @@ pub struct ModelProfileInput {
     pub id: String,
     pub name: String,
     pub provider: String,
-    pub model: String,
-    pub base_url: Option<String>,
     pub api_key: Option<String>,
     #[serde(default)]
     pub clear_credential: bool,
-    #[serde(default = "default_api_protocol")]
-    pub api_protocol: String,
     pub is_default: bool,
+    #[serde(default = "enabled_by_default")]
+    pub claude_enabled: bool,
+    #[serde(default)]
+    pub claude_model: String,
+    pub claude_base_url: Option<String>,
+    #[serde(default = "enabled_by_default")]
+    pub codex_enabled: bool,
+    #[serde(default)]
+    pub codex_model: String,
+    pub codex_base_url: Option<String>,
+    #[serde(default = "default_plan_alert_threshold")]
+    pub plan_alert_threshold: u8,
 }
 
-fn default_api_protocol() -> String {
-    "anthropic".into()
+/// A new profile serves both agents unless the user says otherwise.
+fn enabled_by_default() -> bool {
+    true
+}
+
+fn default_plan_alert_threshold() -> u8 {
+    80
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

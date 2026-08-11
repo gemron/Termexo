@@ -11,7 +11,7 @@
 </p>
 
 <p align="center">
-  <img alt="Version 0.3.17" src="https://img.shields.io/badge/version-0.3.17-58c7a0">
+  <img alt="Version 0.4.4" src="https://img.shields.io/badge/version-0.4.4-58c7a0">
   <img alt="Windows" src="https://img.shields.io/badge/platform-Windows-0078D4?logo=windows">
   <img alt="Tauri 2" src="https://img.shields.io/badge/Tauri-2-24C8DB?logo=tauri&logoColor=white">
   <img alt="Angular 22" src="https://img.shields.io/badge/Angular-22-DD0031?logo=angular">
@@ -34,8 +34,9 @@ Run the complete Windows app with one command—no Termexo account or server req
 npx termexo@latest
 ```
 
-> The latest published release is **V0.3.17**. It keeps the IME candidate window on the caret
-> instead of a screen corner, and lets you clear a terminal's waiting status.
+> The current development version is **V0.4.4** (latest published: **V0.3.18**). It adds
+> transactional model switching, local token telemetry, Plan estimates, system-proxy discovery,
+> and failure rollback for CLI upgrades.
 
 ![Termexo multi-terminal grid workbench](website/assets/termexo-workbench.png)
 
@@ -92,6 +93,31 @@ you configure under their own terms and privacy policies.
 The interface is available in Simplified Chinese, English, Spanish, French, German, Japanese,
 and Korean. It follows the Windows language automatically, or you can choose a language from
 the main toolbar and keep that choice across restarts.
+
+## V0.3.18 Updates
+
+- Model profiles are organised by provider. One profile now holds the Claude side (Anthropic
+  protocol) and the Codex side (OpenAI protocol) together — a model and endpoint each, a switch
+  each, both on by default, and one shared API key. A provider serves the two agents on different
+  paths (DeepSeek answers on `/anthropic` and `/v1`), which the previous single-endpoint profile
+  could not express.
+- DeepSeek, MiniMax, GLM, Kimi, and SCNet ship as presets taken from their published API docs.
+  Selecting a provider fills both sides at once and shows where the values came from. The official
+  Anthropic and OpenAI presets remain, alongside a blank Custom entry, and every field stays
+  editable.
+- A side the provider publishes no endpoint for switches itself off rather than sitting half
+  configured, so "enabled" always means "reachable".
+- Launching an agent only ever picks a profile enabled for it: naming one that is switched off for
+  that agent falls back to the default instead of pointing it at the other protocol's URL.
+- On upgrade, existing single-protocol profiles move to the side their protocol served, with the
+  other side left off.
+- Fix Codex never actually switching to a third-party provider. The endpoint was passed as
+  `OPENAI_BASE_URL` and `OPENAI_MODEL`, neither of which Codex reads — it resolves providers from
+  its own config, so every session kept talking to the official endpoint. Termexo now declares the
+  provider through the `-c` overrides Codex supports (`model_provider`, `base_url`, `env_key`,
+  `wire_api`), with the API key staying in the environment rather than on the command line. Note
+  that current Codex speaks only the Responses API (`{base_url}/responses`), so reaching a provider
+  depends on it offering that interface.
 
 ## V0.3.17 Updates
 
@@ -308,7 +334,7 @@ the main toolbar and keep that choice across restarts.
 - Adjust grid rows and columns with steppers, a visual preview, dimension swapping, and live capacity feedback.
 - Use the new compact circuit-line identity across the desktop app, installers, and website.
 
-## V0.4 Development
+## V0.4.0
 
 - Create global or workspace-scoped network profiles for HTTP, HTTPS, SOCKS, and `NO_PROXY`.
 - Manage npm registry, proxy, `https-proxy`, `strict-ssl`, and enterprise CA settings without rewriting the user's global npm configuration.
@@ -316,8 +342,12 @@ the main toolbar and keep that choice across restarts.
 - Test DNS/TCP reachability and apply the effective workspace-over-global profile to Claude and Codex launch environments.
 - Preview and confirm one-click Claude Code/Codex installation or upgrades from their official npm packages, with exact version or dist-tag selection.
 - Apply the effective network profile to npm, preflight the registry, prevent overlapping mutations, enforce a timeout, and verify CLI health after completion.
-- Multiple isolated Claude/ChatGPT accounts are now available; automatic rollback,
-  system-proxy discovery, and Plan quota monitoring remain planned.
+- Discover standard proxy environment variables or the current Windows user proxy and import it as an editable Profile without reading passwords.
+- Restore the previously detected CLI version automatically when npm mutation or post-install health verification fails.
+- Switch one or many Claude/Codex terminals as a transaction: preflight every launch, and restore original commands, sessions, and profiles after a partial failure.
+- Extract per-turn Token usage from native Claude/Codex event and transcript data, then show cumulative totals, Tokens/minute, per-terminal totals, and a recent activity curve.
+- Configure a Plan allowance, reset time, and alert threshold per provider Profile. The inspector shows remaining allowance, reset countdown, one-time threshold warnings, and blocks switching to an exhausted Profile.
+- Provider quota APIs are not universally available. V0.4 labels configured/local figures as estimates and unsupported providers as unavailable instead of presenting estimates as official data.
 
 ## Why Termexo
 
@@ -499,12 +529,19 @@ identifiers still use a legacy name. This does not affect the Termexo product na
 | ------- | ------------------------------------------------------------------------------ | ----------- |
 | V0.1    | Workspace, multi-terminal, PTY, and SQLite foundation                          | Complete    |
 | V0.2    | Claude detection, session resume, hooks, and profiles                          | Complete    |
-| V0.3    | Codex CLI adapter and unified Claude/Codex session center                      | Current     |
-| V0.4    | Account/provider control, CLI/network lifecycle, rollback, and Plan visibility | In progress |
-| V0.5    | Session summaries and cross-agent migration                                    | Planned     |
-| V0.6    | Multi-agent collaboration, task orchestration, and notifications               | Planned     |
+| V0.3    | Multi-agent foundation, interaction stabilization, and file-link openers        | Complete    |
+| V0.4    | Model switching, live token telemetry, and Plan quota/reset alerts              | Current     |
+| V0.5    | Prompt assets, handoff documents, session summaries, and cross-agent migration  | Planned     |
+| V0.6    | Multi-agent collaboration, orchestration, and domestic/international channels   | Planned     |
 | V0.7    | Workspace sharing, remote computers, and mobile access                         | Planned     |
 | V1.0    | Stable release, security hardening, and complete recovery UX                   | Planned     |
+
+Near-term order: interaction and file-opening fixes ([#11](https://github.com/gemron/Termexo/issues/11),
+[#15](https://github.com/gemron/Termexo/issues/15)) → model switching and token/Plan visibility
+([#4](https://github.com/gemron/Termexo/issues/4), [#12](https://github.com/gemron/Termexo/issues/12)) →
+prompt assets and session handoff ([#8](https://github.com/gemron/Termexo/issues/8),
+[#7](https://github.com/gemron/Termexo/issues/7)) → notification channels
+([#5](https://github.com/gemron/Termexo/issues/5)). See [Termexo.md](Termexo.md) for dependencies and acceptance criteria.
 
 ## Repository Layout
 

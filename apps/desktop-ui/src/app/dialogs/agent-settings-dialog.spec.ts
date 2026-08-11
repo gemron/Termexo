@@ -12,11 +12,13 @@ const CUSTOM_PROFILE: ModelProfile = {
   id: 'custom-default',
   name: 'Team Claude',
   provider: 'Anthropic',
-  model: 'claude-sonnet-4-6',
-  baseUrl: 'https://api.example.test',
-  apiProtocol: 'anthropic',
   isDefault: true,
   hasCredential: true,
+  claudeEnabled: true,
+  claudeModel: 'claude-sonnet-4-6',
+  claudeBaseUrl: 'https://api.example.test',
+  codexEnabled: false,
+  codexModel: '',
 };
 
 const NETWORK_PROFILE: NetworkProfile = {
@@ -62,10 +64,11 @@ describe('AgentSettingsDialogComponent', () => {
       '.profile-editor input:not([type="checkbox"])',
     );
 
+    // Name, Claude model + endpoint, Codex model + endpoint, then the shared API key.
     expect(inputs[0].value).toBe('Team Claude');
     expect(inputs[1].value).toBe('claude-sonnet-4-6');
     expect(inputs[2].value).toBe('https://api.example.test');
-    expect(inputs[3].placeholder).toContain('已安全保存');
+    expect(inputs[5].placeholder).toContain('已安全保存');
   });
 
   it('reuses the generated id when a new profile is saved more than once', async () => {
@@ -95,26 +98,38 @@ describe('AgentSettingsDialogComponent', () => {
 
     clickButton('模型 Profile');
     clickButton('新建 Profile');
-    const selects = root.querySelectorAll<HTMLSelectElement>('.profile-editor select');
-    const provider = selects[1]; // second select is provider, first is apiProtocol
+    const provider = root.querySelector<HTMLSelectElement>('.profile-editor select');
     expect(provider).toBeTruthy();
     provider!.value = 'DeepSeek';
     provider!.dispatchEvent(new Event('change'));
     await fixture.whenStable();
     fixture.detectChanges();
 
+    // Name, then Claude model + endpoint, then Codex model + endpoint, then the shared key.
     const inputs = root.querySelectorAll<HTMLInputElement>(
       '.profile-editor input:not([type="checkbox"])',
     );
-    expect(inputs[0].value).toBe('DeepSeek V4 Pro');
+    expect(inputs[0].value).toBe('DeepSeek 深度求索');
     expect(inputs[1].value).toBe('deepseek-v4-pro[1m]');
     expect(inputs[2].value).toBe('https://api.deepseek.com/anthropic');
-    setEditorInputValue(3, 'test-deepseek-key');
+    expect(inputs[3].value).toBe('deepseek-v4');
+    expect(inputs[4].value).toBe('https://api.deepseek.com/v1');
+    setEditorInputValue(5, 'test-deepseek-key');
 
     const saved: ModelProfileInput[] = [];
     component.modelSaved.subscribe((profile) => saved.push(profile));
     clickButton('保存 Profile');
-    expect(saved[0]).toEqual(expect.objectContaining({ provider: 'DeepSeek' }));
+    expect(saved[0]).toEqual(
+      expect.objectContaining({
+        provider: 'DeepSeek',
+        claudeEnabled: true,
+        claudeModel: 'deepseek-v4-pro[1m]',
+        claudeBaseUrl: 'https://api.deepseek.com/anthropic',
+        codexEnabled: true,
+        codexModel: 'deepseek-v4',
+        codexBaseUrl: 'https://api.deepseek.com/v1',
+      }),
+    );
   });
 
   it('opens a requested third-party profile and requires its missing API key', async () => {
@@ -122,11 +137,14 @@ describe('AgentSettingsDialogComponent', () => {
       id: 'minimax-m3',
       name: 'MiniMax M3',
       provider: 'MiniMax',
-      model: 'MiniMax-M3',
-      baseUrl: 'https://api.minimaxi.com/anthropic',
-      apiProtocol: 'anthropic',
       isDefault: false,
       hasCredential: false,
+      claudeEnabled: true,
+      claudeModel: 'MiniMax-M3',
+      claudeBaseUrl: 'https://api.minimaxi.com/anthropic',
+      codexEnabled: true,
+      codexModel: 'MiniMax-M3',
+      codexBaseUrl: 'https://api.minimaxi.com/v1',
     };
     fixture.componentRef.setInput('modelProfiles', [CUSTOM_PROFILE, minimax]);
     fixture.componentRef.setInput('initialTab', 'models');
@@ -141,7 +159,7 @@ describe('AgentSettingsDialogComponent', () => {
     );
     expect(saveButton?.disabled).toBe(true);
 
-    setEditorInputValue(3, 'test-minimax-key');
+    setEditorInputValue(5, 'test-minimax-key');
     expect(saveButton?.disabled).toBe(false);
     const saved: ModelProfileInput[] = [];
     component.modelSaved.subscribe((profile) => saved.push(profile));

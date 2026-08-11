@@ -63,6 +63,72 @@
       </section>
     }
 
+    <section class="quota-panel">
+      <header class="section-header">
+        <span>{{ 'quota.title' | t }}</span>
+        <button
+          type="button"
+          class="quota-refresh"
+          [disabled]="quotaLoading()"
+          (click)="refreshQuotas.emit()"
+        >
+          {{ (quotaLoading() ? 'quota.refreshing' : 'quota.refresh') | t }}
+        </button>
+      </header>
+      <button
+        type="button"
+        class="quota-scope-toggle"
+        [attr.aria-pressed]="showAllQuotas()"
+        (click)="toggleQuotaScope()"
+      >
+        {{ (showAllQuotas() ? 'quota.showCurrent' : 'quota.showAll') | t }}
+      </button>
+      @for (row of quotaRows(); track row.quota.profileId) {
+        <article class="quota-row">
+          <header>
+            <strong>{{ row.quota.profileName }}</strong>
+            @if (!row.quota.official) {
+              <span class="quota-unofficial">{{ 'quota.unofficial' | t }}</span>
+            }
+          </header>
+          @for (line of row.entries; track line.entry.label) {
+            <div class="quota-entry" [class.alerting]="line.alerting">
+              <div class="quota-entry-head">
+                <span>{{ line.entry.label }}</span>
+                <span>{{ formatAmount(line.entry, line.entry.remaining) }}</span>
+              </div>
+              @if (line.entry.percent !== undefined) {
+                <progress
+                  class="progress progress-primary"
+                  max="100"
+                  [value]="line.entry.percent"
+                ></progress>
+              }
+              <small>
+                @if (line.entry.total !== undefined) {
+                  {{ 'quota.of' | t }} {{ formatAmount(line.entry, line.entry.total) }}
+                }
+                @if (line.entry.resetsAt) {
+                  · {{ resetLabel(line.entry.resetsAt) }}
+                }
+              </small>
+            </div>
+          }
+          @if (row.quota.diagnostic) {
+            <small class="quota-unavailable">{{ row.quota.diagnostic }}</small>
+          } @else {
+            <small class="quota-checked"
+              >{{ 'quota.checkedAt' | t }} {{ checkedLabel(row.quota.checkedAt) }}</small
+            >
+          }
+        </article>
+      } @empty {
+        <p class="quota-empty">
+          {{ (showAllQuotas() ? 'quota.none' : 'quota.currentNone') | t }}
+        </p>
+      }
+    </section>
+
     <section class="activity">
       <header class="section-header">
         <span>{{ 'inspector.recentActivity' | t }}</span>

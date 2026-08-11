@@ -5,9 +5,12 @@ import { FormsModule } from '@angular/forms';
 import {
   type AccountProfile,
   type AgentInstallation,
+  type AgentProtocol,
   type AgentSession,
   CODEX_MODEL_SUGGESTIONS,
   isNativeModel,
+  profileModel,
+  profileServes,
   type McpProfile,
   type ModelProfile,
   type NativeAgentType,
@@ -210,7 +213,7 @@ const AGENT_FILTERS: readonly {
                         (ngModelChange)="profileId.set($event)"
                       >
                         @for (profile of anthropicProfiles(); track profile.id) {
-                          <option [value]="profile.id">{{ profileLabel(profile) }}</option>
+                          <option [value]="profile.id">{{ profileLabel(profile, 'claude') }}</option>
                         }
                       </select>
                     </label>
@@ -255,7 +258,7 @@ const AGENT_FILTERS: readonly {
                         (ngModelChange)="codexProfileId.set($event)"
                       >
                         @for (profile of openaiProfiles(); track profile.id) {
-                          <option [value]="profile.id">{{ profileLabel(profile) }}</option>
+                          <option [value]="profile.id">{{ profileLabel(profile, 'codex') }}</option>
                         }
                       </select>
                     </label>
@@ -410,10 +413,10 @@ export class SessionCenterDialogComponent {
   protected readonly mcpProfileId = signal('');
   protected readonly claudeAccountProfileId = signal('');
   protected readonly anthropicProfiles = computed(() =>
-    this.profiles().filter((profile) => profile.apiProtocol === 'anthropic'),
+    this.profiles().filter((profile) => profileServes(profile, 'claude')),
   );
   protected readonly openaiProfiles = computed(() =>
-    this.profiles().filter((profile) => profile.apiProtocol === 'openai'),
+    this.profiles().filter((profile) => profileServes(profile, 'codex')),
   );
   protected readonly codexAccountProfileId = signal('');
   protected readonly codexProfileId = signal('');
@@ -588,10 +591,10 @@ export class SessionCenterDialogComponent {
   }
 
   /** Model profiles read as "name · model", with native profiles called out. */
-  protected profileLabel(profile: ModelProfile): string {
-    const base =
-      profile.name === profile.model ? profile.name : `${profile.name} · ${profile.model}`;
-    return isNativeModel(profile) ? `${base} (${this.i18n.t('settings.nativeModel')})` : base;
+  protected profileLabel(profile: ModelProfile, agent: AgentProtocol): string {
+    const model = profileModel(profile, agent);
+    const base = profile.name === model ? profile.name : `${profile.name} · ${model}`;
+    return isNativeModel(profile, agent) ? `${base} (${this.i18n.t('settings.nativeModel')})` : base;
   }
 
   protected accountLabel(profile: AccountProfile): string {

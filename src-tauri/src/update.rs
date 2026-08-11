@@ -188,9 +188,12 @@ mod tests {
     #[test]
     fn recognizes_only_the_npm_wrapper_layout() {
         // The check runs on the real current_exe, so this pins the path shape it looks for.
-        let npm_path = "C:/Users/x/AppData/Roaming/npm/node_modules/termexo/vendor/win32-x64/termexo.exe";
+        let npm_path =
+            "C:/Users/x/AppData/Roaming/npm/node_modules/termexo/vendor/win32-x64/termexo.exe";
         let installed_path = "C:/Program Files/Termexo/termexo.exe";
-        assert!(npm_path.replace('\\', "/").contains("/node_modules/termexo/vendor/"));
+        assert!(npm_path
+            .replace('\\', "/")
+            .contains("/node_modules/termexo/vendor/"));
         assert!(!installed_path
             .replace('\\', "/")
             .contains("/node_modules/termexo/vendor/"));

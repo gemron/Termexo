@@ -241,7 +241,12 @@ export class TerminalPanelComponent implements AfterViewInit {
   private async initializeRuntime(): Promise<void> {
     let unlisten: (() => void) | undefined;
     try {
-      unlisten = await this.gateway.connect(this.session().id, (data) => this.handleOutput(data));
+      const session = this.session();
+      unlisten = await this.gateway.connect(
+        session.id,
+        session.runtimeRevision ?? 0,
+        (data) => this.handleOutput(data),
+      );
       if (this.destroyRef.destroyed) {
         unlisten();
         unlisten = undefined;

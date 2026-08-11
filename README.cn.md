@@ -11,7 +11,7 @@
 </p>
 
 <p align="center">
-  <img alt="Version 0.3.17" src="https://img.shields.io/badge/version-0.3.17-58c7a0">
+  <img alt="Version 0.4.4" src="https://img.shields.io/badge/version-0.4.4-58c7a0">
   <img alt="Windows" src="https://img.shields.io/badge/platform-Windows-0078D4?logo=windows">
   <img alt="Tauri 2" src="https://img.shields.io/badge/Tauri-2-24C8DB?logo=tauri&logoColor=white">
   <img alt="Angular 22" src="https://img.shields.io/badge/Angular-22-DD0031?logo=angular">
@@ -33,8 +33,8 @@ Termexo 把 Claude Code、Codex 和围绕它们运行的终端收进一个可恢
 npx termexo@latest
 ```
 
-> 最新正式版本为 **V0.3.17**。修复中文输入法候选框跑到屏幕角落，并支持一键清除
-> 「等待输入」等待处理状态。
+> 当前开发版本为 **V0.4.4**（最新正式版仍为 **V0.3.18**），新增模型切换事务、
+> 本地 Token 可观测、Plan 估算、系统代理发现和 CLI 升级失败回滚。
 
 ![Termexo 多终端网格工作台](website/assets/termexo-workbench.png)
 
@@ -85,6 +85,27 @@ SQLite，密钥保存在 Windows Credential Manager，Claude/Codex 历史会话�
 
 界面支持简体中文、英语、西班牙语、法语、德语、日语和韩语。默认自动跟随 Windows
 系统语言，也可通过主工具栏手动切换并跨重启保留选择。
+
+## V0.3.18 更新
+
+- 模型 Profile 改为按供应商组织。一个 Profile 现在同时保存 Claude 侧（Anthropic 协议）与
+  Codex 侧（OpenAI 协议）的模型与 Endpoint，两侧各有启用开关，默认都启用，API Key 两侧共用。
+  同一供应商给两个 Agent 的路径本就不同（DeepSeek 是 `/anthropic` 与 `/v1`），此前的单一
+  Endpoint 结构无法同时服务两者。
+- 内置 DeepSeek、MiniMax、GLM、Kimi、超算互联网的接口参数，取自各家官方文档，选中供应商后
+  两侧一次填好并显示文档出处；Anthropic 与 OpenAI 官方直连预设保留，另有「自定义」空白项。
+  所有参数均可手动修改。
+- 供应商未公布某一侧端点时（如 Anthropic 官方没有 OpenAI 端点），该侧自动关闭而不是留下
+  填了一半的配置，使「已启用」始终等同于「连得上」。
+- 启动 Agent 时只会选用为它启用的 Profile：显式指定了一个未对该 Agent 启用的 Profile 时，
+  改用默认 Profile，而不是把它送到另一种协议的地址上。
+- 升级时，原有的单协议 Profile 按其原本的协议归入对应一侧，另一侧保持关闭。
+- 修复 Codex 切换第三方供应商始终不生效的问题。此前依靠 `OPENAI_BASE_URL` 与 `OPENAI_MODEL`
+  两个环境变量传递端点，而 Codex 根本不读它们——它只从自己的配置解析供应商，因此端点始终是
+  OpenAI 官方。现在改为通过 Codex 支持的 `-c` 配置覆盖声明供应商（`model_provider`、
+  `base_url`、`env_key`、`wire_api`），API Key 仍只存放在环境变量中、不出现在命令行。
+  注意 Codex 现行版本只支持 Responses API（`{base_url}/responses`），能否接入取决于供应商
+  是否提供该接口。
 
 ## V0.3.17 更新
 
@@ -270,7 +291,7 @@ SQLite，密钥保存在 Windows Credential Manager，Claude/Codex 历史会话�
 - 行列设置增加步进控制、可视化预览、行列互换与实时容量提示。
 - 桌面应用、安装包和网站统一使用新的简约科技线条品牌标识。
 
-## V0.4 开发进展
+## V0.4.0
 
 - 支持全局或 Workspace 作用域的 HTTP、HTTPS、SOCKS 与 `NO_PROXY` 网络 Profile。
 - 管理 npm registry、proxy、`https-proxy`、`strict-ssl` 和企业 CA，且不改写用户全局 npm 配置。
@@ -278,7 +299,12 @@ SQLite，密钥保存在 Windows Credential Manager，Claude/Codex 历史会话�
 - 支持 DNS/TCP 连通性测试，启动 Claude/Codex 时优先使用 Workspace Profile，再回退全局 Profile。
 - 支持预览并确认从官方 npm 包一键安装/升级 Claude Code 与 Codex，可选择精确版本或 dist-tag。
 - 安装时应用当前网络 Profile，先检查 registry，禁止并发修改，设置超时并在完成后验证 CLI 健康状态。
-- 多个隔离 Claude/ChatGPT 账号已可使用；失败自动回滚、系统代理发现和 Plan 余量监控仍在后续计划中。
+- 自动发现标准代理环境变量或 Windows 当前用户系统代理，导入为可编辑 Profile，且不读取代理密码。
+- npm 修改失败或安装后健康检查失败时，自动恢复安装前检测到的 CLI 版本。
+- 单终端和批量模型切换改为事务：先预检全部启动配置，部分执行失败时恢复原命令、原会话和原 Profile。
+- 从 Claude/Codex 原生事件与会话文件提取每轮 Token，展示累计量、每分钟速度、分终端统计和最近曲线。
+- 每个供应商 Profile 可配置 Plan 总额度、重置时间和告警阈值；侧栏展示余量与倒计时，阈值只提示一次，额度耗尽时阻止切换。
+- 并非所有供应商提供配额 API；V0.4 将配置值和本地统计明确标为“估算”，无法查询时显示“不可用”，不会伪装成官方数据。
 
 ## 为什么做 Termexo
 
@@ -448,12 +474,19 @@ flowchart LR
 | ---- | ----------------------------------------------- | -------- |
 | V0.1 | Workspace、多终端、PTY、SQLite 基础             | 已完成   |
 | V0.2 | Claude Code 检测、会话恢复、Hooks、Profile      | 已完成   |
-| V0.3 | Codex CLI Adapter 与 Claude/Codex 统一会话中心  | 当前版本 |
-| V0.4 | 账号/供应商控制、CLI/网络环境、回滚与 Plan 余量 | 开发中   |
-| V0.5 | 会话摘要与跨 Agent 迁移                         | 规划中   |
-| V0.6 | 多 Agent 协作、任务编排与通知                   | 规划中   |
+| V0.3 | 多 Agent 基础、交互稳定化与文件链接打开方式     | 已完成   |
+| V0.4 | 模型切换、Token 实时统计与 Plan 额度/恢复提示   | 当前版本 |
+| V0.5 | 提示词资产、会话摘要、交接文档与跨 Agent 迁移   | 规划中   |
+| V0.6 | 多 Agent 协作、任务编排与国内外通知渠道         | 规划中   |
 | V0.7 | Workspace 共享、远程电脑与手机访问              | 规划中   |
 | V1.0 | 稳定发布、安全加固与完整恢复体验                | 规划中   |
+
+近期执行顺序：交互稳定与文件打开（[#11](https://github.com/gemron/Termexo/issues/11)、
+[#15](https://github.com/gemron/Termexo/issues/15)）→ 模型切换与 Token/Plan 可观测（
+[#4](https://github.com/gemron/Termexo/issues/4)、[#12](https://github.com/gemron/Termexo/issues/12)）→
+提示词与会话交接（[#8](https://github.com/gemron/Termexo/issues/8)、
+[#7](https://github.com/gemron/Termexo/issues/7)）→ 通知渠道（
+[#5](https://github.com/gemron/Termexo/issues/5)）。详细依赖和验收标准见 [Termexo.md](Termexo.md)。
 
 ## 项目结构
 

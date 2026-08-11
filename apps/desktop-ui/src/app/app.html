@@ -555,6 +555,10 @@
       [workspace]="state.activeWorkspace()"
       [activeTerminal]="state.activeTerminal()"
       [events]="agents.events()"
+      [quotas]="agents.providerQuotas()"
+      [quotaLoading]="agents.quotaLoading()"
+      [modelProfiles]="agents.modelProfiles()"
+      (refreshQuotas)="refreshProviderQuotas(true)"
     />
   }
 </main>
@@ -671,6 +675,7 @@
     (networkTestRequested)="testNetworkProfile($event)"
     (networkExportRequested)="exportNetworkProfiles()"
     (networkImportRequested)="importNetworkProfiles()"
+    (networkSystemProxyRequested)="importSystemProxy()"
     (accountSaved)="saveAccountProfile($event)"
     (deleteAccountRequested)="deleteAccountProfile($event)"
     (accountLoginRequested)="loginAccount($event)"
@@ -693,6 +698,7 @@
     [busy]="launchingClaude() || launchingCodex()"
     [singleTerminalName]="modelSwitchTerminalName()"
     [lockedAgentType]="modelSwitchAgentType()"
+    [currentProfileId]="modelSwitchCurrentProfileId()"
     (confirmed)="switchModels($event)"
     (cancelled)="closeModelSwitch()"
   />

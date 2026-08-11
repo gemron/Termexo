@@ -259,6 +259,122 @@ section {
   border-bottom: 0;
 }
 
+.quota-panel {
+  display: grid;
+  gap: 6px;
+}
+
+.quota-refresh {
+  padding: 2px 7px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-field);
+  background: var(--surface-raised);
+  color: var(--text-muted);
+  font: 8px/1.5 var(--mono);
+  cursor: pointer;
+
+  &:hover:not(:disabled) {
+    border-color: var(--color-primary);
+    color: var(--text-secondary);
+  }
+
+  &:disabled {
+    cursor: default;
+    opacity: 0.6;
+  }
+}
+
+.quota-scope-toggle {
+  width: 100%;
+  padding: 5px 8px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-field);
+  background: transparent;
+  color: var(--text-muted);
+  font: 8px/1.4 var(--mono);
+  cursor: pointer;
+
+  &:hover {
+    border-color: color-mix(in srgb, var(--color-primary) 58%, var(--border));
+    color: var(--text-secondary);
+    background: var(--primary-soft);
+  }
+}
+
+.quota-row {
+  padding: 8px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-field);
+  background: var(--surface-raised);
+
+  > header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 6px;
+  }
+
+  strong {
+    overflow: hidden;
+    color: var(--text-secondary);
+    font-size: 10px;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  progress {
+    width: 100%;
+    height: 5px;
+    margin: 5px 0 4px;
+  }
+
+  small {
+    display: block;
+    color: var(--text-muted);
+    font: 8px/1.3 var(--mono);
+  }
+}
+
+.quota-entry {
+  margin-top: 7px;
+
+  /* Warns without recolouring the bar itself, which still reads as consumption. */
+  &.alerting .quota-entry-head span:last-child {
+    color: var(--color-warning);
+  }
+}
+
+.quota-entry-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  color: var(--text-muted);
+  font: 8px/1.3 var(--mono);
+}
+
+.quota-unofficial {
+  flex: none;
+  padding: 1px 5px;
+  border: 1px solid color-mix(in srgb, var(--color-warning) 45%, var(--border));
+  border-radius: var(--radius-field);
+  color: var(--color-warning);
+  font: 7px/1.4 var(--mono);
+}
+
+.quota-unavailable,
+.quota-checked {
+  margin-top: 6px;
+}
+
+.quota-empty {
+  padding: 8px;
+  border: 1px dashed var(--border);
+  border-radius: var(--radius-field);
+  color: var(--text-muted);
+  font: 8px/1.3 var(--mono);
+}
+
 .event-row {
   display: grid;
   grid-template-columns: 24px minmax(0, 1fr);

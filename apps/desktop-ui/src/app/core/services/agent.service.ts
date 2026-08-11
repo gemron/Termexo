@@ -24,6 +24,8 @@ import {
   NetworkProfile,
   NetworkProfileInput,
   NetworkTestResult,
+  ProviderQuota,
+  SystemProxyDiscovery,
 } from '../models/agent.models';
 import { isTauriRuntime } from './tauri-runtime';
 
@@ -41,6 +43,8 @@ export class AgentService {
   private readonly mcpProfileItems = signal<McpProfile[]>([]);
   private readonly networkProfileItems = signal<NetworkProfile[]>([]);
   private readonly accountProfileItems = signal<AccountProfile[]>([]);
+  private readonly providerQuotaItems = signal<ProviderQuota[]>([]);
+  private readonly quotaLoadingState = signal(false);
   private readonly busyState = signal(false);
   private readonly errorState = signal<string | null>(null);
   private initialized = false;
@@ -55,6 +59,8 @@ export class AgentService {
   readonly mcpProfiles = this.mcpProfileItems.asReadonly();
   readonly networkProfiles = this.networkProfileItems.asReadonly();
   readonly accountProfiles = this.accountProfileItems.asReadonly();
+  readonly providerQuotas = this.providerQuotaItems.asReadonly();
+  readonly quotaLoading = this.quotaLoadingState.asReadonly();
   readonly busy = this.busyState.asReadonly();
   readonly error = this.errorState.asReadonly();
 
@@ -238,6 +244,7 @@ export class AgentService {
         stderr: '',
         durationMs: 0,
         diagnostic: installation.diagnostic,
+        rollbackAttempted: false,
       };
     }
     const result = await this.runValue(() =>
@@ -324,6 +331,19 @@ export class AgentService {
       };
     }
     return invoke<NetworkTestResult>('test_network_profile', { profileId });
+  }
+
+  async discoverSystemProxy(): Promise<SystemProxyDiscovery> {
+    if (!isTauriRuntime()) {
+      return {
+        source: 'environment',
+        httpProxy: 'http://127.0.0.1:7890',
+        httpsProxy: 'http://127.0.0.1:7890',
+        noProxy: 'localhost,127.0.0.1,::1',
+        diagnostic: this.i18n.t('settings.systemProxyPreview'),
+      };
+    }
+    return invoke<SystemProxyDiscovery>('discover_system_proxy');
   }
 
   /**
@@ -434,10 +454,25 @@ export class AgentService {
           id: 'claude-default',
           name: 'Claude Sonnet',
           provider: 'Anthropic',
-          model: 'sonnet',
-          apiProtocol: 'anthropic',
           isDefault: true,
           hasCredential: false,
+          claudeEnabled: true,
+          claudeModel: 'sonnet',
+          codexEnabled: false,
+          codexModel: '',
+          planAlertThreshold: 80,
+        },
+        {
+          id: 'codex-default',
+          name: 'GPT-5.6 Sol',
+          provider: 'OpenAI',
+          isDefault: false,
+          hasCredential: false,
+          claudeEnabled: false,
+          claudeModel: '',
+          codexEnabled: true,
+          codexModel: 'gpt-5.6-sol',
+          planAlertThreshold: 80,
         },
       ]);
     }
@@ -516,6 +551,42 @@ export class AgentService {
       }
     } catch (error) {
       console.warn('Agent event synchronization failed', error);
+    }
+  }
+
+  /**
+   * Reads the remaining allowance each provider reports.
+   *
+   * Deliberately not wired directly to the one-second event poll: these are third-party endpoints.
+   * The inspector may request an activity refresh, while backend cache windows still control how
+   * often each provider is contacted; a manual forced refresh is the only cache bypass.
+   */
+  async refreshProviderQuotas(workspaceId?: string, force = false): Promise<void> {
+    if (!isTauriRuntime()) {
+      // Browser preview has no backend to reach the providers through, so every profile reports
+      // the same reason rather than the panel appearing broken.
+      this.providerQuotaItems.set(
+        this.modelProfileItems().map((profile) => ({
+          profileId: profile.id,
+          profileName: profile.name,
+          provider: profile.provider,
+          official: true,
+          entries: [],
+          checkedAt: Date.now(),
+          diagnostic: this.i18n.t('quota.browserUnavailable'),
+        })),
+      );
+      return;
+    }
+    this.quotaLoadingState.set(true);
+    try {
+      this.providerQuotaItems.set(
+        await invoke<ProviderQuota[]>('get_provider_quotas', { workspaceId, force }),
+      );
+    } catch (error) {
+      console.warn('Unable to read provider quotas.', error);
+    } finally {
+      this.quotaLoadingState.set(false);
     }
   }
 

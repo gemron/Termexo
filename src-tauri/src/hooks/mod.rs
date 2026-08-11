@@ -192,6 +192,18 @@ impl HookEventStore {
         Ok(path.to_string_lossy().into_owned())
     }
 
+    pub fn write_codex_model_catalog(
+        &self,
+        terminal_id: &str,
+        catalog: &Value,
+    ) -> Result<String, HookError> {
+        let path = self
+            .runtime_directory
+            .join(format!("codex-{terminal_id}.model-catalog.json"));
+        fs::write(&path, serde_json::to_vec_pretty(catalog)?)?;
+        Ok(path.to_string_lossy().into_owned())
+    }
+
     pub fn read_new_events(&self) -> Result<Vec<AgentEvent>, HookError> {
         if !self.event_file.exists() {
             return Ok(Vec::new());
@@ -437,7 +449,8 @@ fn command_quote(value: &str) -> String {
     format!("\"{}\"", value.replace('"', "\\\""))
 }
 
-fn toml_literal(value: &str) -> Result<String, HookError> {
+/// Wraps a value as a TOML literal string, which survives the Windows npm `.cmd` shim intact.
+pub(crate) fn toml_literal(value: &str) -> Result<String, HookError> {
     (!value.contains("'''"))
         .then(|| format!("'''{value}'''"))
         .ok_or(HookError::InvalidCodexConfigValue)

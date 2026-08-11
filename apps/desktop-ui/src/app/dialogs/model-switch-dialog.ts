@@ -2,12 +2,18 @@ import { Component, computed, inject, input, output, signal } from '@angular/cor
 
 import { I18nService } from '../core/i18n/i18n.service';
 import { TranslatePipe } from '../core/i18n/translate.pipe';
-import { ModelProfile, NativeAgentType } from '../core/models/agent.models';
+import {
+  AgentProtocol,
+  ModelProfile,
+  NativeAgentType,
+  profileModel,
+  profileServes,
+} from '../core/models/agent.models';
 import { IconComponent } from '../shared/icon/icon';
 
 export interface ModelSwitchValue {
   profileId: string;
-  apiProtocol: 'anthropic' | 'openai';
+  agent: AgentProtocol;
 }
 
 @Component({
@@ -76,14 +82,19 @@ export interface ModelSwitchValue {
               type="button"
               class="profile-option card"
               [class.selected]="profile.id === resolvedProfileId()"
+              [class.current]="profile.id === currentProfileId()"
+              [disabled]="profile.id === currentProfileId()"
+              [attr.aria-current]="profile.id === currentProfileId() ? 'true' : null"
               (click)="selectedProfileId.set(profile.id)"
             >
               <i [style.background]="profileTone(profile.provider)"></i>
               <span
                 ><strong>{{ profile.name }}</strong
-                ><small>{{ profile.provider }} · {{ profile.model }}</small></span
+                ><small>{{ profile.provider }} · {{ modelOf(profile) }}</small></span
               >
-              @if (profile.id === resolvedProfileId()) {
+              @if (profile.id === currentProfileId()) {
+                <span class="current-tag">{{ 'modelSwitch.current' | t }}</span>
+              } @else if (profile.id === resolvedProfileId()) {
                 <app-icon name="check" [size]="15" />
               }
             </button>
@@ -136,28 +147,34 @@ export class ModelSwitchDialogComponent {
   readonly singleTerminalName = input('');
   /** Fixes the agent type, hiding the tabs when the target terminal already decides it. */
   readonly lockedAgentType = input<NativeAgentType | null>(null);
+  /** Profile already running in a single terminal; it remains visible but cannot be selected. */
+  readonly currentProfileId = input('');
   readonly confirmed = output<ModelSwitchValue>();
   readonly cancelled = output<void>();
   readonly selectedProfileId = signal('');
   protected readonly agentTypeValue = signal<NativeAgentType>('claude');
   readonly agentType = computed(() => this.lockedAgentType() ?? this.agentTypeValue());
+  protected readonly selectedAgent = computed<AgentProtocol>(() =>
+    this.agentType() === 'codex' ? 'codex' : 'claude',
+  );
 
-  protected readonly anthropicProfiles = computed(() =>
-    this.profiles().filter((profile) => profile.apiProtocol === 'anthropic'),
-  );
-  protected readonly openaiProfiles = computed(() =>
-    this.profiles().filter((profile) => profile.apiProtocol === 'openai'),
-  );
+  /** Only profiles switched on for the agent being changed can be offered. */
   protected readonly filteredProfiles = computed(() =>
-    this.agentType() === 'codex' ? this.openaiProfiles() : this.anthropicProfiles(),
+    this.profiles().filter((profile) => profileServes(profile, this.selectedAgent())),
   );
-  protected readonly resolvedProfileId = computed(
-    () =>
-      this.selectedProfileId() ||
-      this.filteredProfiles().find((profile) => profile.isDefault)?.id ||
-      this.filteredProfiles()[0]?.id ||
-      '',
+  protected readonly switchableProfiles = computed(() =>
+    this.filteredProfiles().filter((profile) => profile.id !== this.currentProfileId()),
   );
+  protected readonly resolvedProfileId = computed(() => {
+    const profiles = this.switchableProfiles();
+    const selected = this.selectedProfileId();
+    return (
+      profiles.find((profile) => profile.id === selected)?.id ||
+      profiles.find((profile) => profile.isDefault)?.id ||
+      profiles[0]?.id ||
+      ''
+    );
+  });
   protected readonly description = computed(() => {
     // A single-terminal switch names the terminal, so the scope is unmistakable.
     const name = this.singleTerminalName();
@@ -186,11 +203,11 @@ export class ModelSwitchDialogComponent {
     if (!profileId) {
       return;
     }
-    const profile = this.filteredProfiles().find((p) => p.id === profileId);
-    this.confirmed.emit({
-      profileId,
-      apiProtocol: profile?.apiProtocol ?? 'anthropic',
-    });
+    this.confirmed.emit({ profileId, agent: this.selectedAgent() });
+  }
+
+  protected modelOf(profile: ModelProfile): string {
+    return profileModel(profile, this.selectedAgent());
   }
 
   protected profileTone(provider: string): string {

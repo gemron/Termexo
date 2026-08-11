@@ -8,6 +8,8 @@ use crate::pty::PtyManager;
 #[serde(rename_all = "camelCase")]
 pub struct TerminalStartRequest {
     pub terminal_id: String,
+    #[serde(default)]
+    pub runtime_revision: u64,
     pub shell: String,
     pub working_directory: String,
     pub command: Option<String>,

@@ -150,6 +150,8 @@ trait ProductName {
 
 impl ProductName for Config {
     fn product_name(&self) -> String {
-        self.product_name.clone().unwrap_or_else(|| "Termexo".into())
+        self.product_name
+            .clone()
+            .unwrap_or_else(|| "Termexo".into())
     }
 }

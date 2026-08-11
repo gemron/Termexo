@@ -7,6 +7,8 @@ import {
   AgentInstallation,
   CODEX_MODEL_SUGGESTIONS,
   isNativeModel,
+  profileModel,
+  profileServes,
   ModelProfile,
 } from '../core/models/agent.models';
 import { IconComponent } from '../shared/icon/icon';
@@ -24,7 +26,7 @@ export interface CodexLaunchDialogValue {
   template: `
     <div class="backdrop modal modal-open" (mousedown)="cancelled.emit()">
       <section
-        class="agent-dialog compact modal-box"
+        class="agent-dialog compact codex-launch-dialog modal-box"
         role="dialog"
         aria-modal="true"
         aria-labelledby="codex-launch-title"
@@ -55,8 +57,8 @@ export interface CodexLaunchDialogValue {
           <code>{{ installation()?.version ?? '' }}</code>
         </div>
 
-        <div class="form-grid">
-          <label class="wide">
+        <div class="form-grid codex-launch-form">
+          <label class="wide session-name-field">
             <span>{{ 'launch.sessionName' | t }}</span>
             <input
               type="text"
@@ -67,7 +69,7 @@ export interface CodexLaunchDialogValue {
               autofocus
             />
           </label>
-          <label>
+          <label class="profile-field">
             <span>{{ 'launch.modelProfile' | t }}</span>
             <select
               class="select select-bordered select-sm"
@@ -76,7 +78,7 @@ export interface CodexLaunchDialogValue {
             >
               @for (profile of codexProfiles(); track profile.id) {
                 <option [value]="profile.id">
-                  {{ profile.name }} · {{ profile.model }}
+                  {{ profile.name }} · {{ modelOf(profile) }}
                   @if (isNativeModel(profile)) {
                     ({{ 'settings.nativeModel' | t }})
                   }
@@ -84,7 +86,7 @@ export interface CodexLaunchDialogValue {
               }
             </select>
           </label>
-          <label class="wide">
+          <label class="account-field">
             <span>{{ 'launch.chatgptAccount' | t }}</span>
             <select
               class="select select-bordered select-sm"
@@ -106,7 +108,7 @@ export interface CodexLaunchDialogValue {
               <small class="account-warning">{{ 'launch.accountNotAuthenticated' | t }}</small>
             }
           </label>
-          <label class="wide">
+          <label class="wide model-field">
             <span>{{ 'launch.codexModel' | t }}</span>
             <input
               type="text"
@@ -114,7 +116,7 @@ export interface CodexLaunchDialogValue {
               list="codex-model-suggestions"
               [placeholder]="'launch.codexModelPlaceholder' | t"
               [attr.aria-label]="'launch.codexModel' | t"
-              [ngModel]="model()"
+              [ngModel]="resolvedModel()"
               (ngModelChange)="model.set($event)"
             />
             <datalist id="codex-model-suggestions">
@@ -142,7 +144,7 @@ export interface CodexLaunchDialogValue {
       </section>
     </div>
   `,
-  styleUrl: './agent-dialog.scss',
+  styleUrls: ['./agent-dialog.scss', './codex-launch-dialog.scss'],
 })
 export class CodexLaunchDialogComponent {
   readonly installation = input<AgentInstallation | null>(null);
@@ -164,7 +166,7 @@ export class CodexLaunchDialogComponent {
     this.codexAccounts().find((profile) => profile.id === this.resolvedAccountProfileId()),
   );
   protected readonly codexProfiles = computed(() =>
-    this.profiles().filter((profile) => profile.apiProtocol === 'openai'),
+    this.profiles().filter((profile) => profileServes(profile, 'codex')),
   );
   protected readonly resolvedAccountProfileId = computed(
     () =>
@@ -180,19 +182,38 @@ export class CodexLaunchDialogComponent {
       this.codexProfiles()[0]?.id ||
       '',
   );
+  protected readonly resolvedModel = computed(() => {
+    const explicit = this.model().trim();
+    if (explicit) {
+      return explicit;
+    }
+    const profile = this.codexProfiles().find(
+      (candidate) => candidate.id === this.resolvedProfileId(),
+    );
+    return profile ? profileModel(profile, 'codex') : '';
+  });
   protected readonly canLaunch = computed(
-    () => Boolean(this.installation()?.healthy) && Boolean(this.resolvedAccountProfileId()),
+    () =>
+      Boolean(this.installation()?.healthy) &&
+      Boolean(this.resolvedProfileId()) &&
+      Boolean(this.resolvedAccountProfileId()),
   );
 
   protected isNativeModel(profile: ModelProfile): boolean {
-    return isNativeModel(profile);
+    return isNativeModel(profile, 'codex');
+  }
+
+  protected modelOf(profile: ModelProfile): string {
+    return profileModel(profile, 'codex');
   }
 
   protected onProfileChange(profileId: string): void {
     this.profileId.set(profileId);
     const profile = this.codexProfiles().find((p) => p.id === profileId);
-    if (profile && !this.model().trim()) {
-      this.model.set(profile.model);
+    if (profile) {
+      // A model name belongs to its provider. Retaining the previous profile's value can launch an
+      // official OpenAI provider with a MiniMax/DeepSeek model (or the inverse).
+      this.model.set(profileModel(profile, 'codex'));
     }
   }
 
@@ -202,7 +223,7 @@ export class CodexLaunchDialogComponent {
     }
     this.launched.emit({
       name: this.name().trim(),
-      model: this.model().trim() || undefined,
+      model: this.resolvedModel() || undefined,
       profileId: this.resolvedProfileId() || undefined,
       accountProfileId: this.resolvedAccountProfileId() || undefined,
     });

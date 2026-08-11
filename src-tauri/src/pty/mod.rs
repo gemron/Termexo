@@ -3,7 +3,7 @@ use std::io::{Read, Write};
 use std::sync::Mutex;
 use std::thread;
 
-use portable_pty::{native_pty_system, Child, CommandBuilder, MasterPty, PtySize};
+use portable_pty::{native_pty_system, Child, ChildKiller, CommandBuilder, MasterPty, PtySize};
 use serde::Serialize;
 use tauri::{AppHandle, Emitter};
 use thiserror::Error;
@@ -30,13 +30,26 @@ pub enum PtyError {
 #[serde(rename_all = "camelCase")]
 struct TerminalOutputEvent {
     terminal_id: String,
+    runtime_revision: u64,
     data: String,
+}
+
+/// Reports that a terminal's process ended, so the UI stops presenting it as running.
+#[derive(Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct TerminalExitEvent {
+    terminal_id: String,
+    runtime_revision: u64,
+    exit_code: i32,
+    success: bool,
 }
 
 struct PtyProcess {
     writer: Box<dyn Write + Send>,
     master: Box<dyn MasterPty + Send>,
-    child: Box<dyn Child + Send>,
+    /// The child itself is owned by the exit watcher, which blocks on it; closing a terminal only
+    /// ever needs to kill it.
+    killer: Box<dyn ChildKiller + Send + Sync>,
 }
 
 #[derive(Default)]
@@ -85,6 +98,7 @@ impl PtyManager {
             .spawn_command(command)
             .map_err(|error| PtyError::Spawn(error.to_string()))?;
         drop(pair.slave);
+        let killer = child.clone_killer();
         let reader = pair
             .master
             .try_clone_reader()
@@ -100,14 +114,25 @@ impl PtyManager {
             writer.flush()?;
         }
 
-        spawn_reader(request.terminal_id.clone(), app, reader);
+        spawn_reader(
+            request.terminal_id.clone(),
+            request.runtime_revision,
+            app.clone(),
+            reader,
+        );
+        spawn_exit_watcher(
+            request.terminal_id.clone(),
+            request.runtime_revision,
+            app,
+            child,
+        );
 
         sessions.insert(
             request.terminal_id,
             PtyProcess {
                 writer,
                 master: pair.master,
-                child,
+                killer,
             },
         );
         Ok(())
@@ -144,15 +169,60 @@ impl PtyManager {
         let mut session = sessions
             .remove(terminal_id)
             .ok_or_else(|| PtyError::NotFound(terminal_id.into()))?;
-        session
-            .child
-            .kill()
-            .map_err(|error| PtyError::Backend(error.to_string()))?;
-        Ok(())
+        normalize_kill_result(session.killer.kill())
     }
 }
 
-fn spawn_reader(terminal_id: String, app: AppHandle, mut reader: Box<dyn Read + Send>) {
+/// portable-pty 0.9 reports a successful Windows `TerminateProcess` call as an I/O error built
+/// from `GetLastError`. When Windows has no pending error that becomes the contradictory message
+/// "The operation completed successfully. (os error 0)". The process was terminated, so treating
+/// that one value as a failure makes model switching roll back a successful close.
+fn normalize_kill_result(result: std::io::Result<()>) -> Result<(), PtyError> {
+    match result {
+        Ok(()) => Ok(()),
+        #[cfg(windows)]
+        Err(error) if error.raw_os_error() == Some(0) => Ok(()),
+        Err(error) => Err(PtyError::Backend(error.to_string())),
+    }
+}
+
+/// Waits for the terminal's process and reports how it ended.
+///
+/// This is how a failed agent launch becomes visible: a missing executable, a rejected key, or a
+/// CLI that exits immediately all leave the PTY open with nothing running behind it. Without this
+/// the terminal keeps its running state forever and the user is never told.
+fn spawn_exit_watcher(
+    terminal_id: String,
+    runtime_revision: u64,
+    app: AppHandle,
+    mut child: Box<dyn Child + Send>,
+) {
+    thread::spawn(move || {
+        let (exit_code, success) = match child.wait() {
+            Ok(status) => (status.exit_code() as i32, status.success()),
+            Err(error) => {
+                tracing::warn!(%terminal_id, %error, "failed to wait for terminal process");
+                (-1, false)
+            }
+        };
+        let _ = app.emit(
+            "terminal-exit",
+            TerminalExitEvent {
+                terminal_id,
+                runtime_revision,
+                exit_code,
+                success,
+            },
+        );
+    });
+}
+
+fn spawn_reader(
+    terminal_id: String,
+    runtime_revision: u64,
+    app: AppHandle,
+    mut reader: Box<dyn Read + Send>,
+) {
     thread::spawn(move || {
         let mut buffer = [0_u8; 8 * 1024];
         loop {
@@ -164,6 +234,7 @@ fn spawn_reader(terminal_id: String, app: AppHandle, mut reader: Box<dyn Read + 
                         "terminal-output",
                         TerminalOutputEvent {
                             terminal_id: terminal_id.clone(),
+                            runtime_revision,
                             data,
                         },
                     );
@@ -224,6 +295,21 @@ mod tests {
     fn powershell_without_hidden_command_keeps_using_pty_input() {
         let mut powershell = CommandBuilder::new("powershell.exe");
         assert!(!configure_shell(&mut powershell, "powershell.exe", None));
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn accepts_portable_pty_windows_success_reported_as_os_error_zero() {
+        let result = normalize_kill_result(Err(std::io::Error::from_raw_os_error(0)));
+
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn preserves_real_terminal_kill_errors() {
+        let result = normalize_kill_result(Err(std::io::Error::from_raw_os_error(5)));
+
+        assert!(matches!(result, Err(PtyError::Backend(_))));
     }
 }
 

@@ -218,6 +218,9 @@ impl AgentAdapter for CodexCliAdapter {
         let executable = self.find_executable().ok_or(CodexError::NotInstalled)?;
         let mut command = format!("& {}", powershell_quote(&executable.to_string_lossy()));
         append_option(&mut command, "-c", options.notify_config.as_deref());
+        for provider_config in &options.provider_configs {
+            append_option(&mut command, "-c", Some(provider_config));
+        }
         for hook_config in &options.hook_configs {
             append_option(&mut command, "-c", Some(hook_config));
         }
@@ -592,6 +595,10 @@ mod tests {
                     "hooks.UserPromptSubmit=[{hooks=[{type='command',command='termexo codex-hook-event'}]}]"
                         .into(),
                 ],
+                provider_configs: vec![
+                    "model_provider='''termexo'''".into(),
+                    "model_providers.termexo.base_url='''https://api.deepseek.com/v1'''".into(),
+                ],
             })
             .unwrap();
         assert!(fresh.command.contains("-c 'notify=["));
@@ -601,6 +608,9 @@ mod tests {
         assert!(fresh.command.contains("-c 'features.hooks=true'"));
         assert!(fresh.command.contains("--dangerously-bypass-hook-trust"));
         assert!(fresh.command.contains("--model 'gpt-5.6-sol'"));
+        // Codex resolves providers from its own config, never from OPENAI_BASE_URL.
+        assert!(fresh.command.contains("-c 'model_provider="));
+        assert!(fresh.command.contains("https://api.deepseek.com/v1"));
         assert!(!fresh.command.contains(" resume "));
 
         let resumed = adapter
@@ -609,6 +619,7 @@ mod tests {
                 model: None,
                 notify_config: None,
                 hook_configs: Vec::new(),
+                provider_configs: Vec::new(),
             })
             .unwrap();
         assert!(resumed

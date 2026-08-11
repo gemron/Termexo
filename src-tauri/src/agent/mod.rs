@@ -53,6 +53,8 @@ pub struct CodexLaunchOptions {
     pub model: Option<String>,
     pub notify_config: Option<String>,
     pub hook_configs: Vec<String>,
+    /// `-c` overrides pointing Codex at a compatible provider, empty for the official endpoint.
+    pub provider_configs: Vec<String>,
 }
 
 #[derive(Debug, Clone, Serialize)]

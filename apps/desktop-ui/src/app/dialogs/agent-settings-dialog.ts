@@ -10,6 +10,9 @@ import {
   CliOperationPlan,
   CliOperationRequest,
   CliOperationResult,
+  CUSTOM_PROVIDER,
+  findProviderPreset,
+  groupProfilesByProvider,
   McpProfile,
   McpProfileInput,
   ModelProfile,
@@ -19,13 +22,15 @@ import {
   NetworkProfileScope,
   NetworkTestResult,
   NativeAgentType,
-  ProviderPreset,
   PROVIDER_PRESETS,
 } from '../core/models/agent.models';
 import { UpdateCheck } from '../core/services/update.service';
 import { IconComponent } from '../shared/icon/icon';
 
 export type SettingsTab = 'diagnostics' | 'cli' | 'accounts' | 'models' | 'mcp' | 'network';
+
+/** Matches the backend default for a profile that has never had a threshold set. */
+const DEFAULT_ALERT_THRESHOLD = 80;
 
 @Component({
   selector: 'app-agent-settings-dialog',
@@ -554,25 +559,35 @@ export type SettingsTab = 'diagnostics' | 'cli' | 'accounts' | 'models' | 'mcp' 
             @case ('models') {
               <div class="settings-split">
                 <div class="profile-nav">
-                  @for (profile of modelProfiles(); track profile.id) {
-                    <button
-                      type="button"
-                      [class.active]="profile.id === modelId()"
-                      [class.credential-missing]="profile.baseUrl && !profile.hasCredential"
-                      (click)="editModel(profile)"
-                    >
-                      <strong>{{ profile.name }}</strong>
-                      <small>{{ profile.provider }} · {{ profile.model }}</small>
-                      @if (profile.baseUrl) {
-                        <small class="credential-state" [class.ready]="profile.hasCredential">
-                          {{
-                            profile.hasCredential
-                              ? ('settings.keySaved' | t)
-                              : ('settings.keyRequired' | t)
-                          }}
+                  @for (group of groupedProfiles(); track group.provider) {
+                    <p class="provider-group">{{ group.label }}</p>
+                    @for (profile of group.profiles; track profile.id) {
+                      <button
+                        type="button"
+                        [class.active]="profile.id === modelId()"
+                        [class.credential-missing]="profileMissingKey(profile)"
+                        (click)="editModel(profile)"
+                      >
+                        <strong>{{ profile.name }}</strong>
+                        <small class="agent-badges">
+                          @if (profile.claudeEnabled) {
+                            <em>Claude · {{ profile.claudeModel }}</em>
+                          }
+                          @if (profile.codexEnabled) {
+                            <em>Codex · {{ profile.codexModel }}</em>
+                          }
                         </small>
-                      }
-                    </button>
+                        @if (profileUsesEndpoint(profile)) {
+                          <small class="credential-state" [class.ready]="profile.hasCredential">
+                            {{
+                              profile.hasCredential
+                                ? ('settings.keySaved' | t)
+                                : ('settings.keyRequired' | t)
+                            }}
+                          </small>
+                        }
+                      </button>
+                    }
                   }
                   <button type="button" class="new-profile" (click)="newModel()">
                     <app-icon name="plus" [size]="13" />{{ 'settings.newProfile' | t }}
@@ -583,47 +598,64 @@ export type SettingsTab = 'diagnostics' | 'cli' | 'accounts' | 'models' | 'mcp' 
                     <label
                       ><span>{{ 'settings.name' | t }}</span
                       ><input [(ngModel)]="modelName"
-                    /><small class="model-type-label">{{
-                        modelName && modelProvider && !baseUrl.trim() && (
-                          (modelApiProtocol === 'anthropic' && modelProvider === 'Anthropic') ||
-                          (modelApiProtocol === 'openai' && (modelProvider === 'OpenAI' || modelProvider === 'ChatGPT'))
-                        )
-                          ? ('settings.nativeModel' | t)
-                          : ('settings.thirdPartyModel' | t)
-                      }}</small></label>
-                    <label>
-                      <span>{{ 'settings.apiProtocol' | t }}</span>
-                      <select
-                        [ngModel]="modelApiProtocol"
-                        (ngModelChange)="changeApiProtocol($event)"
-                      >
-                        <option value="anthropic">{{ 'settings.protocolAnthropic' | t }}</option>
-                        <option value="openai">{{ 'settings.protocolOpenAI' | t }}</option>
-                      </select>
-                    </label>
+                    /></label>
                     <label>
                       <span>{{ 'settings.modelProvider' | t }}</span>
                       <select [ngModel]="modelProvider" (ngModelChange)="selectProvider($event)">
-                        @for (preset of filteredPresets(); track preset.provider) {
-                          <option [value]="preset.provider">{{ preset.provider }}</option>
+                        @for (preset of allPresets; track preset.provider) {
+                          <option [value]="preset.provider">{{ preset.label }}</option>
                         }
                         @if (!isPresetProvider(modelProvider)) {
                           <option [value]="modelProvider">{{ modelProvider }}</option>
                         }
                       </select>
                     </label>
-                    <label
-                      ><span>{{ 'settings.model' | t }}</span
-                      ><input [(ngModel)]="modelNameValue"
-                    /></label>
                   </div>
-                  <label>
-                    <span>{{ 'settings.endpoint' | t }}</span>
-                    <input
-                      [placeholder]="'settings.endpointPlaceholder' | t"
-                      [(ngModel)]="baseUrl"
-                    />
-                  </label>
+                  @if (presetDocsUrl()) {
+                    <small class="preset-source">{{
+                      'settings.presetSource' | t: { url: presetDocsUrl() }
+                    }}</small>
+                  }
+
+                  <!-- One provider, two protocols: each agent gets its own endpoint and switch. -->
+                  <fieldset class="agent-endpoint" [class.disabled]="!claudeEnabled">
+                    <label class="checkbox-control">
+                      <input type="checkbox" [(ngModel)]="claudeEnabled" />
+                      <span>{{ 'settings.enableForClaude' | t }}</span>
+                    </label>
+                    <div class="two-columns">
+                      <label
+                        ><span>{{ 'settings.model' | t }}</span
+                        ><input [disabled]="!claudeEnabled" [(ngModel)]="claudeModel"
+                      /></label>
+                      <label
+                        ><span>{{ 'settings.endpointAnthropic' | t }}</span
+                        ><input
+                          [disabled]="!claudeEnabled"
+                          [placeholder]="'settings.endpointPlaceholder' | t"
+                          [(ngModel)]="claudeBaseUrl"
+                      /></label>
+                    </div>
+                  </fieldset>
+                  <fieldset class="agent-endpoint" [class.disabled]="!codexEnabled">
+                    <label class="checkbox-control">
+                      <input type="checkbox" [(ngModel)]="codexEnabled" />
+                      <span>{{ 'settings.enableForCodex' | t }}</span>
+                    </label>
+                    <div class="two-columns">
+                      <label
+                        ><span>{{ 'settings.model' | t }}</span
+                        ><input [disabled]="!codexEnabled" [(ngModel)]="codexModel"
+                      /></label>
+                      <label
+                        ><span>{{ 'settings.endpointOpenAI' | t }}</span
+                        ><input
+                          [disabled]="!codexEnabled"
+                          [placeholder]="'settings.endpointPlaceholder' | t"
+                          [(ngModel)]="codexBaseUrl"
+                      /></label>
+                    </div>
+                  </fieldset>
                   <label>
                     <span>API Key</span>
                     <input
@@ -632,7 +664,7 @@ export type SettingsTab = 'diagnostics' | 'cli' | 'accounts' | 'models' | 'mcp' 
                       [placeholder]="
                         hasCredential()
                           ? ('settings.keySavedPlaceholder' | t)
-                          : baseUrl.trim()
+                          : usesEndpoint()
                             ? ('settings.keyThirdPartyRequired' | t)
                             : ('settings.keyOfficialOptional' | t)
                       "
@@ -648,13 +680,14 @@ export type SettingsTab = 'diagnostics' | 'cli' | 'accounts' | 'models' | 'mcp' 
                       </div>
                     </div>
                   }
+                  <fieldset class="agent-endpoint">
+                    <legend>{{ 'settings.planMonitoring' | t }}</legend>
+                    <label><span>{{ 'settings.planAlertThreshold' | t }}</span><input type="number" min="1" max="100" [(ngModel)]="modelPlanAlertThreshold" /></label>
+                    <small class="preset-source">{{ 'settings.planQuotaHelp' | t }}</small>
+                  </fieldset>
                   <label class="checkbox-control editor-checkbox">
                     <input type="checkbox" [(ngModel)]="isDefault" />
-                    <span>{{
-                      modelApiProtocol === 'anthropic'
-                        ? ('settings.defaultClaudeProfile' | t)
-                        : ('settings.defaultCodexProfile' | t)
-                    }}</span>
+                    <span>{{ 'settings.defaultProfile' | t }}</span>
                   </label>
                   @if (hasCredential()) {
                     <label class="checkbox-control editor-checkbox">
@@ -912,6 +945,15 @@ export type SettingsTab = 'diagnostics' | 'cli' | 'accounts' | 'models' | 'mcp' 
                       type="button"
                       class="secondary"
                       [disabled]="busy()"
+                      [title]="'settings.detectSystemProxyHint' | t"
+                      (click)="networkSystemProxyRequested.emit()"
+                    >
+                      <app-icon name="radio" [size]="13" />{{ 'settings.detectSystemProxy' | t }}
+                    </button>
+                    <button
+                      type="button"
+                      class="secondary"
+                      [disabled]="busy()"
                       [title]="'settings.importProxyHint' | t"
                       (click)="networkImportRequested.emit()"
                     >
@@ -991,6 +1033,7 @@ export class AgentSettingsDialogComponent {
   readonly networkTestRequested = output<string>();
   readonly networkExportRequested = output<void>();
   readonly networkImportRequested = output<void>();
+  readonly networkSystemProxyRequested = output<void>();
   readonly accountSaved = output<AccountProfileInput>();
   readonly deleteAccountRequested = output<string>();
   readonly accountLoginRequested = output<string>();
@@ -1010,12 +1053,16 @@ export class AgentSettingsDialogComponent {
   protected cliConfirmed = false;
   protected modelName = 'Claude Sonnet';
   protected modelProvider = 'Anthropic';
-  protected modelNameValue = 'sonnet';
-  protected modelApiProtocol: 'anthropic' | 'openai' = 'anthropic';
-  protected baseUrl = '';
+  protected claudeEnabled = true;
+  protected claudeModel = 'sonnet';
+  protected claudeBaseUrl = '';
+  protected codexEnabled = false;
+  protected codexModel = '';
+  protected codexBaseUrl = '';
   protected apiKey = '';
   protected isDefault = true;
   protected clearCredential = false;
+  protected modelPlanAlertThreshold = DEFAULT_ALERT_THRESHOLD;
   protected mcpName = '';
   protected mcpConfig = '{\n  "mcpServers": {}\n}';
   protected networkName = this.i18n.t('settings.workspaceProxy');
@@ -1175,23 +1222,27 @@ export class AgentSettingsDialogComponent {
     this.modelId.set(profile.id);
     this.modelName = profile.name;
     this.modelProvider = profile.provider;
-    this.modelNameValue = profile.model;
-    this.modelApiProtocol = profile.apiProtocol;
-    this.baseUrl = profile.baseUrl ?? '';
+    this.claudeEnabled = profile.claudeEnabled;
+    this.claudeModel = profile.claudeModel;
+    this.claudeBaseUrl = profile.claudeBaseUrl ?? '';
+    this.codexEnabled = profile.codexEnabled;
+    this.codexModel = profile.codexModel;
+    this.codexBaseUrl = profile.codexBaseUrl ?? '';
     this.apiKey = '';
     this.isDefault = profile.isDefault;
     this.clearCredential = false;
     this.hasCredential.set(profile.hasCredential);
+    this.modelPlanAlertThreshold = profile.planAlertThreshold || DEFAULT_ALERT_THRESHOLD;
   }
 
   protected newModel(): void {
     this.modelId.set('');
-    this.modelApiProtocol = 'anthropic';
-    this.selectProvider('Anthropic');
+    this.selectProvider(PROVIDER_PRESETS[0].provider);
     this.apiKey = '';
     this.isDefault = false;
     this.clearCredential = false;
     this.hasCredential.set(false);
+    this.modelPlanAlertThreshold = DEFAULT_ALERT_THRESHOLD;
   }
 
   protected saveModel(): void {
@@ -1204,66 +1255,91 @@ export class AgentSettingsDialogComponent {
       id: profileId,
       name: this.modelName.trim(),
       provider: this.modelProvider.trim(),
-      model: this.modelNameValue.trim(),
-      baseUrl: this.baseUrl.trim() || undefined,
       apiKey: this.apiKey || undefined,
       clearCredential: this.clearCredential,
-      apiProtocol: this.modelApiProtocol,
       isDefault: this.isDefault,
+      claudeEnabled: this.claudeEnabled,
+      claudeModel: this.claudeModel.trim(),
+      claudeBaseUrl: this.claudeBaseUrl.trim() || undefined,
+      codexEnabled: this.codexEnabled,
+      codexModel: this.codexModel.trim(),
+      codexBaseUrl: this.codexBaseUrl.trim() || undefined,
+      planAlertThreshold: Math.min(
+        100,
+        Math.max(1, this.modelPlanAlertThreshold || DEFAULT_ALERT_THRESHOLD),
+      ),
     });
   }
 
+  /**
+   * Fills both agents from the provider's documented parameters.
+   *
+   * A side the provider does not publish an endpoint for is switched off rather than left half
+   * configured, which is what keeps "enabled" meaning "reachable".
+   */
   protected selectProvider(provider: string): void {
     this.modelProvider = provider;
-    const preset = this.allPresets.find(
-      (item) => item.provider === provider && item.apiProtocol === this.modelApiProtocol,
-    );
+    const preset = findProviderPreset(provider);
     if (!preset) {
       return;
     }
-    this.modelName = preset.name;
-    this.modelNameValue = preset.model;
-    this.baseUrl = preset.baseUrl;
+    this.modelName = preset.label;
+    this.claudeModel = preset.claudeModel;
+    this.claudeBaseUrl = preset.claudeBaseUrl;
+    this.codexModel = preset.codexModel;
+    this.codexBaseUrl = preset.codexBaseUrl;
+    this.claudeEnabled = Boolean(preset.claudeModel) || preset.provider === CUSTOM_PROVIDER;
+    this.codexEnabled = Boolean(preset.codexModel) || preset.provider === CUSTOM_PROVIDER;
   }
 
-  protected changeApiProtocol(protocol: 'anthropic' | 'openai'): void {
-    this.modelApiProtocol = protocol;
-    const currentPreset = this.allPresets.find(
-      (item) => item.provider === this.modelProvider && item.apiProtocol === protocol,
-    );
-    if (currentPreset) {
-      this.selectProvider(currentPreset.provider);
-    } else {
-      const firstPreset = this.filteredPresets()[0];
-      if (firstPreset) {
-        this.selectProvider(firstPreset.provider);
-      }
-    }
-  }
-
-  protected filteredPresets(): readonly ProviderPreset[] {
-    return this.allPresets.filter((item) => item.apiProtocol === this.modelApiProtocol);
+  protected presetDocsUrl(): string {
+    return findProviderPreset(this.modelProvider)?.docsUrl ?? '';
   }
 
   protected isPresetProvider(provider: string): boolean {
-    return this.allPresets.some(
-      (item) => item.provider === provider && item.apiProtocol === this.modelApiProtocol,
+    return Boolean(findProviderPreset(provider));
+  }
+
+  protected groupedProfiles(): { provider: string; label: string; profiles: ModelProfile[] }[] {
+    return groupProfilesByProvider(this.modelProfiles());
+  }
+
+  protected profileUsesEndpoint(profile: ModelProfile): boolean {
+    return Boolean(
+      (profile.claudeEnabled && profile.claudeBaseUrl) ||
+        (profile.codexEnabled && profile.codexBaseUrl),
+    );
+  }
+
+  protected profileMissingKey(profile: ModelProfile): boolean {
+    return this.profileUsesEndpoint(profile) && !profile.hasCredential;
+  }
+
+  /** True when either enabled side goes through a compatibility endpoint that needs our key. */
+  protected usesEndpoint(): boolean {
+    return (
+      (this.claudeEnabled && Boolean(this.claudeBaseUrl.trim())) ||
+      (this.codexEnabled && Boolean(this.codexBaseUrl.trim()))
     );
   }
 
   protected modelCredentialMissing(): boolean {
     return (
-      Boolean(this.baseUrl.trim()) &&
-      (!this.hasCredential() || this.clearCredential) &&
-      !this.apiKey.trim()
+      this.usesEndpoint() && (!this.hasCredential() || this.clearCredential) && !this.apiKey.trim()
     );
   }
 
   protected canSaveModel(): boolean {
+    if (!this.modelName.trim() || this.modelCredentialMissing()) {
+      return false;
+    }
+    if (!this.claudeEnabled && !this.codexEnabled) {
+      return false;
+    }
+    // An enabled side without a model would launch its agent with nothing to run.
     return (
-      Boolean(this.modelName.trim()) &&
-      Boolean(this.modelNameValue.trim()) &&
-      !this.modelCredentialMissing()
+      (!this.claudeEnabled || Boolean(this.claudeModel.trim())) &&
+      (!this.codexEnabled || Boolean(this.codexModel.trim()))
     );
   }
 

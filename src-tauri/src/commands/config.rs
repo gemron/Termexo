@@ -9,6 +9,7 @@ use crate::config::{
 };
 use crate::database::WorkspaceDatabase;
 use crate::network::{self, NetworkTestResult};
+use crate::system_proxy::{self, SystemProxyDiscovery};
 
 #[tauri::command]
 pub fn list_model_profiles(
@@ -75,17 +76,38 @@ pub fn save_model_profile(
         id: input.id,
         name: input.name.trim().to_owned(),
         provider: input.provider.trim().to_owned(),
-        model: input.model.trim().to_owned(),
-        base_url: input
-            .base_url
-            .map(|value| value.trim().to_owned())
-            .filter(|value| !value.is_empty()),
         has_credential: credential_target.is_some(),
         credential_target,
-        api_protocol: input.api_protocol,
         is_default: input.is_default,
+        claude_enabled: input.claude_enabled,
+        claude_model: input.claude_model.trim().to_owned(),
+        claude_base_url: trimmed_endpoint(input.claude_base_url),
+        codex_enabled: input.codex_enabled,
+        codex_model: input.codex_model.trim().to_owned(),
+        codex_base_url: trimmed_endpoint(input.codex_base_url),
+        plan_alert_threshold: input.plan_alert_threshold.clamp(1, 100),
     };
-    if profile.base_url.is_some() && !profile.has_credential {
+    if !profile.claude_enabled && !profile.codex_enabled {
+        return Err(format!(
+            "模型 Profile「{}」至少要为 Claude 或 Codex 其中之一启用。",
+            profile.name
+        ));
+    }
+    if profile.claude_enabled && profile.claude_model.is_empty() {
+        return Err(format!(
+            "模型 Profile「{}」已为 Claude 启用，必须填写 Claude 使用的模型。",
+            profile.name
+        ));
+    }
+    if profile.codex_enabled && profile.codex_model.is_empty() {
+        return Err(format!(
+            "模型 Profile「{}」已为 Codex 启用，必须填写 Codex 使用的模型。",
+            profile.name
+        ));
+    }
+    let uses_third_party_endpoint = (profile.claude_enabled && profile.claude_base_url.is_some())
+        || (profile.codex_enabled && profile.codex_base_url.is_some());
+    if uses_third_party_endpoint && !profile.has_credential {
         return Err(format!(
             "模型 Profile「{}」使用第三方 Endpoint，必须输入并保存 API Key。",
             profile.name
@@ -95,6 +117,13 @@ pub fn save_model_profile(
         .save_model_profile(&profile)
         .map_err(|error| error.to_string())?;
     Ok(profile)
+}
+
+/// Drops a blank endpoint, so "not set" and "empty string" cannot both mean the official host.
+fn trimmed_endpoint(value: Option<String>) -> Option<String> {
+    value
+        .map(|value| value.trim().to_owned())
+        .filter(|value| !value.is_empty())
 }
 
 #[tauri::command]
@@ -163,6 +192,11 @@ pub fn list_network_profiles(
     database
         .list_network_profiles()
         .map_err(|error| error.to_string())
+}
+
+#[tauri::command]
+pub fn discover_system_proxy() -> Result<SystemProxyDiscovery, String> {
+    system_proxy::discover()
 }
 
 #[tauri::command]
@@ -406,7 +440,7 @@ pub fn validate_claude_profile(
         .build_launch_command(&ClaudeLaunchOptions {
             session_id: None,
             name: None,
-            model: Some(profile.model),
+            model: Some(profile.claude_model),
             settings_path: None,
             mcp_config_path: None,
         })

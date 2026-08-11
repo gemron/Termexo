@@ -6,6 +6,8 @@ import {
   AccountProfile,
   AgentInstallation,
   isNativeModel,
+  profileModel,
+  profileServes,
   McpProfile,
   ModelProfile,
 } from '../core/models/agent.models';
@@ -75,7 +77,7 @@ export interface ClaudeLaunchDialogValue {
               (ngModelChange)="profileId.set($event)"
             >
               @for (profile of claudeProfiles(); track profile.id) {
-                <option [value]="profile.id">{{ profile.name }} · {{ profile.model }}@if (isNativeModel(profile)) { ({{ 'settings.nativeModel' | t }}) }</option>
+                <option [value]="profile.id">{{ profile.name }} · {{ modelOf(profile) }}@if (isNativeModel(profile)) { ({{ 'settings.nativeModel' | t }}) }</option>
               }
             </select>
           </label>
@@ -154,7 +156,7 @@ export class ClaudeLaunchDialogComponent {
     this.claudeAccounts().find((profile) => profile.id === this.resolvedAccountProfileId()),
   );
   protected readonly claudeProfiles = computed(() =>
-    this.profiles().filter((profile) => profile.apiProtocol === 'anthropic'),
+    this.profiles().filter((profile) => profileServes(profile, 'claude')),
   );
   protected readonly resolvedAccountProfileId = computed(
     () =>
@@ -175,7 +177,11 @@ export class ClaudeLaunchDialogComponent {
   );
 
   protected isNativeModel(profile: ModelProfile): boolean {
-    return isNativeModel(profile);
+    return isNativeModel(profile, 'claude');
+  }
+
+  protected modelOf(profile: ModelProfile): string {
+    return profileModel(profile, 'claude');
   }
 
   protected submit(): void {

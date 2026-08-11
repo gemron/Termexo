@@ -268,7 +268,10 @@ fn probe_http_tunnel(mut stream: TcpStream, proxy: &Url) -> Option<(bool, String
         Err(_) => {
             return Some((
                 false,
-                format!("代理在 {} 秒内没有回应 CONNECT 请求", TUNNEL_TIMEOUT.as_secs()),
+                format!(
+                    "代理在 {} 秒内没有回应 CONNECT 请求",
+                    TUNNEL_TIMEOUT.as_secs()
+                ),
             ))
         }
     };
@@ -633,7 +636,8 @@ mod tests {
     fn reports_a_proxy_demanding_authentication() {
         // Reaching this proxy succeeds, so the old TCP-only probe called it healthy while
         // agents hung on every request.
-        let (proxy, handle) = spawn_proxy("HTTP/1.1 407 Proxy Authentication Required\r\n\r\n", None);
+        let (proxy, handle) =
+            spawn_proxy("HTTP/1.1 407 Proxy Authentication Required\r\n\r\n", None);
         let mut profile = test_network_profile();
         profile.https_proxy = Some(proxy);
 

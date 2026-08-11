@@ -419,7 +419,7 @@ export class AppStateService {
     terminalId: string,
     command: string,
     model: string,
-    profileId: string,
+    profileId?: string,
     mcpProfileId?: string,
   ): boolean {
     const workspace = this.activeWorkspace();

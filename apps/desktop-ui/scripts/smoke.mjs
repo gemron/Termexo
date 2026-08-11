@@ -596,7 +596,7 @@ try {
   await codexLaunchDialog.getByLabel('Codex 模型').fill('gpt-5.6-sol');
   await codexLaunchDialog.getByRole('button', { name: '关闭' }).click();
 
-  await toolbar.getByRole('button', { name: 'Claude 模型', exact: true }).click();
+  await toolbar.getByRole('button', { name: /批量切换|Switch all/ }).click();
   const modelSwitchDialog = page.getByRole('dialog', {
     name: '切换 Claude Code 后端模型',
   });
@@ -677,7 +677,11 @@ try {
   await settingsDialog.getByRole('button', { name: '模型 Profile' }).click();
   await settingsDialog.getByRole('button', { name: /新建 Profile/ }).click();
   await settingsDialog.getByLabel('名称', { exact: true }).fill('Smoke Profile');
-  await settingsDialog.getByLabel('模型', { exact: true }).fill('sonnet');
+  await settingsDialog
+    .locator('fieldset.agent-endpoint:not(.disabled)')
+    .first()
+    .getByLabel('模型', { exact: true })
+    .fill('sonnet');
   const saveProfileButton = settingsDialog.getByRole('button', { name: '保存 Profile' });
   await saveProfileButton.click();
   await settingsDialog
@@ -697,7 +701,8 @@ try {
   await settingsDialog.getByRole('button', { name: '新建代理 Profile', exact: true }).click();
   await settingsDialog.getByLabel('名称', { exact: true }).fill('Smoke Network');
   await settingsDialog
-    .getByLabel('HTTPS_PROXY', { exact: true })
+    .getByPlaceholder('http://proxy.internal:8080')
+    .nth(1)
     .fill('http://proxy.internal:8080');
   await settingsDialog
     .getByLabel('registry', { exact: true })

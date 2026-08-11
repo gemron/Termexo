@@ -63,6 +63,12 @@ pub struct CliOperationResult {
     pub stderr: String,
     pub duration_ms: u128,
     pub diagnostic: String,
+    /// True when an installation changed (or may have changed) an existing CLI and Termexo
+    /// attempted to put the previously detected version back.
+    pub rollback_attempted: bool,
+    /// `None` means no rollback was necessary. A performed rollback records its health result.
+    pub rollback_succeeded: Option<bool>,
+    pub rollback_diagnostic: Option<String>,
 }
 
 #[derive(Default)]
@@ -98,9 +104,9 @@ pub fn build_operation_plan(
 
     // Ask the registry what the requested tag resolves to. Without this an already-current CLI
     // still reads as "upgrade", because being installed was the only thing checked.
-    let resolved_version = npm_path.as_deref().and_then(|path| {
-        read_published_version(path, &package_spec, network_profile).ok()
-    });
+    let resolved_version = npm_path
+        .as_deref()
+        .and_then(|path| read_published_version(path, &package_spec, network_profile).ok());
     let installed_version = installation.version.as_deref().map(extract_version);
     let up_to_date = match (installed_version.as_deref(), resolved_version.as_deref()) {
         (Some(installed), Some(resolved)) => installed == resolved,
@@ -140,7 +146,11 @@ pub fn build_operation_plan(
             (None, _) => format!(
                 "已检测到 npm {}，可{} {}。（无法查询远端版本，可能是网络或代理问题）",
                 npm_version.as_deref().unwrap_or_default(),
-                if action == "install" { "安装" } else { "升级" },
+                if action == "install" {
+                    "安装"
+                } else {
+                    "升级"
+                },
                 definition.display_name
             ),
         }
@@ -177,11 +187,12 @@ pub fn execute_operation(
     let npm_path = plan
         .npm_path
         .as_deref()
+        .map(PathBuf::from)
         .ok_or_else(|| "安装计划缺少 npm 路径。".to_owned())?;
     let started = Instant::now();
 
     let preflight = run_npm_command(
-        Path::new(npm_path),
+        &npm_path,
         &["view", &plan.package_spec, "version", "--json"],
         &environment,
         CLI_PREFLIGHT_TIMEOUT,
@@ -197,7 +208,7 @@ pub fn execute_operation(
     }
 
     let install = run_npm_command(
-        Path::new(npm_path),
+        &npm_path,
         &[
             "install",
             "--global",
@@ -209,12 +220,14 @@ pub fn execute_operation(
         CLI_OPERATION_TIMEOUT,
     )?;
     if !install.success {
-        return Ok(failed_result(
+        return Ok(failed_result_with_rollback(
             plan,
             install.stdout,
             install.stderr,
             started,
-            "npm 安装或升级失败；已重新检查原 CLI 状态。",
+            &npm_path,
+            &environment,
+            "npm 安装或升级失败。",
         ));
     }
 
@@ -231,7 +244,15 @@ pub fn execute_operation(
             installation.version.as_deref().unwrap_or("CLI 可正常执行")
         )
     } else {
-        "npm 命令已完成，但 CLI 健康检查失败；请查看输出诊断。".into()
+        return Ok(failed_result_with_rollback(
+            plan,
+            install.stdout,
+            install.stderr,
+            started,
+            &npm_path,
+            &environment,
+            "npm 命令已完成，但 CLI 健康检查失败。",
+        ));
     };
 
     Ok(CliOperationResult {
@@ -242,7 +263,94 @@ pub fn execute_operation(
         stderr: install.stderr,
         duration_ms: started.elapsed().as_millis(),
         diagnostic,
+        rollback_attempted: false,
+        rollback_succeeded: None,
+        rollback_diagnostic: None,
     })
+}
+
+fn failed_result_with_rollback(
+    plan: CliOperationPlan,
+    stdout: String,
+    stderr: String,
+    started: Instant,
+    npm_path: &Path,
+    environment: &HashMap<String, String>,
+    diagnostic: &str,
+) -> CliOperationResult {
+    let Some(package_spec) = rollback_package_spec(&plan) else {
+        return failed_result(
+            plan,
+            stdout,
+            stderr,
+            started,
+            &format!("{diagnostic} 安装前未检测到可回滚版本，请查看诊断。"),
+        );
+    };
+
+    let rollback = run_npm_command(
+        npm_path,
+        &[
+            "install",
+            "--global",
+            &package_spec,
+            "--no-fund",
+            "--no-audit",
+        ],
+        environment,
+        CLI_OPERATION_TIMEOUT,
+    );
+    let (rollback_command_succeeded, rollback_stdout, rollback_stderr) = match rollback {
+        Ok(result) => (result.success, result.stdout, result.stderr),
+        Err(error) => (false, String::new(), error),
+    };
+    let installation = detect_agent(&plan.agent_type).unwrap_or_else(|error| AgentInstallation {
+        agent_type: plan.agent_type.clone(),
+        installed: false,
+        executable_path: None,
+        version: None,
+        healthy: false,
+        diagnostic: error,
+    });
+    let expected_version = plan
+        .current_version
+        .as_deref()
+        .map(extract_version)
+        .unwrap_or_default();
+    let restored_version = installation.version.as_deref().map(extract_version);
+    let rollback_succeeded = rollback_command_succeeded
+        && installation.healthy
+        && restored_version.as_deref() == Some(expected_version.as_str());
+    let rollback_diagnostic = if rollback_succeeded {
+        format!("已自动恢复原版本 {expected_version}，并通过健康检查。")
+    } else {
+        format!(
+            "自动回滚到 {expected_version} 失败；当前状态：{}",
+            installation.diagnostic
+        )
+    };
+
+    CliOperationResult {
+        success: false,
+        plan,
+        installation,
+        stdout: append_message(stdout, &rollback_stdout),
+        stderr: append_message(stderr, &rollback_stderr),
+        duration_ms: started.elapsed().as_millis(),
+        diagnostic: format!("{diagnostic} {rollback_diagnostic}"),
+        rollback_attempted: true,
+        rollback_succeeded: Some(rollback_succeeded),
+        rollback_diagnostic: Some(rollback_diagnostic),
+    }
+}
+
+fn rollback_package_spec(plan: &CliOperationPlan) -> Option<String> {
+    let version = plan
+        .current_version
+        .as_deref()
+        .map(extract_version)
+        .filter(|version| !version.trim().is_empty())?;
+    Some(format!("{}@{version}", plan.package_name))
 }
 
 fn failed_result(
@@ -268,6 +376,9 @@ fn failed_result(
         stderr,
         duration_ms: started.elapsed().as_millis(),
         diagnostic: diagnostic.into(),
+        rollback_attempted: false,
+        rollback_succeeded: None,
+        rollback_diagnostic: None,
     }
 }
 
@@ -373,7 +484,9 @@ fn extract_version(reported: &str) -> String {
         .map(|token| token.trim_start_matches('v'))
         .find(|token| {
             let mut characters = token.chars();
-            characters.next().is_some_and(|first| first.is_ascii_digit())
+            characters
+                .next()
+                .is_some_and(|first| first.is_ascii_digit())
                 && token
                     .chars()
                     .all(|character| character.is_ascii_digit() || ".-+".contains(character))
@@ -581,5 +694,33 @@ mod tests {
         assert!(!manager.try_begin());
         manager.finish();
         assert!(manager.try_begin());
+    }
+
+    #[test]
+    fn builds_a_rollback_spec_from_the_detected_cli_version() {
+        let plan = CliOperationPlan {
+            agent_type: "claude".into(),
+            display_name: "Claude Code".into(),
+            package_name: "@anthropic-ai/claude-code".into(),
+            target_version: "latest".into(),
+            package_spec: "@anthropic-ai/claude-code@latest".into(),
+            action: "upgrade".into(),
+            current_version: Some("2.1.224 (Claude Code)".into()),
+            resolved_version: Some("2.2.0".into()),
+            up_to_date: false,
+            npm_path: Some("npm.cmd".into()),
+            npm_version: Some("11.0.0".into()),
+            command_preview: String::new(),
+            network_profile_id: None,
+            network_profile_name: None,
+            npm_registry: None,
+            ready: true,
+            diagnostic: String::new(),
+        };
+
+        assert_eq!(
+            rollback_package_spec(&plan).as_deref(),
+            Some("@anthropic-ai/claude-code@2.1.224")
+        );
     }
 }

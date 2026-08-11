@@ -15,6 +15,9 @@ const AGENT_MIGRATION: &str = include_str!("../../migrations/0002_agent_sessions
 const NETWORK_MIGRATION: &str = include_str!("../../migrations/0003_network_profiles.sql");
 const ACCOUNT_MIGRATION: &str = include_str!("../../migrations/0004_account_profiles.sql");
 const API_PROTOCOL_MIGRATION: &str = include_str!("../../migrations/0005_api_protocol.sql");
+const PROVIDER_PROFILE_MIGRATION: &str =
+    include_str!("../../migrations/0006_provider_profiles.sql");
+const PROVIDER_PLAN_MIGRATION: &str = include_str!("../../migrations/0007_provider_plans.sql");
 const LEGACY_MINIMAX_M3_MODEL: &str = "MiniMax-M3[1m]";
 const MINIMAX_M3_MODEL: &str = "MiniMax-M3";
 
@@ -88,6 +91,8 @@ impl WorkspaceDatabase {
         connection.execute_batch(NETWORK_MIGRATION)?;
         connection.execute_batch(ACCOUNT_MIGRATION)?;
         run_api_protocol_migration(&connection)?;
+        run_provider_profile_migration(&connection)?;
+        split_legacy_single_protocol_profiles(&connection)?;
         migrate_legacy_minimax_m3_model(&connection)?;
         ensure_default_profile(&connection)?;
         Ok(Self {
@@ -336,13 +341,11 @@ impl WorkspaceDatabase {
             .connection
             .lock()
             .map_err(|_| DatabaseError::LockPoisoned)?;
-        let mut statement = connection.prepare(
-            "SELECT
-                 id, name, provider, model, base_url, credential_target,
-                 api_protocol, is_default
+        let mut statement = connection.prepare(&format!(
+            "SELECT {MODEL_PROFILE_COLUMNS}
              FROM model_profiles
-             ORDER BY is_default DESC, name",
-        )?;
+             ORDER BY is_default DESC, provider, name"
+        ))?;
         let rows = statement.query_map([], model_profile_from_row)?;
         rows.collect::<Result<Vec<_>, _>>()
             .map_err(DatabaseError::from)
@@ -356,12 +359,11 @@ impl WorkspaceDatabase {
             .connection
             .lock()
             .map_err(|_| DatabaseError::LockPoisoned)?;
-        let mut statement = connection.prepare(
-            "SELECT
-                 id, name, provider, model, base_url, credential_target, api_protocol, is_default
+        let mut statement = connection.prepare(&format!(
+            "SELECT {MODEL_PROFILE_COLUMNS}
              FROM model_profiles
-             WHERE id = ?1",
-        )?;
+             WHERE id = ?1"
+        ))?;
         let mut rows = statement.query_map([profile_id], model_profile_from_row)?;
         rows.next().transpose().map_err(DatabaseError::from)
     }
@@ -375,12 +377,21 @@ impl WorkspaceDatabase {
         if profile.is_default {
             connection.execute("UPDATE model_profiles SET is_default = 0", [])?;
         }
+        // The pre-split columns are still NOT NULL, so they keep mirroring whichever side is on.
+        let (legacy_protocol, legacy_model, legacy_base_url) = if profile.claude_enabled {
+            ("anthropic", &profile.claude_model, &profile.claude_base_url)
+        } else {
+            ("openai", &profile.codex_model, &profile.codex_base_url)
+        };
         connection.execute(
             "INSERT INTO model_profiles (
                  id, name, provider, model, base_url, credential_target,
-                 api_protocol, is_default, created_at, updated_at
+                 api_protocol, is_default, created_at, updated_at,
+                 claude_enabled, claude_model, claude_base_url,
+                 codex_enabled, codex_model, codex_base_url,
+                 plan_alert_threshold
              )
-             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?9)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16)
              ON CONFLICT(id) DO UPDATE SET
                  name = excluded.name,
                  provider = excluded.provider,
@@ -389,17 +400,31 @@ impl WorkspaceDatabase {
                  credential_target = excluded.credential_target,
                  api_protocol = excluded.api_protocol,
                  is_default = excluded.is_default,
-                 updated_at = excluded.updated_at",
+                 updated_at = excluded.updated_at,
+                 claude_enabled = excluded.claude_enabled,
+                 claude_model = excluded.claude_model,
+                 claude_base_url = excluded.claude_base_url,
+                 codex_enabled = excluded.codex_enabled,
+                 codex_model = excluded.codex_model,
+                 codex_base_url = excluded.codex_base_url,
+                 plan_alert_threshold = excluded.plan_alert_threshold",
             params![
                 profile.id,
                 profile.name,
                 profile.provider,
-                profile.model,
-                profile.base_url,
+                legacy_model,
+                legacy_base_url,
                 profile.credential_target,
-                profile.api_protocol,
+                legacy_protocol,
                 profile.is_default,
                 now,
+                profile.claude_enabled,
+                profile.claude_model,
+                profile.claude_base_url,
+                profile.codex_enabled,
+                profile.codex_model,
+                profile.codex_base_url,
+                profile.plan_alert_threshold,
             ],
         )?;
         Ok(())
@@ -718,20 +743,23 @@ fn ensure_default_profile(connection: &Connection) -> Result<(), DatabaseError> 
         connection.query_row("SELECT COUNT(*) FROM model_profiles", [], |row| row.get(0))?;
     if profile_count == 0 {
         let now = unix_timestamp_millis();
+        // The two official endpoints each serve one agent, so neither profile enables the other.
         connection.execute(
             "INSERT INTO model_profiles (
-                 id, name, provider, model, api_protocol, is_default, created_at, updated_at
+                 id, name, provider, model, api_protocol, is_default, created_at, updated_at,
+                 claude_enabled, claude_model, codex_enabled, codex_model
              )
              VALUES ('claude-default', 'Claude Sonnet', 'Anthropic', 'sonnet',
-                     'anthropic', 1, ?1, ?1)",
+                     'anthropic', 1, ?1, ?1, 1, 'sonnet', 0, '')",
             [now],
         )?;
         connection.execute(
             "INSERT INTO model_profiles (
-                 id, name, provider, model, api_protocol, is_default, created_at, updated_at
+                 id, name, provider, model, api_protocol, is_default, created_at, updated_at,
+                 claude_enabled, claude_model, codex_enabled, codex_model
              )
              VALUES ('codex-default', 'GPT-5.6 Sol', 'OpenAI', 'gpt-5.6-sol',
-                     'openai', 0, ?1, ?1)",
+                     'openai', 0, ?1, ?1, 0, '', 1, 'gpt-5.6-sol')",
             [now],
         )?;
     }
@@ -747,6 +775,12 @@ fn migrate_legacy_minimax_m3_model(connection: &Connection) -> Result<(), Databa
         params![MINIMAX_M3_MODEL, now, LEGACY_MINIMAX_M3_MODEL],
     )?;
     connection.execute(
+        "UPDATE model_profiles
+         SET claude_model = ?1, updated_at = ?2
+         WHERE provider COLLATE NOCASE = 'MiniMax' AND claude_model = ?3",
+        params![MINIMAX_M3_MODEL, now, LEGACY_MINIMAX_M3_MODEL],
+    )?;
+    connection.execute(
         "UPDATE workspaces
          SET layout_json = replace(layout_json, ?1, ?2), updated_at = ?3
          WHERE instr(layout_json, ?1) > 0",
@@ -755,18 +789,27 @@ fn migrate_legacy_minimax_m3_model(connection: &Connection) -> Result<(), Databa
     Ok(())
 }
 
+/// Column order every model profile query selects, so the row mapper can index it positionally.
+const MODEL_PROFILE_COLUMNS: &str = "id, name, provider, credential_target, is_default, \
+     claude_enabled, claude_model, claude_base_url, \
+     codex_enabled, codex_model, codex_base_url, plan_alert_threshold";
+
 fn model_profile_from_row(row: &rusqlite::Row<'_>) -> rusqlite::Result<ModelProfile> {
-    let credential_target: Option<String> = row.get(5)?;
+    let credential_target: Option<String> = row.get(3)?;
     Ok(ModelProfile {
         id: row.get(0)?,
         name: row.get(1)?,
         provider: row.get(2)?,
-        model: row.get(3)?,
-        base_url: row.get(4)?,
         has_credential: credential_target.is_some(),
         credential_target,
-        api_protocol: row.get(6)?,
-        is_default: row.get(7)?,
+        is_default: row.get(4)?,
+        claude_enabled: row.get(5)?,
+        claude_model: row.get(6)?,
+        claude_base_url: row.get(7)?,
+        codex_enabled: row.get(8)?,
+        codex_model: row.get(9)?,
+        codex_base_url: row.get(10)?,
+        plan_alert_threshold: row.get(11)?,
     })
 }
 
@@ -819,15 +862,69 @@ fn unix_timestamp_millis() -> i64 {
 fn run_api_protocol_migration(connection: &Connection) -> Result<(), DatabaseError> {
     if let Err(error) = connection.execute_batch(API_PROTOCOL_MIGRATION) {
         match error {
-            rusqlite::Error::SqliteFailure(
-                _,
-                Some(ref message),
-            ) if message.contains("duplicate column") => {
+            rusqlite::Error::SqliteFailure(_, Some(ref message))
+                if message.contains("duplicate column") =>
+            {
                 // Column already exists — migration is a no-op
             }
             other => return Err(other.into()),
         }
     }
+    Ok(())
+}
+
+/// Adds the per-agent columns, one statement at a time.
+///
+/// `execute_batch` abandons the rest of the batch at the first error, so a run interrupted partway
+/// would leave the remaining columns missing forever. Applying each `ALTER` on its own and
+/// swallowing only "duplicate column" lets a half-applied migration finish on the next startup.
+fn run_provider_profile_migration(connection: &Connection) -> Result<(), DatabaseError> {
+    for migration in [PROVIDER_PROFILE_MIGRATION, PROVIDER_PLAN_MIGRATION] {
+        let sql: String = migration
+            .lines()
+            .filter(|line| !line.trim_start().starts_with("--"))
+            .collect::<Vec<_>>()
+            .join("\n");
+        for statement in sql
+            .split(';')
+            .map(str::trim)
+            .filter(|statement| !statement.is_empty())
+        {
+            match connection.execute(statement, []) {
+                Ok(_) => {}
+                Err(rusqlite::Error::SqliteFailure(_, Some(ref message)))
+                    if message.contains("duplicate column") => {}
+                Err(other) => return Err(other.into()),
+            }
+        }
+    }
+    Ok(())
+}
+
+/// Moves a pre-split profile onto the side its protocol served.
+///
+/// Those profiles carry one endpoint, so only the matching agent can reach the provider — turning
+/// the other side on would hand it a base URL that answers a different protocol. Rows already
+/// carrying a model on either side are left alone, which is what makes this safe to re-run.
+fn split_legacy_single_protocol_profiles(connection: &Connection) -> Result<(), DatabaseError> {
+    connection.execute(
+        "UPDATE model_profiles
+         SET claude_model = model,
+             claude_base_url = base_url,
+             claude_enabled = 1,
+             codex_enabled = 0
+         WHERE api_protocol = 'anthropic' AND claude_model = '' AND codex_model = ''",
+        [],
+    )?;
+    connection.execute(
+        "UPDATE model_profiles
+         SET codex_model = model,
+             codex_base_url = base_url,
+             codex_enabled = 1,
+             claude_enabled = 0
+         WHERE api_protocol = 'openai' AND claude_model = '' AND codex_model = ''",
+        [],
+    )?;
     Ok(())
 }
 
@@ -933,8 +1030,14 @@ mod tests {
         database.save(&workspace).unwrap();
         let stored = database.list().unwrap();
 
-        assert_eq!(stored[0].terminals[0].profile_id.as_deref(), Some("glm-4-6"));
-        assert_eq!(stored[0].terminals[0].mcp_profile_id.as_deref(), Some("mcp-1"));
+        assert_eq!(
+            stored[0].terminals[0].profile_id.as_deref(),
+            Some("glm-4-6")
+        );
+        assert_eq!(
+            stored[0].terminals[0].mcp_profile_id.as_deref(),
+            Some("mcp-1")
+        );
     }
 
     #[test]
@@ -1015,16 +1118,21 @@ mod tests {
                 "{INITIAL_MIGRATION}\n{AGENT_MIGRATION}\n{NETWORK_MIGRATION}\n{ACCOUNT_MIGRATION}"
             ))
             .unwrap();
+        run_provider_profile_migration(&database.connection.lock().unwrap()).unwrap();
         let model = ModelProfile {
             id: "profile-1".into(),
             name: "Gateway Sonnet".into(),
             provider: "Anthropic".into(),
-            model: "sonnet".into(),
-            base_url: Some("https://gateway.example.com".into()),
             credential_target: Some("model-profile:profile-1".into()),
-            api_protocol: "anthropic".into(),
             is_default: true,
             has_credential: true,
+            claude_enabled: true,
+            claude_model: "sonnet".into(),
+            claude_base_url: Some("https://gateway.example.com/anthropic".into()),
+            codex_enabled: true,
+            codex_model: "gpt-5.6-sol".into(),
+            codex_base_url: Some("https://gateway.example.com/v1".into()),
+            plan_alert_threshold: 80,
         };
         let mcp = McpProfile {
             id: "mcp-1".into(),
@@ -1035,7 +1143,9 @@ mod tests {
         database.save_model_profile(&model).unwrap();
         database.save_mcp_profile(&mcp).unwrap();
 
-        assert_eq!(database.list_model_profiles().unwrap().len(), 1);
+        let profiles = database.list_model_profiles().unwrap();
+        assert_eq!(profiles.len(), 1);
+        assert_eq!(profiles[0].plan_alert_threshold, 80);
         assert_eq!(database.list_mcp_profiles().unwrap().len(), 1);
         assert!(
             database
@@ -1063,6 +1173,8 @@ mod tests {
                 [LEGACY_MINIMAX_M3_MODEL],
             )
             .unwrap();
+        run_provider_profile_migration(&connection).unwrap();
+        split_legacy_single_protocol_profiles(&connection).unwrap();
         connection
             .execute(
                 "INSERT INTO workspaces (
@@ -1092,9 +1204,62 @@ mod tests {
                 |row| row.get(0),
             )
             .unwrap();
+        let claude_model: String = connection
+            .query_row(
+                "SELECT claude_model FROM model_profiles WHERE id = 'minimax'",
+                [],
+                |row| row.get(0),
+            )
+            .unwrap();
         assert_eq!(model, MINIMAX_M3_MODEL);
+        assert_eq!(claude_model, MINIMAX_M3_MODEL);
         assert!(layout_json.contains(MINIMAX_M3_MODEL));
         assert!(!layout_json.contains(LEGACY_MINIMAX_M3_MODEL));
+    }
+
+    #[test]
+    fn moves_a_pre_split_profile_onto_the_side_its_protocol_served() {
+        let connection = Connection::open_in_memory().unwrap();
+        connection
+            .execute_batch(&format!(
+                "{INITIAL_MIGRATION}\n{AGENT_MIGRATION}\n{NETWORK_MIGRATION}\n{ACCOUNT_MIGRATION}"
+            ))
+            .unwrap();
+        connection
+            .execute(
+                "INSERT INTO model_profiles (
+                     id, name, provider, model, base_url, api_protocol,
+                     is_default, created_at, updated_at
+                 ) VALUES ('glm', 'GLM', 'GLM', 'glm-5.2',
+                     'https://open.bigmodel.cn/api/paas/v4', 'openai', 0, 1, 1)",
+                [],
+            )
+            .unwrap();
+        run_provider_profile_migration(&connection).unwrap();
+
+        split_legacy_single_protocol_profiles(&connection).unwrap();
+        // Re-running must not disturb the result, since every migration replays on each startup.
+        split_legacy_single_protocol_profiles(&connection).unwrap();
+
+        let (claude_enabled, codex_enabled, codex_model, codex_base_url): (
+            bool,
+            bool,
+            String,
+            String,
+        ) = connection
+            .query_row(
+                "SELECT claude_enabled, codex_enabled, codex_model, codex_base_url
+                 FROM model_profiles WHERE id = 'glm'",
+                [],
+                |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?, row.get(3)?)),
+            )
+            .unwrap();
+
+        assert!(codex_enabled);
+        assert_eq!(codex_model, "glm-5.2");
+        assert_eq!(codex_base_url, "https://open.bigmodel.cn/api/paas/v4");
+        // The Claude side has no endpoint of its own, so it stays off rather than borrowing one.
+        assert!(!claude_enabled);
     }
 
     #[test]

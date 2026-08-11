@@ -199,7 +199,7 @@ try {
   await workspaceMaximizeButton.click();
   await page.locator('.app-shell:not(.workspace-maximized)').waitFor();
   const terminalMaximizeButton = page
-    .locator('.terminal-panel:not(.workbench-hidden) .terminal-meta button')
+    .locator('.terminal-panel:not(.workbench-hidden) .terminal-meta button.btn')
     .first();
   await terminalMaximizeButton.click();
   results.push(

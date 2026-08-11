@@ -34,8 +34,8 @@ pub fn update_via_npm(app: AppHandle) -> Result<(), String> {
     if !update::is_npm_installation() {
         return Err("当前不是通过 npm 安装的版本，请从发布页面下载安装包。".into());
     }
-    let executable = std::env::current_exe()
-        .map_err(|error| format!("无法确定当前程序路径：{error}"))?;
+    let executable =
+        std::env::current_exe().map_err(|error| format!("无法确定当前程序路径：{error}"))?;
     let package = update::NPM_PACKAGE;
 
     // Waits for the PID to disappear before installing, then starts the new build. Quoting the
@@ -53,7 +53,13 @@ pub fn update_via_npm(app: AppHandle) -> Result<(), String> {
     const CREATE_NO_WINDOW: u32 = 0x0800_0000;
     const DETACHED_PROCESS: u32 = 0x0000_0008;
     Command::new("powershell.exe")
-        .args(["-NoLogo", "-NoProfile", "-NonInteractive", "-Command", &script])
+        .args([
+            "-NoLogo",
+            "-NoProfile",
+            "-NonInteractive",
+            "-Command",
+            &script,
+        ])
         .stdin(Stdio::null())
         .stdout(Stdio::null())
         .stderr(Stdio::null())

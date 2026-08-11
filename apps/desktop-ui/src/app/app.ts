@@ -16,8 +16,10 @@ import {
   McpProfileInput,
   ModelProfileInput,
   NativeAgentType,
+  needsCredential,
   NetworkProfileInput,
   NetworkTestResult,
+  profileModel,
 } from './core/models/agent.models';
 import {
   AgentType,
@@ -49,7 +51,11 @@ import { AppStateService } from './core/services/app-state.service';
 import { DirectoryPickerService } from './core/services/directory-picker.service';
 import { DesktopNotificationService } from './core/services/desktop-notification.service';
 import { UpdateCheck, UpdateService } from './core/services/update.service';
-import { TerminalGatewayService } from './core/services/terminal-gateway.service';
+import {
+  TerminalExitEvent,
+  terminalEventMatchesSession,
+  TerminalGatewayService,
+} from './core/services/terminal-gateway.service';
 import { AgentSettingsDialogComponent, SettingsTab } from './dialogs/agent-settings-dialog';
 import {
   ClaudeLaunchDialogComponent,
@@ -86,6 +92,12 @@ const INSPECTOR_MIN_WIDTH = 220;
 const INSPECTOR_MAX_WIDTH = 460;
 const INSPECTOR_AUTO_COLLAPSE_WIDTH = 900;
 const WORKSPACE_SIDEBAR_AUTO_COLLAPSE_WIDTH = 760;
+/** Matches the backend default for a profile that has never had a threshold set. */
+const DEFAULT_ALERT_THRESHOLD = 80;
+/** Checks for model activity often, while the backend cache controls actual provider requests. */
+const QUOTA_ACTIVITY_CHECK_INTERVAL_MS = 30_000;
+/** Keeps a short completed model turn eligible for the next automatic refresh. */
+const QUOTA_RECENT_ACTIVITY_WINDOW_MS = 90_000;
 
 function readStoredBoolean(key: string, fallback: boolean): boolean {
   try {
@@ -152,6 +164,7 @@ export class App {
   private readonly desktopNotifications = inject(DesktopNotificationService);
   private readonly terminalGateway = inject(TerminalGatewayService);
   private readonly handledEventKeys = new Set<string>();
+  private readonly handledPlanAlertKeys = new Set<string>();
   private readonly eventStatusCutoff = Date.now();
   private readonly preferredTerminalIds = signal<Record<string, string[]>>({});
   private readonly mountedWorkspaceIds = signal<string[]>([]);
@@ -181,6 +194,16 @@ export class App {
     }
     return (
       this.state.activeWorkspace()?.terminals.find((item) => item.id === terminalId)?.name ?? ''
+    );
+  });
+  /** Profile currently running in the one-terminal switcher. Batch switches have no single current item. */
+  protected readonly modelSwitchCurrentProfileId = computed(() => {
+    const terminalId = this.modelSwitchTerminalId();
+    if (!terminalId) {
+      return '';
+    }
+    return (
+      this.state.activeWorkspace()?.terminals.find((item) => item.id === terminalId)?.profileId ?? ''
     );
   });
   protected readonly agentMenuOpen = signal(false);
@@ -360,6 +383,89 @@ export class App {
         this.showToast(this.i18n.t('notice.agentsCompleted', { count: completed.length }));
       }
     });
+    void this.terminalGateway.onExit((event) => this.handleTerminalExit(event));
+    // Reads allowances when the panel opens, then keeps them current while the selected model is
+    // producing Agent events. The non-forced refresh preserves the backend's provider-specific
+    // cache windows; the button remains the explicit way to bypass those caches.
+    effect((onCleanup) => {
+      if (!this.inspectorOpen()) return;
+      untracked(() => void this.refreshProviderQuotas());
+      const timer = window.setInterval(() => {
+        const terminal = this.state.activeTerminal();
+        if (!terminal || terminal.agentType === 'shell') return;
+        const activityCutoff = Date.now() - QUOTA_RECENT_ACTIVITY_WINDOW_MS;
+        const recentlyActive = this.agents
+          .events()
+          .some((event) => event.terminalId === terminal.id && event.createdAt >= activityCutoff);
+        if (recentlyActive) {
+          void this.refreshProviderQuotas();
+        }
+      }, QUOTA_ACTIVITY_CHECK_INTERVAL_MS);
+      onCleanup(() => window.clearInterval(timer));
+    });
+    // Warns once per reading that crosses a profile's threshold. Every number here comes from the
+    // provider, so a profile whose allowance cannot be read never raises an alert.
+    effect(() => {
+      const thresholds = new Map(
+        this.agents
+          .modelProfiles()
+          .map((profile) => [profile.id, profile.planAlertThreshold ?? DEFAULT_ALERT_THRESHOLD]),
+      );
+      for (const quota of this.agents.providerQuotas()) {
+        const threshold = thresholds.get(quota.profileId) ?? DEFAULT_ALERT_THRESHOLD;
+        for (const entry of quota.entries) {
+          if (entry.percent === undefined || entry.percent < threshold) continue;
+          // The reset time distinguishes one billing window from the next, so the same window
+          // warns once while the window after it can warn again.
+          const key = `${quota.profileId}:${entry.label}:${entry.resetsAt ?? 0}:${threshold}`;
+          if (this.handledPlanAlertKeys.has(key)) continue;
+          this.handledPlanAlertKeys.add(key);
+          this.showToast(
+            this.i18n.t('quota.thresholdAlert', {
+              name: quota.profileName,
+              label: entry.label,
+              percent: Math.round(entry.percent),
+            }),
+            'attention',
+          );
+        }
+      }
+    });
+  }
+
+  /**
+   * Marks a terminal whose process ended, and says so when it failed.
+   *
+   * An agent that never starts — a missing executable, a rejected credential, a CLI that exits
+   * immediately — otherwise leaves a tile sitting at "running" with nothing behind it.
+   */
+  private handleTerminalExit(event: TerminalExitEvent): void {
+    const terminal = this.state
+      .workspaces()
+      .flatMap((workspace) => workspace.terminals)
+      .find((item) => item.id === event.terminalId);
+    if (!terminal) {
+      return;
+    }
+    if (!terminalEventMatchesSession(event, terminal)) {
+      return;
+    }
+    this.state.updateTerminalStatus(event.terminalId, event.success ? 'STOPPED' : 'FAILED');
+    if (event.success) {
+      return;
+    }
+    this.showToast(
+      this.i18n.t('terminal.exitFailed', {
+        name: terminal.name,
+        code: event.exitCode,
+      }),
+      'attention',
+    );
+  }
+
+  /** `force` skips the backend's short-lived cache, for the panel's refresh button. */
+  protected async refreshProviderQuotas(force = false): Promise<void> {
+    await this.agents.refreshProviderQuotas(this.state.activeWorkspace()?.id, force);
   }
 
   protected async createTerminal(agentType: AgentType): Promise<void> {
@@ -430,7 +536,10 @@ export class App {
         agentType: 'codex',
         name: value.name || undefined,
         command: launch.command,
-        model: profile?.name ?? value.model ?? this.i18n.t('terminal.defaultCodexModel'),
+        model:
+          (profile ? profileModel(profile, 'codex') : undefined) ??
+          value.model ??
+          this.i18n.t('terminal.defaultCodexModel'),
         workingDirectory,
         profileId: value.profileId,
         accountProfileId: value.accountProfileId,
@@ -460,7 +569,7 @@ export class App {
     }
 
     const profile = this.agents.modelProfiles().find((item) => item.id === value.profileId);
-    if (profile?.baseUrl && !profile.hasCredential) {
+    if (profile && needsCredential(profile, 'claude')) {
       this.openModelCredentialSettings(profile.id, profile.name);
       return;
     }
@@ -481,7 +590,7 @@ export class App {
         agentType: 'claude',
         name: value.name || undefined,
         command: launch.command,
-        model: profile?.name ?? 'Claude Sonnet',
+        model: profile ? profileModel(profile, 'claude') : 'Claude Sonnet',
         workingDirectory,
         profileId: value.profileId,
         mcpProfileId: value.mcpProfileId,
@@ -521,7 +630,7 @@ export class App {
     }
 
     const profile = this.agents.modelProfiles().find((item) => item.id === value.profileId);
-    if (profile?.baseUrl && !profile.hasCredential) {
+    if (profile && needsCredential(profile, 'codex')) {
       this.openModelCredentialSettings(profile.id, profile.name);
       return;
     }
@@ -552,7 +661,7 @@ export class App {
         name: value.session.title,
         command: launch.command,
         model:
-          profile?.name ??
+          (profile ? profileModel(profile, isCodex ? 'codex' : 'claude') : undefined) ??
           value.model ??
           value.session.modelName ??
           (isCodex ? this.i18n.t('terminal.defaultCodexModel') : 'Claude Sonnet'),
@@ -1089,7 +1198,7 @@ export class App {
   }
 
   protected async switchModels(value: ModelSwitchValue): Promise<void> {
-    const isClaude = value.apiProtocol === 'anthropic';
+    const isClaude = value.agent === 'claude';
     if (isClaude ? this.launchingClaude() : this.launchingCodex()) {
       return;
     }
@@ -1116,16 +1225,25 @@ export class App {
       );
       return;
     }
-    if (profile.baseUrl && !profile.hasCredential) {
+    if (needsCredential(profile, isClaude ? 'claude' : 'codex')) {
       this.openModelCredentialSettings(profile.id, profile.name);
+      return;
+    }
+    // The dialog disables the current profile; this guard also prevents a stale or scripted event
+    // from needlessly closing and restarting the same single terminal.
+    if (targetId !== null && terminals.length === 1 && terminals[0].profileId === profile.id) {
+      this.closeModelSwitch();
       return;
     }
 
     (isClaude ? this.launchingClaude : this.launchingCodex).set(true);
     try {
-      const results = await Promise.allSettled(
-        terminals.map(async (terminal) => {
-          const launch = isClaude
+      // Build every launch command before touching a PTY. A missing credential or incompatible
+      // profile therefore aborts the whole plan with every existing session still running.
+      const plans = await Promise.all(
+        terminals.map(async (terminal) => ({
+          original: { ...terminal },
+          launch: isClaude
             ? await this.agents.prepareLaunch({
                 terminalId: terminal.id,
                 workspaceId: workspace?.id,
@@ -1138,43 +1256,81 @@ export class App {
                 workspaceId: workspace?.id,
                 profileId: value.profileId,
                 accountProfileId: terminal.accountProfileId,
-              });
-          await this.terminalGateway.close(terminal.id).catch(() => undefined);
+              }),
+        })),
+      );
+      const switched: typeof plans = [];
+      let failure: unknown = null;
+      for (const plan of plans) {
+        try {
+          await this.terminalGateway.close(plan.original.id);
           if (
             !this.state.restartTerminalWithProfile(
-              terminal.id,
-              launch.command,
-              profile.name,
+              plan.original.id,
+              plan.launch.command,
+              profileModel(profile, value.agent),
               value.profileId,
-              isClaude ? terminal.mcpProfileId : undefined,
+              isClaude ? plan.original.mcpProfileId : undefined,
             )
           ) {
             throw new Error(
               this.i18n.t('restore.terminalMissing', {
                 agent: isClaude ? 'Claude' : 'Codex',
-                name: terminal.name,
+                name: plan.original.name,
               }),
             );
           }
-        }),
-      );
-      const switched = results.filter((result) => result.status === 'fulfilled').length;
-      const failures = results.filter(
-        (result): result is PromiseRejectedResult => result.status === 'rejected',
-      );
+          switched.push(plan);
+        } catch (error) {
+          failure = error;
+          break;
+        }
+      }
+
+      let rollbackFailures = 0;
+      if (failure) {
+        // Include the failed target: its PTY may already have closed before the state update failed.
+        const rollbackTargets = plans.slice(0, Math.min(switched.length + 1, plans.length));
+        for (const plan of rollbackTargets.reverse()) {
+          try {
+            await this.terminalGateway.close(plan.original.id).catch(() => undefined);
+            if (
+              !plan.original.command ||
+              !this.state.restartTerminalWithProfile(
+                plan.original.id,
+                plan.original.command,
+                plan.original.model,
+                plan.original.profileId,
+                plan.original.mcpProfileId,
+              )
+            ) {
+              rollbackFailures += 1;
+            }
+          } catch {
+            rollbackFailures += 1;
+          }
+        }
+      }
       this.closeModelSwitch();
       this.showToast(
-        failures.length > 0
+        failure
           ? this.i18n.t('profile.switchPartial', {
-              switched,
-              failed: failures.length,
-              error: this.errorMessage(failures[0].reason),
+              switched: 0,
+              failed: terminals.length,
+              error: `${this.errorMessage(failure)} · ${
+                rollbackFailures === 0
+                  ? this.i18n.t('profile.rollbackComplete')
+                  : this.i18n.t('profile.rollbackPartial', { count: rollbackFailures })
+              }`,
             })
           : this.i18n.t(isClaude ? 'profile.switched' : 'profile.switchedCodex', {
-              count: switched,
+              count: switched.length,
               name: profile.name,
             }),
+        failure ? 'attention' : 'success',
       );
+    } catch (error) {
+      this.showToast(this.errorMessage(error), 'attention');
     } finally {
       (isClaude ? this.launchingClaude : this.launchingCodex).set(false);
     }
@@ -1320,6 +1476,27 @@ export class App {
         latencyMs: 0,
       });
       this.showToast(message);
+    }
+  }
+
+  protected async importSystemProxy(): Promise<void> {
+    try {
+      const discovered = await this.agents.discoverSystemProxy();
+      await this.agents.saveNetworkProfile({
+        id: crypto.randomUUID(),
+        name: this.i18n.t('settings.importedSystemProxy'),
+        scope: 'global',
+        enabled: true,
+        isDefault: false,
+        httpProxy: discovered.httpProxy,
+        httpsProxy: discovered.httpsProxy,
+        allProxy: discovered.allProxy,
+        noProxy: discovered.noProxy,
+        npmStrictSsl: true,
+      });
+      this.showToast(discovered.diagnostic);
+    } catch (error) {
+      this.showToast(this.errorMessage(error), 'attention');
     }
   }
 
@@ -1517,7 +1694,7 @@ export class App {
         if (!profile) {
           throw new Error(this.i18n.t('restore.noModelProfile', { name: terminal.name }));
         }
-        if (profile.baseUrl && !profile.hasCredential) {
+        if (needsCredential(profile, terminal.agentType === 'codex' ? 'codex' : 'claude')) {
           throw new Error(this.i18n.t('restore.invalidCredential', { name: profile.name }));
         }
 
@@ -1532,7 +1709,7 @@ export class App {
         if (
           !this.state.updateRestoredTerminalLaunch(terminal.id, launch.command, {
             profileId: profile.id,
-            model: profile.name,
+            model: profileModel(profile, 'claude'),
           })
         ) {
           throw new Error(
@@ -1582,7 +1759,7 @@ export class App {
         if (
           !this.state.updateRestoredTerminalLaunch(terminal.id, launch.command, {
             profileId: profile?.id,
-            model: profile?.name ?? terminal.model,
+            model: profile ? profileModel(profile, 'codex') : terminal.model,
           })
         ) {
           throw new Error(

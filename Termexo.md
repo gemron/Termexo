@@ -1355,6 +1355,26 @@ Model：Claude Sonnet
 
 # 八、版本规划
 
+## 近期执行顺序（2026-08 重新规划）
+
+以下顺序以“先稳定高频操作，再建立数据与模型控制底座，最后扩展自动化和外部集成”为原则。
+GitHub Issue 是执行入口，版本章节定义能力边界和验收标准。
+
+| 顺序 | 版本阶段 | 目标 | 对应 Issue | 依赖关系 |
+| --- | --- | --- | --- | --- |
+| P0 | V0.3 稳定化 | 修复 Claude 右键粘贴重复；Agent 选择弹窗支持点击空白关闭；文件链接可选择 VS Code 或文本编辑器打开 | [#11](https://github.com/gemron/Termexo/issues/11)、[#15](https://github.com/gemron/Termexo/issues/15) | 无，优先降低日常操作摩擦 |
+| P1 | V0.4 模型控制 | Claude 支持单窗口切换和多终端批量切换，展示兼容性、执行进度、失败回滚 | [#11](https://github.com/gemron/Termexo/issues/11) | 复用现有账号/Profile 和会话恢复能力 |
+| P2 | V0.4 用量可观测 | 建立统一 Token 用量事件、实时曲线、消耗速度、累计总量和分终端统计 | [#4](https://github.com/gemron/Termexo/issues/4) | 为 Plan 估算、告警和切换预检提供数据底座 |
+| P3 | V0.4 Plan 额度 | 检查账号 Plan 总量、余量与重置时间；额度不足、恢复可用和即将重置时提示 | [#12](https://github.com/gemron/Termexo/issues/12) | 优先使用官方数据，缺失时复用 #4 的本地统计并标记为估算 |
+| P4 | V0.5 提示词资产 | 实时保存输入草稿，提供历史检索、收藏和置顶 | [#8](https://github.com/gemron/Termexo/issues/8) | 复用本地数据库、搜索和敏感信息保护策略 |
+| P5 | V0.5 会话接力 | 一键批量操作会话；生成、读取交接文档，并让新 Agent 按交接内容继续工作 | [#7](https://github.com/gemron/Termexo/issues/7) | 依赖会话摘要、任务状态、Git Diff 和迁移包 |
+| P6 | V0.6 通知集成 | 把统一事件接入企业微信、钉钉、飞书及海外通知应用 | [#5](https://github.com/gemron/Termexo/issues/5) | 依赖 Agent 状态、Plan 告警和可扩展通知事件模型 |
+
+并行原则：P0 可独立完成；P1 与 P2 可并行；P3 在 P2 的统一数据模型确定后接入；P4 可与
+P1～P3 并行；P5 在会话迁移包稳定后完成；P6 最后接渠道 Adapter，避免各渠道重复实现业务判断。
+
+---
+
 ## V0.1：多终端原型
 
 目标：验证终端和 Workspace 恢复能力。
@@ -1429,6 +1449,8 @@ Model：Claude Sonnet
 * [x] Claude / Codex 统一会话中心
 * [ ] Codex Hooks 与统一运行状态事件
 * [ ] Generic CLI Adapter 与 Adapter SDK
+* [ ] 修复 Claude 右键粘贴重复，Agent 选择弹窗支持点击遮罩关闭（[#11](https://github.com/gemron/Termexo/issues/11)）
+* [ ] 终端文件链接支持选择 VS Code、系统默认或指定文本编辑器打开（[#15](https://github.com/gemron/Termexo/issues/15)）
 
 交付标准：
 
@@ -1473,6 +1495,9 @@ Model：Claude Sonnet
 * 官方 Usage API、CLI 状态和本地估算适配器
 * 多账号、多时间窗口和余量告警
 * 模型切换前的配额可用性检查
+* Claude 当前终端、选中终端、Workspace 和全部终端的分级模型切换（[#11](https://github.com/gemron/Termexo/issues/11)）
+* 单终端及聚合 Token 实时曲线、消耗速度和累计总量仪表（[#4](https://github.com/gemron/Termexo/issues/4)）
+* Token Plan 额度检查、重置倒计时、额度恢复和阈值提示（[#12](https://github.com/gemron/Termexo/issues/12)）
 
 当前开发进度：
 
@@ -1485,9 +1510,12 @@ Model：Claude Sonnet
 * [x] 精确版本或 dist-tag 选择、安装源、npm 与生效代理可见并明确确认
 * [x] 安装前 registry 解析、禁止并发操作、超时终止与安装后健康验证
 * [x] CLI 安装/升级复用 Workspace 优先、全局回退的代理与 npm 配置
-* [ ] 系统代理自动发现与导入
-* [ ] CLI 安装失败后的原版本自动回滚
-* [ ] 多账号切换和 Plan 余量监控
+* [x] 系统代理与标准代理环境变量的自动发现、无密码导入
+* [x] CLI 安装失败或健康检查失败后的原版本自动回滚
+* [x] Claude/Codex 单窗口与批量模型切换、全量预检及失败回滚（[#11](https://github.com/gemron/Termexo/issues/11)）
+* [x] Token 实时曲线、速度、累计总量和分终端统计（[#4](https://github.com/gemron/Termexo/issues/4)）
+* [x] 多账号切换、自定义 Plan 额度/重置时间、本地余量估算和阈值提示（[#12](https://github.com/gemron/Termexo/issues/12)）
+* [ ] 按供应商接入官方 Usage/Billing API，并在官方重置后确认额度恢复
 
 交付标准：
 
@@ -1495,6 +1523,8 @@ Model：Claude Sonnet
 一次操作切换多个 Agent 的模型配置
 不会因为部分失败破坏原有会话
 可以查看每个供应商和账号的 Plan 剩余额度与重置时间
+可以查看当前终端、Workspace 和账号维度的实时消耗速度与累计总量
+达到阈值、额度耗尽、额度恢复或临近重置时只触发一次可解释的提示
 无法获取官方数据时明确显示估算或不可用
 可以为内网 Workspace 配置代理与 npm registry，并在启动 Agent 前验证连通性
 代理密码不进入 SQLite、日志、快照或前端回传数据
@@ -1513,12 +1543,17 @@ Model：Claude Sonnet
 * 跨 Agent 迁移
 * 内容脱敏
 * Token 预算
+* 输入中提示词实时草稿、历史检索、收藏与置顶（[#8](https://github.com/gemron/Termexo/issues/8)）
+* 所有会话的一键批量快捷操作（[#7](https://github.com/gemron/Termexo/issues/7)）
+* 基于迁移包生成和读取交接文档，并从交接点继续工作（[#7](https://github.com/gemron/Termexo/issues/7)）
 
 交付标准：
 
 ```text
 Claude 会话可以迁移到 Codex
 新 Agent 能够了解已完成工作和下一步任务
+应用异常关闭后可以恢复尚未发送的提示词草稿
+交接文档包含任务、决策、改动、验证结果、风险和下一步，并可被新 Agent 读取
 ```
 
 ---
@@ -1537,6 +1572,16 @@ Claude 会话可以迁移到 Codex
 * 冲突检测
 * 自动提交
 * Pull Request 生成
+* 可扩展通知 Channel Adapter（[#5](https://github.com/gemron/Termexo/issues/5)）
+* 企业微信、钉钉、飞书、Slack、Microsoft Teams、Discord、Telegram 和通用 Webhook
+* 按 Workspace、事件、严重级别和静默时段路由，支持测试、重试、去重和脱敏
+
+交付标准：
+
+```text
+同一个 Agent 或 Plan 事件只由统一规则判断一次，再投递到一个或多个渠道
+渠道故障不阻塞本地 Agent，会记录可重试状态且不泄露提示词、密钥和完整终端输出
+```
 
 ---
 
