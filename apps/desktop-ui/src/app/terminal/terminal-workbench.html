@@ -17,6 +17,7 @@
         [maximized]="terminalMaximized() && terminal.id === activeTerminalId()"
         [layoutRevision]="layoutRevision()"
         [fontSize]="terminalFontSize()"
+        [fontName]="terminalFontName()"
         [themeColor]="themeColor()"
         (selected)="terminalSelected.emit($event)"
         (closeRequested)="terminalClosed.emit($event)"

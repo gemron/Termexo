@@ -23,6 +23,8 @@ import {
 } from '../core/models/workspace.models';
 import { TerminalGatewayService } from '../core/services/terminal-gateway.service';
 import { IconComponent } from '../shared/icon/icon';
+import { TerminalCompositionAnchor } from './terminal-composition-anchor';
+import { DEFAULT_TERMINAL_FONT_NAME, terminalFontFamily } from './terminal-font';
 import { terminalKeySequence } from './terminal-key-sequences';
 import { TerminalResizeCoordinator } from './terminal-resize-coordinator';
 import { detectTerminalRuntimeIssue, TerminalRuntimeIssue } from './terminal-runtime-diagnostics';
@@ -45,7 +47,7 @@ export class TerminalPanelComponent implements AfterViewInit {
   private readonly terminal = new Terminal({
     cursorBlink: true,
     cursorStyle: 'bar',
-    fontFamily: '"Cascadia Code", "JetBrains Mono", Consolas, monospace',
+    fontFamily: terminalFontFamily(DEFAULT_TERMINAL_FONT_NAME),
     fontSize: 12,
     lineHeight: 1.35,
     scrollback: 10_000,
@@ -71,6 +73,7 @@ export class TerminalPanelComponent implements AfterViewInit {
   private fitFrame?: number;
   private stabilizationFrame?: number;
   private activationFrame?: number;
+  private compositionAnchor?: TerminalCompositionAnchor;
   private runtimeReady = false;
   private viewReady = false;
   private outputTail = '';
@@ -82,6 +85,7 @@ export class TerminalPanelComponent implements AfterViewInit {
   readonly maximized = input(false);
   readonly layoutRevision = input(0);
   readonly fontSize = input(12);
+  readonly fontName = input(DEFAULT_TERMINAL_FONT_NAME);
   readonly themeColor = input<string>();
   readonly selected = output<string>();
   readonly closeRequested = output<string>();
@@ -132,6 +136,12 @@ export class TerminalPanelComponent implements AfterViewInit {
       }
     });
     effect(() => {
+      this.terminal.options.fontFamily = terminalFontFamily(this.fontName());
+      if (this.viewReady && this.visible()) {
+        this.scheduleFit();
+      }
+    });
+    effect(() => {
       this.terminal.options.theme = createTerminalTheme(this.themeColor());
       if (this.viewReady && this.visible()) {
         this.terminal.refresh(0, Math.max(0, this.terminal.rows - 1));
@@ -157,6 +167,15 @@ export class TerminalPanelComponent implements AfterViewInit {
     this.terminal.loadAddon(this.fitAddon);
     const terminalContainer = this.container().nativeElement;
     this.terminal.open(terminalContainer);
+    this.compositionAnchor = new TerminalCompositionAnchor(terminalContainer, () => {
+      const cursor = this.terminal.buffer.active;
+      return {
+        cols: this.terminal.cols,
+        rows: this.terminal.rows,
+        cursorX: cursor.cursorX,
+        cursorY: cursor.cursorY,
+      };
+    });
     terminalContainer.addEventListener('wheel', this.prepareWheelInteraction, {
       capture: true,
       passive: true,
@@ -164,8 +183,12 @@ export class TerminalPanelComponent implements AfterViewInit {
     terminalContainer.addEventListener('wheel', this.stopWheelPropagation, { passive: true });
     terminalContainer.addEventListener('mousedown', this.suppressRightButtonReport, true);
     terminalContainer.addEventListener('contextmenu', this.handleContextMenu);
-    terminalContainer.addEventListener('compositionstart', this.anchorComposition, true);
-    terminalContainer.addEventListener('focusin', this.anchorComposition);
+    terminalContainer.addEventListener('compositionstart', this.prepareComposition, true);
+    terminalContainer.addEventListener('compositionstart', this.beginComposition);
+    terminalContainer.addEventListener('compositionupdate', this.restoreComposition);
+    terminalContainer.addEventListener('compositionend', this.endComposition);
+    terminalContainer.addEventListener('focusin', this.prepareComposition);
+    terminalContainer.addEventListener('focusout', this.endComposition);
     this.fitTerminal();
     this.scheduleFit();
     if (this.active() && this.visible()) {
@@ -186,17 +209,25 @@ export class TerminalPanelComponent implements AfterViewInit {
       }
       void this.gateway.write(this.session(), data);
     });
+    // xterm repositions its IME elements on every render. Registering after open means this runs
+    // after xterm's own render listener and restores the caret captured at compositionstart.
+    const renderDisposable = this.terminal.onRender(this.restoreComposition);
 
     this.resizeObserver = new ResizeObserver(() => this.scheduleFit(false));
     this.resizeObserver.observe(terminalContainer);
 
     this.destroyRef.onDestroy(() => {
       inputDisposable.dispose();
+      renderDisposable.dispose();
       this.resizeObserver?.disconnect();
       terminalContainer.removeEventListener('mousedown', this.suppressRightButtonReport, true);
       terminalContainer.removeEventListener('contextmenu', this.handleContextMenu);
-      terminalContainer.removeEventListener('compositionstart', this.anchorComposition, true);
-      terminalContainer.removeEventListener('focusin', this.anchorComposition);
+      terminalContainer.removeEventListener('compositionstart', this.prepareComposition, true);
+      terminalContainer.removeEventListener('compositionstart', this.beginComposition);
+      terminalContainer.removeEventListener('compositionupdate', this.restoreComposition);
+      terminalContainer.removeEventListener('compositionend', this.endComposition);
+      terminalContainer.removeEventListener('focusin', this.prepareComposition);
+      terminalContainer.removeEventListener('focusout', this.endComposition);
       terminalContainer.removeEventListener('wheel', this.prepareWheelInteraction, true);
       terminalContainer.removeEventListener('wheel', this.stopWheelPropagation);
       this.resizeCoordinator.dispose();
@@ -242,10 +273,8 @@ export class TerminalPanelComponent implements AfterViewInit {
     let unlisten: (() => void) | undefined;
     try {
       const session = this.session();
-      unlisten = await this.gateway.connect(
-        session.id,
-        session.runtimeRevision ?? 0,
-        (data) => this.handleOutput(data),
+      unlisten = await this.gateway.connect(session.id, session.runtimeRevision ?? 0, (data) =>
+        this.handleOutput(data),
       );
       if (this.destroyRef.destroyed) {
         unlisten();
@@ -348,32 +377,13 @@ export class TerminalPanelComponent implements AfterViewInit {
     return false;
   };
 
-  /**
-   * Anchors the IME to the caret when xterm has left its helper textarea parked off-screen.
-   *
-   * That textarea is what Windows measures to place the candidate window, and xterm moves it only
-   * when the cursor moves inside the viewport — before that it sits thousands of pixels to the
-   * left with no size. Composing while it is still parked, on a terminal that has just opened or
-   * one scrolled away from its cursor, leaves Windows without a caret rect, so the candidate
-   * window drops into a screen corner instead of following the text. Positioning from the public
-   * cursor coordinates reproduces xterm's own placement exactly.
-   */
-  private readonly anchorComposition = (): void => {
-    const host = this.container().nativeElement;
-    const textarea = host.querySelector<HTMLTextAreaElement>('.xterm-helper-textarea');
-    const screen = host.querySelector<HTMLElement>('.xterm-screen');
-    if (!textarea || !screen || textarea.getBoundingClientRect().left >= 0) {
-      return;
-    }
-    // The screen element is sized to exactly cols x rows, so it yields the true cell size.
-    const cellWidth = screen.clientWidth / Math.max(this.terminal.cols, 1);
-    const cellHeight = screen.clientHeight / Math.max(this.terminal.rows, 1);
-    const cursor = this.terminal.buffer.active;
-    textarea.style.left = `${cursor.cursorX * cellWidth}px`;
-    textarea.style.top = `${cursor.cursorY * cellHeight}px`;
-    textarea.style.width = `${cellWidth}px`;
-    textarea.style.height = `${cellHeight}px`;
-  };
+  private readonly prepareComposition = (): void => this.compositionAnchor?.prepare();
+
+  private readonly beginComposition = (): void => this.compositionAnchor?.begin();
+
+  private readonly restoreComposition = (): void => this.compositionAnchor?.restore();
+
+  private readonly endComposition = (): void => this.compositionAnchor?.end();
 
   /**
    * Keeps the right button away from xterm so this component alone acts on it.

@@ -346,6 +346,11 @@
         </button>
       </div>
 
+      <app-terminal-font-picker
+        [value]="terminalFontName()"
+        (fontChange)="selectTerminalFont($event)"
+      />
+
       <div class="layout-controls join" [attr.aria-label]="'terminal.layout' | t">
         <button
           type="button"
@@ -519,6 +524,7 @@
             [terminalMaximized]="workspace.id === activeWorkspace.id && terminalMaximized()"
             [layoutRevision]="layoutRevision()"
             [terminalFontSize]="terminalFontSize()"
+            [terminalFontName]="terminalFontName()"
             [themeColor]="workspace.themeColor"
             [gridColumns]="gridColumns()"
             [gridRows]="gridRows()"

@@ -4,6 +4,7 @@ mod cli;
 mod commands;
 mod config;
 mod database;
+mod fonts;
 mod hooks;
 mod network;
 mod notification;
@@ -102,6 +103,7 @@ pub fn run() {
             commands::config::delete_network_profile,
             commands::config::test_network_profile,
             commands::config::discover_system_proxy,
+            commands::fonts::list_system_fonts,
             commands::network_export::export_network_profiles,
             commands::network_export::write_network_profile_export,
             commands::network_export::import_network_profiles,

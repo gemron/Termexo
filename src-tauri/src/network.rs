@@ -128,8 +128,11 @@ pub fn profile_environment(
         environment.insert("NO_PROXY".into(), value.into());
         environment.insert("no_proxy".into(), value.into());
         // npm reads NO_PROXY too, but its own `noproxy` config wins when both are present —
-        // leaving it unset would let an explicit NPM_CONFIG_PROXY capture excluded hosts.
-        environment.insert("NPM_CONFIG_NOPROXY".into(), value.into());
+        // leaving it unset would let an explicit NPM_CONFIG_PROXY capture excluded hosts. npm's
+        // format is narrower than Windows/system bypass lists, so translate it independently.
+        if let Some(value) = npm_no_proxy(value) {
+            environment.insert("NPM_CONFIG_NOPROXY".into(), value);
+        }
     }
 
     if let Some(value) = trimmed(profile.npm_registry.as_deref()) {
@@ -157,6 +160,87 @@ pub fn profile_environment(
         environment.insert("NPM_CONFIG_CAFILE".into(), value.into());
     }
     Ok(environment)
+}
+
+/// Converts common system/Windows bypass-list forms to npm's comma-delimited domain extensions.
+///
+/// npm's current proxy matcher compares hostname segments. It therefore cannot match Windows'
+/// `*.example.com` spelling or entries carrying a port, and it sees a bare IPv6 address differently
+/// from URL.hostname. The system variables keep the user's original value; only npm receives this
+/// compatibility form.
+fn npm_no_proxy(value: &str) -> Option<String> {
+    let mut entries = Vec::<String>::new();
+    let mut push = |entry: &str| {
+        let Some(entry) = npm_no_proxy_entry(entry) else {
+            return;
+        };
+        if !entries
+            .iter()
+            .any(|existing| existing.eq_ignore_ascii_case(&entry))
+        {
+            entries.push(entry);
+        }
+    };
+
+    for entry in value
+        .split([',', ';', '\n', '\r'])
+        .map(str::trim)
+        .filter(|entry| !entry.is_empty())
+    {
+        if entry.eq_ignore_ascii_case("<local>") {
+            for local in ["localhost", "127.0.0.1", "::1"] {
+                push(local);
+            }
+        } else {
+            push(entry);
+        }
+    }
+
+    (!entries.is_empty()).then(|| entries.join(","))
+}
+
+fn npm_no_proxy_entry(value: &str) -> Option<String> {
+    let value = value.trim();
+    if value.is_empty() {
+        return None;
+    }
+
+    if value.contains("://") {
+        if let Ok(url) = Url::parse(value) {
+            return url.host().map(|host| match host {
+                url::Host::Ipv6(address) => format!("[{address}]"),
+                _ => host.to_string(),
+            });
+        }
+    }
+
+    // Windows uses `*.domain`; npm expects a domain extension and already includes subdomains.
+    let value = value
+        .strip_prefix("*.")
+        .map(|domain| format!(".{domain}"))
+        .unwrap_or_else(|| value.trim_start_matches('*').to_owned());
+    if value.is_empty() {
+        // Preserve the global wildcard. Some npm versions/libraries support it even though the
+        // current @npmcli/agent matcher only documents domain extensions.
+        return Some("*".into());
+    }
+
+    if value.starts_with('[') {
+        // A bracketed IPv6 address may carry a port; npm compares URL.hostname including brackets.
+        return value
+            .find(']')
+            .map(|end| value[..=end].to_owned())
+            .or(Some(value));
+    }
+    if value.matches(':').count() > 1 && !value.contains('/') {
+        return Some(format!("[{value}]"));
+    }
+    if let Some((host, port)) = value.rsplit_once(':') {
+        if !host.is_empty() && port.chars().all(|character| character.is_ascii_digit()) {
+            return Some(host.to_owned());
+        }
+    }
+    Some(value)
 }
 
 pub fn test_profile(
@@ -500,6 +584,36 @@ mod tests {
         assert_eq!(
             environment.get("NPM_CONFIG_STRICT_SSL").map(String::as_str),
             Some("false")
+        );
+    }
+
+    #[test]
+    fn converts_system_bypass_syntax_for_npm() {
+        assert_eq!(
+            npm_no_proxy(
+                "*.corp.example;registry.corp.example:4873;<local>;LOCALHOST;::1;[2001:db8::1]:8080"
+            )
+            .as_deref(),
+            Some(
+                ".corp.example,registry.corp.example,localhost,127.0.0.1,[::1],[2001:db8::1]"
+            )
+        );
+    }
+
+    #[test]
+    fn converts_url_entries_and_keeps_system_no_proxy_unchanged() {
+        let mut profile = test_network_profile();
+        profile.no_proxy = Some("https://registry.internal:4873/path;*.corp".into());
+
+        let environment = profile_environment(&profile, Some("p@ss word")).unwrap();
+
+        assert_eq!(
+            environment.get("NO_PROXY").map(String::as_str),
+            Some("https://registry.internal:4873/path;*.corp")
+        );
+        assert_eq!(
+            environment.get("NPM_CONFIG_NOPROXY").map(String::as_str),
+            Some("registry.internal,.corp")
         );
     }
 

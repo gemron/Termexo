@@ -11,7 +11,7 @@
 </p>
 
 <p align="center">
-  <img alt="Version 0.4.4" src="https://img.shields.io/badge/version-0.4.4-58c7a0">
+  <img alt="Version 0.4.5" src="https://img.shields.io/badge/version-0.4.5-58c7a0">
   <img alt="Windows" src="https://img.shields.io/badge/platform-Windows-0078D4?logo=windows">
   <img alt="Tauri 2" src="https://img.shields.io/badge/Tauri-2-24C8DB?logo=tauri&logoColor=white">
   <img alt="Angular 22" src="https://img.shields.io/badge/Angular-22-DD0031?logo=angular">
@@ -34,7 +34,7 @@ Run the complete Windows app with one command—no Termexo account or server req
 npx termexo@latest
 ```
 
-> The current development version is **V0.4.4** (latest published: **V0.3.18**). It adds
+> The current version is **V0.4.5**. It adds
 > transactional model switching, local token telemetry, Plan estimates, system-proxy discovery,
 > and failure rollback for CLI upgrades.
 

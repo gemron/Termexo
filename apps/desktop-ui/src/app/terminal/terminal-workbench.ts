@@ -7,8 +7,9 @@ import {
   TerminalSession,
   TerminalStatus,
 } from '../core/models/workspace.models';
-import { IconComponent } from '../shared/icon/icon';
 import { TranslatePipe } from '../core/i18n/translate.pipe';
+import { IconComponent } from '../shared/icon/icon';
+import { DEFAULT_TERMINAL_FONT_NAME } from './terminal-font';
 import { TerminalPanelComponent } from './terminal-panel';
 
 @Component({
@@ -25,6 +26,7 @@ export class TerminalWorkbenchComponent {
   readonly terminalMaximized = input(false);
   readonly layoutRevision = input(0);
   readonly terminalFontSize = input(12);
+  readonly terminalFontName = input(DEFAULT_TERMINAL_FONT_NAME);
   readonly themeColor = input<string>();
   readonly gridColumns = input(DEFAULT_TERMINAL_GRID_DIMENSION);
   readonly gridRows = input(DEFAULT_TERMINAL_GRID_DIMENSION);

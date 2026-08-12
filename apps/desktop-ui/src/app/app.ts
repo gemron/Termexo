@@ -75,6 +75,12 @@ import { InspectorPanelComponent } from './inspector/inspector-panel';
 import { IconComponent } from './shared/icon/icon';
 import { LanguageSelectorComponent } from './shared/language-selector/language-selector';
 import {
+  DEFAULT_TERMINAL_FONT_NAME,
+  isTerminalFontAvailable,
+  normalizeTerminalFontName,
+} from './terminal/terminal-font';
+import { TerminalFontPickerComponent } from './terminal/terminal-font-picker';
+import {
   layoutTerminalCapacity,
   resolveVisibleTerminalIds,
   revealTerminalInLayout,
@@ -98,6 +104,7 @@ const DEFAULT_ALERT_THRESHOLD = 80;
 const QUOTA_ACTIVITY_CHECK_INTERVAL_MS = 30_000;
 /** Keeps a short completed model turn eligible for the next automatic refresh. */
 const QUOTA_RECENT_ACTIVITY_WINDOW_MS = 90_000;
+const TERMINAL_FONT_NAME_STORAGE_KEY = 'termexo.terminalFontName';
 
 function readStoredBoolean(key: string, fallback: boolean): boolean {
   try {
@@ -112,6 +119,14 @@ function readStoredWidth(key: string, fallback: number, min: number, max: number
   try {
     const value = Number(window.localStorage.getItem(key));
     return Number.isFinite(value) && value >= min && value <= max ? value : fallback;
+  } catch {
+    return fallback;
+  }
+}
+
+function readStoredString(key: string, fallback: string): string {
+  try {
+    return window.localStorage.getItem(key) ?? fallback;
   } catch {
     return fallback;
   }
@@ -132,6 +147,7 @@ function readStoredWidth(key: string, fallback: number, min: number, max: number
     MergeWorkspaceDialogComponent,
     ModelSwitchDialogComponent,
     SessionCenterDialogComponent,
+    TerminalFontPickerComponent,
     TerminalWorkbenchComponent,
     TranslatePipe,
     WorkspaceSidebarComponent,
@@ -203,7 +219,8 @@ export class App {
       return '';
     }
     return (
-      this.state.activeWorkspace()?.terminals.find((item) => item.id === terminalId)?.profileId ?? ''
+      this.state.activeWorkspace()?.terminals.find((item) => item.id === terminalId)?.profileId ??
+      ''
     );
   });
   protected readonly agentMenuOpen = signal(false);
@@ -217,6 +234,11 @@ export class App {
       DEFAULT_TERMINAL_FONT_SIZE,
       MIN_TERMINAL_FONT_SIZE,
       MAX_TERMINAL_FONT_SIZE,
+    ),
+  );
+  protected readonly terminalFontName = signal(
+    this.availableTerminalFontName(
+      readStoredString(TERMINAL_FONT_NAME_STORAGE_KEY, DEFAULT_TERMINAL_FONT_NAME),
     ),
   );
   protected readonly workspaceSidebarWidth = signal(
@@ -915,6 +937,27 @@ export class App {
     this.storePreference('termexo.terminalFontSize', next);
   }
 
+  /**
+   * Applies a family chosen from the picker.
+   *
+   * The picker only lists installed families, so the availability check is a guard against a
+   * font uninstalled since the list was cached rather than against a typo.
+   */
+  protected selectTerminalFont(name: string): void {
+    const next = normalizeTerminalFontName(name);
+    if (!isTerminalFontAvailable(next)) {
+      this.showToast(this.i18n.t('terminal.fontUnavailable', { name: next }), 'attention');
+      return;
+    }
+    this.terminalFontName.set(next);
+    this.storePreference(TERMINAL_FONT_NAME_STORAGE_KEY, next);
+  }
+
+  private availableTerminalFontName(value: string): string {
+    const normalized = normalizeTerminalFontName(value);
+    return isTerminalFontAvailable(normalized) ? normalized : DEFAULT_TERMINAL_FONT_NAME;
+  }
+
   protected createWorkspace(value: { name: string; projectPath: string }): void {
     this.state.createWorkspace(value.name, value.projectPath);
     this.mountWorkspace(this.state.activeWorkspace()?.id);
@@ -1127,10 +1170,7 @@ export class App {
         result.updateAvailable ? 'attention' : 'success',
       );
     } catch (error) {
-      this.showToast(
-        `${this.i18n.t('update.failed')}: ${this.errorMessage(error)}`,
-        'attention',
-      );
+      this.showToast(`${this.i18n.t('update.failed')}: ${this.errorMessage(error)}`, 'attention');
     }
   }
 
@@ -1172,9 +1212,7 @@ export class App {
 
   /** Opens the switcher scoped to one terminal, preselecting its agent type. */
   protected openSingleModelSwitch(terminalId: string): void {
-    const terminal = this.state
-      .activeWorkspace()
-      ?.terminals.find((item) => item.id === terminalId);
+    const terminal = this.state.activeWorkspace()?.terminals.find((item) => item.id === terminalId);
     if (!terminal || terminal.agentType === 'shell') {
       return;
     }
@@ -1537,9 +1575,7 @@ export class App {
         );
       }
       if (summary.skipped.length > 0) {
-        parts.push(
-          this.i18n.t('settings.importProxySkipped', { count: summary.skipped.length }),
-        );
+        parts.push(this.i18n.t('settings.importProxySkipped', { count: summary.skipped.length }));
       }
       this.showToast(parts.join(' '), summary.skipped.length > 0 ? 'attention' : 'success');
     } catch (error) {
@@ -1593,7 +1629,7 @@ export class App {
     return error instanceof Error ? error.message : String(error);
   }
 
-  private storePreference(key: string, value: boolean | number): void {
+  private storePreference(key: string, value: boolean | number | string): void {
     try {
       window.localStorage.setItem(key, String(value));
     } catch {

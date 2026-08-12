@@ -1,6 +1,7 @@
 pub mod agent;
 pub mod cli;
 pub mod config;
+pub mod fonts;
 pub mod hooks;
 pub mod network_export;
 pub mod notification;
