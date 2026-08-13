@@ -351,6 +351,27 @@
         (fontChange)="selectTerminalFont($event)"
       />
 
+      <div class="join" role="group" [attr.aria-label]="'prompt.tools' | t">
+        <button
+          type="button"
+          class="btn btn-ghost btn-xs join-item"
+          [title]="'prompt.open' | t"
+          (click)="openPromptLibrary()"
+        >
+          <app-icon name="history" [size]="13" />
+          {{ 'prompt.button' | t }}
+        </button>
+        <button
+          type="button"
+          class="btn btn-ghost btn-xs join-item"
+          [title]="'handoff.open' | t"
+          (click)="openHandoffCenter()"
+        >
+          <app-icon name="merge" [size]="13" />
+          {{ 'handoff.button' | t }}
+        </button>
+      </div>
+
       <div class="layout-controls join" [attr.aria-label]="'terminal.layout' | t">
         <button
           type="button"
@@ -535,6 +556,8 @@
             (terminalStatusChanged)="state.updateTerminalStatus($event.terminalId, $event.status)"
             (terminalRenamed)="state.renameTerminal($event.terminalId, $event.name)"
             (terminalModelSwitchRequested)="openSingleModelSwitch($event)"
+            (terminalInput)="handleTerminalInput($event)"
+            (terminalOutput)="handleTerminalOutput($event)"
           />
         }
       }
@@ -642,6 +665,40 @@
     (resumed)="resumeAgent($event)"
     (cancelled)="sessionCenterOpen.set(false)"
   />
+}
+
+@defer (when promptLibraryOpen()) {
+  @if (promptLibraryOpen()) {
+    <app-prompt-library-dialog
+      [assets]="activePromptAssets()"
+      [canUse]="!!state.activeTerminal() && state.activeTerminal()?.agentType !== 'shell'"
+      (used)="usePromptAsset($event)"
+      (favoriteToggled)="togglePromptFavorite($event)"
+      (pinToggled)="togglePromptPinned($event)"
+      (deleted)="deletePromptAsset($event)"
+      (cancelled)="promptLibraryOpen.set(false)"
+    />
+  }
+}
+
+@defer (when handoffOpen()) {
+  @if (handoffOpen()) {
+    <app-handoff-dialog
+      [records]="activeHandoffRecords()"
+      [preview]="handoffPreview()"
+      [terminals]="activeAgentTerminals()"
+      [activeTerminalId]="handoffSourceTerminalId()"
+      [busy]="handoffs.busy()"
+      [error]="handoffs.error()"
+      (generated)="generateHandoff($event)"
+      (recordSelected)="selectHandoffRecord($event)"
+      (recordDeleted)="deleteHandoffRecord($event)"
+      (imported)="importHandoff()"
+      (exported)="exportHandoff($event)"
+      (sent)="sendHandoff($event)"
+      (cancelled)="handoffOpen.set(false)"
+    />
+  }
 }
 
 @if (settingsOpen()) {

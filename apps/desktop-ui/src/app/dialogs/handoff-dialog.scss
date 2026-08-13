@@ -1,0 +1,363 @@
+.handoff-dialog {
+  width: min(1040px, calc(100vw - 30px));
+  height: min(760px, calc(100vh - 30px));
+  max-width: none;
+  padding: 0;
+  overflow: hidden;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-box);
+  color: var(--text);
+  background: var(--surface-raised);
+  box-shadow: 0 24px 80px rgb(0 0 0 / 55%);
+
+  > header {
+    display: flex;
+    min-height: 65px;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 18px;
+    border-bottom: 1px solid var(--border);
+  }
+}
+
+.dialog-heading {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+
+  > span {
+    display: grid;
+    width: 32px;
+    height: 32px;
+    place-items: center;
+    border-radius: 9px;
+    color: var(--color-primary);
+    background: var(--primary-soft);
+  }
+
+  h2,
+  p {
+    margin: 0;
+  }
+
+  h2 {
+    font-size: 15px;
+  }
+
+  p {
+    margin-top: 3px;
+    color: var(--text-muted);
+    font-size: 10px;
+  }
+}
+
+.handoff-body {
+  display: grid;
+  height: calc(100% - 65px);
+  grid-template-columns: 270px minmax(0, 1fr);
+
+  > aside {
+    min-height: 0;
+    padding: 12px;
+    overflow: auto;
+    border-right: 1px solid var(--border);
+    background: var(--surface-1);
+  }
+
+  > main {
+    display: grid;
+    min-width: 0;
+    min-height: 0;
+    grid-template-rows: auto auto minmax(0, 1fr) auto;
+  }
+}
+
+.build-card,
+.history-card {
+  padding: 11px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface-inset);
+
+  h3 {
+    margin: 0;
+    font-size: 11px;
+  }
+}
+
+.build-card {
+  display: grid;
+  gap: 10px;
+
+  label {
+    display: grid;
+    gap: 5px;
+
+    span {
+      color: var(--text-muted);
+      font-size: 9px;
+    }
+
+    select,
+    input {
+      width: 100%;
+      height: 31px;
+      padding: 0 8px;
+      border: 1px solid var(--border-strong);
+      border-radius: var(--radius-field);
+      color: var(--text);
+      background: var(--surface-2);
+      font-size: 10px;
+    }
+  }
+}
+
+.history-card {
+  margin-top: 10px;
+  padding: 0;
+  overflow: hidden;
+}
+
+.section-title,
+.preview-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.section-title {
+  padding: 10px;
+  border-bottom: 1px solid var(--border);
+
+  button {
+    display: grid;
+    width: 25px;
+    height: 25px;
+    place-items: center;
+    border: 0;
+    border-radius: 6px;
+    color: var(--text-muted);
+    background: transparent;
+
+    &:hover {
+      color: var(--color-primary);
+      background: var(--primary-soft);
+    }
+  }
+}
+
+.record-list {
+  max-height: 330px;
+  overflow: auto;
+
+  > p {
+    padding: 18px 10px;
+    color: var(--text-muted);
+    font-size: 9px;
+    text-align: center;
+  }
+
+  article {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    border-bottom: 1px solid var(--border);
+
+    &.active {
+      background: var(--primary-soft);
+    }
+  }
+}
+
+.record-main {
+  display: grid;
+  min-width: 0;
+  gap: 4px;
+  padding: 9px 10px;
+  border: 0;
+  color: var(--text-secondary);
+  text-align: left;
+  background: transparent;
+
+  strong {
+    overflow: hidden;
+    font-size: 9px;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  time {
+    color: var(--text-muted);
+    font-size: 8px;
+  }
+}
+
+.record-delete {
+  width: 29px;
+  border: 0;
+  color: var(--text-muted);
+  background: transparent;
+
+  &:hover {
+    color: var(--color-error);
+  }
+}
+
+.handoff-error {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 8px 14px;
+  color: var(--color-error);
+  background: color-mix(in oklab, var(--color-error) 12%, transparent);
+  font-size: 10px;
+}
+
+.preview-heading {
+  gap: 12px;
+  padding: 13px 16px;
+  border-bottom: 1px solid var(--border);
+
+  h3,
+  span {
+    display: block;
+    margin: 0;
+  }
+
+  h3 {
+    font-size: 12px;
+  }
+
+  span {
+    margin-top: 4px;
+    color: var(--text-muted);
+    font-size: 9px;
+  }
+}
+
+.preview-actions {
+  display: flex;
+  gap: 5px;
+
+  button {
+    display: flex;
+    height: 28px;
+    align-items: center;
+    gap: 5px;
+    padding: 0 8px;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    color: var(--text-secondary);
+    background: var(--surface-2);
+    font-size: 9px;
+  }
+}
+
+.package-preview {
+  min-height: 0;
+  padding: 14px 16px;
+  overflow: auto;
+
+  section {
+    margin-bottom: 13px;
+    padding: 10px 11px;
+    border: 1px solid var(--border);
+    border-radius: 7px;
+    background: var(--surface-inset);
+  }
+
+  h4,
+  p,
+  ul {
+    margin: 0;
+  }
+
+  h4 {
+    margin-bottom: 7px;
+    color: var(--color-primary);
+    font-size: 9px;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+  }
+
+  p,
+  li {
+    color: var(--text-secondary);
+    font-size: 10px;
+    line-height: 1.55;
+    overflow-wrap: anywhere;
+    white-space: pre-wrap;
+  }
+
+  ul {
+    padding-left: 16px;
+  }
+
+  .mono {
+    font-family: var(--mono);
+  }
+}
+
+.state-columns {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.send-bar {
+  display: flex;
+  align-items: end;
+  gap: 10px;
+  padding: 11px 16px;
+  border-top: 1px solid var(--border);
+  background: var(--surface-1);
+
+  label {
+    display: grid;
+    min-width: 0;
+    flex: 1;
+    gap: 5px;
+
+    span {
+      color: var(--text-muted);
+      font-size: 9px;
+    }
+
+    select {
+      height: 31px;
+      padding: 0 8px;
+      border: 1px solid var(--border-strong);
+      border-radius: var(--radius-field);
+      color: var(--text);
+      background: var(--surface-inset);
+      font-size: 10px;
+    }
+  }
+}
+
+.empty-preview {
+  display: grid;
+  grid-row: 1 / -1;
+  place-content: center;
+  justify-items: center;
+  gap: 8px;
+  color: var(--text-muted);
+
+  strong {
+    color: var(--text-secondary);
+    font-size: 12px;
+  }
+
+  span {
+    font-size: 10px;
+  }
+}
+
+@media (max-width: 780px) {
+  .handoff-body {
+    grid-template-columns: 220px minmax(0, 1fr);
+  }
+
+  .state-columns {
+    grid-template-columns: 1fr;
+  }
+}

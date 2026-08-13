@@ -19,6 +19,7 @@ interface CompositionAnchorPosition {
 /** Keeps a Windows IME composition at the caret where the user started typing. */
 export class TerminalCompositionAnchor {
   private position?: CompositionAnchorPosition;
+  private readonly pendingRestores = new Set<ReturnType<typeof setTimeout>>();
 
   constructor(
     private readonly host: HTMLElement,
@@ -28,10 +29,12 @@ export class TerminalCompositionAnchor {
   /** Gives Windows a valid caret rectangle before xterm starts a composition. */
   prepare(): void {
     const textarea = this.helperTextarea();
-    if (!textarea || textarea.getBoundingClientRect().left >= 0) {
+    if (!textarea) {
       return;
     }
 
+    // xterm leaves this element at the previous composition's caret. Always refresh it here: a
+    // newly focused terminal may have moved its prompt since the textarea was last used.
     const position = this.measureCaret();
     if (position) {
       this.applyToTextarea(textarea, position, true);
@@ -40,6 +43,7 @@ export class TerminalCompositionAnchor {
 
   /** Captures the caret once; terminal output must not move it during this composition. */
   begin(): void {
+    this.cancelPendingRestores();
     this.position = this.measureCaret();
     this.restore();
   }
@@ -64,8 +68,30 @@ export class TerminalCompositionAnchor {
     }
   }
 
+  /**
+   * Restores now and once more after xterm's own deferred positioning pass.
+   *
+   * xterm calls `updateCompositionElements` synchronously on render/update and schedules the same
+   * method with `setTimeout(0)`. Restoring only from our event or render listener therefore looks
+   * correct for one task, then the deferred xterm pass moves the Windows IME back to the live
+   * buffer cursor. Queueing after xterm keeps the focused terminal stable while other panes render.
+   */
+  restoreAfterBrowserUpdate(): void {
+    this.restore();
+    if (!this.position) {
+      return;
+    }
+
+    const timer = setTimeout(() => {
+      this.pendingRestores.delete(timer);
+      this.restore();
+    }, 0);
+    this.pendingRestores.add(timer);
+  }
+
   end(): void {
     this.position = undefined;
+    this.cancelPendingRestores();
   }
 
   private measureCaret(): CompositionAnchorPosition | undefined {
@@ -106,5 +132,12 @@ export class TerminalCompositionAnchor {
     if (initializeWidth) {
       textarea.style.width = position.width;
     }
+  }
+
+  private cancelPendingRestores(): void {
+    for (const timer of this.pendingRestores) {
+      clearTimeout(timer);
+    }
+    this.pendingRestores.clear();
   }
 }

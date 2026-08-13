@@ -11,7 +11,7 @@
 </p>
 
 <p align="center">
-  <img alt="Version 0.4.5" src="https://img.shields.io/badge/version-0.4.5-58c7a0">
+  <img alt="Version 0.5.0" src="https://img.shields.io/badge/version-0.5.0-58c7a0">
   <img alt="Windows" src="https://img.shields.io/badge/platform-Windows-0078D4?logo=windows">
   <img alt="Tauri 2" src="https://img.shields.io/badge/Tauri-2-24C8DB?logo=tauri&logoColor=white">
   <img alt="Angular 22" src="https://img.shields.io/badge/Angular-22-DD0031?logo=angular">
@@ -34,9 +34,9 @@ Run the complete Windows app with one command—no Termexo account or server req
 npx termexo@latest
 ```
 
-> The current version is **V0.4.5**. It adds
-> transactional model switching, local token telemetry, Plan estimates, system-proxy discovery,
-> and failure rollback for CLI upgrades.
+> The current version is **V0.5.0**. It adds recoverable live prompt drafts, searchable prompt
+> history with favorites and pins, token-budgeted handoff documents, Git context extraction,
+> content redaction, and one-click continuation between Claude Code and Codex terminals.
 
 ![Termexo multi-terminal grid workbench](website/assets/termexo-workbench.png)
 
@@ -349,6 +349,15 @@ the main toolbar and keep that choice across restarts.
 - Configure a Plan allowance, reset time, and alert threshold per provider Profile. The inspector shows remaining allowance, reset countdown, one-time threshold warnings, and blocks switching to an exhausted Profile.
 - Provider quota APIs are not universally available. V0.4 labels configured/local figures as estimates and unsupported providers as unavailable instead of presenting estimates as official data.
 
+## V0.5.0
+
+- Capture live Claude Code and Codex input independently per terminal, recover unsent drafts after an abnormal close, and keep submitted prompt history searchable, favoritable, and pinnable.
+- Redact common API keys, bearer tokens, passwords, and secrets before prompt assets or handoff packages are persisted.
+- Generate terminal- or workspace-scoped handoff packages with task state, session summaries, recent prompts, terminal output, Git status/diff, changed files, validation evidence, risks, and next actions.
+- Enforce a configurable Token budget and truncate bulky terminal output or Git diff without breaking UTF-8 content.
+- Export and import readable Markdown or machine-readable JSON handoff documents, then send the handoff directly to another Claude Code or Codex terminal to continue work.
+- Keep Chinese IME composition anchored to the active terminal caret when another terminal is producing output.
+
 ## Why Termexo
 
 AI coding tools usually run in isolated terminals and sessions. As the number of projects
@@ -377,6 +386,8 @@ a local control plane that is observable, recoverable, and extensible.
 | Network and npm profiles | Scope HTTP/HTTPS/SOCKS and npm settings globally or per workspace, test reachability, and inject them at launch    |
 | Account management       | Manage multiple isolated Claude and ChatGPT/Codex logins, defaults, authentication status, and launch-time choice  |
 | Managed CLI lifecycle    | Preview, confirm, install, or upgrade official Claude Code and Codex npm packages, then verify the result          |
+| Prompt assets            | Recover live per-terminal drafts; search, favorite, pin, delete, and reuse submitted prompts                       |
+| Session handoff          | Build redacted, token-budgeted Git/task packages; import/export documents and continue in another Agent            |
 | Local data and secrets   | Store workspace/session/event data in SQLite and API keys in Windows Credential Manager                            |
 | Browser preview          | Preview the complete UI without Rust and exercise layout flows through an interactive simulated terminal           |
 
@@ -414,8 +425,9 @@ a local control plane that is observable, recoverable, and extensible.
 - Claude and Codex JSONL files are read-only. Termexo never edits, renames, or deletes them.
 - Snapshot, Git, and task orchestration surfaces remain hidden until their production
   backends are implemented.
-- Automatic permission approval, cross-agent session migration, and cross-agent batch
-  model-switch transactions are outside the current release.
+- V0.5 migrates a redacted context package, not a provider's private native transcript. Automatic
+  permission approval, native transcript rewriting, and cross-agent batch model-switch transactions
+  remain outside the current release.
 
 See [Termexo.md](./Termexo.md) for the complete product plan and
 [V0.2 architecture](./docs/architecture/v0.2.md) for current technical boundaries.
@@ -516,6 +528,7 @@ flowchart LR
 | Claude/Codex session index            | SQLite                        | Upserted from read-only native session files |
 | Agent events                          | JSONL spool + SQLite          | Deduplicated by `event_key`                  |
 | Model and MCP profiles                | SQLite                        | Plaintext API keys never enter the database  |
+| Prompt assets and handoff packages    | SQLite                        | Common credentials are redacted before save  |
 | API keys                              | Windows Credential Manager    | The frontend can read only `hasCredential`   |
 | Native agent sessions                 | Claude/Codex data directories | Read-only; never modified or deleted         |
 
@@ -530,8 +543,8 @@ identifiers still use a legacy name. This does not affect the Termexo product na
 | V0.1    | Workspace, multi-terminal, PTY, and SQLite foundation                          | Complete    |
 | V0.2    | Claude detection, session resume, hooks, and profiles                          | Complete    |
 | V0.3    | Multi-agent foundation, interaction stabilization, and file-link openers        | Complete    |
-| V0.4    | Model switching, live token telemetry, and Plan quota/reset alerts              | Current     |
-| V0.5    | Prompt assets, handoff documents, session summaries, and cross-agent migration  | Planned     |
+| V0.4    | Model switching, live token telemetry, and Plan quota/reset alerts              | Complete    |
+| V0.5    | Prompt assets, handoff documents, session summaries, and cross-agent migration  | Current     |
 | V0.6    | Multi-agent collaboration, orchestration, and domestic/international channels   | Planned     |
 | V0.7    | Workspace sharing, remote computers, and mobile access                         | Planned     |
 | V1.0    | Stable release, security hardening, and complete recovery UX                   | Planned     |

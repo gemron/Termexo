@@ -1366,8 +1366,8 @@ GitHub Issue 是执行入口，版本章节定义能力边界和验收标准。
 | P1 | V0.4 模型控制 | Claude 支持单窗口切换和多终端批量切换，展示兼容性、执行进度、失败回滚 | [#11](https://github.com/gemron/Termexo/issues/11) | 复用现有账号/Profile 和会话恢复能力 |
 | P2 | V0.4 用量可观测 | 建立统一 Token 用量事件、实时曲线、消耗速度、累计总量和分终端统计 | [#4](https://github.com/gemron/Termexo/issues/4) | 为 Plan 估算、告警和切换预检提供数据底座 |
 | P3 | V0.4 Plan 额度 | 检查账号 Plan 总量、余量与重置时间；额度不足、恢复可用和即将重置时提示 | [#12](https://github.com/gemron/Termexo/issues/12) | 优先使用官方数据，缺失时复用 #4 的本地统计并标记为估算 |
-| P4 | V0.5 提示词资产 | 实时保存输入草稿，提供历史检索、收藏和置顶 | [#8](https://github.com/gemron/Termexo/issues/8) | 复用本地数据库、搜索和敏感信息保护策略 |
-| P5 | V0.5 会话接力 | 一键批量操作会话；生成、读取交接文档，并让新 Agent 按交接内容继续工作 | [#7](https://github.com/gemron/Termexo/issues/7) | 依赖会话摘要、任务状态、Git Diff 和迁移包 |
+| P4 | V0.5 提示词资产（已完成） | 实时保存输入草稿，提供历史检索、收藏和置顶 | [#8](https://github.com/gemron/Termexo/issues/8) | 复用本地数据库、搜索和敏感信息保护策略 |
+| P5 | V0.5 会话接力（已完成） | 一键批量操作会话；生成、读取交接文档，并让新 Agent 按交接内容继续工作 | [#7](https://github.com/gemron/Termexo/issues/7) | 依赖会话摘要、任务状态、Git Diff 和迁移包 |
 | P6 | V0.6 通知集成 | 把统一事件接入企业微信、钉钉、飞书及海外通知应用 | [#5](https://github.com/gemron/Termexo/issues/5) | 依赖 Agent 状态、Plan 告警和可扩展通知事件模型 |
 
 并行原则：P0 可独立完成；P1 与 P2 可并行；P3 在 P2 的统一数据模型确定后接入；P4 可与
@@ -1533,6 +1533,9 @@ P1～P3 并行；P5 在会话迁移包稳定后完成；P6 最后接渠道 Adapt
 ---
 
 ## V0.5：会话迁移版本
+
+状态：已完成（V0.5.0）。迁移使用 Termexo 自有的脱敏上下文包，不改写 Claude Code 或
+Codex 的原生会话文件。
 
 增加：
 
