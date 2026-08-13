@@ -11,7 +11,7 @@
 </p>
 
 <p align="center">
-  <img alt="Version 0.4.5" src="https://img.shields.io/badge/version-0.4.5-58c7a0">
+  <img alt="Version 0.5.0" src="https://img.shields.io/badge/version-0.5.0-58c7a0">
   <img alt="Windows" src="https://img.shields.io/badge/platform-Windows-0078D4?logo=windows">
   <img alt="Tauri 2" src="https://img.shields.io/badge/Tauri-2-24C8DB?logo=tauri&logoColor=white">
   <img alt="Angular 22" src="https://img.shields.io/badge/Angular-22-DD0031?logo=angular">
@@ -33,8 +33,9 @@ Termexo 把 Claude Code、Codex 和围绕它们运行的终端收进一个可恢
 npx termexo@latest
 ```
 
-> 当前版本为 **V0.4.5**，新增模型切换事务、
-> 本地 Token 可观测、Plan 估算、系统代理发现和 CLI 升级失败回滚。
+> 当前版本为 **V0.5.0**，新增可恢复的实时提示词草稿、可搜索/收藏/置顶的提示词历史、
+> 带 Token 预算的交接文档、Git 上下文提取、内容脱敏，以及 Claude Code 与 Codex
+> 终端之间的一键接力。
 
 ![Termexo 多终端网格工作台](website/assets/termexo-workbench.png)
 
@@ -306,6 +307,15 @@ SQLite，密钥保存在 Windows Credential Manager，Claude/Codex 历史会话�
 - 每个供应商 Profile 可配置 Plan 总额度、重置时间和告警阈值；侧栏展示余量与倒计时，阈值只提示一次，额度耗尽时阻止切换。
 - 并非所有供应商提供配额 API；V0.4 将配置值和本地统计明确标为“估算”，无法查询时显示“不可用”，不会伪装成官方数据。
 
+## V0.5.0
+
+- 按终端独立捕获 Claude Code 与 Codex 实时输入，异常关闭后恢复未发送草稿，并支持历史搜索、收藏、置顶、删除和复用。
+- 提示词资产或交接包落库前，自动清除常见 API Key、Bearer Token、密码和 Secret。
+- 按当前终端或整个 Workspace 生成交接包，包含任务状态、会话摘要、最近提示词、终端输出、Git 状态/Diff、变更文件、验证、风险和下一步。
+- 支持可配置 Token 预算，自动截断大段终端输出和 Git Diff，同时保证 UTF-8 内容完整。
+- 导入/导出可读 Markdown 或机器可读 JSON 交接文档，并把交接内容直接发送到另一个 Claude Code 或 Codex 终端继续工作。
+- 多终端同时输出时，将中文输入法候选框稳定锚定在当前终端光标处。
+
 ## 为什么做 Termexo
 
 AI 编程工具通常以独立终端或独立会话运行。项目一多，开发者需要自己记住：
@@ -333,6 +343,8 @@ Termexo 以 **Workspace** 为组织单位，把这些信息集中到一个可观
 | 网络与 npm Profile | 按全局/Workspace 管理 HTTP/HTTPS/SOCKS 与 npm 配置，测试连通性并在启动时注入      |
 | 多账号管理         | 管理多个隔离 Claude 与 ChatGPT/Codex 登录、默认账号、认证状态和启动时选择         |
 | CLI 生命周期管理   | 预览、确认、安装或升级官方 Claude Code/Codex npm 包，并在完成后验证结果           |
+| 提示词资产         | 按终端恢复实时草稿；搜索、收藏、置顶、删除和复用已提交提示词                     |
+| 会话交接           | 生成带脱敏和 Token 预算的 Git/任务包；导入导出文档并交给另一个 Agent 继续         |
 | 本地数据与密钥     | Workspace、会话索引和事件保存到 SQLite；API Key 保存到 Windows Credential Manager |
 | 浏览器预览         | 无需 Rust 即可预览完整 UI，并使用可交互的模拟终端验证布局与基础流程               |
 
@@ -361,7 +373,8 @@ Termexo 以 **Workspace** 为组织单位，把这些信息集中到一个可观
   历史 Claude 会话需要从会话中心显式恢复。
 - Claude 与 Codex 原始 JSONL 均只读，Termexo 不修改、重命名或删除这些文件。
 - 快照、Git 与任务编排入口会保持隐藏，直到对应生产后端完成。
-- 当前版本不包含自动权限批准、跨 Agent 会话迁移或跨 Agent 批量模型切换事务。
+- V0.5 迁移的是脱敏后的上下文包，不会改写供应商私有的原生会话记录。自动权限批准、
+  原生 transcript 改写和跨 Agent 批量模型切换事务仍不在当前版本范围内。
 
 完整产品规划见 [Termexo.md](./Termexo.md)，当前架构边界见
 [V0.2 架构说明](./docs/architecture/v0.2.md)。
@@ -462,6 +475,7 @@ flowchart LR
 | Claude/Codex 会话索引 | SQLite                     | 从 Agent 原生会话文件只读解析后 Upsert |
 | Agent 事件            | JSONL spool + SQLite       | 按 `event_key` 去重                    |
 | 模型与 MCP Profile    | SQLite                     | API Key 明文不进入数据库               |
+| 提示词资产与交接包    | SQLite                     | 保存前自动清除常见凭据                 |
 | API Key               | Windows Credential Manager | 前端只能读取 `hasCredential`           |
 | Agent 原始会话        | Claude/Codex 数据目录      | 只读，不修改、重命名或删除             |
 
@@ -475,8 +489,8 @@ flowchart LR
 | V0.1 | Workspace、多终端、PTY、SQLite 基础             | 已完成   |
 | V0.2 | Claude Code 检测、会话恢复、Hooks、Profile      | 已完成   |
 | V0.3 | 多 Agent 基础、交互稳定化与文件链接打开方式     | 已完成   |
-| V0.4 | 模型切换、Token 实时统计与 Plan 额度/恢复提示   | 当前版本 |
-| V0.5 | 提示词资产、会话摘要、交接文档与跨 Agent 迁移   | 规划中   |
+| V0.4 | 模型切换、Token 实时统计与 Plan 额度/恢复提示   | 已完成   |
+| V0.5 | 提示词资产、会话摘要、交接文档与跨 Agent 迁移   | 当前版本 |
 | V0.6 | 多 Agent 协作、任务编排与国内外通知渠道         | 规划中   |
 | V0.7 | Workspace 共享、远程电脑与手机访问              | 规划中   |
 | V1.0 | 稳定发布、安全加固与完整恢复体验                | 规划中   |

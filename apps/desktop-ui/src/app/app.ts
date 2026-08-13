@@ -33,8 +33,11 @@ import {
   normalizeTerminalGridDimension,
   normalizeWorkspaceThemeColor,
   TerminalStatus,
+  TerminalSession,
   Workspace,
 } from './core/models/workspace.models';
+import type { HandoffPackage, HandoffRecord } from './core/models/handoff';
+import type { PromptAsset } from './core/models/prompt-assets';
 import { I18nService } from './core/i18n/i18n.service';
 import { TranslatePipe } from './core/i18n/translate.pipe';
 import {
@@ -50,6 +53,8 @@ import { AgentService } from './core/services/agent.service';
 import { AppStateService } from './core/services/app-state.service';
 import { DirectoryPickerService } from './core/services/directory-picker.service';
 import { DesktopNotificationService } from './core/services/desktop-notification.service';
+import { HandoffService } from './core/services/handoff.service';
+import { PromptAssetService } from './core/services/prompt-asset.service';
 import { UpdateCheck, UpdateService } from './core/services/update.service';
 import {
   TerminalExitEvent,
@@ -70,6 +75,12 @@ import {
 } from './dialogs/edit-workspace-dialog';
 import { MergeWorkspaceDialogComponent } from './dialogs/merge-workspace-dialog';
 import { ModelSwitchDialogComponent, ModelSwitchValue } from './dialogs/model-switch-dialog';
+import {
+  HandoffDialogComponent,
+  type HandoffGenerateRequest,
+  type HandoffSendRequest,
+} from './dialogs/handoff-dialog';
+import { PromptLibraryDialogComponent } from './dialogs/prompt-library-dialog';
 import { ResumeSessionValue, SessionCenterDialogComponent } from './dialogs/session-center-dialog';
 import { InspectorPanelComponent } from './inspector/inspector-panel';
 import { IconComponent } from './shared/icon/icon';
@@ -141,11 +152,13 @@ function readStoredString(key: string, fallback: string): string {
     CreateWorkspaceDialogComponent,
     DeleteWorkspaceDialogComponent,
     EditWorkspaceDialogComponent,
+    HandoffDialogComponent,
     IconComponent,
     InspectorPanelComponent,
     LanguageSelectorComponent,
     MergeWorkspaceDialogComponent,
     ModelSwitchDialogComponent,
+    PromptLibraryDialogComponent,
     SessionCenterDialogComponent,
     TerminalFontPickerComponent,
     TerminalWorkbenchComponent,
@@ -179,6 +192,8 @@ export class App {
   private readonly directoryPicker = inject(DirectoryPickerService);
   private readonly desktopNotifications = inject(DesktopNotificationService);
   private readonly terminalGateway = inject(TerminalGatewayService);
+  protected readonly promptAssets = inject(PromptAssetService);
+  protected readonly handoffs = inject(HandoffService);
   private readonly handledEventKeys = new Set<string>();
   private readonly handledPlanAlertKeys = new Set<string>();
   private readonly eventStatusCutoff = Date.now();
@@ -194,6 +209,9 @@ export class App {
   protected readonly claudeLaunchOpen = signal(false);
   protected readonly codexLaunchOpen = signal(false);
   protected readonly sessionCenterOpen = signal(false);
+  protected readonly promptLibraryOpen = signal(false);
+  protected readonly handoffOpen = signal(false);
+  protected readonly handoffPreview = signal<HandoffPackage | null>(null);
   protected readonly settingsOpen = signal(false);
   protected readonly settingsInitialTab = signal<SettingsTab>('diagnostics');
   protected readonly settingsInitialModelProfileId = signal('');
@@ -280,6 +298,27 @@ export class App {
   protected readonly cliOperationPlan = signal<CliOperationPlan | null>(null);
   protected readonly cliOperationResult = signal<CliOperationResult | null>(null);
   protected readonly activeTerminalId = computed(() => this.state.activeTerminal()?.id ?? null);
+  protected readonly activePromptAssets = computed(() =>
+    this.promptAssets.forWorkspace(this.state.activeWorkspace()?.id ?? ''),
+  );
+  protected readonly activeHandoffRecords = computed(() =>
+    this.handoffs.forWorkspace(this.state.activeWorkspace()?.id ?? ''),
+  );
+  protected readonly activeAgentTerminals = computed(
+    () =>
+      this.state
+        .activeWorkspace()
+        ?.terminals.filter(
+          (terminal): terminal is TerminalSession & { agentType: 'claude' | 'codex' } =>
+            terminal.agentType !== 'shell',
+        ) ?? [],
+  );
+  protected readonly handoffSourceTerminalId = computed(() => {
+    const active = this.state.activeTerminal();
+    return active?.agentType !== 'shell'
+      ? (active?.id ?? null)
+      : (this.activeAgentTerminals()[0]?.id ?? null);
+  });
   protected readonly mountedWorkspaces = computed(() => {
     const mountedIds = new Set(this.mountedWorkspaceIds());
     return this.state.workspaces().filter((workspace) => mountedIds.has(workspace.id));
@@ -739,6 +778,158 @@ export class App {
         .getElementById(`terminal-tab-${terminalId}`)
         ?.scrollIntoView({ block: 'nearest', inline: 'nearest' });
     });
+  }
+
+  protected handleTerminalInput(event: { terminalId: string; data: string }): void {
+    const located = this.findTerminal(event.terminalId);
+    if (located) {
+      this.promptAssets.captureInput(located.workspace, located.terminal, event.data);
+    }
+  }
+
+  protected handleTerminalOutput(event: { terminalId: string; data: string }): void {
+    this.handoffs.captureOutput(event.terminalId, event.data);
+  }
+
+  protected openPromptLibrary(): void {
+    this.promptLibraryOpen.set(true);
+  }
+
+  protected async usePromptAsset(asset: PromptAsset): Promise<void> {
+    const workspace = this.state.activeWorkspace();
+    const terminal = this.state.activeTerminal();
+    if (!workspace || !terminal || terminal.agentType === 'shell') {
+      this.showToast(this.i18n.t('prompt.noAgent'), 'attention');
+      return;
+    }
+    try {
+      await this.promptAssets.setDraft(workspace, terminal, asset.content);
+      await this.terminalGateway.write(terminal, this.terminalPaste(asset.content, false));
+      this.promptLibraryOpen.set(false);
+      this.showToast(this.i18n.t('prompt.restored', { name: terminal.name }));
+    } catch (error) {
+      this.showToast(this.errorMessage(error), 'attention');
+    }
+  }
+
+  protected async togglePromptFavorite(asset: PromptAsset): Promise<void> {
+    try {
+      await this.promptAssets.toggleFavorite(asset);
+    } catch (error) {
+      this.showToast(this.errorMessage(error), 'attention');
+    }
+  }
+
+  protected async togglePromptPinned(asset: PromptAsset): Promise<void> {
+    try {
+      await this.promptAssets.togglePinned(asset);
+    } catch (error) {
+      this.showToast(this.errorMessage(error), 'attention');
+    }
+  }
+
+  protected async deletePromptAsset(asset: PromptAsset): Promise<void> {
+    try {
+      await this.promptAssets.delete(asset.id);
+    } catch (error) {
+      this.showToast(this.errorMessage(error), 'attention');
+    }
+  }
+
+  protected openHandoffCenter(): void {
+    const latest = this.activeHandoffRecords()[0];
+    if (!this.handoffPreview() && latest) {
+      this.selectHandoffRecord(latest);
+    }
+    this.handoffOpen.set(true);
+  }
+
+  protected async generateHandoff(request: HandoffGenerateRequest): Promise<void> {
+    const workspace = this.state.activeWorkspace();
+    const sourceTerminalId = this.handoffSourceTerminalId() ?? undefined;
+    if (!workspace || !sourceTerminalId) {
+      this.showToast(this.i18n.t('handoff.noAgent'), 'attention');
+      return;
+    }
+    try {
+      const handoff = await this.handoffs.generate(
+        workspace,
+        request.scope,
+        sourceTerminalId,
+        request.tokenBudget,
+        this.activePromptAssets(),
+        this.agents.sessions(),
+      );
+      this.handoffPreview.set(handoff);
+      this.showToast(this.i18n.t('handoff.generated'));
+    } catch (error) {
+      this.showToast(this.errorMessage(error), 'attention');
+    }
+  }
+
+  protected async selectHandoffRecord(record: HandoffRecord): Promise<void> {
+    try {
+      this.handoffPreview.set(await this.handoffs.packageFromRecord(record));
+    } catch (error) {
+      this.showToast(this.errorMessage(error), 'attention');
+    }
+  }
+
+  protected async deleteHandoffRecord(record: HandoffRecord): Promise<void> {
+    try {
+      await this.handoffs.delete(record.id);
+      if (this.handoffPreview()?.id === record.id) {
+        this.handoffPreview.set(null);
+      }
+    } catch (error) {
+      this.showToast(this.errorMessage(error), 'attention');
+    }
+  }
+
+  protected async importHandoff(): Promise<void> {
+    try {
+      const handoff = await this.handoffs.importPackage();
+      if (handoff) {
+        this.handoffPreview.set(handoff);
+        this.showToast(this.i18n.t('handoff.imported'));
+      }
+    } catch (error) {
+      this.showToast(this.errorMessage(error), 'attention');
+    }
+  }
+
+  protected async exportHandoff(event: {
+    handoff: HandoffPackage;
+    format: 'md' | 'json';
+  }): Promise<void> {
+    try {
+      if (await this.handoffs.exportPackage(event.handoff, event.format)) {
+        this.showToast(this.i18n.t('handoff.exported'));
+      }
+    } catch (error) {
+      this.showToast(this.errorMessage(error), 'attention');
+    }
+  }
+
+  protected async sendHandoff(request: HandoffSendRequest): Promise<void> {
+    const workspace = this.state.activeWorkspace();
+    const terminal = workspace?.terminals.find((candidate) => candidate.id === request.terminalId);
+    if (!workspace || !terminal || terminal.agentType === 'shell') {
+      this.showToast(this.i18n.t('handoff.targetMissing'), 'attention');
+      return;
+    }
+    try {
+      const { continuationPrompt } = await import('./core/models/handoff');
+      const prompt = continuationPrompt(request.handoff);
+      await this.promptAssets.setDraft(workspace, terminal, prompt);
+      this.promptAssets.captureInput(workspace, terminal, '\r');
+      await this.terminalGateway.write(terminal, this.terminalPaste(prompt, true));
+      this.selectTerminal(terminal.id);
+      this.handoffOpen.set(false);
+      this.showToast(this.i18n.t('handoff.sent', { name: terminal.name }));
+    } catch (error) {
+      this.showToast(this.errorMessage(error), 'attention');
+    }
   }
 
   protected selectTerminalFromPicker(event: Event): void {
@@ -1629,6 +1820,25 @@ export class App {
     return error instanceof Error ? error.message : String(error);
   }
 
+  private findTerminal(
+    terminalId: string,
+  ): { workspace: Workspace; terminal: TerminalSession } | null {
+    for (const workspace of this.state.workspaces()) {
+      const terminal = workspace.terminals.find((candidate) => candidate.id === terminalId);
+      if (terminal) {
+        return { workspace, terminal };
+      }
+    }
+    return null;
+  }
+
+  private terminalPaste(content: string, submit: boolean): string {
+    const safeContent = content
+      .replace(/\r\n?/g, '\n')
+      .replace(/[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]/g, '');
+    return `\u0015\u001b[200~${safeContent}\u001b[201~${submit ? '\r' : ''}`;
+  }
+
   private storePreference(key: string, value: boolean | number | string): void {
     try {
       window.localStorage.setItem(key, String(value));
@@ -1664,10 +1874,20 @@ export class App {
 
   private async initialize(): Promise<void> {
     await this.state.initialize();
-    await this.agents.initialize();
+    await Promise.all([
+      this.agents.initialize(),
+      this.promptAssets.initialize(),
+      this.handoffs.initialize(),
+    ]);
     await this.refreshRestoredClaudeLaunches();
     await this.refreshRestoredCodexLaunches();
     this.mountWorkspace(this.state.activeWorkspace()?.id);
+    const recoveredDraft = this.state.activeTerminal()
+      ? this.promptAssets.draftForTerminal(this.state.activeTerminal()!.id)
+      : undefined;
+    if (recoveredDraft) {
+      this.showToast(this.i18n.t('prompt.recovered'));
+    }
     void this.notifyWhenUpdateAvailable();
   }
 

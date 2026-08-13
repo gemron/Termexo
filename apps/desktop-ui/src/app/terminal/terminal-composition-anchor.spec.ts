@@ -8,6 +8,7 @@ describe('TerminalCompositionAnchor', () => {
   let anchor: TerminalCompositionAnchor;
 
   beforeEach(() => {
+    vi.useFakeTimers();
     host = document.createElement('div');
     const screen = document.createElement('div');
     screen.className = 'xterm-screen';
@@ -25,6 +26,11 @@ describe('TerminalCompositionAnchor', () => {
     anchor = new TerminalCompositionAnchor(host, () => caret);
   });
 
+  afterEach(() => {
+    anchor.end();
+    vi.useRealTimers();
+  });
+
   it('moves an off-screen helper textarea to the current caret before composition starts', () => {
     textarea.getBoundingClientRect = () => ({ left: -10_000 }) as DOMRect;
 
@@ -34,6 +40,17 @@ describe('TerminalCompositionAnchor', () => {
     expect(textarea.style.top).toBe('160px');
     expect(textarea.style.width).toBe('10px');
     expect(textarea.style.height).toBe('20px');
+  });
+
+  it('refreshes an on-screen textarea left at an earlier prompt position', () => {
+    textarea.getBoundingClientRect = () => ({ left: 450 }) as DOMRect;
+    textarea.style.left = '450px';
+    textarea.style.top = '400px';
+
+    anchor.prepare();
+
+    expect(textarea.style.left).toBe('120px');
+    expect(textarea.style.top).toBe('160px');
   });
 
   it('keeps the textarea and composition view at the starting caret while output moves the cursor', () => {
@@ -50,6 +67,37 @@ describe('TerminalCompositionAnchor', () => {
     expect(textarea.style.top).toBe('160px');
     expect(compositionView.style.left).toBe('120px');
     expect(compositionView.style.top).toBe('160px');
+  });
+
+  it('wins after xterm repeats its positioning in a zero-delay timer', () => {
+    anchor.begin();
+    caret = { ...caret, cursorX: 45, cursorY: 20 };
+
+    // xterm schedules this before the host's composition/render listener runs.
+    setTimeout(() => {
+      textarea.style.left = '450px';
+      textarea.style.top = '400px';
+      compositionView.style.left = '450px';
+      compositionView.style.top = '400px';
+    }, 0);
+    anchor.restoreAfterBrowserUpdate();
+    vi.runAllTimers();
+
+    expect(textarea.style.left).toBe('120px');
+    expect(textarea.style.top).toBe('160px');
+    expect(compositionView.style.left).toBe('120px');
+    expect(compositionView.style.top).toBe('160px');
+  });
+
+  it('does not restore a delayed position after composition leaves the terminal', () => {
+    anchor.begin();
+    anchor.restoreAfterBrowserUpdate();
+    anchor.end();
+    textarea.style.left = '450px';
+
+    vi.runAllTimers();
+
+    expect(textarea.style.left).toBe('450px');
   });
 
   it('stops restoring the captured position when the composition ends', () => {

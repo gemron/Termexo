@@ -18,9 +18,9 @@ use std::fs;
 use tauri::Manager;
 
 use crate::cli::CliOperationManager;
+use crate::commands::quota::QuotaCache;
 use crate::config::{CredentialStore, LaunchEnvironmentStore};
 use crate::database::WorkspaceDatabase;
-use crate::commands::quota::QuotaCache;
 use crate::hooks::HookEventStore;
 use crate::pty::PtyManager;
 
@@ -90,6 +90,15 @@ pub fn run() {
             commands::agent::prepare_claude_launch,
             commands::agent::prepare_codex_launch,
             commands::agent::prepare_account_login,
+            commands::assets::list_prompt_assets,
+            commands::assets::save_prompt_asset,
+            commands::assets::delete_prompt_asset,
+            commands::assets::list_handoff_packages,
+            commands::assets::save_handoff_package,
+            commands::assets::delete_handoff_package,
+            commands::assets::collect_git_context,
+            commands::assets::write_handoff_document,
+            commands::assets::read_handoff_document,
             commands::cli::preview_cli_operation,
             commands::cli::execute_cli_operation,
             commands::config::list_model_profiles,

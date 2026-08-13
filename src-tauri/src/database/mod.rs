@@ -18,6 +18,7 @@ const API_PROTOCOL_MIGRATION: &str = include_str!("../../migrations/0005_api_pro
 const PROVIDER_PROFILE_MIGRATION: &str =
     include_str!("../../migrations/0006_provider_profiles.sql");
 const PROVIDER_PLAN_MIGRATION: &str = include_str!("../../migrations/0007_provider_plans.sql");
+const V05_ASSETS_MIGRATION: &str = include_str!("../../migrations/0008_v05_assets.sql");
 const LEGACY_MINIMAX_M3_MODEL: &str = "MiniMax-M3[1m]";
 const MINIMAX_M3_MODEL: &str = "MiniMax-M3";
 
@@ -79,6 +80,76 @@ pub struct TerminalSession {
     pub account_profile_id: Option<String>,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct PromptAsset {
+    pub id: String,
+    pub workspace_id: String,
+    pub terminal_id: Option<String>,
+    pub terminal_name: String,
+    pub agent_type: String,
+    pub kind: String,
+    pub content: String,
+    #[serde(default)]
+    pub redacted: bool,
+    #[serde(default)]
+    pub favorite: bool,
+    #[serde(default)]
+    pub pinned: bool,
+    pub created_at: i64,
+    pub updated_at: i64,
+}
+
+impl PromptAsset {
+    pub fn validate(&self) -> Result<(), String> {
+        if self.id.trim().is_empty() || self.workspace_id.trim().is_empty() {
+            return Err("Prompt asset is missing an ID or workspace.".into());
+        }
+        if !matches!(self.kind.as_str(), "draft" | "history") {
+            return Err("Prompt asset kind is invalid.".into());
+        }
+        if self.content.len() > 256 * 1024 {
+            return Err("Prompt asset exceeds the 256 KiB safety limit.".into());
+        }
+        if self.kind == "draft" && self.terminal_id.as_deref().unwrap_or("").is_empty() {
+            return Err("A draft must be associated with a terminal.".into());
+        }
+        Ok(())
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct HandoffRecord {
+    pub id: String,
+    pub workspace_id: String,
+    pub source_terminal_id: Option<String>,
+    pub title: String,
+    pub package_json: String,
+    pub created_at: i64,
+    pub updated_at: i64,
+}
+
+impl HandoffRecord {
+    pub fn validate(&self) -> Result<(), String> {
+        if self.id.trim().is_empty() || self.workspace_id.trim().is_empty() {
+            return Err("Handoff package is missing an ID or workspace.".into());
+        }
+        if self.title.trim().is_empty() {
+            return Err("Handoff package title cannot be empty.".into());
+        }
+        if self.package_json.len() > 2 * 1024 * 1024 {
+            return Err("Handoff package exceeds the 2 MB safety limit.".into());
+        }
+        let parsed: serde_json::Value = serde_json::from_str(&self.package_json)
+            .map_err(|error| format!("Handoff package JSON is invalid: {error}"))?;
+        if !parsed.is_object() {
+            return Err("Handoff package must be a JSON object.".into());
+        }
+        Ok(())
+    }
+}
+
 pub struct WorkspaceDatabase {
     connection: Mutex<Connection>,
 }
@@ -92,6 +163,7 @@ impl WorkspaceDatabase {
         connection.execute_batch(ACCOUNT_MIGRATION)?;
         run_api_protocol_migration(&connection)?;
         run_provider_profile_migration(&connection)?;
+        connection.execute_batch(V05_ASSETS_MIGRATION)?;
         split_legacy_single_protocol_profiles(&connection)?;
         migrate_legacy_minimax_m3_model(&connection)?;
         ensure_default_profile(&connection)?;
@@ -159,11 +231,172 @@ impl WorkspaceDatabase {
     }
 
     pub fn delete_workspace(&self, workspace_id: &str) -> Result<(), DatabaseError> {
+        let mut connection = self
+            .connection
+            .lock()
+            .map_err(|_| DatabaseError::LockPoisoned)?;
+        let transaction = connection.transaction()?;
+        transaction.execute(
+            "DELETE FROM prompt_assets WHERE workspace_id = ?1",
+            [workspace_id],
+        )?;
+        transaction.execute(
+            "DELETE FROM handoff_packages WHERE workspace_id = ?1",
+            [workspace_id],
+        )?;
+        transaction.execute("DELETE FROM workspaces WHERE id = ?1", [workspace_id])?;
+        transaction.commit()?;
+        Ok(())
+    }
+
+    pub fn list_prompt_assets(
+        &self,
+        workspace_id: Option<&str>,
+    ) -> Result<Vec<PromptAsset>, DatabaseError> {
         let connection = self
             .connection
             .lock()
             .map_err(|_| DatabaseError::LockPoisoned)?;
-        connection.execute("DELETE FROM workspaces WHERE id = ?1", [workspace_id])?;
+        let mut statement = connection.prepare(
+            "SELECT id, workspace_id, terminal_id, terminal_name, agent_type, kind, content,
+                    redacted, favorite, pinned, created_at, updated_at
+             FROM prompt_assets
+             WHERE (?1 IS NULL OR workspace_id = ?1)
+             ORDER BY pinned DESC, favorite DESC, updated_at DESC
+             LIMIT 1000",
+        )?;
+        let rows = statement.query_map([workspace_id], |row| {
+            Ok(PromptAsset {
+                id: row.get(0)?,
+                workspace_id: row.get(1)?,
+                terminal_id: row.get(2)?,
+                terminal_name: row.get(3)?,
+                agent_type: row.get(4)?,
+                kind: row.get(5)?,
+                content: row.get(6)?,
+                redacted: row.get(7)?,
+                favorite: row.get(8)?,
+                pinned: row.get(9)?,
+                created_at: row.get(10)?,
+                updated_at: row.get(11)?,
+            })
+        })?;
+        rows.collect::<Result<Vec<_>, _>>()
+            .map_err(DatabaseError::from)
+    }
+
+    pub fn save_prompt_asset(&self, asset: &PromptAsset) -> Result<(), DatabaseError> {
+        let connection = self
+            .connection
+            .lock()
+            .map_err(|_| DatabaseError::LockPoisoned)?;
+        connection.execute(
+            "INSERT INTO prompt_assets (
+                 id, workspace_id, terminal_id, terminal_name, agent_type, kind, content,
+                 redacted, favorite, pinned, created_at, updated_at
+             ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12)
+             ON CONFLICT(id) DO UPDATE SET
+                 workspace_id = excluded.workspace_id,
+                 terminal_id = excluded.terminal_id,
+                 terminal_name = excluded.terminal_name,
+                 agent_type = excluded.agent_type,
+                 kind = excluded.kind,
+                 content = excluded.content,
+                 redacted = excluded.redacted,
+                 favorite = excluded.favorite,
+                 pinned = excluded.pinned,
+                 updated_at = excluded.updated_at",
+            params![
+                asset.id,
+                asset.workspace_id,
+                asset.terminal_id,
+                asset.terminal_name,
+                asset.agent_type,
+                asset.kind,
+                asset.content,
+                asset.redacted,
+                asset.favorite,
+                asset.pinned,
+                asset.created_at,
+                asset.updated_at,
+            ],
+        )?;
+        Ok(())
+    }
+
+    pub fn delete_prompt_asset(&self, asset_id: &str) -> Result<(), DatabaseError> {
+        let connection = self
+            .connection
+            .lock()
+            .map_err(|_| DatabaseError::LockPoisoned)?;
+        connection.execute("DELETE FROM prompt_assets WHERE id = ?1", [asset_id])?;
+        Ok(())
+    }
+
+    pub fn list_handoff_packages(
+        &self,
+        workspace_id: Option<&str>,
+    ) -> Result<Vec<HandoffRecord>, DatabaseError> {
+        let connection = self
+            .connection
+            .lock()
+            .map_err(|_| DatabaseError::LockPoisoned)?;
+        let mut statement = connection.prepare(
+            "SELECT id, workspace_id, source_terminal_id, title, package_json, created_at, updated_at
+             FROM handoff_packages
+             WHERE (?1 IS NULL OR workspace_id = ?1)
+             ORDER BY updated_at DESC
+             LIMIT 250",
+        )?;
+        let rows = statement.query_map([workspace_id], |row| {
+            Ok(HandoffRecord {
+                id: row.get(0)?,
+                workspace_id: row.get(1)?,
+                source_terminal_id: row.get(2)?,
+                title: row.get(3)?,
+                package_json: row.get(4)?,
+                created_at: row.get(5)?,
+                updated_at: row.get(6)?,
+            })
+        })?;
+        rows.collect::<Result<Vec<_>, _>>()
+            .map_err(DatabaseError::from)
+    }
+
+    pub fn save_handoff_package(&self, record: &HandoffRecord) -> Result<(), DatabaseError> {
+        let connection = self
+            .connection
+            .lock()
+            .map_err(|_| DatabaseError::LockPoisoned)?;
+        connection.execute(
+            "INSERT INTO handoff_packages (
+                 id, workspace_id, source_terminal_id, title, package_json, created_at, updated_at
+             ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)
+             ON CONFLICT(id) DO UPDATE SET
+                 workspace_id = excluded.workspace_id,
+                 source_terminal_id = excluded.source_terminal_id,
+                 title = excluded.title,
+                 package_json = excluded.package_json,
+                 updated_at = excluded.updated_at",
+            params![
+                record.id,
+                record.workspace_id,
+                record.source_terminal_id,
+                record.title,
+                record.package_json,
+                record.created_at,
+                record.updated_at,
+            ],
+        )?;
+        Ok(())
+    }
+
+    pub fn delete_handoff_package(&self, package_id: &str) -> Result<(), DatabaseError> {
+        let connection = self
+            .connection
+            .lock()
+            .map_err(|_| DatabaseError::LockPoisoned)?;
+        connection.execute("DELETE FROM handoff_packages WHERE id = ?1", [package_id])?;
         Ok(())
     }
 
@@ -932,6 +1165,116 @@ fn split_legacy_single_protocol_profiles(connection: &Connection) -> Result<(), 
 mod tests {
     use super::*;
 
+    fn asset_database() -> WorkspaceDatabase {
+        let database = WorkspaceDatabase {
+            connection: Mutex::new(Connection::open_in_memory().unwrap()),
+        };
+        database
+            .connection
+            .lock()
+            .unwrap()
+            .execute_batch(V05_ASSETS_MIGRATION)
+            .unwrap();
+        database
+    }
+
+    #[test]
+    fn upserts_one_live_draft_per_terminal_and_keeps_history() {
+        let database = asset_database();
+        let mut draft = PromptAsset {
+            id: "draft:terminal-1".into(),
+            workspace_id: "workspace-1".into(),
+            terminal_id: Some("terminal-1".into()),
+            terminal_name: "Claude 1".into(),
+            agent_type: "claude".into(),
+            kind: "draft".into(),
+            content: "first draft".into(),
+            redacted: false,
+            favorite: false,
+            pinned: false,
+            created_at: 1,
+            updated_at: 1,
+        };
+        database.save_prompt_asset(&draft).unwrap();
+        draft.content = "latest draft".into();
+        draft.updated_at = 2;
+        database.save_prompt_asset(&draft).unwrap();
+
+        let mut history = draft.clone();
+        history.id = "prompt:1".into();
+        history.kind = "history".into();
+        history.content = "submitted".into();
+        database.save_prompt_asset(&history).unwrap();
+
+        let stored = database.list_prompt_assets(Some("workspace-1")).unwrap();
+        assert_eq!(stored.len(), 2);
+        assert_eq!(
+            stored
+                .iter()
+                .find(|item| item.kind == "draft")
+                .unwrap()
+                .content,
+            "latest draft"
+        );
+
+        database.delete_prompt_asset(&draft.id).unwrap();
+        let stored = database.list_prompt_assets(Some("workspace-1")).unwrap();
+        assert_eq!(stored.len(), 1);
+        assert_eq!(stored[0].kind, "history");
+    }
+
+    #[test]
+    fn saves_and_deletes_handoff_packages_by_workspace() {
+        let database = asset_database();
+        let record = HandoffRecord {
+            id: "handoff-1".into(),
+            workspace_id: "workspace-1".into(),
+            source_terminal_id: Some("terminal-1".into()),
+            title: "Termexo handoff".into(),
+            package_json: r#"{"format":"termexo-handoff","version":1}"#.into(),
+            created_at: 1,
+            updated_at: 2,
+        };
+        record.validate().unwrap();
+        database.save_handoff_package(&record).unwrap();
+
+        let stored = database.list_handoff_packages(Some("workspace-1")).unwrap();
+        assert_eq!(stored, vec![record.clone()]);
+
+        database.delete_handoff_package(&record.id).unwrap();
+        assert!(database.list_handoff_packages(None).unwrap().is_empty());
+    }
+
+    #[test]
+    fn validates_prompt_and_handoff_storage_limits() {
+        let invalid_draft = PromptAsset {
+            id: "draft:missing-terminal".into(),
+            workspace_id: "workspace-1".into(),
+            terminal_id: None,
+            terminal_name: "Claude".into(),
+            agent_type: "claude".into(),
+            kind: "draft".into(),
+            content: "work".into(),
+            redacted: false,
+            favorite: false,
+            pinned: false,
+            created_at: 1,
+            updated_at: 1,
+        };
+        assert!(invalid_draft.validate().is_err());
+
+        let invalid_handoff = HandoffRecord {
+            id: "handoff-1".into(),
+            workspace_id: "workspace-1".into(),
+            source_terminal_id: None,
+            title: "Invalid".into(),
+            package_json: "[]".into(),
+            created_at: 1,
+            updated_at: 1,
+        };
+        assert!(invalid_handoff.validate().is_err());
+    }
+
     #[test]
     fn saves_and_lists_workspace_snapshots() {
         let database = WorkspaceDatabase {
@@ -942,7 +1285,7 @@ mod tests {
             .lock()
             .unwrap()
             .execute_batch(&format!(
-                "{INITIAL_MIGRATION}\n{AGENT_MIGRATION}\n{NETWORK_MIGRATION}\n{ACCOUNT_MIGRATION}"
+                "{INITIAL_MIGRATION}\n{AGENT_MIGRATION}\n{NETWORK_MIGRATION}\n{ACCOUNT_MIGRATION}\n{V05_ASSETS_MIGRATION}"
             ))
             .unwrap();
 

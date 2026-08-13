@@ -25,6 +25,8 @@
         (statusChanged)="terminalStatusChanged.emit($event)"
         (renameRequested)="terminalRenamed.emit($event)"
         (modelSwitchRequested)="terminalModelSwitchRequested.emit($event)"
+        (inputCaptured)="terminalInput.emit($event)"
+        (outputCaptured)="terminalOutput.emit($event)"
       />
     }
   </div>

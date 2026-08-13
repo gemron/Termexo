@@ -93,6 +93,8 @@ export class TerminalPanelComponent implements AfterViewInit {
   readonly statusChanged = output<{ terminalId: string; status: TerminalStatus }>();
   readonly renameRequested = output<{ terminalId: string; name: string }>();
   readonly modelSwitchRequested = output<string>();
+  readonly inputCaptured = output<{ terminalId: string; data: string }>();
+  readonly outputCaptured = output<{ terminalId: string; data: string }>();
 
   protected readonly renaming = signal(false);
 
@@ -185,7 +187,7 @@ export class TerminalPanelComponent implements AfterViewInit {
     terminalContainer.addEventListener('contextmenu', this.handleContextMenu);
     terminalContainer.addEventListener('compositionstart', this.prepareComposition, true);
     terminalContainer.addEventListener('compositionstart', this.beginComposition);
-    terminalContainer.addEventListener('compositionupdate', this.restoreComposition);
+    terminalContainer.addEventListener('compositionupdate', this.restoreCompositionAfterUpdate);
     terminalContainer.addEventListener('compositionend', this.endComposition);
     terminalContainer.addEventListener('focusin', this.prepareComposition);
     terminalContainer.addEventListener('focusout', this.endComposition);
@@ -197,6 +199,7 @@ export class TerminalPanelComponent implements AfterViewInit {
 
     void this.initializeRuntime();
     const inputDisposable = this.terminal.onData((data) => {
+      this.inputCaptured.emit({ terminalId: this.session().id, data });
       if (data.includes('\r')) {
         this.terminal.scrollToBottom();
         this.runtimeIssue.set(null);
@@ -211,7 +214,7 @@ export class TerminalPanelComponent implements AfterViewInit {
     });
     // xterm repositions its IME elements on every render. Registering after open means this runs
     // after xterm's own render listener and restores the caret captured at compositionstart.
-    const renderDisposable = this.terminal.onRender(this.restoreComposition);
+    const renderDisposable = this.terminal.onRender(this.restoreCompositionAfterUpdate);
 
     this.resizeObserver = new ResizeObserver(() => this.scheduleFit(false));
     this.resizeObserver.observe(terminalContainer);
@@ -224,7 +227,10 @@ export class TerminalPanelComponent implements AfterViewInit {
       terminalContainer.removeEventListener('contextmenu', this.handleContextMenu);
       terminalContainer.removeEventListener('compositionstart', this.prepareComposition, true);
       terminalContainer.removeEventListener('compositionstart', this.beginComposition);
-      terminalContainer.removeEventListener('compositionupdate', this.restoreComposition);
+      terminalContainer.removeEventListener(
+        'compositionupdate',
+        this.restoreCompositionAfterUpdate,
+      );
       terminalContainer.removeEventListener('compositionend', this.endComposition);
       terminalContainer.removeEventListener('focusin', this.prepareComposition);
       terminalContainer.removeEventListener('focusout', this.endComposition);
@@ -240,6 +246,7 @@ export class TerminalPanelComponent implements AfterViewInit {
       if (this.activationFrame !== undefined) {
         window.cancelAnimationFrame(this.activationFrame);
       }
+      this.compositionAnchor?.end();
       this.terminal.dispose();
     });
   }
@@ -381,7 +388,8 @@ export class TerminalPanelComponent implements AfterViewInit {
 
   private readonly beginComposition = (): void => this.compositionAnchor?.begin();
 
-  private readonly restoreComposition = (): void => this.compositionAnchor?.restore();
+  private readonly restoreCompositionAfterUpdate = (): void =>
+    this.compositionAnchor?.restoreAfterBrowserUpdate();
 
   private readonly endComposition = (): void => this.compositionAnchor?.end();
 
@@ -464,6 +472,7 @@ export class TerminalPanelComponent implements AfterViewInit {
   }
 
   private handleOutput(data: string): void {
+    this.outputCaptured.emit({ terminalId: this.session().id, data });
     this.terminal.write(data);
     this.outputTail = `${this.outputTail}${data}`.slice(-2_000);
     const issue = detectTerminalRuntimeIssue(this.outputTail);

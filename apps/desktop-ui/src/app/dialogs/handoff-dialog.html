@@ -1,0 +1,210 @@
+<div class="backdrop modal modal-open" (mousedown)="cancelled.emit()">
+  <section
+    class="handoff-dialog modal-box"
+    role="dialog"
+    aria-modal="true"
+    aria-labelledby="handoff-title"
+    (mousedown)="$event.stopPropagation()"
+  >
+    <header>
+      <div class="dialog-heading">
+        <span><app-icon name="merge" [size]="17" /></span>
+        <div>
+          <h2 id="handoff-title">{{ 'handoff.title' | t }}</h2>
+          <p>{{ 'handoff.subtitle' | t }}</p>
+        </div>
+      </div>
+      <button
+        type="button"
+        class="btn btn-square btn-ghost btn-sm"
+        [title]="'common.close' | t"
+        [attr.aria-label]="'common.close' | t"
+        (click)="cancelled.emit()"
+      >
+        <app-icon name="x" [size]="15" />
+      </button>
+    </header>
+
+    <div class="handoff-body">
+      <aside>
+        <section class="build-card">
+          <h3>{{ 'handoff.generate' | t }}</h3>
+          <label>
+            <span>{{ 'handoff.scope' | t }}</span>
+            <select [ngModel]="scope()" (ngModelChange)="scope.set($event)">
+              <option value="terminal">{{ 'handoff.currentTerminal' | t }}</option>
+              <option value="workspace">{{ 'handoff.entireWorkspace' | t }}</option>
+            </select>
+          </label>
+          <label>
+            <span>{{ 'handoff.tokenBudget' | t }}</span>
+            <input
+              type="number"
+              min="512"
+              max="32000"
+              step="512"
+              [ngModel]="tokenBudget()"
+              (ngModelChange)="tokenBudget.set(+$event)"
+            />
+          </label>
+          <button
+            type="button"
+            class="btn btn-primary btn-sm"
+            [disabled]="busy() || !activeTerminalId()"
+            (click)="generate()"
+          >
+            <app-icon name="sparkles" [size]="13" />
+            {{ busy() ? ('common.loading' | t) : ('handoff.generateAction' | t) }}
+          </button>
+        </section>
+
+        <section class="history-card">
+          <div class="section-title">
+            <h3>{{ 'handoff.history' | t }}</h3>
+            <button
+              type="button"
+              [disabled]="busy()"
+              [title]="'handoff.import' | t"
+              (click)="imported.emit()"
+            >
+              <app-icon name="upload" [size]="13" />
+            </button>
+          </div>
+          <div class="record-list">
+            @for (record of records(); track record.id) {
+              <article [class.active]="preview()?.id === record.id">
+                <button type="button" class="record-main" (click)="recordSelected.emit(record)">
+                  <strong>{{ record.title }}</strong>
+                  <time>{{ record.updatedAt | date: 'MM-dd HH:mm' }}</time>
+                </button>
+                <button
+                  type="button"
+                  class="record-delete"
+                  [title]="'common.delete' | t"
+                  (click)="recordDeleted.emit(record)"
+                >
+                  <app-icon name="trash" [size]="12" />
+                </button>
+              </article>
+            } @empty {
+              <p>{{ 'handoff.emptyHistory' | t }}</p>
+            }
+          </div>
+        </section>
+      </aside>
+
+      <main>
+        @if (error()) {
+          <div class="handoff-error" role="alert">
+            <app-icon name="triangle-alert" [size]="14" />
+            {{ error() }}
+          </div>
+        }
+
+        @if (preview(); as handoff) {
+          <div class="preview-heading">
+            <div>
+              <h3>{{ handoff.title }}</h3>
+              <span>
+                {{ handoff.sources.length }} Agent · {{ handoff.estimatedTokens }}/{{
+                  handoff.tokenBudget
+                }}
+                tokens
+                @if (handoff.redactions) {
+                  · {{ 'handoff.redactionCount' | t: { count: handoff.redactions } }}
+                }
+              </span>
+            </div>
+            <div class="preview-actions">
+              <button
+                type="button"
+                [title]="'handoff.exportMarkdown' | t"
+                (click)="exported.emit({ handoff, format: 'md' })"
+              >
+                <app-icon name="download" [size]="13" /> MD
+              </button>
+              <button
+                type="button"
+                [title]="'handoff.exportJson' | t"
+                (click)="exported.emit({ handoff, format: 'json' })"
+              >
+                <app-icon name="download" [size]="13" /> JSON
+              </button>
+            </div>
+          </div>
+
+          <div class="package-preview">
+            <section>
+              <h4>{{ 'handoff.task' | t }}</h4>
+              <p>{{ handoff.task }}</p>
+            </section>
+            <section>
+              <h4>{{ 'handoff.summary' | t }}</h4>
+              <p>{{ handoff.summary }}</p>
+            </section>
+            <div class="state-columns">
+              <section>
+                <h4>{{ 'handoff.completed' | t }}</h4>
+                <ul>
+                  @for (item of handoff.completed; track item) {
+                    <li>{{ item }}</li>
+                  } @empty {
+                    <li>{{ 'handoff.noneRecorded' | t }}</li>
+                  }
+                </ul>
+              </section>
+              <section>
+                <h4>{{ 'handoff.pending' | t }}</h4>
+                <ul>
+                  @for (item of handoff.pending; track item) {
+                    <li>{{ item }}</li>
+                  } @empty {
+                    <li>{{ 'handoff.noneRecorded' | t }}</li>
+                  }
+                </ul>
+              </section>
+            </div>
+            <section>
+              <h4>{{ 'handoff.changedFiles' | t }}</h4>
+              <p class="mono">
+                {{ handoff.changedFiles.join('\n') || ('handoff.noneRecorded' | t) }}
+              </p>
+            </section>
+            <section>
+              <h4>{{ 'handoff.nextAction' | t }}</h4>
+              <p>{{ handoff.nextAction }}</p>
+            </section>
+          </div>
+
+          <footer class="send-bar">
+            <label>
+              <span>{{ 'handoff.sendTo' | t }}</span>
+              <select [ngModel]="targetTerminalId()" (ngModelChange)="targetTerminalId.set($event)">
+                @for (terminal of terminals(); track terminal.id) {
+                  <option [value]="terminal.id">
+                    {{ terminal.name }} · {{ terminal.agentType }} · {{ terminal.model }}
+                  </option>
+                }
+              </select>
+            </label>
+            <button
+              type="button"
+              class="btn btn-primary btn-sm"
+              [disabled]="busy() || !targetTerminalId()"
+              (click)="sent.emit({ terminalId: targetTerminalId(), handoff })"
+            >
+              <app-icon name="play" [size]="13" />
+              {{ 'handoff.sendAndContinue' | t }}
+            </button>
+          </footer>
+        } @else {
+          <div class="empty-preview">
+            <app-icon name="package" [size]="28" />
+            <strong>{{ 'handoff.emptyPreview' | t }}</strong>
+            <span>{{ 'handoff.emptyPreviewHelp' | t }}</span>
+          </div>
+        }
+      </main>
+    </div>
+  </section>
+</div>
