@@ -68,7 +68,11 @@ export class InspectorPanelComponent {
       ? this.modelProfiles().find((profile) => profile.id === terminal.profileId)
       : undefined;
     const currentQuotaIds = new Set<string>();
-    if (terminal && terminal.agentType !== 'shell' && activeProfile) {
+    if (
+      terminal &&
+      (terminal.agentType === 'claude' || terminal.agentType === 'codex') &&
+      activeProfile
+    ) {
       if (isNativeModel(activeProfile, terminal.agentType)) {
         // Official models spend the subscription belonging to the login account selected for this
         // terminal, not an API-key allowance attached to the model profile.
@@ -145,9 +149,10 @@ export class InspectorPanelComponent {
         detail['notification_type'] ??
         detail['error_details'] ??
         detail['error'] ??
+        detail['message'] ??
         detail['source'] ??
         event.nativeSessionId ??
-        'Claude Code',
+        AGENT_LABELS[event.agentType],
     );
   }
 

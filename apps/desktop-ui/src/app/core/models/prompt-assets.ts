@@ -5,7 +5,7 @@ export interface PromptAsset {
   workspaceId: string;
   terminalId?: string;
   terminalName: string;
-  agentType: 'claude' | 'codex';
+  agentType: 'claude' | 'codex' | 'opencode';
   kind: PromptAssetKind;
   content: string;
   redacted: boolean;
@@ -26,7 +26,7 @@ const BRACKETED_PASTE_END = '\u001b[201~';
 const MAX_PROMPT_LENGTH = 256 * 1024;
 
 /**
- * Mirrors the common readline controls used by Claude Code and Codex without touching the PTY.
+ * Mirrors the common readline controls used by coding agents without touching the PTY.
  * The capture is deliberately independent per terminal, so output in another xterm cannot move
  * or overwrite the draft currently being composed.
  */

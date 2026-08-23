@@ -26,7 +26,8 @@ export interface HandoffSendRequest {
 export class HandoffDialogComponent {
   readonly records = input.required<HandoffRecord[]>();
   readonly preview = input<HandoffPackage | null>(null);
-  readonly terminals = input.required<(TerminalSession & { agentType: 'claude' | 'codex' })[]>();
+  readonly terminals =
+    input.required<(TerminalSession & { agentType: 'claude' | 'codex' | 'opencode' })[]>();
   readonly activeTerminalId = input<string | null>(null);
   readonly busy = input(false);
   readonly error = input<string | null>(null);

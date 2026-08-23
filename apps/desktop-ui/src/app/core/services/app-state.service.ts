@@ -56,8 +56,13 @@ export class AppStateService {
       this.activeWorkspace()?.terminals.filter((terminal) => terminal.agentType === 'codex')
         .length ?? 0,
   );
+  readonly openCodeTerminalCount = computed(
+    () =>
+      this.activeWorkspace()?.terminals.filter((terminal) => terminal.agentType === 'opencode')
+        .length ?? 0,
+  );
 
-  agentCountFor(agentType: 'claude' | 'codex'): number {
+  agentCountFor(agentType: 'claude' | 'codex' | 'opencode'): number {
     return (
       this.activeWorkspace()?.terminals.filter((terminal) => terminal.agentType === agentType)
         .length ?? 0
@@ -498,7 +503,13 @@ export class AppStateService {
       status: 'STARTING',
       model:
         input.model ??
-        (agentType === 'claude' ? 'Claude Sonnet' : agentType === 'codex' ? 'GPT Codex' : 'Local'),
+        (agentType === 'claude'
+          ? 'Claude Sonnet'
+          : agentType === 'codex'
+            ? 'GPT Codex'
+            : agentType === 'opencode'
+              ? 'OpenCode 默认模型'
+              : 'Local'),
       branch: workspace.activeBranch,
       command: input.command ?? this.defaultCommand(agentType),
       nativeSessionId: input.nativeSessionId,

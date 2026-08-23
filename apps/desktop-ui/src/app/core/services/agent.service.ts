@@ -24,6 +24,7 @@ import {
   NetworkProfile,
   NetworkProfileInput,
   NetworkTestResult,
+  OpenCodeLaunchRequest,
   ProviderQuota,
   SystemProxyDiscovery,
 } from '../models/agent.models';
@@ -37,6 +38,7 @@ export class AgentService {
   private readonly i18n = inject(I18nService);
   private readonly installationState = signal<AgentInstallation | null>(null);
   private readonly codexInstallationState = signal<AgentInstallation | null>(null);
+  private readonly openCodeInstallationState = signal<AgentInstallation | null>(null);
   private readonly sessionItems = signal<AgentSession[]>([]);
   private readonly eventItems = signal<AgentEvent[]>([]);
   private readonly modelProfileItems = signal<ModelProfile[]>([]);
@@ -53,6 +55,7 @@ export class AgentService {
 
   readonly installation = this.installationState.asReadonly();
   readonly codexInstallation = this.codexInstallationState.asReadonly();
+  readonly openCodeInstallation = this.openCodeInstallationState.asReadonly();
   readonly sessions = this.sessionItems.asReadonly();
   readonly events = this.eventItems.asReadonly();
   readonly modelProfiles = this.modelProfileItems.asReadonly();
@@ -87,6 +90,7 @@ export class AgentService {
     await Promise.all([
       this.detectClaude(),
       this.detectCodex(),
+      this.detectOpenCode(),
       this.loadProfiles(),
       this.loadSessions(),
     ]);
@@ -118,6 +122,16 @@ export class AgentService {
     });
   }
 
+  async detectOpenCode(): Promise<void> {
+    if (!isTauriRuntime()) {
+      this.openCodeInstallationState.set(this.browserInstallation('opencode'));
+      return;
+    }
+    await this.run(async () => {
+      this.openCodeInstallationState.set(await invoke<AgentInstallation>('detect_opencode'));
+    });
+  }
+
   async refreshSessions(projectPath?: string): Promise<void> {
     if (!isTauriRuntime()) {
       this.sessionItems.set([]);
@@ -129,6 +143,9 @@ export class AgentService {
           projectPath: projectPath || null,
         }),
         invoke<AgentSession[]>('scan_codex_sessions', {
+          projectPath: projectPath || null,
+        }),
+        invoke<AgentSession[]>('scan_opencode_sessions', {
           projectPath: projectPath || null,
         }),
       ]);
@@ -180,6 +197,18 @@ export class AgentService {
     return invoke<AgentLaunchSpec>('prepare_codex_launch', { request });
   }
 
+  async prepareOpenCodeLaunch(request: OpenCodeLaunchRequest): Promise<AgentLaunchSpec> {
+    if (!isTauriRuntime()) {
+      return {
+        command: `opencode${request.sessionId ? ` --session '${request.sessionId}'` : ''}${
+          request.continueLast && !request.sessionId ? ' --continue' : ''
+        }${request.model ? ` --model '${request.model}'` : ''}`,
+        executablePath: 'opencode',
+      };
+    }
+    return invoke<AgentLaunchSpec>('prepare_opencode_launch', { request });
+  }
+
   async prepareAccountLogin(request: AccountLoginRequest): Promise<AgentLaunchSpec> {
     if (!isTauriRuntime()) {
       const profile = this.accountProfileItems().find(
@@ -195,14 +224,22 @@ export class AgentService {
 
   async previewCliOperation(request: CliOperationRequest): Promise<CliOperationPlan> {
     if (!isTauriRuntime()) {
-      const installation =
-        request.agentType === 'claude' ? this.installationState() : this.codexInstallationState();
+      const installation = this.installationFor(request.agentType);
       const packageName =
-        request.agentType === 'claude' ? '@anthropic-ai/claude-code' : '@openai/codex';
+        request.agentType === 'claude'
+          ? '@anthropic-ai/claude-code'
+          : request.agentType === 'codex'
+            ? '@openai/codex'
+            : 'opencode-ai';
       const targetVersion = request.targetVersion?.trim() || 'latest';
       return {
         agentType: request.agentType,
-        displayName: request.agentType === 'claude' ? 'Claude Code' : 'Codex CLI',
+        displayName:
+          request.agentType === 'claude'
+            ? 'Claude Code'
+            : request.agentType === 'codex'
+              ? 'Codex CLI'
+              : 'OpenCode',
         packageName,
         targetVersion,
         packageSpec: `${packageName}@${targetVersion}`,
@@ -254,8 +291,10 @@ export class AgentService {
     );
     if (result.installation.agentType === 'claude') {
       this.installationState.set(result.installation);
-    } else {
+    } else if (result.installation.agentType === 'codex') {
       this.codexInstallationState.set(result.installation);
+    } else {
+      this.openCodeInstallationState.set(result.installation);
     }
     return result;
   }
@@ -435,8 +474,17 @@ export class AgentService {
     this.accountProfileItems.update((items) => items.filter((item) => item.id !== profileId));
   }
 
-  private browserInstallation(agentType: 'claude' | 'codex'): AgentInstallation {
-    const name = agentType === 'claude' ? 'Claude Code' : 'Codex CLI';
+  private installationFor(agentType: 'claude' | 'codex' | 'opencode'): AgentInstallation | null {
+    return agentType === 'claude'
+      ? this.installationState()
+      : agentType === 'codex'
+        ? this.codexInstallationState()
+        : this.openCodeInstallationState();
+  }
+
+  private browserInstallation(agentType: 'claude' | 'codex' | 'opencode'): AgentInstallation {
+    const name =
+      agentType === 'claude' ? 'Claude Code' : agentType === 'codex' ? 'Codex CLI' : 'OpenCode';
     return {
       agentType,
       installed: false,
@@ -448,6 +496,7 @@ export class AgentService {
   private initializeBrowserPreview(): void {
     this.installationState.set(this.browserInstallation('claude'));
     this.codexInstallationState.set(this.browserInstallation('codex'));
+    this.openCodeInstallationState.set(this.browserInstallation('opencode'));
     if (this.modelProfileItems().length === 0) {
       this.modelProfileItems.set([
         {

@@ -75,6 +75,17 @@
                   }}</small>
                 </div>
               </button>
+              <button type="button" data-agent="opencode" (click)="openOpenCodeLaunch()">
+                <span data-tone="amber"><app-icon name="terminal" [size]="14" /></span>
+                <div>
+                  <strong>OpenCode</strong>
+                  <small>{{
+                    agents.openCodeInstallation()?.healthy
+                      ? (agents.openCodeInstallation()?.version ?? ('common.connected' | t))
+                      : ('common.notDetected' | t)
+                  }}</small>
+                </div>
+              </button>
             </div>
           }
         </div>
@@ -649,16 +660,28 @@
   />
 }
 
+@defer (when openCodeLaunchOpen()) {
+  @if (openCodeLaunchOpen()) {
+    <app-opencode-launch-dialog
+      [installation]="agents.openCodeInstallation()"
+      [workingDirectory]="selectedTerminalDirectory() ?? ''"
+      (launched)="launchOpenCode($event)"
+      (cancelled)="closeOpenCodeLaunch()"
+    />
+  }
+}
+
 @if (sessionCenterOpen()) {
   <app-session-center-dialog
     [installation]="agents.installation()"
     [codexInstallation]="agents.codexInstallation()"
+    [openCodeInstallation]="agents.openCodeInstallation()"
     [sessions]="agents.sessions()"
     [profiles]="agents.modelProfiles()"
     [mcpProfiles]="agents.mcpProfiles()"
     [accountProfiles]="agents.accountProfiles()"
     [projectPath]="state.activeWorkspace()?.projectPath ?? ''"
-    [busy]="agents.busy() || launchingClaude() || launchingCodex()"
+    [busy]="agents.busy() || launchingClaude() || launchingCodex() || launchingOpenCode()"
     [error]="agents.error()"
     [sessionLaunchProfiles]="sessionLaunchProfiles"
     (refreshed)="refreshSessions($event)"
@@ -705,6 +728,7 @@
   <app-agent-settings-dialog
     [installation]="agents.installation()"
     [codexInstallation]="agents.codexInstallation()"
+    [openCodeInstallation]="agents.openCodeInstallation()"
     [modelProfiles]="agents.modelProfiles()"
     [mcpProfiles]="agents.mcpProfiles()"
     [networkProfiles]="agents.networkProfiles()"

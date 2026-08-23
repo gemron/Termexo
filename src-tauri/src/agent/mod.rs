@@ -1,10 +1,12 @@
 mod claude;
 mod codex;
+mod opencode;
 
 use serde::{Deserialize, Serialize};
 
 pub use claude::ClaudeCodeAdapter;
 pub use codex::CodexCliAdapter;
+pub use opencode::OpenCodeAdapter;
 
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -55,6 +57,15 @@ pub struct CodexLaunchOptions {
     pub hook_configs: Vec<String>,
     /// `-c` overrides pointing Codex at a compatible provider, empty for the official endpoint.
     pub provider_configs: Vec<String>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct OpenCodeLaunchOptions {
+    pub session_id: Option<String>,
+    pub model: Option<String>,
+    #[serde(default)]
+    pub continue_last: bool,
 }
 
 #[derive(Debug, Clone, Serialize)]

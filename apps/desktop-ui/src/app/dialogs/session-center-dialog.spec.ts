@@ -25,6 +25,15 @@ const CODEX_INSTALLATION: AgentInstallation = {
   diagnostic: 'Codex CLI 已连接',
 };
 
+const OPENCODE_INSTALLATION: AgentInstallation = {
+  agentType: 'opencode',
+  installed: true,
+  executablePath: 'opencode',
+  version: '1.18.21',
+  healthy: true,
+  diagnostic: 'OpenCode 已连接',
+};
+
 const SESSIONS: AgentSession[] = [
   {
     id: 'claude:claude-native-session',
@@ -53,6 +62,18 @@ const SESSIONS: AgentSession[] = [
     transcriptPath: 'rollout.jsonl',
     createdAt: 1_700_000_200_000,
     lastUsedAt: 1_700_000_300_000,
+  },
+  {
+    id: 'opencode:opencode-native-session',
+    agentType: 'opencode',
+    nativeSessionId: 'opencode-native-session',
+    projectPath: 'D:\\devlop\\Termexo',
+    title: 'OpenCode adapter',
+    status: 'idle',
+    messageCount: 0,
+    transcriptPath: 'opencode://session/opencode-native-session',
+    createdAt: 1_700_000_400_000,
+    lastUsedAt: 1_700_000_500_000,
   },
 ];
 
@@ -97,6 +118,7 @@ describe('SessionCenterDialogComponent', () => {
     root = fixture.nativeElement as HTMLElement;
     fixture.componentRef.setInput('installation', CLAUDE_INSTALLATION);
     fixture.componentRef.setInput('codexInstallation', CODEX_INSTALLATION);
+    fixture.componentRef.setInput('openCodeInstallation', OPENCODE_INSTALLATION);
     fixture.componentRef.setInput('sessions', SESSIONS);
     fixture.componentRef.setInput('profiles', [DEFAULT_PROFILE]);
     fixture.componentRef.setInput('projectPath', 'D:\\devlop\\Termexo');
@@ -105,8 +127,8 @@ describe('SessionCenterDialogComponent', () => {
   });
 
   it('shows Agent health, counts, and filters the session list by Agent', () => {
-    expect(root.querySelectorAll('.agent-health')).toHaveLength(2);
-    expect(root.querySelectorAll('.session-row')).toHaveLength(2);
+    expect(root.querySelectorAll('.agent-health')).toHaveLength(3);
+    expect(root.querySelectorAll('.session-row')).toHaveLength(3);
 
     clickButton('Codex');
 
@@ -114,6 +136,15 @@ describe('SessionCenterDialogComponent', () => {
     expect(rows).toHaveLength(1);
     expect(rows[0].textContent).toContain('Codex adapter');
     expect(rows[0].textContent).not.toContain('完善会话中心');
+  });
+
+  it('resumes OpenCode sessions without applying Claude or Codex profiles', () => {
+    const resumed: ResumeSessionValue[] = [];
+    component.resumed.subscribe((value) => resumed.push(value));
+
+    clickResumeFor('OpenCode adapter');
+
+    expect(resumed).toEqual([{ session: SESSIONS[2], model: undefined }]);
   });
 
   it('searches native session ids and emits the selected scan scope', async () => {

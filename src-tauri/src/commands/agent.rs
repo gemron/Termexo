@@ -8,7 +8,8 @@ use tauri::State;
 use crate::account;
 use crate::agent::{
     AgentAdapter, AgentInstallation, AgentLaunchSpec, AgentSession, ClaudeCodeAdapter,
-    ClaudeLaunchOptions, CodexCliAdapter, CodexLaunchOptions,
+    ClaudeLaunchOptions, CodexCliAdapter, CodexLaunchOptions, OpenCodeAdapter,
+    OpenCodeLaunchOptions,
 };
 use crate::config::{AgentProtocol, CredentialStore, LaunchEnvironmentStore, ModelProfile};
 use crate::database::WorkspaceDatabase;
@@ -30,6 +31,17 @@ pub async fn detect_claude() -> Result<AgentInstallation, String> {
 pub async fn detect_codex() -> Result<AgentInstallation, String> {
     tauri::async_runtime::spawn_blocking(|| {
         CodexCliAdapter::new()
+            .detect()
+            .map_err(|error| error.to_string())
+    })
+    .await
+    .map_err(|error| error.to_string())?
+}
+
+#[tauri::command]
+pub async fn detect_opencode() -> Result<AgentInstallation, String> {
+    tauri::async_runtime::spawn_blocking(|| {
+        OpenCodeAdapter::new()
             .detect()
             .map_err(|error| error.to_string())
     })
@@ -105,6 +117,29 @@ pub fn scan_codex_sessions(
 }
 
 #[tauri::command]
+pub async fn scan_opencode_sessions(
+    project_path: Option<String>,
+    database: State<'_, WorkspaceDatabase>,
+) -> Result<Vec<AgentSession>, String> {
+    let sessions = tauri::async_runtime::spawn_blocking(move || {
+        let adapter = OpenCodeAdapter::new();
+        let installation = adapter.detect().map_err(|error| error.to_string())?;
+        if !installation.installed {
+            return Ok(Vec::new());
+        }
+        adapter
+            .list_sessions(project_path.as_deref())
+            .map_err(|error| error.to_string())
+    })
+    .await
+    .map_err(|error| error.to_string())??;
+    database
+        .save_agent_sessions(&sessions)
+        .map_err(|error| error.to_string())?;
+    Ok(sessions)
+}
+
+#[tauri::command]
 pub fn list_agent_sessions(
     database: State<'_, WorkspaceDatabase>,
 ) -> Result<Vec<AgentSession>, String> {
@@ -125,6 +160,15 @@ pub fn build_claude_launch_command(
 #[tauri::command]
 pub fn build_codex_launch_command(options: CodexLaunchOptions) -> Result<AgentLaunchSpec, String> {
     CodexCliAdapter::new()
+        .build_launch_command(&options)
+        .map_err(|error| error.to_string())
+}
+
+#[tauri::command]
+pub fn build_opencode_launch_command(
+    options: OpenCodeLaunchOptions,
+) -> Result<AgentLaunchSpec, String> {
+    OpenCodeAdapter::new()
         .build_launch_command(&options)
         .map_err(|error| error.to_string())
 }
@@ -150,6 +194,17 @@ pub struct PrepareCodexLaunchRequest {
     pub model: Option<String>,
     pub profile_id: Option<String>,
     pub account_profile_id: Option<String>,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PrepareOpenCodeLaunchRequest {
+    pub terminal_id: String,
+    pub workspace_id: Option<String>,
+    pub session_id: Option<String>,
+    pub model: Option<String>,
+    #[serde(default)]
+    pub continue_last: bool,
 }
 
 #[derive(Debug, Deserialize)]
@@ -304,6 +359,37 @@ pub fn prepare_codex_launch(
             notify_config: Some(notify_config),
             hook_configs,
             provider_configs,
+        })
+        .map_err(|error| error.to_string())
+}
+
+#[tauri::command]
+pub fn prepare_opencode_launch(
+    request: PrepareOpenCodeLaunchRequest,
+    database: State<'_, WorkspaceDatabase>,
+    credentials: State<'_, CredentialStore>,
+    launch_environment: State<'_, LaunchEnvironmentStore>,
+    hooks: State<'_, HookEventStore>,
+) -> Result<AgentLaunchSpec, String> {
+    let mut environment =
+        network_environment(&database, &credentials, request.workspace_id.as_deref())?;
+    let runtime = hooks
+        .prepare_opencode_runtime(
+            &request.terminal_id,
+            request.session_id.as_deref(),
+            std::env::var("OPENCODE_CONFIG_CONTENT").ok().as_deref(),
+        )
+        .map_err(|error| error.to_string())?;
+    environment.insert("OPENCODE_CONFIG_CONTENT".into(), runtime.config_content);
+    log_proxy_environment(&environment);
+    launch_environment
+        .put(request.terminal_id, environment)
+        .map_err(|error| error.to_string())?;
+    OpenCodeAdapter::new()
+        .build_launch_command(&OpenCodeLaunchOptions {
+            session_id: request.session_id,
+            model: request.model,
+            continue_last: request.continue_last,
         })
         .map_err(|error| error.to_string())
 }
