@@ -40,11 +40,12 @@ type SessionAgentFilter = 'all' | NativeAgentType;
 const AGENT_HEALTH_ENTRIES: readonly { agentType: NativeAgentType; name: string }[] = [
   { agentType: 'claude', name: 'Claude Code' },
   { agentType: 'codex', name: 'Codex CLI' },
+  { agentType: 'opencode', name: 'OpenCode' },
 ];
 
 const AGENT_FILTERS: readonly {
   value: SessionAgentFilter;
-}[] = [{ value: 'all' }, { value: 'claude' }, { value: 'codex' }];
+}[] = [{ value: 'all' }, { value: 'claude' }, { value: 'codex' }, { value: 'opencode' }];
 
 @Component({
   selector: 'app-session-center-dialog',
@@ -213,7 +214,9 @@ const AGENT_FILTERS: readonly {
                         (ngModelChange)="profileId.set($event)"
                       >
                         @for (profile of anthropicProfiles(); track profile.id) {
-                          <option [value]="profile.id">{{ profileLabel(profile, 'claude') }}</option>
+                          <option [value]="profile.id">
+                            {{ profileLabel(profile, 'claude') }}
+                          </option>
                         }
                       </select>
                     </label>
@@ -389,6 +392,7 @@ export class SessionCenterDialogComponent {
   private readonly i18n = inject(I18nService);
   readonly installation = input<AgentInstallation | null>(null);
   readonly codexInstallation = input<AgentInstallation | null>(null);
+  readonly openCodeInstallation = input<AgentInstallation | null>(null);
   readonly sessions = input<AgentSession[]>([]);
   readonly profiles = input<ModelProfile[]>([]);
   readonly mcpProfiles = input<McpProfile[]>([]);
@@ -425,7 +429,12 @@ export class SessionCenterDialogComponent {
   protected readonly agentHealth = computed(() =>
     AGENT_HEALTH_ENTRIES.map((entry) => ({
       ...entry,
-      installation: entry.agentType === 'codex' ? this.codexInstallation() : this.installation(),
+      installation:
+        entry.agentType === 'claude'
+          ? this.installation()
+          : entry.agentType === 'codex'
+            ? this.codexInstallation()
+            : this.openCodeInstallation(),
     })),
   );
   protected readonly sessionCounts = computed(() => {
@@ -434,6 +443,7 @@ export class SessionCenterDialogComponent {
       all: sessions.length,
       claude: sessions.filter((session) => session.agentType === 'claude').length,
       codex: sessions.filter((session) => session.agentType === 'codex').length,
+      opencode: sessions.filter((session) => session.agentType === 'opencode').length,
     };
   });
   protected readonly resolvedProfileId = computed(
@@ -493,10 +503,14 @@ export class SessionCenterDialogComponent {
     });
   });
   protected readonly showsClaudeOptions = computed(
-    () => this.agentFilter() !== 'codex' && this.sessionCounts().claude > 0,
+    () =>
+      (this.agentFilter() === 'all' || this.agentFilter() === 'claude') &&
+      this.sessionCounts().claude > 0,
   );
   protected readonly showsCodexOptions = computed(
-    () => this.agentFilter() !== 'claude' && this.sessionCounts().codex > 0,
+    () =>
+      (this.agentFilter() === 'all' || this.agentFilter() === 'codex') &&
+      this.sessionCounts().codex > 0,
   );
   /** Keeps the active model profiles visible while the configuration panel is collapsed. */
   protected readonly configSummary = computed(() => {
@@ -523,6 +537,9 @@ export class SessionCenterDialogComponent {
     if (this.agentFilter() === 'codex') {
       return this.i18n.t('session.noCodex');
     }
+    if (this.agentFilter() === 'opencode') {
+      return '没有找到 OpenCode 会话';
+    }
     return this.i18n.t(this.onlyWorkspace() ? 'session.noWorkspace' : 'session.noLocal');
   });
   protected readonly emptyDescription = computed(() =>
@@ -534,11 +551,10 @@ export class SessionCenterDialogComponent {
   );
 
   protected filterLabel(filter: SessionAgentFilter): string {
-    return filter === 'all'
-      ? this.i18n.t('session.filterAll')
-      : filter === 'claude'
-        ? 'Claude'
-        : 'Codex';
+    if (filter === 'all') {
+      return this.i18n.t('session.filterAll');
+    }
+    return filter === 'claude' ? 'Claude' : filter === 'codex' ? 'Codex' : 'OpenCode';
   }
 
   protected countFor(filter: SessionAgentFilter): number {
@@ -554,6 +570,13 @@ export class SessionCenterDialogComponent {
    * survives a restart. An explicit pick in the settings panel overrides them.
    */
   protected resume(session: AgentSession): void {
+    if (session.agentType === 'opencode') {
+      this.resumed.emit({
+        session,
+        model: session.modelName,
+      });
+      return;
+    }
     const isClaude = session.agentType === 'claude';
     const previous = this.sessionLaunchProfiles()(session.nativeSessionId);
     const picked = isClaude ? this.profileId() : this.codexProfileId();
@@ -572,7 +595,11 @@ export class SessionCenterDialogComponent {
   }
 
   protected installationFor(session: AgentSession): AgentInstallation | null {
-    return session.agentType === 'codex' ? this.codexInstallation() : this.installation();
+    return session.agentType === 'claude'
+      ? this.installation()
+      : session.agentType === 'codex'
+        ? this.codexInstallation()
+        : this.openCodeInstallation();
   }
 
   protected agentLabel(session: AgentSession): string {
@@ -594,7 +621,9 @@ export class SessionCenterDialogComponent {
   protected profileLabel(profile: ModelProfile, agent: AgentProtocol): string {
     const model = profileModel(profile, agent);
     const base = profile.name === model ? profile.name : `${profile.name} · ${model}`;
-    return isNativeModel(profile, agent) ? `${base} (${this.i18n.t('settings.nativeModel')})` : base;
+    return isNativeModel(profile, agent)
+      ? `${base} (${this.i18n.t('settings.nativeModel')})`
+      : base;
   }
 
   protected accountLabel(profile: AccountProfile): string {

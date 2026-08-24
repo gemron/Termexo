@@ -17,7 +17,7 @@ export interface GitContext {
 export interface HandoffSource {
   terminalId: string;
   terminalName: string;
-  agentType: 'claude' | 'codex';
+  agentType: 'claude' | 'codex' | 'opencode';
   model: string;
   status: string;
   nativeSessionId?: string;
@@ -88,7 +88,7 @@ export function buildHandoffPackage(input: HandoffBuildInput): HandoffPackage {
   const now = input.now ?? Date.now();
   const budget = Math.min(32_000, Math.max(512, Math.round(input.tokenBudget)));
   const terminals = input.terminals.filter(
-    (terminal): terminal is TerminalSession & { agentType: 'claude' | 'codex' } =>
+    (terminal): terminal is TerminalSession & { agentType: 'claude' | 'codex' | 'opencode' } =>
       terminal.agentType !== 'shell' &&
       (input.scope === 'workspace' || terminal.id === input.sourceTerminalId),
   );
@@ -414,7 +414,7 @@ function isHandoffPackage(value: unknown): value is HandoffPackage {
         typeof source === 'object' &&
         typeof source.terminalId === 'string' &&
         typeof source.terminalName === 'string' &&
-        (source.agentType === 'claude' || source.agentType === 'codex') &&
+        ['claude', 'codex', 'opencode'].includes(source.agentType) &&
         typeof source.model === 'string' &&
         typeof source.status === 'string',
     )

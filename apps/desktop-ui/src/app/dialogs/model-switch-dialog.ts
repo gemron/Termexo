@@ -5,7 +5,6 @@ import { TranslatePipe } from '../core/i18n/translate.pipe';
 import {
   AgentProtocol,
   ModelProfile,
-  NativeAgentType,
   profileModel,
   profileServes,
 } from '../core/models/agent.models';
@@ -107,7 +106,8 @@ export interface ModelSwitchValue {
         </div>
         <div class="switch-plan">
           <div>
-            <strong>{{ 'modelSwitch.cliUnchanged' | t }}</strong><span>CLI {{ agentType() === 'codex' ? 'Codex CLI' : 'Claude Code' }}</span>
+            <strong>{{ 'modelSwitch.cliUnchanged' | t }}</strong
+            ><span>CLI {{ agentType() === 'codex' ? 'Codex CLI' : 'Claude Code' }}</span>
           </div>
           <div>
             <strong>{{ singleTerminalName() ? 1 : agentCount() }}</strong
@@ -146,17 +146,15 @@ export class ModelSwitchDialogComponent {
   /** Name of the single terminal being switched; empty for a batch switch. */
   readonly singleTerminalName = input('');
   /** Fixes the agent type, hiding the tabs when the target terminal already decides it. */
-  readonly lockedAgentType = input<NativeAgentType | null>(null);
+  readonly lockedAgentType = input<AgentProtocol | null>(null);
   /** Profile already running in a single terminal; it remains visible but cannot be selected. */
   readonly currentProfileId = input('');
   readonly confirmed = output<ModelSwitchValue>();
   readonly cancelled = output<void>();
   readonly selectedProfileId = signal('');
-  protected readonly agentTypeValue = signal<NativeAgentType>('claude');
+  protected readonly agentTypeValue = signal<AgentProtocol>('claude');
   readonly agentType = computed(() => this.lockedAgentType() ?? this.agentTypeValue());
-  protected readonly selectedAgent = computed<AgentProtocol>(() =>
-    this.agentType() === 'codex' ? 'codex' : 'claude',
-  );
+  protected readonly selectedAgent = computed<AgentProtocol>(() => this.agentType());
 
   /** Only profiles switched on for the agent being changed can be offered. */
   protected readonly filteredProfiles = computed(() =>

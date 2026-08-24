@@ -10,12 +10,12 @@ import {
 
 import {
   AccountProfileInput,
+  AgentProtocol,
   CliOperationPlan,
   CliOperationRequest,
   CliOperationResult,
   McpProfileInput,
   ModelProfileInput,
-  NativeAgentType,
   needsCredential,
   NetworkProfileInput,
   NetworkTestResult,
@@ -67,6 +67,10 @@ import {
   ClaudeLaunchDialogValue,
 } from './dialogs/claude-launch-dialog';
 import { CodexLaunchDialogComponent, CodexLaunchDialogValue } from './dialogs/codex-launch-dialog';
+import {
+  OpenCodeLaunchDialogComponent,
+  type OpenCodeLaunchDialogValue,
+} from './dialogs/opencode-launch-dialog';
 import { CreateWorkspaceDialogComponent } from './dialogs/create-workspace-dialog';
 import { DeleteWorkspaceDialogComponent } from './dialogs/delete-workspace-dialog';
 import {
@@ -149,6 +153,7 @@ function readStoredString(key: string, fallback: string): string {
     AgentSettingsDialogComponent,
     ClaudeLaunchDialogComponent,
     CodexLaunchDialogComponent,
+    OpenCodeLaunchDialogComponent,
     CreateWorkspaceDialogComponent,
     DeleteWorkspaceDialogComponent,
     EditWorkspaceDialogComponent,
@@ -208,6 +213,7 @@ export class App {
   protected readonly editingWorkspaceId = signal<string | null>(null);
   protected readonly claudeLaunchOpen = signal(false);
   protected readonly codexLaunchOpen = signal(false);
+  protected readonly openCodeLaunchOpen = signal(false);
   protected readonly sessionCenterOpen = signal(false);
   protected readonly promptLibraryOpen = signal(false);
   protected readonly handoffOpen = signal(false);
@@ -219,7 +225,7 @@ export class App {
   /** Terminal the switch applies to; null means every terminal of that agent type. */
   protected readonly modelSwitchTerminalId = signal<string | null>(null);
   /** Agent type to preselect when the switch targets one terminal. */
-  protected readonly modelSwitchAgentType = signal<NativeAgentType | null>(null);
+  protected readonly modelSwitchAgentType = signal<AgentProtocol | null>(null);
   /** Name of the single target, so the dialog can say which terminal it will change. */
   protected readonly modelSwitchTerminalName = computed(() => {
     const terminalId = this.modelSwitchTerminalId();
@@ -281,6 +287,7 @@ export class App {
   protected readonly layoutRevision = signal(0);
   protected readonly launchingClaude = signal(false);
   protected readonly launchingCodex = signal(false);
+  protected readonly launchingOpenCode = signal(false);
   protected readonly updateInstalling = signal(false);
   /** Stable reference so the session center input does not change every check. */
   protected readonly sessionLaunchProfiles = (nativeSessionId: string) =>
@@ -309,7 +316,9 @@ export class App {
       this.state
         .activeWorkspace()
         ?.terminals.filter(
-          (terminal): terminal is TerminalSession & { agentType: 'claude' | 'codex' } =>
+          (
+            terminal,
+          ): terminal is TerminalSession & { agentType: 'claude' | 'codex' | 'opencode' } =>
             terminal.agentType !== 'shell',
         ) ?? [],
   );
@@ -563,6 +572,64 @@ export class App {
     this.codexLaunchOpen.set(true);
   }
 
+  protected async openOpenCodeLaunch(): Promise<void> {
+    this.agentMenuOpen.set(false);
+    const workingDirectory = await this.selectTerminalDirectory();
+    if (!workingDirectory) {
+      return;
+    }
+    this.selectedTerminalDirectory.set(workingDirectory);
+    this.openCodeLaunchOpen.set(true);
+  }
+
+  protected async launchOpenCode(value: OpenCodeLaunchDialogValue): Promise<void> {
+    const workspace = this.state.activeWorkspace();
+    const workingDirectory = this.selectedTerminalDirectory();
+    if (!workspace || !workingDirectory || this.launchingOpenCode()) {
+      return;
+    }
+    if (!this.agents.openCodeInstallation()) {
+      await this.agents.detectOpenCode();
+    }
+    const installation = this.agents.openCodeInstallation();
+    if (!installation?.healthy) {
+      this.showToast(installation?.diagnostic ?? '未检测到 OpenCode。', 'attention');
+      return;
+    }
+
+    const terminalId = crypto.randomUUID();
+    this.launchingOpenCode.set(true);
+    try {
+      const launch = await this.agents.prepareOpenCodeLaunch({
+        terminalId,
+        workspaceId: workspace.id,
+        model: value.model,
+      });
+      const terminal = this.state.createTerminal({
+        id: terminalId,
+        agentType: 'opencode',
+        name: value.name || undefined,
+        command: launch.command,
+        model: value.model ?? 'OpenCode 默认模型',
+        workingDirectory,
+      });
+      this.openCodeLaunchOpen.set(false);
+      this.selectedTerminalDirectory.set(null);
+      if (terminal) {
+        this.showToast(this.i18n.t('terminal.started', { name: terminal.name }));
+      }
+    } catch (error) {
+      this.showToast(this.errorMessage(error), 'attention');
+    } finally {
+      this.launchingOpenCode.set(false);
+    }
+  }
+
+  protected closeOpenCodeLaunch(): void {
+    this.openCodeLaunchOpen.set(false);
+    this.selectedTerminalDirectory.set(null);
+  }
+
   protected async launchCodex(value: CodexLaunchDialogValue): Promise<void> {
     const workspace = this.state.activeWorkspace();
     const workingDirectory = this.selectedTerminalDirectory();
@@ -685,52 +752,75 @@ export class App {
 
   protected async resumeAgent(value: ResumeSessionValue): Promise<void> {
     const workspace = this.state.activeWorkspace();
-    const isCodex = value.session.agentType === 'codex';
-    if (!workspace || (isCodex && this.launchingCodex()) || (!isCodex && this.launchingClaude())) {
+    const agentType = value.session.agentType;
+    const launching =
+      agentType === 'claude'
+        ? this.launchingClaude
+        : agentType === 'codex'
+          ? this.launchingCodex
+          : this.launchingOpenCode;
+    if (!workspace || launching()) {
       return;
     }
 
-    const profile = this.agents.modelProfiles().find((item) => item.id === value.profileId);
-    if (profile && needsCredential(profile, 'codex')) {
+    const profile =
+      agentType === 'opencode'
+        ? undefined
+        : this.agents.modelProfiles().find((item) => item.id === value.profileId);
+    if (profile && needsCredential(profile, agentType === 'claude' ? 'claude' : 'codex')) {
       this.openModelCredentialSettings(profile.id, profile.name);
       return;
     }
 
     const terminalId = crypto.randomUUID();
-    (isCodex ? this.launchingCodex : this.launchingClaude).set(true);
+    launching.set(true);
     try {
-      const launch = isCodex
-        ? await this.agents.prepareCodexLaunch({
-            terminalId,
-            workspaceId: workspace.id,
-            sessionId: value.session.nativeSessionId,
-            model: value.model,
-            profileId: value.profileId,
-            accountProfileId: value.accountProfileId,
-          })
-        : await this.agents.prepareLaunch({
-            terminalId,
-            workspaceId: workspace.id,
-            sessionId: value.session.nativeSessionId,
-            profileId: value.profileId,
-            mcpProfileId: value.mcpProfileId,
-            accountProfileId: value.accountProfileId,
-          });
+      const launch =
+        agentType === 'claude'
+          ? await this.agents.prepareLaunch({
+              terminalId,
+              workspaceId: workspace.id,
+              sessionId: value.session.nativeSessionId,
+              profileId: value.profileId,
+              mcpProfileId: value.mcpProfileId,
+              accountProfileId: value.accountProfileId,
+            })
+          : agentType === 'codex'
+            ? await this.agents.prepareCodexLaunch({
+                terminalId,
+                workspaceId: workspace.id,
+                sessionId: value.session.nativeSessionId,
+                model: value.model,
+                profileId: value.profileId,
+                accountProfileId: value.accountProfileId,
+              })
+            : await this.agents.prepareOpenCodeLaunch({
+                terminalId,
+                workspaceId: workspace.id,
+                sessionId: value.session.nativeSessionId,
+                model: value.model,
+              });
       const terminal = this.state.createTerminal({
         id: terminalId,
         agentType: value.session.agentType,
         name: value.session.title,
         command: launch.command,
         model:
-          (profile ? profileModel(profile, isCodex ? 'codex' : 'claude') : undefined) ??
+          (profile
+            ? profileModel(profile, agentType === 'claude' ? 'claude' : 'codex')
+            : undefined) ??
           value.model ??
           value.session.modelName ??
-          (isCodex ? this.i18n.t('terminal.defaultCodexModel') : 'Claude Sonnet'),
+          (agentType === 'claude'
+            ? 'Claude Sonnet'
+            : agentType === 'codex'
+              ? this.i18n.t('terminal.defaultCodexModel')
+              : 'OpenCode 默认模型'),
         nativeSessionId: value.session.nativeSessionId,
         workingDirectory: value.session.projectPath ?? workspace.projectPath,
         profileId: value.profileId,
-        mcpProfileId: !isCodex ? value.mcpProfileId : undefined,
-        accountProfileId: value.accountProfileId,
+        mcpProfileId: agentType === 'claude' ? value.mcpProfileId : undefined,
+        accountProfileId: agentType === 'opencode' ? undefined : value.accountProfileId,
       });
       this.sessionCenterOpen.set(false);
       if (terminal) {
@@ -739,7 +829,7 @@ export class App {
     } catch (error) {
       this.showToast(this.errorMessage(error));
     } finally {
-      (isCodex ? this.launchingCodex : this.launchingClaude).set(false);
+      launching.set(false);
     }
   }
 
@@ -1404,7 +1494,7 @@ export class App {
   /** Opens the switcher scoped to one terminal, preselecting its agent type. */
   protected openSingleModelSwitch(terminalId: string): void {
     const terminal = this.state.activeWorkspace()?.terminals.find((item) => item.id === terminalId);
-    if (!terminal || terminal.agentType === 'shell') {
+    if (!terminal || terminal.agentType === 'shell' || terminal.agentType === 'opencode') {
       return;
     }
     this.modelSwitchTerminalId.set(terminalId);
@@ -1790,7 +1880,11 @@ export class App {
   }
 
   protected async detectAgentInstallations(): Promise<void> {
-    await Promise.all([this.agents.detectClaude(), this.agents.detectCodex()]);
+    await Promise.all([
+      this.agents.detectClaude(),
+      this.agents.detectCodex(),
+      this.agents.detectOpenCode(),
+    ]);
     this.showToast(this.i18n.t('agent.detectionComplete'));
   }
 
@@ -1865,6 +1959,8 @@ export class App {
 
   private openModelCredentialSettings(profileId: string, profileName: string): void {
     this.claudeLaunchOpen.set(false);
+    this.codexLaunchOpen.set(false);
+    this.openCodeLaunchOpen.set(false);
     this.sessionCenterOpen.set(false);
     this.closeModelSwitch();
     this.selectedTerminalDirectory.set(null);
@@ -1881,6 +1977,7 @@ export class App {
     ]);
     await this.refreshRestoredClaudeLaunches();
     await this.refreshRestoredCodexLaunches();
+    await this.refreshRestoredOpenCodeLaunches();
     this.mountWorkspace(this.state.activeWorkspace()?.id);
     const recoveredDraft = this.state.activeTerminal()
       ? this.promptAssets.draftForTerminal(this.state.activeTerminal()!.id)
@@ -2027,6 +2124,45 @@ export class App {
     const failed = results.filter((result) => result.status === 'rejected').length;
     if (failed > 0) {
       this.showToast(this.i18n.t('restore.codexFailed', { count: failed }), 'attention');
+    }
+  }
+
+  private async refreshRestoredOpenCodeLaunches(): Promise<void> {
+    const restored = this.state
+      .workspaces()
+      .flatMap((workspace) =>
+        workspace.terminals
+          .filter((terminal) => terminal.agentType === 'opencode')
+          .map((terminal) => ({ workspaceId: workspace.id, terminal })),
+      );
+    if (restored.length === 0) {
+      return;
+    }
+
+    const results = await Promise.allSettled(
+      restored.map(async ({ workspaceId, terminal }) => {
+        const model = terminal.model.includes('默认模型') ? undefined : terminal.model;
+        const launch = await this.agents.prepareOpenCodeLaunch({
+          terminalId: terminal.id,
+          workspaceId,
+          sessionId: terminal.nativeSessionId,
+          model,
+          continueLast: !terminal.nativeSessionId,
+        });
+        if (
+          !this.state.updateRestoredTerminalLaunch(terminal.id, launch.command, {
+            model: terminal.model,
+          })
+        ) {
+          throw new Error(
+            this.i18n.t('restore.terminalMissing', { agent: 'OpenCode', name: terminal.name }),
+          );
+        }
+      }),
+    );
+    const failed = results.filter((result) => result.status === 'rejected').length;
+    if (failed > 0) {
+      this.showToast(`有 ${failed} 个 OpenCode 终端恢复失败。`, 'attention');
     }
   }
 

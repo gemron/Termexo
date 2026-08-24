@@ -8,6 +8,7 @@ use std::time::{SystemTime, UNIX_EPOCH};
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use thiserror::Error;
+use url::Url;
 
 #[derive(Debug, Error)]
 pub enum HookError {
@@ -21,6 +22,10 @@ pub enum HookError {
     InvalidArguments,
     #[error("Codex runtime command contains an unsupported TOML delimiter")]
     InvalidCodexConfigValue,
+    #[error("无法生成 OpenCode 运行时插件路径")]
+    InvalidOpenCodePluginPath,
+    #[error("无法合并 OPENCODE_CONFIG_CONTENT：{0}")]
+    InvalidOpenCodeConfig(String),
 }
 
 const TERMEXO_CODEX_EVENT_FILE: &str = "TERMEXO_CODEX_EVENT_FILE";
@@ -56,6 +61,11 @@ pub struct AgentEvent {
 pub struct ClaudeRuntimeSettings {
     pub settings_path: String,
     pub event_file: String,
+}
+
+#[derive(Debug)]
+pub struct OpenCodeRuntimeSettings {
+    pub config_content: String,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -177,6 +187,31 @@ impl HookEventStore {
             ),
             (TERMEXO_CODEX_TERMINAL_ID.into(), terminal_id.into()),
         ]
+    }
+
+    pub fn prepare_opencode_runtime(
+        &self,
+        terminal_id: &str,
+        session_id: Option<&str>,
+        existing_config: Option<&str>,
+    ) -> Result<OpenCodeRuntimeSettings, HookError> {
+        let plugin_path = self
+            .runtime_directory
+            .join(format!("opencode-{terminal_id}.plugin.js"));
+        let plugin = OPENCODE_PLUGIN_TEMPLATE
+            .replace(
+                "__EVENT_FILE__",
+                &serde_json::to_string(&self.event_file.to_string_lossy())?,
+            )
+            .replace("__TERMINAL_ID__", &serde_json::to_string(terminal_id)?)
+            .replace("__SESSION_ID__", &serde_json::to_string(session_id)?);
+        fs::write(&plugin_path, plugin)?;
+
+        let plugin_url = Url::from_file_path(&plugin_path)
+            .map_err(|_| HookError::InvalidOpenCodePluginPath)?
+            .to_string();
+        let config_content = merge_opencode_plugin_config(existing_config, &plugin_url)?;
+        Ok(OpenCodeRuntimeSettings { config_content })
     }
 
     pub fn write_mcp_config(
@@ -310,6 +345,9 @@ fn map_hook_event(stored: StoredHookEvent) -> AgentEvent {
     if stored.agent_type.as_deref() == Some("codex") {
         return map_codex_event(stored);
     }
+    if stored.agent_type.as_deref() == Some("opencode") {
+        return map_opencode_event(stored);
+    }
 
     let hook_name = stored
         .payload
@@ -352,6 +390,62 @@ fn map_hook_event(stored: StoredHookEvent) -> AgentEvent {
         created_at: stored.received_at,
     }
 }
+
+fn map_opencode_event(stored: StoredHookEvent) -> AgentEvent {
+    AgentEvent {
+        event_key: stored.event_key,
+        agent_type: "opencode".into(),
+        native_session_id: stored
+            .payload
+            .get("native_session_id")
+            .and_then(Value::as_str)
+            .map(str::to_owned),
+        terminal_id: stored.terminal_id,
+        event_type: stored
+            .payload
+            .get("event_type")
+            .and_then(Value::as_str)
+            .unwrap_or("agent.notification")
+            .into(),
+        detail: stored
+            .payload
+            .get("detail")
+            .cloned()
+            .unwrap_or_else(|| stored.payload.clone()),
+        created_at: stored.received_at,
+    }
+}
+
+fn merge_opencode_plugin_config(
+    existing_config: Option<&str>,
+    plugin_url: &str,
+) -> Result<String, HookError> {
+    let mut config = match existing_config.filter(|value| !value.trim().is_empty()) {
+        Some(value) => serde_json::from_str::<Value>(value)
+            .map_err(|error| HookError::InvalidOpenCodeConfig(error.to_string()))?,
+        None => json!({}),
+    };
+    let object = config
+        .as_object_mut()
+        .ok_or_else(|| HookError::InvalidOpenCodeConfig("配置内容必须是 JSON 对象".into()))?;
+    let plugins = object.entry("plugin").or_insert_with(|| json!([]));
+    let plugins = plugins
+        .as_array_mut()
+        .ok_or_else(|| HookError::InvalidOpenCodeConfig("plugin 字段必须是数组".into()))?;
+    if !plugins.iter().any(|plugin| {
+        plugin.as_str() == Some(plugin_url)
+            || plugin
+                .as_array()
+                .and_then(|values| values.first())
+                .and_then(Value::as_str)
+                == Some(plugin_url)
+    }) {
+        plugins.push(Value::String(plugin_url.into()));
+    }
+    serde_json::to_string(&config).map_err(HookError::from)
+}
+
+const OPENCODE_PLUGIN_TEMPLATE: &str = include_str!("opencode-plugin.mjs");
 
 fn map_codex_event(stored: StoredHookEvent) -> AgentEvent {
     let event_type = match stored.payload.get("type").and_then(Value::as_str) {
@@ -599,6 +693,59 @@ mod tests {
         );
 
         fs::remove_dir_all(directory).unwrap();
+    }
+
+    #[test]
+    fn writes_an_isolated_opencode_plugin_and_merges_inline_config() {
+        let directory = test_directory("opencode-plugin");
+        let store = HookEventStore::new(&directory).unwrap();
+
+        let runtime = store
+            .prepare_opencode_runtime(
+                "terminal-open",
+                Some("ses_open"),
+                Some(r#"{"theme":"system","plugin":["existing-plugin"]}"#),
+            )
+            .unwrap();
+        let config = serde_json::from_str::<Value>(&runtime.config_content).unwrap();
+        let plugins = config["plugin"].as_array().unwrap();
+        let generated_url = plugins.last().and_then(Value::as_str).unwrap();
+        let generated_path = Url::parse(generated_url).unwrap().to_file_path().unwrap();
+        let plugin = fs::read_to_string(generated_path).unwrap();
+
+        assert_eq!(config["theme"], "system");
+        assert_eq!(plugins[0], "existing-plugin");
+        assert!(plugin.contains("terminal-open"));
+        assert!(plugin.contains("ses_open"));
+        assert!(plugin.contains("permission.asked"));
+        assert!(plugin.contains("question.asked"));
+        assert!(plugin.contains("message.part.updated"));
+        assert!(!plugin.contains("__EVENT_FILE__"));
+
+        fs::remove_dir_all(directory).unwrap();
+    }
+
+    #[test]
+    fn maps_normalized_opencode_events_and_session_ids() {
+        let event = map_hook_event(StoredHookEvent {
+            event_key: "event-opencode-approval".into(),
+            agent_type: Some("opencode".into()),
+            terminal_id: "terminal-open".into(),
+            received_at: 10,
+            payload: json!({
+                "event_type": "approval.required",
+                "native_session_id": "ses_open",
+                "detail": {
+                    "source": "permission.asked",
+                    "title": "执行命令"
+                }
+            }),
+        });
+
+        assert_eq!(event.agent_type, "opencode");
+        assert_eq!(event.event_type, "approval.required");
+        assert_eq!(event.native_session_id.as_deref(), Some("ses_open"));
+        assert_eq!(event.detail["source"], "permission.asked");
     }
 
     #[test]

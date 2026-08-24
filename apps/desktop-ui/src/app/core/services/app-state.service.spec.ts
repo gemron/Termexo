@@ -412,4 +412,25 @@ describe('AppStateService', () => {
     expect(service.activeTerminal()?.status).toBe('WAITING_APPROVAL');
     expect(service.activeTerminal()?.nativeSessionId).toBe('session-1');
   });
+
+  it('binds an OpenCode terminal to the native session reported by its plugin', async () => {
+    await service.initialize();
+    service.createTerminal({
+      id: 'terminal-opencode',
+      agentType: 'opencode',
+    });
+
+    service.applyAgentEvent({
+      eventKey: 'event-opencode-1',
+      agentType: 'opencode',
+      terminalId: 'terminal-opencode',
+      nativeSessionId: 'ses_opencode',
+      eventType: 'user.input.required',
+      detail: { source: 'question.asked' },
+      createdAt: Date.now(),
+    });
+
+    expect(service.activeTerminal()?.status).toBe('WAITING_INPUT');
+    expect(service.activeTerminal()?.nativeSessionId).toBe('ses_opencode');
+  });
 });

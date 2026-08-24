@@ -26,7 +26,9 @@ export function terminalEventMatchesSession(
   event: TerminalRuntimeEvent,
   session: Pick<TerminalSession, 'id' | 'runtimeRevision'>,
 ): boolean {
-  return event.terminalId === session.id && event.runtimeRevision === (session.runtimeRevision ?? 0);
+  return (
+    event.terminalId === session.id && event.runtimeRevision === (session.runtimeRevision ?? 0)
+  );
 }
 
 interface TerminalStartRequest {
@@ -89,7 +91,7 @@ export class TerminalGatewayService {
       shell: session.shell,
       workingDirectory: session.workingDirectory,
       command: session.command,
-      hideInitialCommand: session.agentType === 'codex',
+      hideInitialCommand: session.agentType === 'codex' || session.agentType === 'opencode',
       cols,
       rows,
     };

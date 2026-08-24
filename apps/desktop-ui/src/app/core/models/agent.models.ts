@@ -1,6 +1,7 @@
 import { TerminalStatus } from './workspace.models';
 
-export type NativeAgentType = 'claude' | 'codex';
+export type NativeAgentType = 'claude' | 'codex' | 'opencode';
+export type AccountAgentType = 'claude' | 'codex';
 
 export interface AgentInstallation {
   agentType: NativeAgentType;
@@ -141,6 +142,14 @@ export interface CodexLaunchRequest {
   accountProfileId?: string;
 }
 
+export interface OpenCodeLaunchRequest {
+  terminalId: string;
+  workspaceId?: string;
+  sessionId?: string;
+  model?: string;
+  continueLast?: boolean;
+}
+
 export interface AccountLoginRequest {
   terminalId: string;
   workspaceId?: string;
@@ -150,7 +159,7 @@ export interface AccountLoginRequest {
 export interface AccountProfile {
   id: string;
   name: string;
-  agentType: NativeAgentType;
+  agentType: AccountAgentType;
   configDir?: string;
   isDefault: boolean;
   isSystem: boolean;
@@ -161,11 +170,11 @@ export interface AccountProfile {
 export interface AccountProfileInput {
   id: string;
   name: string;
-  agentType: NativeAgentType;
+  agentType: AccountAgentType;
   isDefault: boolean;
 }
 
-export type AgentProtocol = 'claude' | 'codex';
+export type AgentProtocol = AccountAgentType;
 
 /**
  * One provider's credentials plus the endpoint each agent reaches it through.

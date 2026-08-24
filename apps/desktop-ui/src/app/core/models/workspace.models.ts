@@ -1,4 +1,4 @@
-export type AgentType = 'claude' | 'codex' | 'shell';
+export type AgentType = 'claude' | 'codex' | 'opencode' | 'shell';
 
 export type TerminalStatus =
   | 'STARTING'
@@ -119,5 +119,6 @@ export const TERMINAL_STATUS_LABELS: Record<TerminalStatus, string> = {
 export const AGENT_LABELS: Record<AgentType, string> = {
   claude: 'Claude Code',
   codex: 'Codex CLI',
+  opencode: 'OpenCode',
   shell: 'Shell',
 };

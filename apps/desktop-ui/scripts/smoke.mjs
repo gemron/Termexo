@@ -596,6 +596,16 @@ try {
   await codexLaunchDialog.getByLabel('Codex 模型').fill('gpt-5.6-sol');
   await codexLaunchDialog.getByRole('button', { name: '关闭' }).click();
 
+  await toolbar.getByRole('button', { name: 'Agent', exact: true }).click();
+  page.once('dialog', (dialog) => dialog.accept(dialog.defaultValue()));
+  await page.getByRole('button', { name: /OpenCode/ }).click();
+  const openCodeLaunchDialog = page.getByRole('dialog', { name: '新建 OpenCode 会话' });
+  await openCodeLaunchDialog.waitFor();
+  if (await openCodeLaunchDialog.getByRole('button', { name: '启动' }).isEnabled()) {
+    throw new Error('OpenCode launch must be disabled in browser preview mode');
+  }
+  await openCodeLaunchDialog.getByRole('button', { name: '关闭' }).click();
+
   await toolbar.getByRole('button', { name: /批量切换|Switch all/ }).click();
   const modelSwitchDialog = page.getByRole('dialog', {
     name: '切换 Claude Code 后端模型',

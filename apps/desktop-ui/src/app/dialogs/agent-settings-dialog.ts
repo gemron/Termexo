@@ -4,6 +4,7 @@ import { FormsModule } from '@angular/forms';
 import { I18nService } from '../core/i18n/i18n.service';
 import { TranslatePipe } from '../core/i18n/translate.pipe';
 import {
+  AccountAgentType,
   AccountProfile,
   AccountProfileInput,
   AgentInstallation,
@@ -149,6 +150,23 @@ const DEFAULT_ALERT_THRESHOLD = 80;
                   </div>
                   <code>{{ codexInstallation()?.version ?? ('common.notDetected' | t) }}</code>
                 </div>
+                <div
+                  class="diagnostic-status alert"
+                  [class.unavailable]="!openCodeInstallation()?.healthy"
+                >
+                  <span><app-icon name="terminal" [size]="18" /></span>
+                  <div>
+                    <strong>{{
+                      openCodeInstallation()?.healthy
+                        ? ('settings.available' | t: { name: 'OpenCode' })
+                        : ('settings.unavailable' | t: { name: 'OpenCode' })
+                    }}</strong>
+                    <small>{{
+                      openCodeInstallation()?.diagnostic ?? ('settings.awaitingDetection' | t)
+                    }}</small>
+                  </div>
+                  <code>{{ openCodeInstallation()?.version ?? ('common.notDetected' | t) }}</code>
+                </div>
                 <dl>
                   <div>
                     <dt>Claude</dt>
@@ -157,6 +175,12 @@ const DEFAULT_ALERT_THRESHOLD = 80;
                   <div>
                     <dt>Codex</dt>
                     <dd>{{ codexInstallation()?.executablePath ?? ('settings.notFound' | t) }}</dd>
+                  </div>
+                  <div>
+                    <dt>OpenCode</dt>
+                    <dd>
+                      {{ openCodeInstallation()?.executablePath ?? ('settings.notFound' | t) }}
+                    </dd>
                   </div>
                   <div>
                     <dt>{{ 'settings.credentialStorage' | t }}</dt>
@@ -271,6 +295,19 @@ const DEFAULT_ALERT_THRESHOLD = 80;
                     <small>{{
                       installation()?.healthy
                         ? (installation()?.version ?? ('settings.installed' | t))
+                        : ('common.notDetected' | t)
+                    }}</small>
+                  </button>
+                  <button
+                    type="button"
+                    [class.active]="cliAgentType === 'opencode'"
+                    (click)="selectCliAgent('opencode')"
+                  >
+                    <span><app-icon name="terminal" [size]="16" /></span>
+                    <strong>OpenCode</strong>
+                    <small>{{
+                      openCodeInstallation()?.healthy
+                        ? (openCodeInstallation()?.version ?? ('settings.installed' | t))
                         : ('common.notDetected' | t)
                     }}</small>
                   </button>
@@ -682,7 +719,10 @@ const DEFAULT_ALERT_THRESHOLD = 80;
                   }
                   <fieldset class="agent-endpoint">
                     <legend>{{ 'settings.planMonitoring' | t }}</legend>
-                    <label><span>{{ 'settings.planAlertThreshold' | t }}</span><input type="number" min="1" max="100" [(ngModel)]="modelPlanAlertThreshold" /></label>
+                    <label
+                      ><span>{{ 'settings.planAlertThreshold' | t }}</span
+                      ><input type="number" min="1" max="100" [(ngModel)]="modelPlanAlertThreshold"
+                    /></label>
                     <small class="preset-source">{{ 'settings.planQuotaHelp' | t }}</small>
                   </fieldset>
                   <label class="checkbox-control editor-checkbox">
@@ -999,6 +1039,7 @@ export class AgentSettingsDialogComponent {
   private readonly i18n = inject(I18nService);
   readonly installation = input<AgentInstallation | null>(null);
   readonly codexInstallation = input<AgentInstallation | null>(null);
+  readonly openCodeInstallation = input<AgentInstallation | null>(null);
   readonly modelProfiles = input<ModelProfile[]>([]);
   readonly mcpProfiles = input<McpProfile[]>([]);
   readonly networkProfiles = input<NetworkProfile[]>([]);
@@ -1083,7 +1124,7 @@ export class AgentSettingsDialogComponent {
   protected proxyPassword = '';
   protected clearNetworkCredential = false;
   protected accountName = '';
-  protected accountAgentType: NativeAgentType = 'claude';
+  protected accountAgentType: AccountAgentType = 'claude';
   protected accountDefault = false;
   private modelProfilesInitialized = false;
   private mcpProfilesInitialized = false;
@@ -1307,7 +1348,7 @@ export class AgentSettingsDialogComponent {
   protected profileUsesEndpoint(profile: ModelProfile): boolean {
     return Boolean(
       (profile.claudeEnabled && profile.claudeBaseUrl) ||
-        (profile.codexEnabled && profile.codexBaseUrl),
+      (profile.codexEnabled && profile.codexBaseUrl),
     );
   }
 

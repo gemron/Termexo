@@ -9,7 +9,9 @@ use std::time::{Duration, Instant};
 
 use serde::{Deserialize, Serialize};
 
-use crate::agent::{AgentAdapter, AgentInstallation, ClaudeCodeAdapter, CodexCliAdapter};
+use crate::agent::{
+    AgentAdapter, AgentInstallation, ClaudeCodeAdapter, CodexCliAdapter, OpenCodeAdapter,
+};
 use crate::config::NetworkProfile;
 
 const CLI_OPERATION_TIMEOUT: Duration = Duration::from_secs(300);
@@ -390,6 +392,9 @@ fn detect_agent(agent_type: &str) -> Result<AgentInstallation, String> {
         "codex" => CodexCliAdapter::new()
             .detect()
             .map_err(|error| error.to_string()),
+        "opencode" => OpenCodeAdapter::new()
+            .detect()
+            .map_err(|error| error.to_string()),
         _ => Err(format!("不支持的 Agent CLI：{agent_type}")),
     }
 }
@@ -630,6 +635,11 @@ fn definition(agent_type: &str) -> Result<CliDefinition, String> {
             display_name: "Codex CLI",
             package_name: "@openai/codex",
         }),
+        "opencode" => Ok(CliDefinition {
+            agent_type: "opencode",
+            display_name: "OpenCode",
+            package_name: "opencode-ai",
+        }),
         _ => Err(format!("不支持的 Agent CLI：{agent_type}")),
     }
 }
@@ -684,6 +694,7 @@ mod tests {
             "@anthropic-ai/claude-code"
         );
         assert_eq!(definition("codex").unwrap().package_name, "@openai/codex");
+        assert_eq!(definition("opencode").unwrap().package_name, "opencode-ai");
         assert!(definition("shell").is_err());
     }
 
