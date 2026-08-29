@@ -592,6 +592,19 @@
                 <small class="field-error">请先在 Agent 设置中添加可用的模型配置。</small>
               }
             </label>
+            @if (selectedTaskAgentType() === 'opencode') {
+              <label>
+                <span>OpenCode 模型（可选）</span>
+                <input
+                  type="text"
+                  data-testid="task-opencode-model"
+                  placeholder="provider/model，留空则用 OpenCode 默认模型"
+                  [ngModel]="taskOpenCodeModel()"
+                  (ngModelChange)="taskOpenCodeModel.set($event)"
+                />
+                <small>凭据与供应商在 OpenCode 中配置，不由 Termexo 管理。</small>
+              </label>
+            }
           }
           <label>
             <span>工作目录 *</span>

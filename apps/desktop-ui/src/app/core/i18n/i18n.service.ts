@@ -386,6 +386,13 @@ const EN: TranslationTable = {
   'launch.codexModelPlaceholder': 'Leave blank to use the default model in Codex configuration',
   'launch.codexModelHelp':
     'Choose a recommended model or enter any model ID supported by the current Codex CLI.',
+  'launch.newOpenCode': 'New OpenCode session',
+  'launch.detectingOpenCode': 'Detecting OpenCode',
+  'launch.openCodeNameExample': 'Example: opencode-adapter',
+  'launch.openCodeModel': 'Model (optional)',
+  'launch.openCodeModelPlaceholder': 'provider/model, for example anthropic/claude-sonnet-4-5',
+  'launch.openCodeModelHelp':
+    'Leave blank to use the default model from your OpenCode configuration. Credentials and providers are managed inside OpenCode, not in Termexo.',
   'launch.autoConfirm': 'Automatic confirmation',
   'launch.autoConfirmHelp':
     'Let the CLI handle permission confirmations automatically. Some actions may run without asking, so enable this only for trusted projects.',
@@ -979,6 +986,13 @@ const ZH_CN: TranslationTable = {
   'launch.codexModel': 'Codex 模型',
   'launch.codexModelPlaceholder': '留空使用 Codex 配置的默认模型',
   'launch.codexModelHelp': '可选择推荐模型，也可输入当前 Codex CLI 支持的任意模型 ID。',
+  'launch.newOpenCode': '新建 OpenCode 会话',
+  'launch.detectingOpenCode': '正在检测 OpenCode',
+  'launch.openCodeNameExample': '例如：实现 OpenCode 适配',
+  'launch.openCodeModel': '模型（可选）',
+  'launch.openCodeModelPlaceholder': 'provider/model，例如 anthropic/claude-sonnet-4-5',
+  'launch.openCodeModelHelp':
+    '留空时使用 OpenCode 自身配置的默认模型。凭据与供应商在 OpenCode 中配置，不由 Termexo 管理。',
   'launch.autoConfirm': '自动确认模式',
   'launch.autoConfirmHelp': '由 CLI 自动处理权限确认。部分操作可能不再询问，请仅在可信项目中开启。',
   'launch.start': '启动会话',

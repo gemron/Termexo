@@ -1,19 +1,30 @@
 use std::cmp::Reverse;
 use std::env;
-use std::ffi::OsStr;
-use std::path::PathBuf;
-use std::process::Command;
+use std::path::{Path, PathBuf};
+use std::process::{Command, Output};
+use std::time::Duration;
 
 use serde::Deserialize;
+use serde_json::Value;
 use thiserror::Error;
 
 use super::{
     AgentAdapter, AgentInstallation, AgentLaunchSpec, AgentSession, OpenCodeLaunchOptions,
 };
+use crate::process::{hidden_command, run_with_timeout};
 
 const AGENT_TYPE: &str = "opencode";
 const SESSION_STATUS: &str = "HISTORICAL";
 const OPENCODE_PATH_ENV: &str = "TERMEXO_OPENCODE_PATH";
+/// Auto-approves every permission OpenCode does not explicitly deny.
+const AUTO_CONFIRM_FLAG: &str = "--auto";
+/// Keeps a probe from loading the external plugins a user's own OpenCode config may install,
+/// including the one Termexo writes for a terminal.
+const PURE_MODE_FLAG: &str = "--pure";
+/// Version probes run while the user waits on agent detection at startup.
+const VERSION_TIMEOUT: Duration = Duration::from_secs(10);
+/// The session list is read from the CLI rather than from files, so it needs its own ceiling.
+const SESSION_LIST_TIMEOUT: Duration = Duration::from_secs(20);
 
 #[derive(Debug, Error)]
 pub enum OpenCodeError {
@@ -23,6 +34,8 @@ pub enum OpenCodeError {
     SessionCommand(String),
     #[error("无法解析 OpenCode 会话：{0}")]
     SessionJson(#[from] serde_json::Error),
+    #[error("无法执行 OpenCode 命令：{0}")]
+    CommandFailed(String),
 }
 
 #[derive(Debug, Default)]
@@ -93,28 +106,17 @@ impl OpenCodeAdapter {
         candidates.into_iter().find(|path| path.is_file())
     }
 
-    fn run(&self, arguments: &[&str]) -> Option<std::process::Output> {
-        let executable = self.find_executable()?;
-        #[cfg(windows)]
-        if executable
-            .extension()
-            .is_some_and(|extension| extension.eq_ignore_ascii_case("cmd"))
-        {
-            return command_without_window("cmd.exe")
-                .args(["/d", "/c", "call"])
-                .arg(executable)
-                .args(arguments)
-                .output()
-                .ok();
-        }
-        command_without_window(executable)
-            .args(arguments)
-            .output()
-            .ok()
+    /// Runs a read-only OpenCode query, bounded so a stuck CLI cannot hang the caller.
+    fn run(&self, arguments: &[&str], timeout: Duration) -> Result<Output, OpenCodeError> {
+        let executable = self.find_executable().ok_or(OpenCodeError::NotInstalled)?;
+        let mut command = query_command(&executable);
+        command.arg(PURE_MODE_FLAG).args(arguments);
+        run_with_timeout(&mut command, timeout)
+            .map_err(|error| OpenCodeError::CommandFailed(error.to_string()))
     }
 
     fn read_version(&self) -> Option<String> {
-        let output = self.run(&["--version"])?;
+        let output = self.run(&["--version"], VERSION_TIMEOUT).ok()?;
         if !output.status.success() {
             return None;
         }
@@ -155,9 +157,7 @@ impl AgentAdapter for OpenCodeAdapter {
     }
 
     fn list_sessions(&self, project_path: Option<&str>) -> Result<Vec<AgentSession>, Self::Error> {
-        let output = self
-            .run(&["--pure", "session", "list", "--format", "json"])
-            .ok_or(OpenCodeError::NotInstalled)?;
+        let output = self.run(&["session", "list", "--format", "json"], SESSION_LIST_TIMEOUT)?;
         if !output.status.success() {
             return Err(OpenCodeError::SessionCommand(
                 String::from_utf8_lossy(&output.stderr).trim().to_owned(),
@@ -178,6 +178,10 @@ impl AgentAdapter for OpenCodeAdapter {
             command.push_str(" --continue");
         }
         append_option(&mut command, "--model", options.model.as_deref());
+        if options.auto_confirm {
+            command.push(' ');
+            command.push_str(AUTO_CONFIRM_FLAG);
+        }
         Ok(AgentLaunchSpec {
             command,
             executable_path: executable.to_string_lossy().into_owned(),
@@ -192,8 +196,11 @@ fn parse_sessions(
     if value.trim().is_empty() {
         return Ok(Vec::new());
     }
-    let mut sessions = serde_json::from_str::<Vec<OpenCodeSession>>(value)?
+    let mut sessions = serde_json::from_str::<Vec<Value>>(value)?
         .into_iter()
+        // A record Termexo cannot read is dropped on its own rather than failing the whole list,
+        // so one unexpected entry cannot hide every other session the user has.
+        .filter_map(|record| serde_json::from_value::<OpenCodeSession>(record).ok())
         .filter(|session| match project_path {
             Some(expected) => paths_equal(&session.directory, expected),
             None => true,
@@ -240,15 +247,19 @@ fn command_paths(command: &str) -> Vec<PathBuf> {
     paths
 }
 
-fn command_without_window(program: impl AsRef<OsStr>) -> Command {
-    let mut command = Command::new(program);
+/// Builds a query command, routing a Windows `.cmd` shim through `cmd.exe` so it can run at all.
+fn query_command(executable: &Path) -> Command {
     #[cfg(windows)]
+    if executable
+        .extension()
+        .is_some_and(|extension| extension.eq_ignore_ascii_case("cmd"))
     {
-        use std::os::windows::process::CommandExt;
-        const CREATE_NO_WINDOW: u32 = 0x0800_0000;
-        command.creation_flags(CREATE_NO_WINDOW);
+        let mut command = hidden_command("cmd.exe");
+        command.args(["/d", "/c", "call"]).arg(executable);
+        return command;
     }
-    command
+
+    hidden_command(executable)
 }
 
 fn powershell_quote(value: &str) -> String {
@@ -308,6 +319,7 @@ mod tests {
                 session_id: None,
                 model: Some("anthropic/claude-sonnet-4-5".into()),
                 continue_last: false,
+                auto_confirm: false,
             })
             .unwrap();
         assert!(fresh
@@ -318,6 +330,7 @@ mod tests {
                 session_id: Some("ses_123".into()),
                 model: None,
                 continue_last: false,
+                auto_confirm: false,
             })
             .unwrap();
         assert!(resumed.command.contains("--session 'ses_123'"));
@@ -326,9 +339,92 @@ mod tests {
                 session_id: None,
                 model: None,
                 continue_last: true,
+                auto_confirm: false,
             })
             .unwrap();
         assert!(continued.command.ends_with(" --continue"));
         fs::remove_dir_all(directory).unwrap();
+    }
+
+    #[test]
+    fn adds_the_auto_approve_flag_only_when_asked() {
+        let (directory, executable) = test_executable();
+        let adapter = OpenCodeAdapter::with_executable(executable);
+        let automatic = adapter
+            .build_launch_command(&OpenCodeLaunchOptions {
+                session_id: None,
+                model: None,
+                continue_last: false,
+                auto_confirm: true,
+            })
+            .unwrap();
+        assert!(automatic.command.ends_with(" --auto"), "{}", automatic.command);
+        let manual = adapter
+            .build_launch_command(&OpenCodeLaunchOptions {
+                session_id: None,
+                model: None,
+                continue_last: false,
+                auto_confirm: false,
+            })
+            .unwrap();
+        assert!(!manual.command.contains("--auto"), "{}", manual.command);
+        fs::remove_dir_all(directory).unwrap();
+    }
+
+    #[test]
+    fn keeps_readable_sessions_when_one_record_is_malformed() {
+        let value = r#"[
+          {"id":"ses_ok","title":"Readable","updated":2000,"created":1000,"directory":"/srv/termexo"},
+          {"id":"ses_broken","title":"No directory","updated":3000,"created":1000},
+          "not-an-object"
+        ]"#;
+        let sessions = parse_sessions(value, None).unwrap();
+        assert_eq!(sessions.len(), 1);
+        assert_eq!(sessions[0].native_session_id, "ses_ok");
+    }
+
+    /// Exercises the real CLI rather than a fixture.
+    ///
+    /// Ignored by default because it needs OpenCode on the machine. Point `TERMEXO_OPENCODE_PATH`
+    /// at an executable and run `cargo test -- --ignored` to check the flags and the JSON shape
+    /// this adapter depends on against the version actually installed.
+    #[test]
+    #[ignore]
+    fn talks_to_a_real_opencode_installation() {
+        let adapter = OpenCodeAdapter::new();
+        let installation = adapter.detect().unwrap();
+        assert!(installation.installed, "{}", installation.diagnostic);
+        assert!(installation.healthy, "{}", installation.diagnostic);
+        assert!(installation.version.is_some());
+
+        // Must parse whether or not this machine has any sessions: an empty list is a valid answer,
+        // an error here means the command or the JSON shape has moved.
+        let sessions = adapter.list_sessions(None).unwrap();
+        for session in &sessions {
+            assert_eq!(session.agent_type, AGENT_TYPE);
+            assert!(!session.native_session_id.is_empty());
+        }
+
+        // The launch command has to name a real executable and carry the documented flags.
+        let spec = adapter
+            .build_launch_command(&OpenCodeLaunchOptions {
+                session_id: None,
+                model: None,
+                continue_last: true,
+                auto_confirm: true,
+            })
+            .unwrap();
+        assert!(spec.command.contains("--continue"), "{}", spec.command);
+        assert!(spec.command.contains("--auto"), "{}", spec.command);
+        assert!(Path::new(&spec.executable_path).is_file());
+    }
+
+    #[test]
+    fn reports_a_missing_executable_rather_than_hanging() {
+        let adapter = OpenCodeAdapter::with_executable(PathBuf::from("no-such-opencode.cmd"));
+        let error = adapter
+            .list_sessions(None)
+            .expect_err("a missing executable cannot list sessions");
+        assert!(matches!(error, OpenCodeError::NotInstalled));
     }
 }

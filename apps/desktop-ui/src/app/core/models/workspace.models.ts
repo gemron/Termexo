@@ -1,5 +1,14 @@
 export type AgentType = 'claude' | 'codex' | 'opencode' | 'shell';
 
+/**
+ * Model label for an OpenCode terminal that named no model.
+ *
+ * OpenCode resolves the model from its own configuration, so Termexo has no id to record. The
+ * label doubles as the marker that no explicit model was chosen, and a relaunch must therefore
+ * pass no `--model` at all rather than feeding this text back to the CLI.
+ */
+export const OPENCODE_DEFAULT_MODEL = 'OpenCode 默认模型';
+
 export type TerminalStatus =
   | 'STARTING'
   | 'RUNNING'

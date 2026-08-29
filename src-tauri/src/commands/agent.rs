@@ -214,6 +214,8 @@ pub struct PrepareOpenCodeLaunchRequest {
     pub model: Option<String>,
     #[serde(default)]
     pub continue_last: bool,
+    #[serde(default)]
+    pub auto_confirm: bool,
 }
 
 #[derive(Debug, Deserialize)]
@@ -433,6 +435,7 @@ pub fn prepare_opencode_launch(
             session_id: request.session_id,
             model: request.model,
             continue_last: request.continue_last,
+            auto_confirm: request.auto_confirm,
         })
         .map_err(|error| error.to_string())
 }

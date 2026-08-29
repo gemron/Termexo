@@ -34,6 +34,7 @@ import {
   normalizeTerminalFontSize,
   normalizeTerminalGridDimension,
   normalizeWorkspaceThemeColor,
+  OPENCODE_DEFAULT_MODEL,
   TerminalStatus,
   TerminalSession,
   Workspace,
@@ -647,14 +648,16 @@ export class App {
         terminalId,
         workspaceId: workspace.id,
         model: value.model,
+        autoConfirm: value.autoConfirm,
       });
       const terminal = this.state.createTerminal({
         id: terminalId,
         agentType: 'opencode',
         name: value.name || undefined,
         command: launch.command,
-        model: value.model ?? 'OpenCode 默认模型',
+        model: value.model ?? OPENCODE_DEFAULT_MODEL,
         workingDirectory,
+        autoConfirm: value.autoConfirm,
       });
       this.openCodeLaunchOpen.set(false);
       this.selectedTerminalDirectory.set(null);
@@ -857,6 +860,7 @@ export class App {
                 workspaceId: workspace.id,
                 sessionId: value.session.nativeSessionId,
                 model: value.model,
+                autoConfirm: value.autoConfirm,
               });
       const terminal = this.state.createTerminal({
         id: terminalId,
@@ -873,7 +877,7 @@ export class App {
             ? 'Claude Sonnet'
             : agentType === 'codex'
               ? this.i18n.t('terminal.defaultCodexModel')
-              : 'OpenCode 默认模型'),
+              : OPENCODE_DEFAULT_MODEL),
         nativeSessionId: value.session.nativeSessionId,
         workingDirectory: value.session.projectPath ?? workspace.projectPath,
         profileId: value.profileId,
@@ -2253,18 +2257,21 @@ export class App {
     const workspace = this.state.activeWorkspace();
     const project = this.todos.project(task.projectId);
     const workingDirectory = todoWorkingDirectory(task, project);
+    // OpenCode resolves its own model and credentials, so it is the one agent a task can target
+    // without a Termexo model profile.
+    const isOpenCode = task.agentType === 'opencode';
     const profile = this.agents.modelProfiles().find((item) => item.id === task.profileId);
     if (!workspace || workspace.id !== task.workspaceId || !workingDirectory) {
       this.todos.setExecutionError(task.id, '任务缺少可用的工作目录，请先在待办中选择目录。');
       this.showToast('任务缺少可用的工作目录，请先在待办中选择目录。', 'attention');
       return;
     }
-    if (!profile) {
+    if (!isOpenCode && !profile) {
       this.todos.setExecutionError(task.id, '模型配置已不存在，请编辑待办后重新选择模型。');
       this.showToast('模型配置已不存在，请编辑待办后重新选择模型。', 'attention');
       return;
     }
-    if (needsCredential(profile, task.agentType)) {
+    if (profile && !isOpenCode && needsCredential(profile, task.agentType as AgentProtocol)) {
       this.openModelCredentialSettings(profile.id, profile.name);
       this.todos.setExecutionError(task.id, `模型配置 ${profile.name} 缺少凭据。`);
       return;
@@ -2273,39 +2280,47 @@ export class App {
     // A task carries no account of its own until it has resumed a native session, while the
     // backend silently falls back to the agent's default account. Resolving it here keeps the
     // terminal record honest about the subscription it spends, which is what the inspector
-    // matches provider allowances against.
-    const accountProfileId = resolveAccountProfileId(
-      this.agents.accountProfiles(),
-      task.agentType,
-      task.accountProfileId,
-    );
+    // matches provider allowances against. OpenCode has no Termexo account profile at all.
+    const accountProfileId = isOpenCode
+      ? undefined
+      : resolveAccountProfileId(
+          this.agents.accountProfiles(),
+          task.agentType as AgentProtocol,
+          task.accountProfileId,
+        );
 
     this.busyTodoTaskId.set(task.id);
     const terminalId = crypto.randomUUID();
     try {
       await this.assertTodoAgentAvailable(task.agentType);
       const reclaim: BackgroundReclaim =
-        task.agentType === 'codex'
-          ? { proceed: true, forkSession: false }
-          : await this.reclaimBackgroundSession(sessionId);
+        task.agentType === 'claude'
+          ? await this.reclaimBackgroundSession(sessionId)
+          : { proceed: true, forkSession: false };
       if (!reclaim.proceed) {
         return;
       }
-      const launch =
-        task.agentType === 'codex'
+      const launch = isOpenCode
+        ? await this.agents.prepareOpenCodeLaunch({
+            terminalId,
+            workspaceId: workspace.id,
+            sessionId,
+            model: task.modelName || undefined,
+          })
+        : task.agentType === 'codex'
           ? await this.agents.prepareCodexLaunch({
               terminalId,
               workspaceId: workspace.id,
               sessionId,
-              model: profileModel(profile, 'codex'),
-              profileId: profile.id,
+              model: profileModel(profile!, 'codex'),
+              profileId: profile!.id,
               accountProfileId,
             })
           : await this.agents.prepareLaunch({
               terminalId,
               workspaceId: workspace.id,
               sessionId,
-              profileId: profile.id,
+              profileId: profile!.id,
               accountProfileId,
               forkSession: reclaim.forkSession,
               attachShortId: reclaim.attachShortId,
@@ -2316,10 +2331,12 @@ export class App {
           agentType: task.agentType,
           name: `任务 · ${task.title}`,
           command: launch.command,
-          model: profileModel(profile, task.agentType),
+          model: isOpenCode
+            ? task.modelName || OPENCODE_DEFAULT_MODEL
+            : profileModel(profile!, task.agentType as AgentProtocol),
           nativeSessionId: sessionId,
           workingDirectory,
-          profileId: profile.id,
+          profileId: profile?.id,
           accountProfileId,
         },
         workspace.id,
@@ -2416,6 +2433,14 @@ export class App {
       const installation = this.agents.installation();
       if (!installation?.healthy) {
         throw new Error(installation?.diagnostic ?? '未检测到可用的 Claude Code。');
+      }
+      return;
+    }
+    if (agentType === 'opencode') {
+      if (!this.agents.openCodeInstallation()) await this.agents.detectOpenCode();
+      const installation = this.agents.openCodeInstallation();
+      if (!installation?.healthy) {
+        throw new Error(installation?.diagnostic ?? '未检测到可用的 OpenCode。');
       }
       return;
     }
@@ -2888,17 +2913,31 @@ export class App {
 
     const results = await Promise.allSettled(
       restored.map(async ({ workspaceId, terminal }) => {
-        const model = terminal.model.includes('默认模型') ? undefined : terminal.model;
+        const model = terminal.model === OPENCODE_DEFAULT_MODEL ? undefined : terminal.model;
+        const task = this.todos
+          .tasksFor(workspaceId)
+          .find((candidate) => candidate.terminalId === terminal.id);
+        const sessionId = task
+          ? compatibleTodoSessionId(task, this.agents.sessions(), this.agents.events())
+          : compatibleNativeSessionId(
+              'opencode',
+              terminal.nativeSessionId,
+              undefined,
+              this.agents.sessions(),
+              this.agents.events(),
+            );
         const launch = await this.agents.prepareOpenCodeLaunch({
           terminalId: terminal.id,
           workspaceId,
-          sessionId: terminal.nativeSessionId,
+          sessionId,
           model,
-          continueLast: !terminal.nativeSessionId,
+          continueLast: !sessionId,
+          autoConfirm: terminal.autoConfirm,
         });
         if (
           !this.state.updateRestoredTerminalLaunch(terminal.id, launch.command, {
             model: terminal.model,
+            nativeSessionId: sessionId,
           })
         ) {
           throw new Error(

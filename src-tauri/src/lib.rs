@@ -8,6 +8,7 @@ mod fonts;
 mod hooks;
 mod network;
 mod notification;
+mod process;
 mod pty;
 mod quota;
 mod system_proxy;

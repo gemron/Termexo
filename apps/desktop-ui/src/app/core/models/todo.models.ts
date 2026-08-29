@@ -1,8 +1,8 @@
 import {
   compatibleNativeSessionId,
   type AgentEvent,
-  type AgentProtocol,
   type AgentSession,
+  type NativeAgentType,
 } from './agent.models';
 import type { TerminalSession, TerminalStatus, Workspace } from './workspace.models';
 
@@ -45,7 +45,11 @@ export interface TodoTask {
   sortOrder: number;
   /** Overrides the project directory when this task must run somewhere else. */
   workingDirectory?: string;
-  agentType: AgentProtocol;
+  /**
+   * OpenCode is included even though it has no Termexo model profile: it resolves its own model
+   * and credentials, so a task targeting it carries an empty `profileId`.
+   */
+  agentType: NativeAgentType;
   profileId: string;
   modelName: string;
   /** Existing Agent terminal to reuse for the first execution; absent means create one. */
@@ -237,7 +241,7 @@ export function compatibleTodoSessionId(
 export function isTodoAgentTerminal(
   terminal: TerminalSession,
 ): terminal is TerminalSession & { agentType: TodoTask['agentType'] } {
-  return terminal.agentType === 'claude' || terminal.agentType === 'codex';
+  return terminal.agentType !== 'shell';
 }
 
 /** Agent terminals that are alive and at a prompt where a new task can be submitted. */

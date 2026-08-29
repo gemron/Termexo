@@ -408,6 +408,7 @@
               [workspace]="activeWorkspace"
               [terminals]="activeWorkspace.terminals"
               [modelProfiles]="agents.modelProfiles()"
+              [openCodeAvailable]="agents.openCodeInstallation()?.healthy ?? false"
               [busyTaskId]="busyTodoTaskId()"
               [awaitingTerminalIds]="agentStartup.awaitingTerminalIds()"
               (executionRequested)="executeTodoTask($event)"

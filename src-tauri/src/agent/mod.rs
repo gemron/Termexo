@@ -75,6 +75,8 @@ pub struct OpenCodeLaunchOptions {
     pub model: Option<String>,
     #[serde(default)]
     pub continue_last: bool,
+    #[serde(default)]
+    pub auto_confirm: bool,
 }
 
 #[derive(Debug, Clone, Serialize)]

@@ -200,6 +200,7 @@ export interface OpenCodeLaunchRequest {
   sessionId?: string;
   model?: string;
   continueLast?: boolean;
+  autoConfirm?: boolean;
 }
 
 export interface AccountLoginRequest {

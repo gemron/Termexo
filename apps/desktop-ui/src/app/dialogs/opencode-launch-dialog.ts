@@ -2,16 +2,18 @@ import { Component, computed, input, output, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 
 import { type AgentInstallation } from '../core/models/agent.models';
+import { TranslatePipe } from '../core/i18n/translate.pipe';
 import { IconComponent } from '../shared/icon/icon';
 
 export interface OpenCodeLaunchDialogValue {
   name: string;
   model?: string;
+  autoConfirm?: boolean;
 }
 
 @Component({
   selector: 'app-opencode-launch-dialog',
-  imports: [FormsModule, IconComponent],
+  imports: [FormsModule, IconComponent, TranslatePipe],
   template: `
     <div class="backdrop modal modal-open" (mousedown)="cancelled.emit()">
       <section
@@ -25,15 +27,15 @@ export interface OpenCodeLaunchDialogValue {
           <div class="dialog-title">
             <span class="title-icon"><app-icon name="terminal" [size]="17" /></span>
             <div>
-              <h2 id="opencode-launch-title">新建 OpenCode 会话</h2>
+              <h2 id="opencode-launch-title">{{ 'launch.newOpenCode' | t }}</h2>
               <p>{{ workingDirectory() }}</p>
             </div>
           </div>
           <button
             type="button"
             class="btn btn-square btn-ghost btn-sm"
-            title="关闭"
-            aria-label="关闭"
+            [title]="'common.close' | t"
+            [attr.aria-label]="'common.close' | t"
             (click)="cancelled.emit()"
           >
             <app-icon name="x" [size]="15" />
@@ -42,38 +44,49 @@ export interface OpenCodeLaunchDialogValue {
 
         <div class="installation-line" [class.unavailable]="!installation()?.healthy">
           <i></i>
-          <span>{{ installation()?.diagnostic ?? '正在检测 OpenCode...' }}</span>
+          <span>{{ installation()?.diagnostic ?? ('launch.detectingOpenCode' | t) }}</span>
           <code>{{ installation()?.version ?? '' }}</code>
         </div>
 
         <div class="form-grid">
           <label class="wide">
-            <span>会话名称</span>
+            <span>{{ 'launch.sessionName' | t }}</span>
             <input
               type="text"
               class="input input-bordered input-sm"
-              placeholder="例如：实现 OpenCode 适配"
+              [placeholder]="'launch.openCodeNameExample' | t"
               [ngModel]="name()"
               (ngModelChange)="name.set($event)"
               autofocus
             />
           </label>
           <label class="wide">
-            <span>模型（可选）</span>
+            <span>{{ 'launch.openCodeModel' | t }}</span>
             <input
               type="text"
               class="input input-bordered input-sm"
-              placeholder="provider/model，例如 anthropic/claude-sonnet-4-5"
+              [placeholder]="'launch.openCodeModelPlaceholder' | t"
               [ngModel]="model()"
               (ngModelChange)="model.set($event)"
             />
-            <small>留空时使用 OpenCode 自身配置的默认模型；凭据请在 OpenCode 中配置。</small>
+            <small>{{ 'launch.openCodeModelHelp' | t }}</small>
+          </label>
+          <label class="wide checkbox-control auto-confirm-control">
+            <input
+              type="checkbox"
+              [ngModel]="autoConfirm()"
+              (ngModelChange)="autoConfirm.set($event)"
+            />
+            <span>
+              <strong>{{ 'launch.autoConfirm' | t }}</strong>
+              <small>{{ 'launch.autoConfirmHelp' | t }}</small>
+            </span>
           </label>
         </div>
 
         <footer>
           <button type="button" class="secondary btn btn-ghost btn-sm" (click)="cancelled.emit()">
-            取消
+            {{ 'common.cancel' | t }}
           </button>
           <button
             type="button"
@@ -81,7 +94,7 @@ export interface OpenCodeLaunchDialogValue {
             [disabled]="!canLaunch()"
             (click)="submit()"
           >
-            <app-icon name="play" [size]="13" />启动
+            <app-icon name="play" [size]="13" />{{ 'launch.start' | t }}
           </button>
         </footer>
       </section>
@@ -97,6 +110,7 @@ export class OpenCodeLaunchDialogComponent {
 
   protected readonly name = signal('');
   protected readonly model = signal('');
+  protected readonly autoConfirm = signal(false);
   protected readonly canLaunch = computed(() => Boolean(this.installation()?.healthy));
 
   protected submit(): void {
@@ -106,6 +120,7 @@ export class OpenCodeLaunchDialogComponent {
     this.launched.emit({
       name: this.name().trim(),
       model: this.model().trim() || undefined,
+      autoConfirm: this.autoConfirm(),
     });
   }
 }

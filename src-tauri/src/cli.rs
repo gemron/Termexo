@@ -2,7 +2,7 @@ use std::collections::HashMap;
 use std::env;
 use std::io::Read;
 use std::path::{Path, PathBuf};
-use std::process::{Child, Command, Stdio};
+use std::process::{Command, Stdio};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::thread;
 use std::time::{Duration, Instant};
@@ -13,6 +13,7 @@ use crate::agent::{
     AgentAdapter, AgentInstallation, ClaudeCodeAdapter, CodexCliAdapter, OpenCodeAdapter,
 };
 use crate::config::NetworkProfile;
+use crate::process::{hide_window, terminate_process_tree};
 
 const CLI_OPERATION_TIMEOUT: Duration = Duration::from_secs(300);
 const CLI_PREFLIGHT_TIMEOUT: Duration = Duration::from_secs(45);
@@ -532,7 +533,7 @@ fn run_npm_command(
         .stdin(Stdio::null())
         .stdout(Stdio::piped())
         .stderr(Stdio::piped());
-    command_without_window(&mut command);
+    hide_window(&mut command);
 
     let mut child = command
         .spawn()
@@ -575,29 +576,6 @@ fn run_npm_command(
     })
 }
 
-/// Stops npm and every process launched through its Windows `.cmd` shim.
-///
-/// Killing only `cmd.exe` leaves `node npm-cli.js` alive with the inherited stdout/stderr pipes.
-/// The reader threads then wait forever even though the advertised command timeout elapsed.
-fn terminate_process_tree(child: &mut Child) {
-    #[cfg(windows)]
-    {
-        let pid = child.id().to_string();
-        let mut taskkill = Command::new("taskkill.exe");
-        taskkill
-            .args(["/PID", &pid, "/T", "/F"])
-            .stdin(Stdio::null())
-            .stdout(Stdio::null())
-            .stderr(Stdio::null());
-        command_without_window(&mut taskkill);
-        let _ = taskkill.status();
-    }
-
-    // This is also the non-Windows implementation and a fallback if taskkill could not run.
-    let _ = child.kill();
-    let _ = child.wait();
-}
-
 fn npm_command(npm_path: &Path) -> Command {
     #[cfg(windows)]
     if npm_path
@@ -610,16 +588,6 @@ fn npm_command(npm_path: &Path) -> Command {
     }
 
     Command::new(npm_path)
-}
-
-fn command_without_window(command: &mut Command) {
-    #[cfg(windows)]
-    {
-        use std::os::windows::process::CommandExt;
-
-        const CREATE_NO_WINDOW: u32 = 0x0800_0000;
-        command.creation_flags(CREATE_NO_WINDOW);
-    }
 }
 
 fn read_output(mut reader: impl Read) -> String {

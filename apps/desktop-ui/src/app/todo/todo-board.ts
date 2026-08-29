@@ -34,6 +34,14 @@ interface ModelOption {
 
 type AgentTerminal = TerminalSession & { agentType: TodoTask['agentType'] };
 
+/**
+ * The model-dropdown value for OpenCode.
+ *
+ * OpenCode carries no Termexo model profile, so its option has an empty profile id. That keeps the
+ * key identical to the `agentType|profileId` an OpenCode task round-trips through.
+ */
+const OPENCODE_OPTION_KEY = 'opencode|';
+
 /** The terminal dropdown value that stands for "create one when the task starts". */
 const NEW_TERMINAL_OPTION = 'new';
 /** The project filter value that stands for "every project in this workspace". */
@@ -62,6 +70,8 @@ export class TodoBoardComponent {
   readonly workspace = input<Workspace | null>(null);
   readonly terminals = input<readonly TerminalSession[]>([]);
   readonly modelProfiles = input<readonly ModelProfile[]>([]);
+  /** OpenCode needs no model profile, so its availability alone decides whether it is offered. */
+  readonly openCodeAvailable = input(false);
   readonly busyTaskId = input<string | null>(null);
   /** Terminals whose startup dialogs are still being answered before the prompt is sent. */
   readonly awaitingTerminalIds = input<readonly string[]>([]);
@@ -102,6 +112,8 @@ export class TodoBoardComponent {
   protected readonly taskProjectId = signal('');
   protected readonly taskWorkingDirectory = signal('');
   protected readonly taskModelKey = signal('');
+  /** Free-text `provider/model` for an OpenCode task; blank means OpenCode's own default. */
+  protected readonly taskOpenCodeModel = signal('');
   protected readonly taskTerminalId = signal(NEW_TERMINAL_OPTION);
   protected readonly taskRecurring = signal(false);
 
@@ -183,8 +195,8 @@ export class TodoBoardComponent {
   protected readonly taskTerminalUnavailable = computed(
     () => this.taskTerminalId() !== NEW_TERMINAL_OPTION && !this.selectedTaskTerminalAvailable(),
   );
-  protected readonly modelOptions = computed<ModelOption[]>(() =>
-    this.modelProfiles().flatMap((profile) => {
+  protected readonly modelOptions = computed<ModelOption[]>(() => {
+    const profileOptions = this.modelProfiles().flatMap((profile) => {
       const options: ModelOption[] = [];
       if (profile.claudeEnabled) {
         options.push({
@@ -205,7 +217,27 @@ export class TodoBoardComponent {
         });
       }
       return options;
-    }),
+    });
+    // OpenCode brings its own model and credentials, so being installed is the only condition
+    // for offering it; unlike Claude and Codex it needs no Termexo model profile.
+    return this.openCodeAvailable()
+      ? [
+          ...profileOptions,
+          {
+            key: OPENCODE_OPTION_KEY,
+            agentType: 'opencode' as const,
+            profileId: '',
+            modelName: '',
+            label: 'OpenCode · 自有模型配置',
+          },
+        ]
+      : profileOptions;
+  });
+
+  /** The agent the model dropdown points at, so the form can offer that agent's own fields. */
+  protected readonly selectedTaskAgentType = computed(
+    () =>
+      this.modelOptions().find((option) => option.key === this.taskModelKey())?.agentType ?? null,
   );
   protected readonly editingTask = computed(() => {
     const taskId = this.editingTaskId();
@@ -327,6 +359,7 @@ export class TodoBoardComponent {
     this.taskProjectId.set(projectId);
     this.taskWorkingDirectory.set(this.projectDirectory(projectId));
     this.taskModelKey.set(this.modelOptions()[0]?.key ?? '');
+    this.taskOpenCodeModel.set('');
     this.taskTerminalId.set(NEW_TERMINAL_OPTION);
     this.taskRecurring.set(false);
     this.openTaskDialog(null);
@@ -340,6 +373,7 @@ export class TodoBoardComponent {
     this.taskProjectId.set(task.projectId);
     this.taskWorkingDirectory.set(task.workingDirectory ?? this.projectDirectory(task.projectId));
     this.taskModelKey.set(`${task.agentType}|${task.profileId}`);
+    this.taskOpenCodeModel.set(task.agentType === 'opencode' ? task.modelName : '');
     this.taskTerminalId.set(task.preferredTerminalId ?? task.terminalId ?? NEW_TERMINAL_OPTION);
     this.taskRecurring.set(task.recurring);
     this.openTaskDialog(task.id);
@@ -515,7 +549,10 @@ export class TodoBoardComponent {
             : workingDirectory,
         agentType: terminal?.agentType ?? option!.agentType,
         profileId: terminal?.profileId ?? option?.profileId ?? '',
-        modelName: terminal?.model ?? option?.modelName ?? '',
+        modelName:
+          terminal?.model ??
+          (option?.agentType === 'opencode' ? this.taskOpenCodeModel().trim() : option?.modelName) ??
+          '',
         preferredTerminalId: terminal?.id,
         recurring: this.taskRecurring(),
       };

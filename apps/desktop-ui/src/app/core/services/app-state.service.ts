@@ -11,6 +11,7 @@ import {
   LayoutMode,
   normalizeTerminalGridDimension,
   normalizeWorkspaceThemeColor,
+  OPENCODE_DEFAULT_MODEL,
   TerminalSession,
   TerminalStatus,
   Workspace,
@@ -529,7 +530,7 @@ export class AppStateService {
           : agentType === 'codex'
             ? 'GPT Codex'
             : agentType === 'opencode'
-              ? 'OpenCode 默认模型'
+              ? OPENCODE_DEFAULT_MODEL
               : 'Local'),
       branch: workspace.activeBranch,
       command: input.command ?? this.defaultCommand(agentType),

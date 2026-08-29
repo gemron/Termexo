@@ -2,8 +2,12 @@ import { beforeEach, describe, expect, it } from 'vitest';
 
 import type { AgentEvent } from '../models/agent.models';
 import type { TodoTaskDraft } from '../models/todo.models';
-import { compatibleTodoSessionId, todoWorkingDirectory } from '../models/todo.models';
-import type { Workspace } from '../models/workspace.models';
+import {
+  compatibleTodoSessionId,
+  isTodoAgentTerminal,
+  todoWorkingDirectory,
+} from '../models/todo.models';
+import type { TerminalSession, Workspace } from '../models/workspace.models';
 import { TodoService } from './todo.service';
 
 const workspace: Workspace = {
@@ -36,6 +40,21 @@ function draft(
     preferredTerminalId,
   };
 }
+
+describe('isTodoAgentTerminal', () => {
+  const terminal = (agentType: TerminalSession['agentType']): TerminalSession =>
+    ({ id: 't', agentType }) as TerminalSession;
+
+  it('accepts every Agent the task runner can drive', () => {
+    expect(isTodoAgentTerminal(terminal('claude'))).toBe(true);
+    expect(isTodoAgentTerminal(terminal('codex'))).toBe(true);
+    expect(isTodoAgentTerminal(terminal('opencode'))).toBe(true);
+  });
+
+  it('rejects a plain shell, which has no Agent to send a task to', () => {
+    expect(isTodoAgentTerminal(terminal('shell'))).toBe(false);
+  });
+});
 
 describe('TodoService', () => {
   beforeEach(() => window.localStorage.clear());

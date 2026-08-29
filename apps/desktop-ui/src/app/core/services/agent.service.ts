@@ -228,7 +228,9 @@ export class AgentService {
       return {
         command: `opencode${request.sessionId ? ` --session '${request.sessionId}'` : ''}${
           request.continueLast && !request.sessionId ? ' --continue' : ''
-        }${request.model ? ` --model '${request.model}'` : ''}`,
+        }${request.model ? ` --model '${request.model}'` : ''}${
+          request.autoConfirm ? ' --auto' : ''
+        }`,
         executablePath: 'opencode',
       };
     }
