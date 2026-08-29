@@ -204,7 +204,7 @@ impl HookEventStore {
                 &serde_json::to_string(&self.event_file.to_string_lossy())?,
             )
             .replace("__TERMINAL_ID__", &serde_json::to_string(terminal_id)?)
-            .replace("__SESSION_ID__", &serde_json::to_string(session_id)?);
+            .replace("__SESSION_ID__", &serde_json::to_string(&session_id)?);
         fs::write(&plugin_path, plugin)?;
 
         let plugin_url = Url::from_file_path(&plugin_path)
