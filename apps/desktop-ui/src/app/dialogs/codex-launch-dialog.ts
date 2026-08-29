@@ -9,6 +9,7 @@ import {
   isNativeModel,
   profileModel,
   profileServes,
+  resolveAccountProfileId,
   ModelProfile,
 } from '../core/models/agent.models';
 import { IconComponent } from '../shared/icon/icon';
@@ -182,11 +183,7 @@ export class CodexLaunchDialogComponent {
     this.profiles().filter((profile) => profileServes(profile, 'codex')),
   );
   protected readonly resolvedAccountProfileId = computed(
-    () =>
-      this.accountProfileId() ||
-      this.codexAccounts().find((profile) => profile.isDefault)?.id ||
-      this.codexAccounts()[0]?.id ||
-      '',
+    () => resolveAccountProfileId(this.accountProfiles(), 'codex', this.accountProfileId()) ?? '',
   );
   protected readonly resolvedProfileId = computed(
     () =>

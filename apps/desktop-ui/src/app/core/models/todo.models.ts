@@ -1,5 +1,10 @@
-import { compatibleNativeSessionId, type AgentEvent, type AgentSession } from './agent.models';
-import type { AgentType, TerminalSession, TerminalStatus, Workspace } from './workspace.models';
+import {
+  compatibleNativeSessionId,
+  type AgentEvent,
+  type AgentProtocol,
+  type AgentSession,
+} from './agent.models';
+import type { TerminalSession, TerminalStatus, Workspace } from './workspace.models';
 
 export type TodoStage = 'todo' | 'executing' | 'completed' | 'verified';
 export type TodoPriority = 'low' | 'medium' | 'high';
@@ -40,7 +45,7 @@ export interface TodoTask {
   sortOrder: number;
   /** Overrides the project directory when this task must run somewhere else. */
   workingDirectory?: string;
-  agentType: Exclude<AgentType, 'shell'>;
+  agentType: AgentProtocol;
   profileId: string;
   modelName: string;
   /** Existing Agent terminal to reuse for the first execution; absent means create one. */
@@ -225,12 +230,22 @@ export function compatibleTodoSessionId(
   );
 }
 
+/**
+ * Terminals a task can be bound to at all: the board launches through the Claude and Codex
+ * adapters only, so no other agent may reach {@link isReusableTodoTerminal}.
+ */
+export function isTodoAgentTerminal(
+  terminal: TerminalSession,
+): terminal is TerminalSession & { agentType: TodoTask['agentType'] } {
+  return terminal.agentType === 'claude' || terminal.agentType === 'codex';
+}
+
 /** Agent terminals that are alive and at a prompt where a new task can be submitted. */
 export function isReusableTodoTerminal(
   terminal: TerminalSession,
 ): terminal is TerminalSession & { agentType: TodoTask['agentType'] } {
   return (
-    terminal.agentType !== 'shell' &&
+    isTodoAgentTerminal(terminal) &&
     ['RUNNING', 'WAITING_INPUT', 'IDLE', 'COMPLETED'].includes(terminal.status)
   );
 }

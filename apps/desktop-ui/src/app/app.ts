@@ -23,6 +23,7 @@ import {
   NetworkProfileInput,
   NetworkTestResult,
   profileModel,
+  resolveAccountProfileId,
 } from './core/models/agent.models';
 import {
   AgentType,
@@ -2269,6 +2270,16 @@ export class App {
       return;
     }
 
+    // A task carries no account of its own until it has resumed a native session, while the
+    // backend silently falls back to the agent's default account. Resolving it here keeps the
+    // terminal record honest about the subscription it spends, which is what the inspector
+    // matches provider allowances against.
+    const accountProfileId = resolveAccountProfileId(
+      this.agents.accountProfiles(),
+      task.agentType,
+      task.accountProfileId,
+    );
+
     this.busyTodoTaskId.set(task.id);
     const terminalId = crypto.randomUUID();
     try {
@@ -2288,14 +2299,14 @@ export class App {
               sessionId,
               model: profileModel(profile, 'codex'),
               profileId: profile.id,
-              accountProfileId: task.accountProfileId,
+              accountProfileId,
             })
           : await this.agents.prepareLaunch({
               terminalId,
               workspaceId: workspace.id,
               sessionId,
               profileId: profile.id,
-              accountProfileId: task.accountProfileId,
+              accountProfileId,
               forkSession: reclaim.forkSession,
               attachShortId: reclaim.attachShortId,
             });
@@ -2309,7 +2320,7 @@ export class App {
           nativeSessionId: sessionId,
           workingDirectory,
           profileId: profile.id,
-          accountProfileId: task.accountProfileId,
+          accountProfileId,
         },
         workspace.id,
       );
@@ -2318,7 +2329,7 @@ export class App {
       }
       const started = this.todos.beginExecution(
         task.id,
-        { terminalId, nativeSessionId: sessionId, accountProfileId: task.accountProfileId },
+        { terminalId, nativeSessionId: sessionId, accountProfileId },
         continuation,
       );
       if (!started) {

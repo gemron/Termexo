@@ -8,6 +8,7 @@ import {
   isNativeModel,
   profileModel,
   profileServes,
+  resolveAccountProfileId,
   McpProfile,
   ModelProfile,
 } from '../core/models/agent.models';
@@ -177,11 +178,7 @@ export class ClaudeLaunchDialogComponent {
     this.profiles().filter((profile) => profileServes(profile, 'claude')),
   );
   protected readonly resolvedAccountProfileId = computed(
-    () =>
-      this.accountProfileId() ||
-      this.claudeAccounts().find((profile) => profile.isDefault)?.id ||
-      this.claudeAccounts()[0]?.id ||
-      '',
+    () => resolveAccountProfileId(this.accountProfiles(), 'claude', this.accountProfileId()) ?? '',
   );
   protected readonly resolvedProfileId = computed(
     () =>

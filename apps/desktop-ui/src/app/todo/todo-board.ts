@@ -16,6 +16,7 @@ import {
   TodoTaskDraft,
   canRestartTodoTask,
   isReusableTodoTerminal,
+  isTodoAgentTerminal,
   todoWorkingDirectory,
 } from '../core/models/todo.models';
 import type { TerminalSession, Workspace } from '../core/models/workspace.models';
@@ -167,7 +168,7 @@ export class TodoBoardComponent {
     return (
       this.terminals().find(
         (terminal): terminal is AgentTerminal =>
-          terminal.id === terminalId && terminal.agentType !== 'shell',
+          terminal.id === terminalId && isTodoAgentTerminal(terminal),
       ) ?? null
     );
   });

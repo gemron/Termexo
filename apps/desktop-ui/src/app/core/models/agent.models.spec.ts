@@ -1,4 +1,5 @@
 import {
+  AccountProfile,
   compatibleNativeSessionId,
   findProviderPreset,
   groupProfilesByProvider,
@@ -6,6 +7,7 @@ import {
   ModelProfile,
   needsCredential,
   PROVIDER_PRESETS,
+  resolveAccountProfileId,
 } from './agent.models';
 
 describe('compatibleNativeSessionId', () => {
@@ -134,5 +136,47 @@ describe('isNativeModel', () => {
     });
 
     expect(isNativeModel(proxied, 'claude')).toBe(false);
+  });
+});
+
+const account = (
+  id: string,
+  agentType: AccountProfile['agentType'],
+  isDefault = false,
+): AccountProfile => ({
+  id,
+  name: id,
+  agentType,
+  isDefault,
+  isSystem: false,
+  authenticated: true,
+  diagnostic: '',
+});
+
+describe('resolveAccountProfileId', () => {
+  const accounts = [
+    account('claude-system', 'claude', true),
+    account('claude-work', 'claude'),
+    account('codex-work', 'codex'),
+  ];
+
+  it('keeps an explicit choice that still belongs to the agent', () => {
+    expect(resolveAccountProfileId(accounts, 'claude', 'claude-work')).toBe('claude-work');
+  });
+
+  it('falls back to the agent default when nothing was chosen', () => {
+    expect(resolveAccountProfileId(accounts, 'claude')).toBe('claude-system');
+  });
+
+  it('ignores a choice belonging to the other agent', () => {
+    expect(resolveAccountProfileId(accounts, 'codex', 'claude-work')).toBe('codex-work');
+  });
+
+  it('uses the only account of an agent that has no default', () => {
+    expect(resolveAccountProfileId(accounts, 'codex')).toBe('codex-work');
+  });
+
+  it('reports nothing when the agent has no account at all', () => {
+    expect(resolveAccountProfileId([account('codex-work', 'codex')], 'claude')).toBeUndefined();
   });
 });
