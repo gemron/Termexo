@@ -4,7 +4,16 @@
       <strong>{{ 'inspector.title' | t }}</strong>
       <small>{{ 'inspector.currentWorkspace' | t }}</small>
     </div>
-    <span>{{ workspace()?.terminals?.length ?? 0 }}</span>
+    <span class="terminal-count">{{ workspace()?.terminals?.length ?? 0 }}</span>
+    <button
+      type="button"
+      class="rail-collapse"
+      [title]="'inspector.collapse' | t"
+      [attr.aria-label]="'inspector.collapse' | t"
+      (click)="collapseRequested.emit()"
+    >
+      <app-icon name="panel-close" [size]="15" />
+    </button>
   </header>
 
   <div class="inspector-body">
@@ -69,9 +78,11 @@
         <button
           type="button"
           class="quota-refresh"
+          [class.busy]="quotaLoading()"
           [disabled]="quotaLoading()"
           (click)="refreshQuotas.emit()"
         >
+          <app-icon name="refresh" [size]="12" />
           {{ (quotaLoading() ? 'quota.refreshing' : 'quota.refresh') | t }}
         </button>
       </header>
@@ -94,24 +105,43 @@
           @for (line of row.entries; track line.entry.label) {
             <div class="quota-entry" [class.alerting]="line.alerting">
               <div class="quota-entry-head">
-                <span>{{ line.entry.label }}</span>
-                <span>{{ formatAmount(line.entry, line.entry.remaining) }}</span>
+                <span class="quota-entry-label">{{ line.entry.label }}</span>
+                <span class="quota-entry-amount">
+                  <small>{{ 'quota.remaining' | t }}</small>
+                  <b>{{ formatAmount(line.entry, line.entry.remaining) }}</b>
+                </span>
               </div>
               @if (line.entry.percent !== undefined) {
-                <progress
-                  class="progress progress-primary"
-                  max="100"
-                  [value]="line.entry.percent"
-                ></progress>
+                <div
+                  class="quota-meter"
+                  role="progressbar"
+                  aria-valuemin="0"
+                  aria-valuemax="100"
+                  [attr.aria-label]="line.entry.label"
+                  [attr.aria-valuenow]="meterValue(line.entry.percent)"
+                >
+                  <span [style.width.%]="meterValue(line.entry.percent)"></span>
+                </div>
               }
-              <small>
-                @if (line.entry.total !== undefined) {
-                  {{ 'quota.of' | t }} {{ formatAmount(line.entry, line.entry.total) }}
-                }
+              <div class="quota-entry-meta">
+                <small>
+                  @if (line.entry.percent !== undefined) {
+                    {{ usedLabel(line.entry.percent) }}
+                  }
+                  @if (line.entry.percent !== undefined && line.entry.total !== undefined) {
+                    ·
+                  }
+                  @if (line.entry.total !== undefined) {
+                    {{ 'quota.of' | t }} {{ formatAmount(line.entry, line.entry.total) }}
+                  }
+                </small>
                 @if (line.entry.resetsAt) {
-                  · {{ resetLabel(line.entry.resetsAt) }}
+                  <small class="quota-reset" [title]="resetTooltip(line.entry.resetsAt)">
+                    <app-icon name="history" [size]="11" />
+                    {{ resetLabel(line.entry.resetsAt) }}
+                  </small>
                 }
-              </small>
+              </div>
             </div>
           }
           @if (row.quota.diagnostic) {

@@ -228,6 +228,21 @@ describe('SessionCenterDialogComponent', () => {
     expect(resumed[0].profileId).toBe('claude-default');
   });
 
+  it('can resume a session with automatic confirmation enabled', async () => {
+    root.querySelector<HTMLButtonElement>('.resume-config-toggle')!.click();
+    fixture.detectChanges();
+    await fixture.whenStable();
+
+    root.querySelector<HTMLInputElement>('.resume-auto-confirm input')!.click();
+    fixture.detectChanges();
+
+    const resumed: ResumeSessionValue[] = [];
+    component.resumed.subscribe((value) => resumed.push(value));
+    clickResumeFor('Codex adapter');
+
+    expect(resumed[0]).toEqual(expect.objectContaining({ autoConfirm: true }));
+  });
+
   function clickButton(label: string): void {
     const button = Array.from(root.querySelectorAll<HTMLButtonElement>('button')).find(
       (candidate) => candidate.textContent?.trim().startsWith(label),

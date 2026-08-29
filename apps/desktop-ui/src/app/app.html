@@ -1,7 +1,7 @@
 <main
   class="app-shell bg-base-100 text-base-content"
   [class.workspace-sidebar-collapsed]="!workspaceSidebarOpen()"
-  [class.inspector-collapsed]="!inspectorOpen()"
+  [class.inspector-collapsed]="!inspectorOpen() || workspaceView() === 'tasks'"
   [class.workspace-maximized]="workspaceMaximized()"
   [class.is-resizing]="resizingSidebar()"
   [style.--workspace-sidebar-width.px]="workspaceSidebarWidth()"
@@ -19,6 +19,7 @@
       (moveRequested)="state.moveWorkspace($event.workspaceId, $event.direction)"
       (createRequested)="createWorkspaceOpen.set(true)"
       (settingsRequested)="openSettings()"
+      (collapseRequested)="toggleWorkspaceSidebar()"
     />
     <div
       class="sidebar-resizer workspace-sidebar-resizer"
@@ -29,201 +30,238 @@
     ></div>
   }
 
-  <section class="workspace-main">
+  <section class="workspace-main" [class.task-board-active]="workspaceView() === 'tasks'">
     <header class="topbar navbar">
-      <div class="workspace-title">
-        <strong>{{ state.activeWorkspace()?.name ?? ('workspace.loading' | t) }}</strong>
-        <span>{{ state.activeWorkspace()?.projectPath ?? '' }}</span>
+      <div class="topbar-lead">
+        @if (!workspaceSidebarOpen() && !workspaceMaximized()) {
+          <button
+            type="button"
+            class="rail-reveal"
+            data-testid="workspace-sidebar-reveal"
+            [title]="'workspace.expandSidebar' | t"
+            [attr.aria-label]="'workspace.expandSidebar' | t"
+            (click)="toggleWorkspaceSidebar()"
+          >
+            <app-icon name="panel-left-open" [size]="15" />
+          </button>
+        }
+        <div class="workspace-title">
+          <strong>{{ state.activeWorkspace()?.name ?? ('workspace.loading' | t) }}</strong>
+          <span>{{ state.activeWorkspace()?.projectPath ?? '' }}</span>
+        </div>
       </div>
 
-      <div class="toolbar join" role="toolbar" [attr.aria-label]="'workspace.tools' | t">
-        <button
-          type="button"
-          class="tool-button btn btn-ghost btn-sm join-item"
-          [title]="'terminal.newShell' | t"
-          (click)="createTerminal('shell')"
-        >
-          <app-icon name="terminal" [size]="14" />
-          <span>{{ 'terminal.short' | t }}</span>
-        </button>
+      <div class="toolbar" role="toolbar" [attr.aria-label]="'workspace.tools' | t">
+        <div class="workspace-view-switch" role="tablist" aria-label="工作空间视图">
+          <button
+            type="button"
+            role="tab"
+            class="tool-button"
+            [class.active]="workspaceView() === 'terminal'"
+            [attr.aria-selected]="workspaceView() === 'terminal'"
+            (click)="workspaceView.set('terminal')"
+          >
+            <app-icon name="terminal" [size]="13" />
+            <span>终端</span>
+          </button>
+          <button
+            type="button"
+            role="tab"
+            class="tool-button"
+            data-testid="task-board-toggle"
+            [class.active]="workspaceView() === 'tasks'"
+            [attr.aria-selected]="workspaceView() === 'tasks'"
+            (click)="workspaceView.set('tasks')"
+          >
+            <app-icon name="layout" [size]="13" />
+            <span>任务</span>
+            @if (activeTodoCount() > 0) {
+              <b>{{ activeTodoCount() }}</b>
+            }
+          </button>
+        </div>
 
-        <div class="menu-anchor">
+        <div class="toolbar-actions join">
           <button
             type="button"
             class="tool-button btn btn-ghost btn-sm join-item"
-            [class.active]="agentMenuOpen()"
-            (click)="agentMenuOpen.set(!agentMenuOpen())"
+            [title]="'terminal.newShell' | t"
+            (click)="createTerminal('shell')"
           >
-            <app-icon name="bot" [size]="14" />
-            <span>Agent</span>
-            <app-icon name="chevron-down" [size]="12" />
+            <app-icon name="terminal" [size]="14" />
+            <span>{{ 'terminal.new' | t }}</span>
           </button>
-          @if (agentMenuOpen()) {
-            <div class="agent-menu menu rounded-box bg-base-200 shadow-xl">
-              <button type="button" (click)="openClaudeLaunch()">
-                <span data-tone="green"><app-icon name="bot" [size]="14" /></span>
-                <div><strong>Claude Code</strong><small>Claude Sonnet</small></div>
+
+          <div class="menu-anchor">
+            <button
+              type="button"
+              class="tool-button btn btn-ghost btn-sm join-item"
+              [class.active]="agentMenuOpen()"
+              (click)="agentMenuOpen.set(!agentMenuOpen())"
+            >
+              <app-icon name="bot" [size]="14" />
+              <span>Agent</span>
+              <app-icon name="chevron-down" [size]="12" />
+            </button>
+            @if (agentMenuOpen()) {
+              <div class="agent-menu menu rounded-box bg-base-200 shadow-xl">
+                <button type="button" (click)="openClaudeLaunch()">
+                  <span data-tone="green"><app-icon name="bot" [size]="14" /></span>
+                  <div><strong>Claude Code</strong><small>Claude Sonnet</small></div>
+                </button>
+                <button type="button" (click)="openCodexLaunch()">
+                  <span data-tone="blue"><app-icon name="bot" [size]="14" /></span>
+                  <div>
+                    <strong>Codex CLI</strong>
+                    <small>{{
+                      agents.codexInstallation()?.healthy
+                        ? (agents.codexInstallation()?.version ?? ('common.connected' | t))
+                        : ('common.notDetected' | t)
+                    }}</small>
+                  </div>
+                </button>
+                <button type="button" data-agent="opencode" (click)="openOpenCodeLaunch()">
+                  <span data-tone="amber"><app-icon name="terminal" [size]="14" /></span>
+                  <div>
+                    <strong>OpenCode</strong>
+                    <small>{{
+                      agents.openCodeInstallation()?.healthy
+                        ? (agents.openCodeInstallation()?.version ?? ('common.connected' | t))
+                        : ('common.notDetected' | t)
+                    }}</small>
+                  </div>
+                </button>
+              </div>
+            }
+          </div>
+
+          <span class="tool-divider"></span>
+          <button
+            type="button"
+            class="tool-button btn btn-ghost btn-sm join-item"
+            [title]="'terminal.resumeTitle' | t"
+            (click)="openSessionCenter()"
+          >
+            <app-icon name="play" [size]="14" />
+            <span>{{ 'terminal.resume' | t }}</span>
+          </button>
+          <button
+            type="button"
+            class="tool-button btn btn-ghost btn-sm join-item"
+            [title]="'terminal.switchClaudeModel' | t"
+            (click)="openBatchModelSwitch()"
+          >
+            <app-icon name="zap" [size]="14" />
+            <span>{{ 'terminal.claudeModel' | t }}</span>
+          </button>
+
+          @if (globalTerminalNotices().length > 0) {
+            <span class="tool-divider"></span>
+            <div class="global-notice-anchor">
+              <button
+                type="button"
+                class="tool-button global-notice-trigger btn btn-ghost btn-sm join-item"
+                [class.active]="globalNoticeOpen()"
+                [class.has-waiting]="globalWaitingNoticeCount() > 0"
+                [attr.aria-expanded]="globalNoticeOpen()"
+                aria-haspopup="dialog"
+                [attr.aria-label]="'notice.global' | t"
+                [title]="'notice.globalDescription' | t"
+                (click)="globalNoticeOpen.set(!globalNoticeOpen())"
+              >
+                <app-icon name="bell" [size]="14" />
+                <span>{{ globalNoticeSummary() }}</span>
+                <b>{{ globalTerminalNotices().length }}</b>
               </button>
-              <button type="button" (click)="openCodexLaunch()">
-                <span data-tone="blue"><app-icon name="bot" [size]="14" /></span>
-                <div>
-                  <strong>Codex CLI</strong>
-                  <small>{{
-                    agents.codexInstallation()?.healthy
-                      ? (agents.codexInstallation()?.version ?? ('common.connected' | t))
-                      : ('common.notDetected' | t)
-                  }}</small>
-                </div>
-              </button>
-              <button type="button" data-agent="opencode" (click)="openOpenCodeLaunch()">
-                <span data-tone="amber"><app-icon name="terminal" [size]="14" /></span>
-                <div>
-                  <strong>OpenCode</strong>
-                  <small>{{
-                    agents.openCodeInstallation()?.healthy
-                      ? (agents.openCodeInstallation()?.version ?? ('common.connected' | t))
-                      : ('common.notDetected' | t)
-                  }}</small>
-                </div>
-              </button>
+
+              @if (globalNoticeOpen()) {
+                <section
+                  class="global-notice-panel"
+                  role="dialog"
+                  aria-modal="false"
+                  [attr.aria-label]="'notice.global' | t"
+                >
+                  <header>
+                    <div>
+                      <strong>{{ 'notice.global' | t }}</strong>
+                      <small>{{ 'notice.allWorkspaces' | t }}</small>
+                    </div>
+                    <div class="global-notice-actions">
+                      <button
+                        type="button"
+                        class="btn btn-ghost btn-xs"
+                        [title]="'notice.clearAllHint' | t"
+                        (click)="clearAllTerminalNotices()"
+                      >
+                        {{ 'notice.clearAll' | t }}
+                      </button>
+                      <button
+                        type="button"
+                        class="btn btn-square btn-ghost btn-xs"
+                        [attr.aria-label]="'notice.closeGlobal' | t"
+                        [title]="'common.close' | t"
+                        (click)="globalNoticeOpen.set(false)"
+                      >
+                        <app-icon name="x" [size]="13" />
+                      </button>
+                    </div>
+                  </header>
+                  <div class="global-notice-list">
+                    @for (
+                      notice of globalTerminalNotices();
+                      track notice.terminalId + ':' + notice.status
+                    ) {
+                      <div class="global-notice-row">
+                        <button
+                          type="button"
+                          class="global-notice-item"
+                          [attr.data-status]="notice.status"
+                          (click)="openGlobalTerminalNotice(notice)"
+                        >
+                          <i aria-hidden="true"></i>
+                          <span>
+                            <strong>{{ notice.terminalName }}</strong>
+                            <small>{{ notice.workspaceName }}</small>
+                          </span>
+                          <em>{{ statusLabel(notice.status) }}</em>
+                        </button>
+                        <button
+                          type="button"
+                          class="global-notice-clear btn btn-square btn-ghost btn-xs"
+                          [attr.aria-label]="'notice.clear' | t"
+                          [title]="'notice.clearHint' | t"
+                          (click)="clearTerminalNotice(notice)"
+                        >
+                          <app-icon name="x" [size]="12" />
+                        </button>
+                      </div>
+                    }
+                  </div>
+                </section>
+              }
             </div>
           }
         </div>
-
-        <span class="tool-divider"></span>
-        <button
-          type="button"
-          class="tool-button btn btn-ghost btn-sm join-item"
-          [title]="'terminal.resumeTitle' | t"
-          (click)="openSessionCenter()"
-        >
-          <app-icon name="play" [size]="14" />
-          <span>{{ 'terminal.resume' | t }}</span>
-        </button>
-        <button
-          type="button"
-          class="tool-button btn btn-ghost btn-sm join-item"
-          [title]="'terminal.switchClaudeModel' | t"
-          (click)="openBatchModelSwitch()"
-        >
-          <app-icon name="zap" [size]="14" />
-          <span>{{ 'terminal.claudeModel' | t }}</span>
-        </button>
-
-        @if (globalTerminalNotices().length > 0) {
-          <span class="tool-divider"></span>
-          <div class="global-notice-anchor">
-            <button
-              type="button"
-              class="tool-button global-notice-trigger btn btn-ghost btn-sm join-item"
-              [class.active]="globalNoticeOpen()"
-              [class.has-waiting]="globalWaitingNoticeCount() > 0"
-              [attr.aria-expanded]="globalNoticeOpen()"
-              aria-haspopup="dialog"
-              [attr.aria-label]="'notice.global' | t"
-              [title]="'notice.globalDescription' | t"
-              (click)="globalNoticeOpen.set(!globalNoticeOpen())"
-            >
-              <app-icon name="bell" [size]="14" />
-              <span>{{ globalNoticeSummary() }}</span>
-              <b>{{ globalTerminalNotices().length }}</b>
-            </button>
-
-            @if (globalNoticeOpen()) {
-              <section
-                class="global-notice-panel"
-                role="dialog"
-                aria-modal="false"
-                [attr.aria-label]="'notice.global' | t"
-              >
-                <header>
-                  <div>
-                    <strong>{{ 'notice.global' | t }}</strong>
-                    <small>{{ 'notice.allWorkspaces' | t }}</small>
-                  </div>
-                  <div class="global-notice-actions">
-                    <button
-                      type="button"
-                      class="btn btn-ghost btn-xs"
-                      [title]="'notice.clearAllHint' | t"
-                      (click)="clearAllTerminalNotices()"
-                    >
-                      {{ 'notice.clearAll' | t }}
-                    </button>
-                    <button
-                      type="button"
-                      class="btn btn-square btn-ghost btn-xs"
-                      [attr.aria-label]="'notice.closeGlobal' | t"
-                      [title]="'common.close' | t"
-                      (click)="globalNoticeOpen.set(false)"
-                    >
-                      <app-icon name="x" [size]="13" />
-                    </button>
-                  </div>
-                </header>
-                <div class="global-notice-list">
-                  @for (
-                    notice of globalTerminalNotices();
-                    track notice.terminalId + ':' + notice.status
-                  ) {
-                    <div class="global-notice-row">
-                      <button
-                        type="button"
-                        class="global-notice-item"
-                        [attr.data-status]="notice.status"
-                        (click)="openGlobalTerminalNotice(notice)"
-                      >
-                        <i aria-hidden="true"></i>
-                        <span>
-                          <strong>{{ notice.terminalName }}</strong>
-                          <small>{{ notice.workspaceName }}</small>
-                        </span>
-                        <em>{{ statusLabel(notice.status) }}</em>
-                      </button>
-                      <button
-                        type="button"
-                        class="global-notice-clear btn btn-square btn-ghost btn-xs"
-                        [attr.aria-label]="'notice.clear' | t"
-                        [title]="'notice.clearHint' | t"
-                        (click)="clearTerminalNotice(notice)"
-                      >
-                        <app-icon name="x" [size]="12" />
-                      </button>
-                    </div>
-                  }
-                </div>
-              </section>
-            }
-          </div>
-        }
       </div>
 
-      <div class="window-tools join">
+      <div class="window-tools">
+        @if (!inspectorOpen() && workspaceView() === 'terminal' && !workspaceMaximized()) {
+          <button
+            type="button"
+            class="rail-reveal"
+            data-testid="inspector-reveal"
+            [title]="'inspector.expand' | t"
+            [attr.aria-label]="'inspector.expand' | t"
+            (click)="toggleInspector()"
+          >
+            <app-icon name="panel-right-open" [size]="15" />
+          </button>
+        }
         <app-language-selector />
         <button
           type="button"
-          class="btn btn-square btn-ghost btn-sm join-item"
-          [title]="
-            workspaceSidebarOpen()
-              ? ('workspace.collapseSidebar' | t)
-              : ('workspace.expandSidebar' | t)
-          "
-          [attr.aria-label]="
-            workspaceSidebarOpen()
-              ? ('workspace.collapseSidebar' | t)
-              : ('workspace.expandSidebar' | t)
-          "
-          [class.active]="workspaceSidebarOpen()"
-          (click)="toggleWorkspaceSidebar()"
-        >
-          <app-icon
-            [name]="workspaceSidebarOpen() ? 'panel-left-close' : 'panel-left-open'"
-            [size]="15"
-          />
-        </button>
-        <button
-          type="button"
-          class="btn btn-square btn-ghost btn-sm join-item"
+          class="window-tool"
+          data-testid="workspace-maximize-toggle"
           [title]="
             workspaceMaximized() ? ('workspace.restoreShortcut' | t) : ('workspace.maximize' | t)
           "
@@ -235,52 +273,68 @@
         >
           <app-icon [name]="workspaceMaximized() ? 'minimize' : 'maximize'" [size]="15" />
         </button>
-        <button
-          type="button"
-          class="btn btn-square btn-ghost btn-sm join-item"
-          [title]="inspectorOpen() ? ('inspector.collapse' | t) : ('inspector.expand' | t)"
-          [attr.aria-label]="
-            inspectorOpen() ? ('inspector.collapse' | t) : ('inspector.expand' | t)
-          "
-          [class.active]="inspectorOpen()"
-          (click)="toggleInspector()"
-        >
-          <app-icon [name]="inspectorOpen() ? 'panel-close' : 'panel-right-open'" [size]="15" />
-        </button>
       </div>
     </header>
 
-    <div class="terminal-tabs">
-      <div
-        class="tab-strip tabs tabs-border"
-        role="tablist"
-        [attr.aria-label]="'terminal.tabs' | t"
-      >
-        @for (terminal of state.activeWorkspace()?.terminals ?? []; track terminal.id) {
-          <button
-            [id]="'terminal-tab-' + terminal.id"
-            type="button"
-            role="tab"
-            class="tab"
-            [class.active]="terminal.id === activeTerminalId()"
-            [class.visible]="isTerminalVisible(terminal.id)"
-            [attr.data-status]="terminal.status"
-            [attr.aria-selected]="terminal.id === activeTerminalId()"
-            [attr.title]="
-              isTerminalVisible(terminal.id)
-                ? ('terminal.activate' | t)
-                : ('terminal.showInLayout' | t)
-            "
-            (click)="selectTerminal(terminal.id)"
-          >
-            <i [attr.data-status]="terminal.status"></i>
-            <span>{{ terminal.name }}</span>
-            <small>{{ terminal.agentType }}</small>
-          </button>
-        }
+    <div class="terminal-tabs" [class.view-hidden]="workspaceView() === 'tasks'">
+      <div class="tab-bar">
+        <div
+          class="tab-strip tabs tabs-border"
+          role="tablist"
+          [attr.aria-label]="'terminal.tabs' | t"
+          (wheel)="scrollTabStrip($event)"
+        >
+          @for (
+            terminal of state.activeWorkspace()?.terminals ?? [];
+            track terminal.id;
+            let index = $index
+          ) {
+            <div
+              class="tab-slot"
+              draggable="true"
+              [class.dragging]="terminal.id === draggedTerminalId()"
+              [class.drop-before]="tabDropIndex() === index"
+              [class.drop-after]="tabDropIndex() === index + 1"
+              (dragstart)="startTabDrag($event, terminal.id)"
+              (dragover)="trackTabDrag($event, index)"
+              (drop)="dropTab($event)"
+              (dragend)="endTabDrag()"
+            >
+              <button
+                [id]="'terminal-tab-' + terminal.id"
+                type="button"
+                role="tab"
+                class="tab"
+                [class.active]="terminal.id === activeTerminalId()"
+                [class.visible]="isTerminalVisible(terminal.id)"
+                [attr.data-status]="terminal.status"
+                [attr.aria-selected]="terminal.id === activeTerminalId()"
+                [title]="terminalTabTitle(terminal)"
+                (click)="selectTerminal(terminal.id)"
+                (auxclick)="closeTerminalOnMiddleClick($event, terminal.id)"
+              >
+                <i [attr.data-status]="terminal.status"></i>
+                <app-icon
+                  [name]="terminal.agentType === 'shell' ? 'terminal' : 'bot'"
+                  [size]="12"
+                />
+                <span>{{ terminal.name }}</span>
+              </button>
+              <button
+                type="button"
+                class="tab-close"
+                [title]="'terminal.close' | t"
+                [attr.aria-label]="'terminal.close' | t"
+                (click)="closeTerminal(terminal.id)"
+              >
+                <app-icon name="x" [size]="11" />
+              </button>
+            </div>
+          }
+        </div>
         <button
           type="button"
-          class="add-tab tab"
+          class="add-tab"
           [title]="'terminal.new' | t"
           [attr.aria-label]="'terminal.new' | t"
           (click)="createTerminal('shell')"
@@ -289,220 +343,23 @@
         </button>
       </div>
 
-      <label class="terminal-picker">
-        <span>{{ visibleTerminalIds().length }}/{{ visibleTerminalLimit() }}</span>
-        <select
-          class="select select-bordered select-xs"
-          [attr.aria-label]="'terminal.chooseVisible' | t"
-          [value]="activeTerminalId() ?? ''"
-          (change)="selectTerminalFromPicker($event)"
-        >
-          @for (terminal of state.activeWorkspace()?.terminals ?? []; track terminal.id) {
-            <option [value]="terminal.id">
-              {{ isTerminalVisible(terminal.id) ? '●' : '○' }} {{ terminal.name }}
-            </option>
-          }
-        </select>
-      </label>
-
-      <div
-        class="terminal-order-controls join"
-        role="group"
-        [attr.aria-label]="'terminal.reorder' | t"
-      >
-        <button
-          type="button"
-          class="btn btn-square btn-ghost btn-xs join-item"
-          [title]="'terminal.moveLeft' | t"
-          [attr.aria-label]="'terminal.moveLeft' | t"
-          [disabled]="!canMoveActiveTerminal(-1)"
-          (click)="moveActiveTerminal(-1)"
-        >
-          <app-icon name="arrow-left" [size]="12" />
-        </button>
-        <button
-          type="button"
-          class="btn btn-square btn-ghost btn-xs join-item"
-          [title]="'terminal.moveRight' | t"
-          [attr.aria-label]="'terminal.moveRight' | t"
-          [disabled]="!canMoveActiveTerminal(1)"
-          (click)="moveActiveTerminal(1)"
-        >
-          <app-icon name="arrow-right" [size]="12" />
-        </button>
-      </div>
-
-      <div class="font-size-controls" role="group" [attr.aria-label]="'terminal.fontSize' | t">
-        <span aria-hidden="true">Aa</span>
-        <button
-          type="button"
-          [title]="'terminal.fontSmaller' | t"
-          [attr.aria-label]="'terminal.fontSmaller' | t"
-          [disabled]="terminalFontSize() <= minTerminalFontSize"
-          (click)="adjustTerminalFontSize(-1)"
-        >
-          −
-        </button>
-        <output [attr.aria-label]="'terminal.fontSizeCurrent' | t: { size: terminalFontSize() }">
-          {{ terminalFontSize() }}
-        </output>
-        <button
-          type="button"
-          [title]="'terminal.fontLarger' | t"
-          [attr.aria-label]="'terminal.fontLarger' | t"
-          [disabled]="terminalFontSize() >= maxTerminalFontSize"
-          (click)="adjustTerminalFontSize(1)"
-        >
-          +
-        </button>
-      </div>
-
-      <app-terminal-font-picker
-        [value]="terminalFontName()"
+      <app-terminal-toolbar
+        [visibleCount]="visibleTerminalIds().length"
+        [visibleLimit]="visibleTerminalLimit()"
+        [terminalCount]="(state.activeWorkspace()?.terminals ?? []).length"
+        [layout]="state.activeWorkspace()?.layout ?? 'single'"
+        [gridColumns]="gridColumns()"
+        [gridRows]="gridRows()"
+        [fontSize]="terminalFontSize()"
+        [fontName]="terminalFontName()"
+        (promptLibraryRequested)="openPromptLibrary()"
+        (handoffRequested)="openHandoffCenter()"
+        (layoutChange)="changeLayout($event)"
+        (fontSizeChange)="adjustTerminalFontSize($event)"
         (fontChange)="selectTerminalFont($event)"
+        (gridDimensionChange)="adjustGridDimension($event.axis, $event.delta)"
+        (gridSwapRequested)="swapGridDimensions()"
       />
-
-      <div class="join" role="group" [attr.aria-label]="'prompt.tools' | t">
-        <button
-          type="button"
-          class="btn btn-ghost btn-xs join-item"
-          [title]="'prompt.open' | t"
-          (click)="openPromptLibrary()"
-        >
-          <app-icon name="history" [size]="13" />
-          {{ 'prompt.button' | t }}
-        </button>
-        <button
-          type="button"
-          class="btn btn-ghost btn-xs join-item"
-          [title]="'handoff.open' | t"
-          (click)="openHandoffCenter()"
-        >
-          <app-icon name="merge" [size]="13" />
-          {{ 'handoff.button' | t }}
-        </button>
-      </div>
-
-      <div class="layout-controls join" [attr.aria-label]="'terminal.layout' | t">
-        <button
-          type="button"
-          class="btn btn-square btn-ghost btn-xs join-item"
-          [title]="'terminal.layoutSingle' | t"
-          [class.active]="state.activeWorkspace()?.layout === 'single'"
-          (click)="changeLayout('single')"
-        >
-          <app-icon name="square" [size]="13" />
-        </button>
-        <button
-          type="button"
-          class="btn btn-square btn-ghost btn-xs join-item"
-          [title]="'terminal.layoutColumns' | t"
-          [class.active]="state.activeWorkspace()?.layout === 'columns'"
-          (click)="changeLayout('columns')"
-        >
-          <app-icon name="columns" [size]="13" />
-        </button>
-        <button
-          type="button"
-          class="btn btn-square btn-ghost btn-xs join-item"
-          [title]="'terminal.layoutRows' | t"
-          [class.active]="state.activeWorkspace()?.layout === 'rows'"
-          (click)="changeLayout('rows')"
-        >
-          <app-icon name="rows" [size]="13" />
-        </button>
-        <button
-          type="button"
-          class="btn btn-square btn-ghost btn-xs join-item"
-          [title]="'terminal.layoutGrid' | t"
-          [class.active]="state.activeWorkspace()?.layout === 'grid'"
-          (click)="changeLayout('grid')"
-        >
-          <app-icon name="grid" [size]="13" />
-        </button>
-        @if (state.activeWorkspace()?.layout === 'grid') {
-          <div class="grid-dimensions" [attr.aria-label]="'terminal.gridCustom' | t">
-            <span
-              class="grid-preview"
-              aria-hidden="true"
-              [style.--preview-columns]="gridColumns()"
-              [style.--preview-rows]="gridRows()"
-              [title]="'terminal.gridSize' | t: { columns: gridColumns(), rows: gridRows() }"
-            >
-              @for (_ of gridCells(); track $index) {
-                <i [class.occupied]="$index < visibleTerminalIds().length"></i>
-              }
-            </span>
-
-            <div
-              class="dimension-stepper"
-              role="group"
-              [attr.aria-label]="'terminal.gridColumns' | t"
-            >
-              <span class="dimension-axis">{{ 'terminal.gridColumns' | t }}</span>
-              <button
-                type="button"
-                [attr.aria-label]="'terminal.gridDecreaseColumns' | t"
-                [title]="'terminal.gridDecreaseColumns' | t"
-                [disabled]="gridColumns() <= minGridDimension"
-                (click)="adjustGridDimension('columns', -1)"
-              >
-                −
-              </button>
-              <output [attr.aria-label]="'terminal.gridCurrentColumns' | t">{{
-                gridColumns()
-              }}</output>
-              <button
-                type="button"
-                [attr.aria-label]="'terminal.gridIncreaseColumns' | t"
-                [title]="'terminal.gridIncreaseColumns' | t"
-                [disabled]="gridColumns() >= maxGridDimension"
-                (click)="adjustGridDimension('columns', 1)"
-              >
-                +
-              </button>
-            </div>
-
-            <button
-              type="button"
-              class="dimension-swap"
-              [attr.aria-label]="'terminal.gridSwap' | t"
-              [title]="'terminal.gridSwap' | t"
-              [disabled]="gridColumns() === gridRows()"
-              (click)="swapGridDimensions()"
-            >
-              ×
-            </button>
-
-            <div class="dimension-stepper" role="group" [attr.aria-label]="'terminal.gridRows' | t">
-              <span class="dimension-axis">{{ 'terminal.gridRows' | t }}</span>
-              <button
-                type="button"
-                [attr.aria-label]="'terminal.gridDecreaseRows' | t"
-                [title]="'terminal.gridDecreaseRows' | t"
-                [disabled]="gridRows() <= minGridDimension"
-                (click)="adjustGridDimension('rows', -1)"
-              >
-                −
-              </button>
-              <output [attr.aria-label]="'terminal.gridCurrentRows' | t">{{ gridRows() }}</output>
-              <button
-                type="button"
-                [attr.aria-label]="'terminal.gridIncreaseRows' | t"
-                [title]="'terminal.gridIncreaseRows' | t"
-                [disabled]="gridRows() >= maxGridDimension"
-                (click)="adjustGridDimension('rows', 1)"
-              >
-                +
-              </button>
-            </div>
-
-            <span class="grid-capacity" [title]="'terminal.gridCapacity' | t">
-              {{ 'terminal.gridCells' | t: { count: gridCapacity() } }}
-            </span>
-          </div>
-        }
-      </div>
     </div>
 
     @if (attentionBanner(); as banner) {
@@ -543,12 +400,30 @@
       </div>
     }
 
-    <section class="workbench-area">
+    <section class="workbench-area" [class.board-active]="workspaceView() === 'tasks'">
       @if (state.activeWorkspace(); as activeWorkspace) {
+        @defer (when workspaceView() === 'tasks') {
+          @if (workspaceView() === 'tasks') {
+            <app-todo-board
+              [workspace]="activeWorkspace"
+              [terminals]="activeWorkspace.terminals"
+              [modelProfiles]="agents.modelProfiles()"
+              [busyTaskId]="busyTodoTaskId()"
+              [awaitingTerminalIds]="agentStartup.awaitingTerminalIds()"
+              (executionRequested)="executeTodoTask($event)"
+              (stopRequested)="stopTodoTask($event)"
+              (continuationRequested)="continueTodoTask($event)"
+              (terminalRequested)="openTodoTerminal($event)"
+              (terminalCloseRequested)="closeTodoTerminal($event)"
+            />
+          }
+        }
         @for (workspace of mountedWorkspaces(); track workspace.id) {
           <app-terminal-workbench
-            [class.workspace-hidden]="workspace.id !== activeWorkspace.id"
-            [attr.aria-hidden]="workspace.id !== activeWorkspace.id"
+            [class.workspace-hidden]="
+              workspace.id !== activeWorkspace.id || workspaceView() === 'tasks'
+            "
+            [attr.aria-hidden]="workspace.id !== activeWorkspace.id || workspaceView() === 'tasks'"
             [terminals]="workspace.terminals"
             [layout]="workspace.layout"
             [activeTerminalId]="workspace.id === activeWorkspace.id ? activeTerminalId() : null"
@@ -564,7 +439,7 @@
             (terminalClosed)="closeTerminal($event)"
             (terminalMaximizeRequested)="toggleTerminalMaximize($event)"
             (terminalRequested)="createTerminal('shell')"
-            (terminalStatusChanged)="state.updateTerminalStatus($event.terminalId, $event.status)"
+            (terminalStatusChanged)="handleTerminalStatus($event)"
             (terminalRenamed)="state.renameTerminal($event.terminalId, $event.name)"
             (terminalModelSwitchRequested)="openSingleModelSwitch($event)"
             (terminalInput)="handleTerminalInput($event)"
@@ -576,14 +451,20 @@
 
     <footer class="statusbar">
       <span class="connection"><i></i> Desktop Core</span>
-      <span>{{ 'inspector.agentActivity' | t: { count: state.runningAgentCount() } }}</span>
+      <span>
+        {{
+          workspaceView() === 'tasks'
+            ? activeTodoCount() + ' 个任务'
+            : ('inspector.agentActivity' | t: { count: state.runningAgentCount() })
+        }}
+      </span>
       <span class="status-spacer"></span>
       <span>{{ state.activeWorkspace()?.activeBranch ?? '' }}</span>
       <span>UTF-8</span>
     </footer>
   </section>
 
-  @if (inspectorOpen()) {
+  @if (inspectorOpen() && workspaceView() === 'terminal') {
     <div
       class="sidebar-resizer inspector-resizer"
       role="separator"
@@ -599,6 +480,7 @@
       [quotaLoading]="agents.quotaLoading()"
       [modelProfiles]="agents.modelProfiles()"
       (refreshQuotas)="refreshProviderQuotas(true)"
+      (collapseRequested)="toggleInspector()"
     />
   }
 </main>
@@ -615,6 +497,13 @@
     [workspace]="workspace"
     (saved)="saveWorkspaceAppearance($event)"
     (cancelled)="editingWorkspaceId.set(null)"
+  />
+}
+
+@if (backgroundSessions().length > 0) {
+  <app-background-session-dialog
+    [sessions]="backgroundSessions()"
+    (resolved)="resolveBackgroundSessions($event)"
   />
 }
 

@@ -18,6 +18,7 @@ export interface CodexLaunchDialogValue {
   model?: string;
   profileId?: string;
   accountProfileId?: string;
+  autoConfirm?: boolean;
 }
 
 @Component({
@@ -126,6 +127,17 @@ export interface CodexLaunchDialogValue {
             </datalist>
             <small>{{ 'launch.codexModelHelp' | t }}</small>
           </label>
+          <label class="wide checkbox-control auto-confirm-control">
+            <input
+              type="checkbox"
+              [ngModel]="autoConfirm()"
+              (ngModelChange)="autoConfirm.set($event)"
+            />
+            <span>
+              <strong>{{ 'launch.autoConfirm' | t }}</strong>
+              <small>{{ 'launch.autoConfirmHelp' | t }}</small>
+            </span>
+          </label>
         </div>
 
         <footer>
@@ -158,6 +170,7 @@ export class CodexLaunchDialogComponent {
   protected readonly model = signal('');
   protected readonly profileId = signal('');
   protected readonly accountProfileId = signal('');
+  protected readonly autoConfirm = signal(false);
   protected readonly modelSuggestions = CODEX_MODEL_SUGGESTIONS;
   protected readonly codexAccounts = computed(() =>
     this.accountProfiles().filter((profile) => profile.agentType === 'codex'),
@@ -226,6 +239,7 @@ export class CodexLaunchDialogComponent {
       model: this.resolvedModel() || undefined,
       profileId: this.resolvedProfileId() || undefined,
       accountProfileId: this.resolvedAccountProfileId() || undefined,
+      autoConfirm: this.autoConfirm() || undefined,
     });
   }
 }

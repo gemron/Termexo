@@ -96,11 +96,34 @@ describe('AppStateService', () => {
   it('adds a terminal to the active workspace', async () => {
     await service.initialize();
 
-    const terminal = service.createTerminal({ agentType: 'codex' });
+    const terminal = service.createTerminal({ agentType: 'codex', autoConfirm: true });
 
     expect(terminal?.agentType).toBe('codex');
+    expect(terminal?.autoConfirm).toBe(true);
     expect(service.activeTerminal()?.id).toBe(terminal?.id);
     expect(repository.save).toHaveBeenCalled();
+  });
+
+  it('adds a task terminal to its requested workspace even after the user switches away', async () => {
+    await service.initialize();
+    const sourceWorkspace = service.activeWorkspace()!;
+    const targetWorkspace = service.workspaces()[1];
+    const activeTerminalId = service.activeTerminal()?.id;
+
+    const terminal = service.createTerminal(
+      { id: 'task-terminal', agentType: 'codex', name: 'Task terminal' },
+      targetWorkspace.id,
+    );
+
+    expect(terminal?.id).toBe('task-terminal');
+    expect(service.activeWorkspace()?.id).toBe(sourceWorkspace.id);
+    expect(service.activeTerminal()?.id).toBe(activeTerminalId);
+    expect(
+      service
+        .workspaces()
+        .find((workspace) => workspace.id === targetWorkspace.id)
+        ?.terminals.some((item) => item.id === terminal?.id),
+    ).toBe(true);
   });
 
   it('persists normalized custom grid dimensions for the active workspace', async () => {
@@ -391,6 +414,40 @@ describe('AppStateService', () => {
     );
   });
 
+  it('drops a dragged tab at its target position and rejects a no-op drop', async () => {
+    await service.initialize();
+    const first = service.createTerminal({ agentType: 'shell', name: 'First' })!;
+    const second = service.createTerminal({ agentType: 'codex', name: 'Second' })!;
+    const third = service.createTerminal({ agentType: 'claude', name: 'Third' })!;
+    const count = service.activeWorkspace()!.terminals.length;
+
+    expect(service.reorderTerminal(first.id, count - 1)).toBe(true);
+    expect(
+      service
+        .activeWorkspace()!
+        .terminals.slice(-3)
+        .map((terminal) => terminal.id),
+    ).toEqual([second.id, third.id, first.id]);
+
+    expect(service.reorderTerminal(first.id, count - 1)).toBe(false);
+    expect(service.reorderTerminal(first.id, count)).toBe(false);
+  });
+
+  it('activates the neighbouring tab when the active terminal is closed', async () => {
+    await service.initialize();
+    const first = service.createTerminal({ agentType: 'shell', name: 'First' })!;
+    const second = service.createTerminal({ agentType: 'codex', name: 'Second' })!;
+    const third = service.createTerminal({ agentType: 'claude', name: 'Third' })!;
+
+    service.selectTerminal(second.id);
+    service.closeTerminal(second.id);
+    expect(service.activeTerminal()?.id).toBe(third.id);
+
+    // Closing the last tab has no tab to its right, so the one before it takes over.
+    service.closeTerminal(third.id);
+    expect(service.activeTerminal()?.id).toBe(first.id);
+  });
+
   it('applies Claude hook events to the matching terminal', async () => {
     await service.initialize();
     const terminal = service.createTerminal({
@@ -432,5 +489,23 @@ describe('AppStateService', () => {
 
     expect(service.activeTerminal()?.status).toBe('WAITING_INPUT');
     expect(service.activeTerminal()?.nativeSessionId).toBe('ses_opencode');
+  });
+
+  it('ignores hook events from a different Agent even when the terminal ID matches', async () => {
+    await service.initialize();
+    service.createTerminal({ id: 'terminal-codex', agentType: 'codex' });
+
+    service.applyAgentEvent({
+      eventKey: 'event-claude',
+      agentType: 'claude',
+      terminalId: 'terminal-codex',
+      nativeSessionId: 'claude-session',
+      eventType: 'task.completed',
+      detail: {},
+      createdAt: Date.now(),
+    });
+
+    expect(service.activeTerminal()?.status).toBe('STARTING');
+    expect(service.activeTerminal()?.nativeSessionId).toBeUndefined();
   });
 });

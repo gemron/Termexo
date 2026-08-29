@@ -25,6 +25,7 @@ export interface ResumeSessionValue {
   mcpProfileId?: string;
   accountProfileId?: string;
   model?: string;
+  autoConfirm?: boolean;
 }
 
 /** Profiles a previous run of a session used, or null when it never ran here. */
@@ -196,6 +197,17 @@ const AGENT_FILTERS: readonly {
 
             @if (optionsExpanded()) {
               <div id="resume-config-panel" class="resume-config-panel">
+                <label class="checkbox-control resume-auto-confirm">
+                  <input
+                    type="checkbox"
+                    [ngModel]="autoConfirm()"
+                    (ngModelChange)="autoConfirm.set($event)"
+                  />
+                  <span>
+                    <strong>{{ 'launch.autoConfirm' | t }}</strong>
+                    <small>{{ 'launch.autoConfirmHelp' | t }}</small>
+                  </span>
+                </label>
                 @if (showsClaudeOptions()) {
                   <section class="resume-options">
                     <h3>
@@ -425,6 +437,7 @@ export class SessionCenterDialogComponent {
   protected readonly codexAccountProfileId = signal('');
   protected readonly codexProfileId = signal('');
   protected readonly codexModel = signal('');
+  protected readonly autoConfirm = signal(false);
   protected readonly agentFilters = AGENT_FILTERS;
   protected readonly agentHealth = computed(() =>
     AGENT_HEALTH_ENTRIES.map((entry) => ({
@@ -591,6 +604,7 @@ export class SessionCenterDialogComponent {
         (isClaude ? this.resolvedClaudeAccountProfileId() : this.resolvedCodexAccountProfileId()) ||
         undefined,
       model: isClaude ? undefined : this.codexModel().trim() || session.modelName || undefined,
+      autoConfirm: this.autoConfirm() || undefined,
     });
   }
 

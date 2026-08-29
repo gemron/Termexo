@@ -37,9 +37,10 @@
 
     .terminal-identity {
       strong {
+        color: color-mix(in srgb, var(--accent) 72%, white);
         font-weight: 700;
         letter-spacing: 0.01em;
-        animation: active-terminal-title-color 10s ease-in-out infinite;
+        text-shadow: 0 0 9px color-mix(in srgb, var(--accent) 20%, transparent);
       }
 
       .agent-icon {
@@ -58,7 +59,6 @@
       inset 0 2px 0 var(--color-warning),
       0 0 0 1px color-mix(in srgb, var(--color-warning) 15%, transparent),
       0 0 20px color-mix(in srgb, var(--color-warning) 16%, transparent);
-    animation: terminal-attention-pulse 2.8s ease-in-out infinite;
 
     header {
       background:
@@ -246,6 +246,16 @@ header {
 .terminal-meta {
   gap: 4px;
 
+  .auto-confirm-chip {
+    padding: 2px 5px;
+    border: 1px solid color-mix(in srgb, var(--color-warning) 45%, var(--border));
+    border-radius: var(--radius-selector);
+    color: color-mix(in srgb, var(--color-warning) 82%, var(--text));
+    background: color-mix(in srgb, var(--color-warning) 10%, transparent);
+    font: 700 8px/1.2 var(--mono);
+    letter-spacing: 0.05em;
+  }
+
   > span {
     overflow: hidden;
     max-width: 120px;
@@ -386,57 +396,18 @@ footer {
   }
 }
 
-@keyframes active-terminal-title-color {
-  0%,
-  100% {
-    color: color-mix(in srgb, var(--accent) 72%, white);
-    text-shadow: 0 0 9px color-mix(in srgb, var(--accent) 20%, transparent);
-  }
-
-  34% {
-    color: color-mix(in srgb, var(--accent) 54%, var(--color-info));
-    text-shadow: 0 0 9px color-mix(in srgb, var(--accent) 16%, var(--color-info) 5%);
-  }
-
-  67% {
-    color: color-mix(in srgb, var(--accent) 54%, var(--color-warning));
-    text-shadow: 0 0 9px color-mix(in srgb, var(--accent) 16%, var(--color-warning) 5%);
-  }
-}
-
-@keyframes terminal-attention-pulse {
-  0%,
-  100% {
-    filter: saturate(0.96);
-  }
-
-  50% {
-    filter: saturate(1.18);
-  }
-}
-
 @keyframes terminal-status-light {
   0%,
   100% {
     opacity: 0.48;
-    transform: scale(0.82);
-    box-shadow: 0 0 0 1px color-mix(in srgb, currentColor 10%, transparent);
   }
 
   50% {
     opacity: 1;
-    transform: scale(1);
-    box-shadow:
-      0 0 0 3px color-mix(in srgb, currentColor 15%, transparent),
-      0 0 9px currentColor;
   }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .terminal-panel {
-    animation: none;
-  }
-
   .terminal-panel.active .terminal-identity strong {
     color: color-mix(in srgb, var(--accent) 72%, white);
     text-shadow: none;

@@ -8,6 +8,10 @@
   --attention-accent: var(--color-warning);
   --attention-accent-content: var(--color-warning-content);
 
+  // Row 3 of .workspace-main is the only one sized to its content. Pinning it matters because
+  // the task board view hides the tab strip, and grid auto-placement would otherwise slide the
+  // banner up into the collapsed tab row, where the topbar clips it.
+  grid-row: 3;
   z-index: 20;
   display: flex;
   flex: 0 0 auto;

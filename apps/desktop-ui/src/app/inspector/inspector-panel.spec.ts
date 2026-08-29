@@ -1,8 +1,11 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 
+import { I18nService } from '../core/i18n/i18n.service';
 import { type ModelProfile, type ProviderQuota } from '../core/models/agent.models';
 import { type TerminalSession } from '../core/models/workspace.models';
 import { InspectorPanelComponent } from './inspector-panel';
+
+const MINUTE_MS = 60_000;
 
 const TERMINAL: TerminalSession = {
   id: 'terminal-1',
@@ -145,5 +148,76 @@ describe('InspectorPanelComponent provider allowances', () => {
     fixture.detectChanges();
     expect(root.querySelectorAll('.quota-row')).toHaveLength(1);
     expect(root.textContent).not.toContain('DeepSeek Chat');
+  });
+});
+
+describe('InspectorPanelComponent allowance reset countdown', () => {
+  let fixture: ComponentFixture<InspectorPanelComponent>;
+  let root: HTMLElement;
+
+  /** Renders the active terminal's allowance with a single window that resets after `minutes`. */
+  async function renderReset(minutes: number): Promise<void> {
+    fixture.componentRef.setInput('quotas', [
+      {
+        profileId: 'glm-profile',
+        profileName: 'GLM 5.2',
+        provider: 'GLM',
+        official: true,
+        checkedAt: Date.now(),
+        entries: [
+          {
+            label: '5-hour window',
+            unit: 'percent',
+            percent: 40,
+            resetsAt: Date.now() + minutes * MINUTE_MS,
+          },
+        ],
+      },
+    ] satisfies ProviderQuota[]);
+    fixture.detectChanges();
+    await fixture.whenStable();
+  }
+
+  beforeEach(async () => {
+    await TestBed.configureTestingModule({
+      imports: [InspectorPanelComponent],
+    }).compileComponents();
+
+    fixture = TestBed.createComponent(InspectorPanelComponent);
+    root = fixture.nativeElement as HTMLElement;
+    TestBed.inject(I18nService).setPreference('en');
+    fixture.componentRef.setInput('activeTerminal', TERMINAL);
+    fixture.componentRef.setInput('modelProfiles', MODEL_PROFILES);
+  });
+
+  it('counts down to the minute below one hour', async () => {
+    await renderReset(45);
+
+    expect(root.querySelector('.quota-reset')?.textContent?.trim()).toBe('Resets in 45m');
+  });
+
+  it('keeps the minutes alongside the hours', async () => {
+    await renderReset(3 * 60 + 25);
+
+    expect(root.querySelector('.quota-reset')?.textContent?.trim()).toBe('Resets in 3h 25m');
+  });
+
+  it('keeps the minutes alongside days and hours', async () => {
+    await renderReset(2 * 24 * 60 + 3 * 60 + 7);
+
+    expect(root.querySelector('.quota-reset')?.textContent?.trim()).toBe('Resets in 2d 3h 7m');
+  });
+
+  it('reports a window whose reset moment has passed', async () => {
+    await renderReset(-5);
+
+    expect(root.querySelector('.quota-reset')?.textContent?.trim()).toBe('Reset due');
+  });
+
+  it('names the exact reset moment in the tooltip', async () => {
+    await renderReset(90);
+
+    const tooltip = root.querySelector('.quota-reset')?.getAttribute('title') ?? '';
+    expect(tooltip).toMatch(/^Resets at \d{2}\/\d{2}\D+\d{2}:\d{2}$/);
   });
 });

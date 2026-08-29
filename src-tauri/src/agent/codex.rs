@@ -20,6 +20,7 @@ const CODEX_PATH_ENV: &str = "TERMEXO_CODEX_PATH";
 const LEGACY_CODEX_PATH_ENV: &str = "AGENTDOCK_CODEX_PATH";
 const HOOKS_ENABLED_CONFIG: &str = "features.hooks=true";
 const BYPASS_HOOK_TRUST_FLAG: &str = "--dangerously-bypass-hook-trust";
+const AUTO_CONFIRM_FLAG: &str = "--approve-for-me";
 
 #[derive(Debug, Error)]
 pub enum CodexError {
@@ -227,6 +228,10 @@ impl AgentAdapter for CodexCliAdapter {
         append_option(&mut command, "-c", Some(HOOKS_ENABLED_CONFIG));
         command.push(' ');
         command.push_str(BYPASS_HOOK_TRUST_FLAG);
+        if options.auto_confirm {
+            command.push(' ');
+            command.push_str(AUTO_CONFIRM_FLAG);
+        }
         if let Some(session_id) = options
             .session_id
             .as_deref()
@@ -599,6 +604,7 @@ mod tests {
                     "model_provider='''termexo'''".into(),
                     "model_providers.termexo.base_url='''https://api.deepseek.com/v1'''".into(),
                 ],
+                auto_confirm: true,
             })
             .unwrap();
         assert!(fresh.command.contains("-c 'notify=["));
@@ -607,6 +613,7 @@ mod tests {
         assert!(fresh.command.contains("codex-hook-event"));
         assert!(fresh.command.contains("-c 'features.hooks=true'"));
         assert!(fresh.command.contains("--dangerously-bypass-hook-trust"));
+        assert!(fresh.command.contains("--approve-for-me"));
         assert!(fresh.command.contains("--model 'gpt-5.6-sol'"));
         // Codex resolves providers from its own config, never from OPENAI_BASE_URL.
         assert!(fresh.command.contains("-c 'model_provider="));
@@ -620,6 +627,7 @@ mod tests {
                 notify_config: None,
                 hook_configs: Vec::new(),
                 provider_configs: Vec::new(),
+                auto_confirm: false,
             })
             .unwrap();
         assert!(resumed
@@ -627,6 +635,7 @@ mod tests {
             .contains("resume '019f9978-f46b-7d50-93b6-927b7eefcb1f'"));
         assert!(resumed.command.contains("-c 'features.hooks=true'"));
         assert!(resumed.command.contains("--dangerously-bypass-hook-trust"));
+        assert!(!resumed.command.contains("--approve-for-me"));
 
         fs::remove_dir_all(directory).unwrap();
     }

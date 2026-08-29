@@ -30,7 +30,7 @@ import { IconComponent } from '../icon/icon';
       display: inline-flex;
       min-width: 0;
     }
-    /* Mirrors .window-tools button so the selector reads as a peer of the flat
+    /* Mirrors .window-tools .window-tool so the selector reads as a peer of the flat
        icon buttons, not a raised island with its own border and fill. */
     .language-selector {
       position: relative;

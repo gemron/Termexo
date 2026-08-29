@@ -33,6 +33,8 @@ let browser;
 let page;
 let proxyServer;
 let temporaryNetworkProfileId;
+let temporaryNetworkProfileName;
+let previousDefaultNetworkProfiles = [];
 try {
   await waitForDebugEndpoint(debugUrl, child);
   browser = await chromium.connectOverCDP(debugUrl);
@@ -132,7 +134,25 @@ try {
     throw new Error('Desktop account profiles did not resolve isolated CLI login status.');
   }
 
-  proxyServer = createServer((socket) => socket.end());
+  proxyServer = createServer((socket) => {
+    let tunnelEstablished = false;
+    socket.on('error', () => undefined);
+    socket.on('data', (chunk) => {
+      if (!tunnelEstablished) {
+        if (!chunk.toString('ascii').startsWith('CONNECT ')) {
+          socket.end('HTTP/1.1 400 Bad Request\r\n\r\n');
+          return;
+        }
+        tunnelEstablished = true;
+        socket.write('HTTP/1.1 200 Connection Established\r\n\r\n');
+        return;
+      }
+
+      // The native probe sends a TLS ClientHello after CONNECT. A TLS alert is sufficient to
+      // prove that the tunnel carries end-to-end TLS traffic without contacting a real service.
+      socket.end(Buffer.from([0x15, 0x03, 0x03, 0x00, 0x02, 0x02, 0x28]));
+    });
+  });
   await new Promise((resolveListen, rejectListen) => {
     proxyServer.once('error', rejectListen);
     proxyServer.listen(0, '127.0.0.1', resolveListen);
@@ -142,12 +162,16 @@ try {
     throw new Error('Desktop smoke proxy did not expose a TCP address.');
   }
   const proxyUrl = `http://127.0.0.1:${proxyAddress.port}`;
-  const temporaryNetworkProfileName = `Desktop smoke proxy ${Date.now()}`;
+  temporaryNetworkProfileName = `Desktop smoke proxy ${Date.now()}`;
+
+  previousDefaultNetworkProfiles = (
+    await page.evaluate(() => window.__TAURI_INTERNALS__.invoke('list_network_profiles'))
+  ).filter((profile) => profile.isDefault);
 
   await settingsDialog.getByRole('button', { name: '网络与 npm', exact: true }).click();
   await settingsDialog.getByRole('button', { name: '新建代理 Profile', exact: true }).click();
   await settingsDialog.getByLabel('名称', { exact: true }).fill(temporaryNetworkProfileName);
-  await settingsDialog.getByLabel('HTTPS_PROXY', { exact: true }).fill(proxyUrl);
+  await settingsDialog.getByLabel('HTTPS_PROXY').fill(proxyUrl);
   await settingsDialog.getByLabel('registry', { exact: true }).fill('https://registry.npmjs.org/');
   await settingsDialog.getByRole('button', { name: '保存代理 Profile', exact: true }).click();
   await settingsDialog.getByText(temporaryNetworkProfileName, { exact: true }).waitFor();
@@ -164,7 +188,9 @@ try {
   temporaryNetworkProfileId = storedNetworkProfile.id;
 
   await settingsDialog.getByRole('button', { name: '测试连接', exact: true }).click();
-  await settingsDialog.getByText('TCP 连通性测试通过', { exact: true }).waitFor();
+  await settingsDialog
+    .getByText('代理可访问 api.anthropic.com，Agent 请求可以正常发出', { exact: true })
+    .waitFor();
 
   const cliPlans = await page.evaluate(
     (workspaceId) =>
@@ -215,6 +241,9 @@ try {
     throw new Error(`desktop runtime errors:\n${errors.join('\n')}`);
   }
 
+  const verifiedNetworkProfileId = temporaryNetworkProfileId;
+  await cleanupTemporaryNetworkState();
+
   console.log(
     JSON.stringify({
       claudeDiagnostic: backendInstallation.diagnostic,
@@ -230,7 +259,7 @@ try {
         diagnostic: profile.diagnostic,
       })),
       networkProfileTest: {
-        id: temporaryNetworkProfileId,
+        id: verifiedNetworkProfileId,
         target: proxyUrl,
         persisted: true,
         connectivity: 'passed',
@@ -239,7 +268,7 @@ try {
         officialPackages: cliPlans.map((plan) => plan.packageSpec),
         npmVersion: cliPlans[0].npmVersion,
         workspaceProxyApplied: cliPlans.every(
-          (plan) => plan.networkProfileId === temporaryNetworkProfileId,
+          (plan) => plan.networkProfileId === verifiedNetworkProfileId,
         ),
         mutationRequiresConfirmation: true,
       },
@@ -247,14 +276,7 @@ try {
   );
 } finally {
   try {
-    if (page && temporaryNetworkProfileId) {
-      await page
-        .evaluate(
-          (profileId) => window.__TAURI_INTERNALS__.invoke('delete_network_profile', { profileId }),
-          temporaryNetworkProfileId,
-        )
-        .catch(() => undefined);
-    }
+    await cleanupTemporaryNetworkState().catch(() => undefined);
     if (proxyServer) {
       await new Promise((resolveClose) => proxyServer.close(resolveClose));
     }
@@ -262,6 +284,67 @@ try {
   } finally {
     await stopChildProcess(child);
   }
+}
+
+async function cleanupTemporaryNetworkState() {
+  if (!page || (!temporaryNetworkProfileId && !temporaryNetworkProfileName)) {
+    return;
+  }
+
+  const profiles = await page.evaluate(() =>
+    window.__TAURI_INTERNALS__.invoke('list_network_profiles'),
+  );
+  const temporaryProfile = profiles.find(
+    (profile) =>
+      profile.id === temporaryNetworkProfileId || profile.name === temporaryNetworkProfileName,
+  );
+  if (!temporaryProfile) {
+    return;
+  }
+
+  await page.evaluate(
+    (profileId) => window.__TAURI_INTERNALS__.invoke('delete_network_profile', { profileId }),
+    temporaryProfile.id,
+  );
+  temporaryNetworkProfileId = undefined;
+  temporaryNetworkProfileName = undefined;
+
+  const defaultInputs = previousDefaultNetworkProfiles.map((profile) => ({
+    id: profile.id,
+    name: profile.name,
+    scope: profile.scope,
+    workspaceId: profile.workspaceId,
+    enabled: profile.enabled,
+    isDefault: true,
+    httpProxy: profile.httpProxy,
+    httpsProxy: profile.httpsProxy,
+    allProxy: profile.allProxy,
+    noProxy: profile.noProxy,
+    npmRegistry: profile.npmRegistry,
+    npmProxy: profile.npmProxy,
+    npmHttpsProxy: profile.npmHttpsProxy,
+    npmStrictSsl: profile.npmStrictSsl,
+    npmCaPath: profile.npmCaPath,
+    proxyUsername: profile.proxyUsername,
+  }));
+  await page.evaluate(async (inputs) => {
+    for (const input of inputs) {
+      await window.__TAURI_INTERNALS__.invoke('save_network_profile', { input });
+    }
+  }, defaultInputs);
+
+  const restoredProfiles = await page.evaluate(() =>
+    window.__TAURI_INTERNALS__.invoke('list_network_profiles'),
+  );
+  if (
+    previousDefaultNetworkProfiles.some(
+      (previous) =>
+        !restoredProfiles.some((profile) => profile.id === previous.id && profile.isDefault),
+    )
+  ) {
+    throw new Error('Desktop smoke did not restore the previous default network profiles.');
+  }
+  previousDefaultNetworkProfiles = [];
 }
 
 async function waitForDebugEndpoint(url, process) {

@@ -25,7 +25,7 @@ import { TerminalGatewayService } from '../core/services/terminal-gateway.servic
 import { IconComponent } from '../shared/icon/icon';
 import { TerminalCompositionAnchor } from './terminal-composition-anchor';
 import { DEFAULT_TERMINAL_FONT_NAME, terminalFontFamily } from './terminal-font';
-import { terminalKeySequence } from './terminal-key-sequences';
+import { terminalKeySequence, workbenchShortcut } from './terminal-key-sequences';
 import { TerminalResizeCoordinator } from './terminal-resize-coordinator';
 import { detectTerminalRuntimeIssue, TerminalRuntimeIssue } from './terminal-runtime-diagnostics';
 import { createTerminalTheme } from './terminal-theme';
@@ -170,12 +170,14 @@ export class TerminalPanelComponent implements AfterViewInit {
     const terminalContainer = this.container().nativeElement;
     this.terminal.open(terminalContainer);
     this.compositionAnchor = new TerminalCompositionAnchor(terminalContainer, () => {
-      const cursor = this.terminal.buffer.active;
+      const buffer = this.terminal.buffer.active;
       return {
         cols: this.terminal.cols,
         rows: this.terminal.rows,
-        cursorX: cursor.cursorX,
-        cursorY: cursor.cursorY,
+        cursorX: buffer.cursorX,
+        cursorY: buffer.cursorY,
+        baseY: buffer.baseY,
+        viewportY: buffer.viewportY,
       };
     });
     terminalContainer.addEventListener('wheel', this.prepareWheelInteraction, {
@@ -213,8 +215,9 @@ export class TerminalPanelComponent implements AfterViewInit {
       void this.gateway.write(this.session(), data);
     });
     // xterm repositions its IME elements on every render. Registering after open means this runs
-    // after xterm's own render listener and restores the caret captured at compositionstart.
-    const renderDisposable = this.terminal.onRender(this.restoreCompositionAfterUpdate);
+    // after xterm's own render listener, so it wins for both the caret captured at
+    // compositionstart and the live cursor the next composition will start from.
+    const renderDisposable = this.terminal.onRender(this.syncCompositionAfterRender);
 
     this.resizeObserver = new ResizeObserver(() => this.scheduleFit(false));
     this.resizeObserver.observe(terminalContainer);
@@ -375,6 +378,11 @@ export class TerminalPanelComponent implements AfterViewInit {
    * which would move focus out of the terminal entirely.
    */
   private readonly handleCustomKey = (event: KeyboardEvent): boolean => {
+    // Tab shortcuts belong to the workbench. Declining them here keeps xterm from writing an
+    // escape sequence to the PTY; the event still bubbles to the shell, which acts on it.
+    if (workbenchShortcut(event)) {
+      return false;
+    }
     const sequence = terminalKeySequence(event);
     if (!sequence) {
       return true;
@@ -390,6 +398,9 @@ export class TerminalPanelComponent implements AfterViewInit {
 
   private readonly restoreCompositionAfterUpdate = (): void =>
     this.compositionAnchor?.restoreAfterBrowserUpdate();
+
+  private readonly syncCompositionAfterRender = (): void =>
+    this.compositionAnchor?.syncAfterRender();
 
   private readonly endComposition = (): void => this.compositionAnchor?.end();
 

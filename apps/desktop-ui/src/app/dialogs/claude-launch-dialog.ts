@@ -18,6 +18,7 @@ export interface ClaudeLaunchDialogValue {
   profileId?: string;
   mcpProfileId?: string;
   accountProfileId?: string;
+  autoConfirm?: boolean;
 }
 
 @Component({
@@ -77,7 +78,12 @@ export interface ClaudeLaunchDialogValue {
               (ngModelChange)="profileId.set($event)"
             >
               @for (profile of claudeProfiles(); track profile.id) {
-                <option [value]="profile.id">{{ profile.name }} · {{ modelOf(profile) }}@if (isNativeModel(profile)) { ({{ 'settings.nativeModel' | t }}) }</option>
+                <option [value]="profile.id">
+                  {{ profile.name }} · {{ modelOf(profile) }}
+                  @if (isNativeModel(profile)) {
+                    ({{ 'settings.nativeModel' | t }})
+                  }
+                </option>
               }
             </select>
           </label>
@@ -116,6 +122,17 @@ export interface ClaudeLaunchDialogValue {
               }
             </select>
           </label>
+          <label class="wide checkbox-control auto-confirm-control">
+            <input
+              type="checkbox"
+              [ngModel]="autoConfirm()"
+              (ngModelChange)="autoConfirm.set($event)"
+            />
+            <span>
+              <strong>{{ 'launch.autoConfirm' | t }}</strong>
+              <small>{{ 'launch.autoConfirmHelp' | t }}</small>
+            </span>
+          </label>
         </div>
 
         <footer>
@@ -149,6 +166,7 @@ export class ClaudeLaunchDialogComponent {
   protected readonly profileId = signal('');
   protected readonly mcpProfileId = signal('');
   protected readonly accountProfileId = signal('');
+  protected readonly autoConfirm = signal(false);
   protected readonly claudeAccounts = computed(() =>
     this.accountProfiles().filter((profile) => profile.agentType === 'claude'),
   );
@@ -193,6 +211,7 @@ export class ClaudeLaunchDialogComponent {
       profileId: this.resolvedProfileId() || undefined,
       mcpProfileId: this.mcpProfileId() || undefined,
       accountProfileId: this.resolvedAccountProfileId() || undefined,
+      autoConfirm: this.autoConfirm() || undefined,
     });
   }
 }

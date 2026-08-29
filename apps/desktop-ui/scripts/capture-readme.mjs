@@ -35,7 +35,7 @@ try {
   await page.locator('.terminal-panel').first().waitFor();
 
   const toolbar = page.getByRole('toolbar', { name: '工作区工具' });
-  await toolbar.getByRole('button', { name: '终端', exact: true }).click();
+  await toolbar.getByRole('button', { name: '新建终端', exact: true }).click();
   const shellPanel = page.locator('.terminal-panel').last();
   await shellPanel.getByText('运行中', { exact: true }).waitFor();
   await page.getByTitle('网格布局').click();

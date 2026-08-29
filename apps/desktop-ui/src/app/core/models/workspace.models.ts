@@ -70,6 +70,7 @@ export interface TerminalSession {
   profileId?: string;
   mcpProfileId?: string;
   accountProfileId?: string;
+  autoConfirm?: boolean;
   runtimeRevision?: number;
 }
 
@@ -100,6 +101,7 @@ export interface CreateTerminalInput {
   profileId?: string;
   mcpProfileId?: string;
   accountProfileId?: string;
+  autoConfirm?: boolean;
 }
 
 export const TERMINAL_STATUS_LABELS: Record<TerminalStatus, string> = {

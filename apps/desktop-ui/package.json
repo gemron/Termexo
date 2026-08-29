@@ -11,6 +11,7 @@
     "e2e:smoke": "node scripts/smoke.mjs",
     "e2e:responsive": "node scripts/responsive-smoke.mjs",
     "e2e:v05": "node scripts/v05-smoke.mjs",
+    "e2e:todos": "node scripts/todo-board-smoke.mjs",
     "e2e:desktop:v05": "node scripts/desktop-v05-smoke.mjs",
     "e2e:desktop": "node scripts/desktop-smoke.mjs",
     "tauri:dev": "node scripts/run-tauri.mjs dev",

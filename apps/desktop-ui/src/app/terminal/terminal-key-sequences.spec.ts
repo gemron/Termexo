@@ -1,4 +1,8 @@
-import { REVERSE_TAB_SEQUENCE, terminalKeySequence } from './terminal-key-sequences';
+import {
+  REVERSE_TAB_SEQUENCE,
+  terminalKeySequence,
+  workbenchShortcut,
+} from './terminal-key-sequences';
 
 function keyEvent(overrides: Partial<Parameters<typeof terminalKeySequence>[0]> = {}) {
   return {
@@ -33,5 +37,47 @@ describe('terminalKeySequence', () => {
 
   it('ignores other keys', () => {
     expect(terminalKeySequence(keyEvent({ key: 'Enter' }))).toBeNull();
+  });
+});
+
+describe('workbenchShortcut', () => {
+  it('cycles tabs with Ctrl+Tab, backwards when Shift is held', () => {
+    expect(workbenchShortcut(keyEvent({ ctrlKey: true, shiftKey: false }))).toEqual({
+      action: 'cycleTab',
+      delta: 1,
+    });
+    expect(workbenchShortcut(keyEvent({ ctrlKey: true }))).toEqual({
+      action: 'cycleTab',
+      delta: -1,
+    });
+  });
+
+  it('cycles with Ctrl+PageUp/PageDown and moves the tab when Shift is added', () => {
+    expect(
+      workbenchShortcut(keyEvent({ key: 'PageDown', ctrlKey: true, shiftKey: false })),
+    ).toEqual({ action: 'cycleTab', delta: 1 });
+    expect(workbenchShortcut(keyEvent({ key: 'PageUp', ctrlKey: true }))).toEqual({
+      action: 'moveTab',
+      delta: -1,
+    });
+  });
+
+  it('selects a tab by position with Alt and a digit', () => {
+    expect(workbenchShortcut(keyEvent({ key: '3', altKey: true, shiftKey: false }))).toEqual({
+      action: 'selectTab',
+      index: 2,
+    });
+  });
+
+  it('leaves Ctrl+Alt+digit to the keyboard layout, where it may be AltGr', () => {
+    expect(
+      workbenchShortcut(keyEvent({ key: '3', altKey: true, ctrlKey: true, shiftKey: false })),
+    ).toBeNull();
+  });
+
+  it('claims nothing the terminal itself uses', () => {
+    expect(workbenchShortcut(keyEvent())).toBeNull();
+    expect(workbenchShortcut(keyEvent({ key: 'Enter', ctrlKey: true }))).toBeNull();
+    expect(workbenchShortcut(keyEvent({ ctrlKey: true, type: 'keyup' }))).toBeNull();
   });
 });

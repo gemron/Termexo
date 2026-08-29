@@ -2,6 +2,7 @@ import { Injectable } from '@angular/core';
 import { invoke } from '@tauri-apps/api/core';
 import { listen, UnlistenFn } from '@tauri-apps/api/event';
 
+import { TerminalPromptCapture } from '../models/prompt-assets';
 import { TerminalSession } from '../models/workspace.models';
 import { isTauriRuntime } from './tauri-runtime';
 
@@ -18,6 +19,9 @@ export interface TerminalExitEvent {
   exitCode: number;
   success: boolean;
 }
+
+/** Clears the current line and parks the cursor at its start, ready for a redraw. */
+const ERASE_LINE = '\x1b[2K\r';
 
 type TerminalRuntimeEvent = Pick<TerminalExitEvent, 'terminalId' | 'runtimeRevision'>;
 
@@ -45,7 +49,7 @@ interface TerminalStartRequest {
 @Injectable({ providedIn: 'root' })
 export class TerminalGatewayService {
   private readonly browserListeners = new Map<string, (data: string) => void>();
-  private readonly browserLines = new Map<string, string>();
+  private readonly browserInputs = new Map<string, TerminalPromptCapture>();
 
   async connect(
     terminalId: string,
@@ -66,7 +70,7 @@ export class TerminalGatewayService {
     this.browserListeners.set(terminalId, onOutput);
     return () => {
       this.browserListeners.delete(terminalId);
-      this.browserLines.delete(terminalId);
+      this.browserInputs.delete(terminalId);
     };
   }
 
@@ -135,31 +139,33 @@ export class TerminalGatewayService {
       await invoke('close_terminal', { terminalId });
     }
     this.browserListeners.delete(terminalId);
-    this.browserLines.delete(terminalId);
+    this.browserInputs.delete(terminalId);
   }
 
+  /**
+   * Mirrors how an agent CLI reads its input, so the preview shows what the desktop app really
+   * writes: control keys, bracketed pastes and the Enter that submits them all arrive separately.
+   */
   private handleBrowserInput(session: TerminalSession, data: string): void {
-    const currentLine = this.browserLines.get(session.id) ?? '';
-
-    if (data === '\r') {
+    const capture = this.browserInputFor(session.id);
+    const result = capture.consume(data);
+    if (result.submitted.length === 0) {
+      this.emit(session.id, `${ERASE_LINE}${this.browserPrompt(session)}${result.draft}`);
+      return;
+    }
+    for (const command of result.submitted) {
       this.emit(session.id, '\r\n');
-      this.runBrowserCommand(session, currentLine.trim());
-      this.browserLines.set(session.id, '');
-      return;
+      this.runBrowserCommand(session, command);
     }
+  }
 
-    if (data === '\u007f') {
-      if (currentLine.length > 0) {
-        this.browserLines.set(session.id, currentLine.slice(0, -1));
-        this.emit(session.id, '\b \b');
-      }
-      return;
+  private browserInputFor(terminalId: string): TerminalPromptCapture {
+    let capture = this.browserInputs.get(terminalId);
+    if (!capture) {
+      capture = new TerminalPromptCapture();
+      this.browserInputs.set(terminalId, capture);
     }
-
-    if (data >= ' ') {
-      this.browserLines.set(session.id, currentLine + data);
-      this.emit(session.id, data);
-    }
+    return capture;
   }
 
   private runBrowserCommand(session: TerminalSession, command: string): void {

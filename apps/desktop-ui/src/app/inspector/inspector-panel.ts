@@ -1,4 +1,4 @@
-import { Component, computed, inject, input, output, signal } from '@angular/core';
+import { Component, computed, DestroyRef, inject, input, output, signal } from '@angular/core';
 
 import {
   AgentEvent,
@@ -35,6 +35,12 @@ const EVENT_LABELS: Readonly<Record<string, string>> = {
 /** Matches the backend default for a profile that has never had a threshold set. */
 const DEFAULT_ALERT_THRESHOLD = 80;
 
+const MINUTE_MS = 60_000;
+const HOUR_MINUTES = 60;
+const DAY_MINUTES = 24 * HOUR_MINUTES;
+/** Keeps the minute-precision countdown honest without re-rendering every second. */
+const COUNTDOWN_TICK_MS = 20_000;
+
 @Component({
   selector: 'app-inspector-panel',
   imports: [IconComponent, TranslatePipe],
@@ -50,7 +56,15 @@ export class InspectorPanelComponent {
   readonly quotaLoading = input(false);
   readonly modelProfiles = input<ModelProfile[]>([]);
   readonly refreshQuotas = output<void>();
+  readonly collapseRequested = output<void>();
   protected readonly showAllQuotas = signal(false);
+  /** Drives the reset countdown so a panel left open does not keep showing a stale minute. */
+  private readonly now = signal(Date.now());
+
+  constructor() {
+    const ticker = setInterval(() => this.now.set(Date.now()), COUNTDOWN_TICK_MS);
+    inject(DestroyRef).onDestroy(() => clearInterval(ticker));
+  }
 
   /**
    * Shows only the allowance sources used by the active terminal unless the user explicitly asks
@@ -190,14 +204,44 @@ export class InspectorPanelComponent {
     }
   }
 
+  /** Counts down to the minute; providers publish reset moments that are minutes apart. */
   protected resetLabel(timestamp?: number): string {
     if (!timestamp) return '';
-    const remaining = timestamp - Date.now();
+    const remaining = timestamp - this.now();
     if (remaining <= 0) return this.i18n.t('quota.resetDue');
-    const hours = Math.ceil(remaining / 3_600_000);
-    return hours < 48
-      ? this.i18n.t('quota.resetHours', { count: hours })
-      : this.i18n.t('quota.resetDays', { count: Math.ceil(hours / 24) });
+    // Whole minutes elapsed, so the reading never overstates what is left; a final partial
+    // minute still shows as one rather than collapsing to zero.
+    const totalMinutes = Math.max(1, Math.floor(remaining / MINUTE_MS));
+    const minutes = totalMinutes % HOUR_MINUTES;
+    if (totalMinutes < HOUR_MINUTES) {
+      return this.i18n.t('quota.resetMinutes', { minutes: totalMinutes });
+    }
+    if (totalMinutes < DAY_MINUTES) {
+      return this.i18n.t('quota.resetHoursMinutes', {
+        hours: Math.floor(totalMinutes / HOUR_MINUTES),
+        minutes,
+      });
+    }
+    return this.i18n.t('quota.resetDaysHoursMinutes', {
+      days: Math.floor(totalMinutes / DAY_MINUTES),
+      hours: Math.floor((totalMinutes % DAY_MINUTES) / HOUR_MINUTES),
+      minutes,
+    });
+  }
+
+  /** The countdown is relative, so the tooltip pins the exact moment it refers to. */
+  protected resetTooltip(timestamp?: number): string {
+    if (!timestamp) return '';
+    return this.i18n.t('quota.resetAt', { time: this.i18n.formatDateTime(timestamp) });
+  }
+
+  protected usedLabel(percent: number): string {
+    return this.i18n.t('quota.used', { percent: Math.round(percent) });
+  }
+
+  /** Providers occasionally report an overage, which must not overflow the meter track. */
+  protected meterValue(percent: number): number {
+    return Math.min(100, Math.max(0, Math.round(percent)));
   }
 
   protected checkedLabel(timestamp: number): string {

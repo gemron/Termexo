@@ -179,7 +179,7 @@ try {
       },
     }),
   );
-  const workspaceMaximizeButton = page.locator('.window-tools button').nth(1);
+  const workspaceMaximizeButton = page.locator('[data-testid="workspace-maximize-toggle"]');
   await workspaceMaximizeButton.click();
   await page.locator('.app-shell.workspace-maximized').waitFor();
   results.push(

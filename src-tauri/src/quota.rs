@@ -182,7 +182,11 @@ fn canonical_provider(provider: &str) -> Option<&'static str> {
 /// than hard-coding one keeps mirrors and regional sites working: Kimi's `api.moonshot.cn` and
 /// `api.moonshot.ai` are separate sites whose keys are not interchangeable, and GLM has both
 /// `open.bigmodel.cn` and `api.z.ai`.
-pub fn build_request(provider: &str, base_url: Option<&str>, api_key: &str) -> Option<QuotaRequest> {
+pub fn build_request(
+    provider: &str,
+    base_url: Option<&str>,
+    api_key: &str,
+) -> Option<QuotaRequest> {
     let provider = canonical_provider(provider)?;
     match provider {
         PROVIDER_DEEPSEEK => Some(QuotaRequest::bearer(
@@ -196,7 +200,11 @@ pub fn build_request(provider: &str, base_url: Option<&str>, api_key: &str) -> O
         PROVIDER_MINIMAX => Some(QuotaRequest::bearer(MINIMAX_QUOTA_URL.to_owned(), api_key)),
         // GLM rejects the `Bearer ` prefix on this endpoint and wants the raw key.
         PROVIDER_GLM => Some(QuotaRequest {
-            url: join_origin(base_url, GLM_DEFAULT_ORIGIN, "/api/monitor/usage/quota/limit"),
+            url: join_origin(
+                base_url,
+                GLM_DEFAULT_ORIGIN,
+                "/api/monitor/usage/quota/limit",
+            ),
             headers: vec![(AUTHORIZATION, api_key.to_owned())],
         }),
         _ => None,
@@ -288,7 +296,10 @@ fn parse_glm(body: &Value) -> Result<Vec<QuotaEntry>, String> {
     let entries = limits
         .iter()
         .filter_map(|limit| {
-            let kind = limit.get("type").and_then(Value::as_str).unwrap_or_default();
+            let kind = limit
+                .get("type")
+                .and_then(Value::as_str)
+                .unwrap_or_default();
             let unit = if kind.eq_ignore_ascii_case("TIME_LIMIT") {
                 QuotaUnit::Requests
             } else {
@@ -345,9 +356,9 @@ fn parse_minimax(body: &Value) -> Result<Vec<QuotaEntry>, String> {
         return Err(format!("MiniMax 余量接口返回错误 {code}：{message}"));
     }
 
-    let models = body.get("model_remains").ok_or_else(|| {
-        format!("MiniMax 返回了未识别的结构（字段：{}）", key_outline(body))
-    })?;
+    let models = body
+        .get("model_remains")
+        .ok_or_else(|| format!("MiniMax 返回了未识别的结构（字段：{}）", key_outline(body)))?;
     // A single-model plan may arrive as one object rather than a list.
     let models: Vec<&Value> = match models {
         Value::Array(items) => items.iter().collect(),
@@ -666,8 +677,7 @@ fn parse_rfc3339(text: &str) -> Option<i64> {
     let hour: i64 = text.get(11..13)?.parse().ok()?;
     let minute: i64 = text.get(14..16)?.parse().ok()?;
     let second: i64 = text.get(17..19)?.parse().ok()?;
-    let seconds =
-        days_from_civil(year, month, day) * 86_400 + hour * 3_600 + minute * 60 + second;
+    let seconds = days_from_civil(year, month, day) * 86_400 + hour * 3_600 + minute * 60 + second;
     Some(seconds * 1_000)
 }
 
@@ -757,7 +767,10 @@ mod tests {
         .unwrap();
 
         assert_eq!(request.url, "https://api.moonshot.ai/v1/users/me/balance");
-        assert_eq!(request.headers, vec![("Authorization", "Bearer test-key".to_owned())]);
+        assert_eq!(
+            request.headers,
+            vec![("Authorization", "Bearer test-key".to_owned())]
+        );
     }
 
     #[test]
@@ -781,7 +794,10 @@ mod tests {
             request.url,
             "https://open.bigmodel.cn/api/monitor/usage/quota/limit"
         );
-        assert_eq!(request.headers, vec![("Authorization", "test-key".to_owned())]);
+        assert_eq!(
+            request.headers,
+            vec![("Authorization", "test-key".to_owned())]
+        );
     }
 
     #[test]

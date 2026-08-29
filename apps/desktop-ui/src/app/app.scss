@@ -5,7 +5,7 @@
 
 .app-shell {
   --workspace-sidebar-track: clamp(152px, var(--workspace-sidebar-width, 208px), 30vw);
-  --inspector-track: clamp(200px, var(--inspector-width, 252px), 32vw);
+  --inspector-track: clamp(240px, var(--inspector-width, 280px), 32vw);
 
   display: grid;
   height: 100%;
@@ -120,6 +120,14 @@ app-inspector-panel {
   background: var(--surface-0);
 }
 
+.workspace-main.task-board-active {
+  grid-template-rows: 52px 0 auto minmax(0, 1fr) 22px;
+}
+
+.app-shell.workspace-maximized .workspace-main.task-board-active {
+  grid-template-rows: 52px 0 auto minmax(0, 1fr) 0;
+}
+
 .topbar {
   position: relative;
   z-index: 30;
@@ -134,14 +142,44 @@ app-inspector-panel {
   padding: 0;
   overflow: visible;
   border-bottom: 1px solid var(--border);
-  background: color-mix(in srgb, var(--surface-0) 88%, transparent);
+  background: var(--surface-0);
   box-shadow: 0 8px 28px rgb(0 0 0 / 10%);
-  backdrop-filter: blur(12px) saturate(120%);
+}
+
+.topbar-lead {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 4px;
+  padding-left: 8px;
+}
+
+/* Appears only while its panel is hidden, so the topbar carries no control it does not need. */
+.rail-reveal {
+  display: grid;
+  width: 28px;
+  height: 28px;
+  flex: none;
+  place-items: center;
+  border: 0;
+  border-radius: 3px;
+  color: var(--text-muted);
+  background: transparent;
+  transition:
+    color 140ms ease,
+    background-color 140ms ease;
+
+  &:hover,
+  &:focus-visible {
+    color: var(--text);
+    background: var(--surface-2);
+    outline: 0;
+  }
 }
 
 .workspace-title {
   min-width: 0;
-  padding-left: 13px;
+  padding-left: 5px;
 
   strong,
   span {
@@ -176,6 +214,14 @@ app-inspector-panel {
 
 .toolbar {
   height: 32px;
+  gap: 8px;
+}
+
+.workspace-view-switch,
+.toolbar-actions {
+  display: flex;
+  height: 32px;
+  align-items: center;
   gap: 2px;
   padding: 2px;
   border: 1px solid var(--border);
@@ -184,6 +230,33 @@ app-inspector-panel {
   box-shadow:
     inset 0 1px 0 rgb(255 255 255 / 2%),
     0 7px 20px rgb(0 0 0 / 12%);
+}
+
+.workspace-view-switch {
+  border-color: color-mix(in srgb, var(--accent) 28%, var(--border));
+  background: color-mix(in srgb, var(--accent) 6%, var(--surface-raised));
+  gap: 1px;
+
+  .tool-button {
+    position: relative;
+
+    &.active {
+      color: color-mix(in srgb, var(--accent) 72%, var(--text));
+      box-shadow: inset 0 -1px 0 color-mix(in srgb, var(--accent) 74%, transparent);
+    }
+
+    b {
+      display: grid;
+      min-width: 15px;
+      height: 15px;
+      place-items: center;
+      padding: 0 3px;
+      border-radius: 8px;
+      color: var(--text-secondary);
+      background: var(--surface-inset);
+      font: 700 8px/1 var(--mono);
+    }
+  }
 }
 
 .tool-button {
@@ -503,10 +576,10 @@ app-inspector-panel {
 
 .window-tools {
   justify-content: flex-end;
-  gap: 3px;
+  gap: 2px;
   padding-right: 10px;
 
-  button {
+  .window-tool {
     display: grid;
     width: 28px;
     height: 28px;
@@ -515,26 +588,45 @@ app-inspector-panel {
     border-radius: 3px;
     color: var(--text-muted);
     background: transparent;
+    transition:
+      color 140ms ease,
+      background-color 140ms ease;
 
     &:hover,
+    &:focus-visible,
     &.active {
       color: var(--text);
       background: var(--surface-2);
+      outline: 0;
     }
   }
 }
 
 .terminal-tabs {
+  // The toolbar sheds its labels on this row's own width, not the window's: the two sidebars
+  // take most of what a window query would measure.
+  container: terminal-tabs / inline-size;
   position: relative;
   z-index: 10;
   display: flex;
   min-width: 0;
   align-items: center;
-  justify-content: space-between;
+  gap: 6px;
   border-bottom: 1px solid var(--border);
-  background: color-mix(in srgb, var(--surface-1) 92%, transparent);
+  background: var(--surface-1);
   box-shadow: 0 8px 24px rgb(0 0 0 / 8%);
-  backdrop-filter: blur(10px);
+
+  &.view-hidden {
+    display: none;
+  }
+}
+
+/* Takes every pixel the toolbar does not need: the tabs are the control used most here. */
+.tab-bar {
+  display: flex;
+  min-width: 0;
+  height: 100%;
+  flex: 1;
 }
 
 .tab-strip {
@@ -542,20 +634,59 @@ app-inspector-panel {
   min-width: 0;
   height: 100%;
   flex: 1;
+  // DaisyUI's `.tabs` wraps; a second row of tabs would eat into the terminals below it, so the
+  // strip scrolls sideways instead.
+  flex-wrap: nowrap;
   overflow: auto hidden;
   scrollbar-color: var(--surface-2) var(--surface-0);
   scrollbar-width: thin;
 
-  button {
+  /* Holds the tab and its close button, which cannot nest inside the tab's own button. */
+  .tab-slot {
+    position: relative;
+    display: flex;
+    // Below this a name is worn down to two characters; the strip scrolls rather than shrink
+    // further, and the wheel and Ctrl+Tab both reach whatever is off-screen.
+    min-width: 124px;
+    max-width: 190px;
+    flex: 0 1 auto;
+    border-right: 1px solid var(--border);
+
+    &.dragging {
+      opacity: 0.45;
+    }
+
+    /* Marks the gap the dragged tab will drop into. */
+    &.drop-before::after,
+    &.drop-after::after {
+      position: absolute;
+      z-index: 1;
+      top: 0;
+      bottom: 0;
+      width: 2px;
+      background: var(--accent);
+      content: '';
+    }
+
+    &.drop-before::after {
+      left: -1px;
+    }
+
+    &.drop-after::after {
+      right: -1px;
+    }
+  }
+
+  .tab {
     display: flex;
     height: 100%;
     min-width: 0;
-    max-width: 180px;
+    flex: 1;
     align-items: center;
     gap: 6px;
-    padding: 0 10px;
+    /* Room for the close button, which overlays the tab's trailing edge. */
+    padding: 0 26px 0 10px;
     border: 0;
-    border-right: 1px solid var(--border);
     color: var(--text-muted);
     background: transparent;
     font-size: 10px;
@@ -630,144 +761,60 @@ app-inspector-panel {
       }
     }
 
+    app-icon {
+      flex: 0 0 auto;
+      opacity: 0.7;
+    }
+
     span {
       overflow: hidden;
       text-overflow: ellipsis;
       white-space: nowrap;
     }
-
-    small {
-      color: var(--text-muted);
-      font: 9px/1 var(--mono);
-    }
   }
 
-  .add-tab {
+  /* Revealed on hover, on focus, and on the active tab, so a full strip stays readable at rest. */
+  .tab-close {
+    position: absolute;
+    top: 50%;
+    right: 5px;
     display: grid;
-    width: 34px;
-    min-width: 34px;
+    width: 17px;
+    height: 17px;
     place-items: center;
-    padding: 0;
-  }
-}
-
-.terminal-picker {
-  display: flex;
-  min-width: 0;
-  align-items: center;
-  gap: 5px;
-  padding-left: 7px;
-  border-left: 1px solid var(--border);
-
-  span {
-    color: var(--text-muted);
-    font: 9px/1 var(--mono);
-    white-space: nowrap;
-  }
-
-  select {
-    width: 148px;
-    height: 27px;
-    border: 1px solid var(--border);
-    border-radius: var(--radius-field);
-    color: var(--text-secondary);
-    background: var(--surface-inset);
-    font-size: 10px;
-    outline: none;
-
-    &:focus {
-      border-color: var(--color-primary);
-    }
-  }
-}
-
-.terminal-order-controls {
-  display: flex;
-  align-items: center;
-  gap: 1px;
-  padding-left: 5px;
-
-  button {
-    display: grid;
-    width: 23px;
-    min-height: 23px;
-    height: 23px;
-    place-items: center;
-
-    &:disabled {
-      opacity: 0.28;
-    }
-  }
-}
-
-.font-size-controls {
-  display: flex;
-  height: 25px;
-  align-items: center;
-  gap: 1px;
-  margin-left: 5px;
-  padding: 1px;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-field);
-  color: var(--text-muted);
-  background: var(--surface-inset);
-
-  > span {
-    padding: 0 4px;
-    font: 9px/1 var(--sans);
-  }
-
-  button {
-    display: grid;
-    width: 20px;
-    height: 20px;
-    place-items: center;
-    padding: 0;
     border: 0;
     border-radius: var(--radius-selector);
-    color: var(--text-secondary);
+    color: var(--text-muted);
     background: transparent;
-    font: 12px/1 var(--mono);
-
-    &:hover:not(:disabled) {
-      color: var(--text);
-      background: var(--surface-2);
-    }
-
-    &:disabled {
-      opacity: 0.28;
-    }
+    opacity: 0;
+    transform: translateY(-50%);
   }
 
-  output {
-    min-width: 18px;
-    color: var(--text);
-    font: 9px/1 var(--mono);
-    text-align: center;
+  .tab-slot:hover .tab-close,
+  .tab-slot:focus-within .tab-close,
+  .tab-slot:has(.tab.active) .tab-close {
+    opacity: 1;
   }
 }
 
-.layout-controls {
-  display: flex;
-  align-items: center;
-  gap: 2px;
-  padding: 0 7px;
+/* Outside the scrolling strip so it stays reachable however many tabs are open. */
+.add-tab {
+  display: grid;
+  width: 32px;
+  flex: 0 0 auto;
+  place-items: center;
+  border: 0;
+  border-right: 1px solid var(--border);
+}
 
-  button {
-    display: grid;
-    width: 25px;
-    height: 25px;
-    place-items: center;
-    border: 0;
-    border-radius: 3px;
-    color: var(--text-muted);
-    background: transparent;
+.add-tab,
+.tab-close {
+  color: var(--text-muted);
+  background: transparent;
 
-    &:hover,
-    &.active {
-      color: var(--text);
-      background: var(--surface-2);
-    }
+  &:hover {
+    color: var(--text);
+    background: var(--surface-2);
   }
 }
 
@@ -779,106 +826,6 @@ app-inspector-panel {
 
   50% {
     opacity: 1;
-  }
-}
-
-.grid-dimensions {
-  display: flex;
-  height: 25px;
-  align-items: center;
-  gap: 5px;
-  margin-left: 3px;
-  padding-left: 6px;
-  border-left: 1px solid var(--border);
-  color: var(--text-muted);
-
-  .grid-preview {
-    display: grid;
-    width: 24px;
-    height: 20px;
-    grid-template-columns: repeat(var(--preview-columns), minmax(0, 1fr));
-    grid-template-rows: repeat(var(--preview-rows), minmax(0, 1fr));
-    gap: 1px;
-    padding: 2px;
-    border: 1px solid var(--border-strong);
-    border-radius: var(--radius-selector);
-    background: var(--surface-inset);
-
-    i {
-      min-width: 1px;
-      min-height: 1px;
-      border-radius: 1px;
-      background: var(--surface-2);
-
-      &.occupied {
-        background: var(--accent);
-        box-shadow: 0 0 3px color-mix(in srgb, var(--accent) 45%, transparent);
-      }
-    }
-  }
-
-  .dimension-stepper {
-    display: flex;
-    align-items: center;
-    gap: 1px;
-    padding: 1px;
-    border: 1px solid var(--border);
-    border-radius: var(--radius-field);
-    background: var(--surface-inset);
-  }
-
-  .dimension-axis {
-    padding: 0 3px 0 4px;
-    color: var(--text-muted);
-    font-size: 9px;
-    white-space: nowrap;
-  }
-
-  .dimension-stepper button,
-  .dimension-swap {
-    display: grid;
-    width: 20px;
-    height: 20px;
-    place-items: center;
-    padding: 0;
-    border: 0;
-    border-radius: var(--radius-selector);
-    color: var(--text-secondary);
-    font: 12px/1 var(--mono);
-    background: transparent;
-
-    &:hover:not(:disabled) {
-      color: var(--text);
-      background: var(--surface-2);
-    }
-
-    &:disabled {
-      cursor: default;
-      opacity: 0.28;
-    }
-  }
-
-  output {
-    min-width: 17px;
-    color: var(--text);
-    font: 10px/1 var(--mono);
-    text-align: center;
-  }
-
-  .dimension-swap {
-    width: 18px;
-    color: var(--text-muted);
-    font-size: 10px;
-  }
-
-  .grid-capacity {
-    padding: 4px 5px;
-    border: 1px solid color-mix(in oklab, var(--color-primary) 34%, var(--border));
-    border-radius: var(--radius-selector);
-    color: color-mix(in oklab, var(--color-primary) 70%, var(--text));
-    font: 9px/1 var(--mono);
-    white-space: nowrap;
-    background: var(--primary-soft);
   }
 }
 
@@ -895,6 +842,18 @@ app-inspector-panel {
 
   > app-terminal-workbench.workspace-hidden {
     display: none;
+  }
+
+  > app-todo-board {
+    display: block;
+    width: 100%;
+    height: 100%;
+    min-width: 0;
+    min-height: 0;
+  }
+
+  &.board-active {
+    padding: 7px;
   }
 }
 
@@ -1024,20 +983,14 @@ app-inspector-panel {
     display: none;
   }
 
-  .grid-dimensions {
-    .grid-preview,
-    .grid-capacity {
-      display: none;
-    }
+  /* The popover behind each trigger still spells these out, so the labels go before the tabs do. */
+  .popover-trigger b {
+    display: none;
   }
 }
 
 @media (max-width: 860px) {
-  .terminal-picker select {
-    width: 108px;
-  }
-
-  .grid-dimensions .dimension-axis {
+  .visible-count {
     display: none;
   }
 }
@@ -1050,6 +1003,11 @@ app-inspector-panel {
 
   .topbar {
     height: 46px;
+  }
+
+  .workspace-main.task-board-active,
+  .app-shell.workspace-maximized .workspace-main.task-board-active {
+    grid-template-rows: 46px 0 auto minmax(0, 1fr) 0;
   }
 
   .statusbar {

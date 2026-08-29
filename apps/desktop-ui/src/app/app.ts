@@ -11,9 +11,12 @@ import {
 import {
   AccountProfileInput,
   AgentProtocol,
+  BackgroundSessionResolution,
+  ClaudeBackgroundSession,
   CliOperationPlan,
   CliOperationRequest,
   CliOperationResult,
+  compatibleNativeSessionId,
   McpProfileInput,
   ModelProfileInput,
   needsCredential,
@@ -26,9 +29,7 @@ import {
   DEFAULT_TERMINAL_FONT_SIZE,
   LayoutMode,
   MAX_TERMINAL_FONT_SIZE,
-  MAX_TERMINAL_GRID_DIMENSION,
   MIN_TERMINAL_FONT_SIZE,
-  MIN_TERMINAL_GRID_DIMENSION,
   normalizeTerminalFontSize,
   normalizeTerminalGridDimension,
   normalizeWorkspaceThemeColor,
@@ -38,6 +39,14 @@ import {
 } from './core/models/workspace.models';
 import type { HandoffPackage, HandoffRecord } from './core/models/handoff';
 import type { PromptAsset } from './core/models/prompt-assets';
+import { AGENT_STARTUP_CONFIRM_KEY } from './core/models/agent-startup';
+import { TERMINAL_INPUT_SETTLE_MS, terminalPromptWrites } from './core/models/terminal-input';
+import type { TodoContinuationRequest, TodoTask } from './core/models/todo.models';
+import {
+  compatibleTodoSessionId,
+  isReusableTodoTerminal,
+  todoWorkingDirectory,
+} from './core/models/todo.models';
 import { I18nService } from './core/i18n/i18n.service';
 import { TranslatePipe } from './core/i18n/translate.pipe';
 import {
@@ -55,6 +64,9 @@ import { DirectoryPickerService } from './core/services/directory-picker.service
 import { DesktopNotificationService } from './core/services/desktop-notification.service';
 import { HandoffService } from './core/services/handoff.service';
 import { PromptAssetService } from './core/services/prompt-asset.service';
+import { AgentStartupService } from './core/services/agent-startup.service';
+import { TodoService } from './core/services/todo.service';
+import { isTauriRuntime } from './core/services/tauri-runtime';
 import { UpdateCheck, UpdateService } from './core/services/update.service';
 import {
   TerminalExitEvent,
@@ -72,6 +84,7 @@ import {
   type OpenCodeLaunchDialogValue,
 } from './dialogs/opencode-launch-dialog';
 import { CreateWorkspaceDialogComponent } from './dialogs/create-workspace-dialog';
+import { BackgroundSessionDialogComponent } from './dialogs/background-session-dialog';
 import { DeleteWorkspaceDialogComponent } from './dialogs/delete-workspace-dialog';
 import {
   EditWorkspaceDialogComponent,
@@ -94,22 +107,35 @@ import {
   isTerminalFontAvailable,
   normalizeTerminalFontName,
 } from './terminal/terminal-font';
-import { TerminalFontPickerComponent } from './terminal/terminal-font-picker';
+import { AGENT_INTERRUPT_SEQUENCE, workbenchShortcut } from './terminal/terminal-key-sequences';
 import {
   layoutTerminalCapacity,
   resolveVisibleTerminalIds,
   revealTerminalInLayout,
 } from './terminal/terminal-visibility';
+import { TerminalToolbarComponent } from './terminal/terminal-toolbar';
 import { TerminalWorkbenchComponent } from './terminal/terminal-workbench';
+import { TodoBoardComponent } from './todo/todo-board';
 import { WorkspaceSidebarComponent } from './workspace/workspace-sidebar';
 
 type SidebarResizeTarget = 'workspace' | 'inspector';
+type WorkspaceView = 'terminal' | 'tasks';
 
+/** How a resume should proceed once the CLI's hold on the session has been dealt with. */
+interface BackgroundReclaim {
+  /** False when the user chose to leave a running session alone, so nothing is launched. */
+  proceed: boolean;
+  forkSession: boolean;
+  attachShortId?: string;
+}
+
+/** `MouseEvent.button` value for the middle button, which closes a tab. */
+const MIDDLE_MOUSE_BUTTON = 1;
 const WORKSPACE_SIDEBAR_DEFAULT_WIDTH = 208;
 const WORKSPACE_SIDEBAR_MIN_WIDTH = 168;
 const WORKSPACE_SIDEBAR_MAX_WIDTH = 360;
-const INSPECTOR_DEFAULT_WIDTH = 252;
-const INSPECTOR_MIN_WIDTH = 220;
+const INSPECTOR_DEFAULT_WIDTH = 280;
+const INSPECTOR_MIN_WIDTH = 240;
 const INSPECTOR_MAX_WIDTH = 460;
 const INSPECTOR_AUTO_COLLAPSE_WIDTH = 900;
 const WORKSPACE_SIDEBAR_AUTO_COLLAPSE_WIDTH = 760;
@@ -155,6 +181,7 @@ function readStoredString(key: string, fallback: string): string {
     CodexLaunchDialogComponent,
     OpenCodeLaunchDialogComponent,
     CreateWorkspaceDialogComponent,
+    BackgroundSessionDialogComponent,
     DeleteWorkspaceDialogComponent,
     EditWorkspaceDialogComponent,
     HandoffDialogComponent,
@@ -165,8 +192,9 @@ function readStoredString(key: string, fallback: string): string {
     ModelSwitchDialogComponent,
     PromptLibraryDialogComponent,
     SessionCenterDialogComponent,
-    TerminalFontPickerComponent,
+    TerminalToolbarComponent,
     TerminalWorkbenchComponent,
+    TodoBoardComponent,
     TranslatePipe,
     WorkspaceSidebarComponent,
   ],
@@ -199,6 +227,8 @@ export class App {
   private readonly terminalGateway = inject(TerminalGatewayService);
   protected readonly promptAssets = inject(PromptAssetService);
   protected readonly handoffs = inject(HandoffService);
+  protected readonly todos = inject(TodoService);
+  protected readonly agentStartup = inject(AgentStartupService);
   private readonly handledEventKeys = new Set<string>();
   private readonly handledPlanAlertKeys = new Set<string>();
   private readonly eventStatusCutoff = Date.now();
@@ -210,6 +240,8 @@ export class App {
   private previousViewportWidth = Number.POSITIVE_INFINITY;
 
   protected readonly createWorkspaceOpen = signal(false);
+  protected readonly workspaceView = signal<WorkspaceView>('terminal');
+  protected readonly busyTodoTaskId = signal<string | null>(null);
   protected readonly editingWorkspaceId = signal<string | null>(null);
   protected readonly claudeLaunchOpen = signal(false);
   protected readonly codexLaunchOpen = signal(false);
@@ -248,6 +280,14 @@ export class App {
     );
   });
   protected readonly agentMenuOpen = signal(false);
+  /** Background sessions awaiting the user's decision; empty closes the dialog. */
+  protected readonly backgroundSessions = signal<readonly ClaudeBackgroundSession[]>([]);
+  private backgroundSessionResolver: ((resolution: BackgroundSessionResolution) => void) | null =
+    null;
+  /** The tab being dragged, which also tells the strip a reorder is in progress. */
+  protected readonly draggedTerminalId = signal<string | null>(null);
+  /** The gap the dragged tab would drop into, counted between tabs rather than over them. */
+  protected readonly tabDropIndex = signal<number | null>(null);
   protected readonly workspaceSidebarOpen = signal(
     readStoredBoolean('termexo.workspaceSidebarOpen', true),
   );
@@ -305,6 +345,10 @@ export class App {
   protected readonly cliOperationPlan = signal<CliOperationPlan | null>(null);
   protected readonly cliOperationResult = signal<CliOperationResult | null>(null);
   protected readonly activeTerminalId = computed(() => this.state.activeTerminal()?.id ?? null);
+  protected readonly activeTodoCount = computed(() => {
+    const workspaceId = this.state.activeWorkspace()?.id;
+    return workspaceId ? this.todos.tasksFor(workspaceId).length : 0;
+  });
   protected readonly activePromptAssets = computed(() =>
     this.promptAssets.forWorkspace(this.state.activeWorkspace()?.id ?? ''),
   );
@@ -369,18 +413,12 @@ export class App {
   protected readonly workspaceThemePalette = computed(() =>
     createAppThemePalette(this.workspaceThemeColor()),
   );
-  protected readonly minGridDimension = MIN_TERMINAL_GRID_DIMENSION;
-  protected readonly maxGridDimension = MAX_TERMINAL_GRID_DIMENSION;
-  protected readonly minTerminalFontSize = MIN_TERMINAL_FONT_SIZE;
-  protected readonly maxTerminalFontSize = MAX_TERMINAL_FONT_SIZE;
   protected readonly gridColumns = computed(() =>
     normalizeTerminalGridDimension(this.state.activeWorkspace()?.gridColumns),
   );
   protected readonly gridRows = computed(() =>
     normalizeTerminalGridDimension(this.state.activeWorkspace()?.gridRows),
   );
-  protected readonly gridCapacity = computed(() => this.gridColumns() * this.gridRows());
-  protected readonly gridCells = computed(() => Array.from({ length: this.gridCapacity() }));
   protected statusLabel(status: TerminalStatus): string {
     const keys: Record<TerminalStatus, string> = {
       STARTING: 'status.starting',
@@ -422,6 +460,7 @@ export class App {
           this.handledEventKeys.add(event.eventKey);
           if (event.createdAt >= this.eventStatusCutoff) {
             this.state.applyAgentEvent(event);
+            this.todos.applyAgentEvent(event);
           }
         }
       }
@@ -520,7 +559,10 @@ export class App {
     if (!terminalEventMatchesSession(event, terminal)) {
       return;
     }
-    this.state.updateTerminalStatus(event.terminalId, event.success ? 'STOPPED' : 'FAILED');
+    const status = event.success ? 'STOPPED' : 'FAILED';
+    this.state.updateTerminalStatus(event.terminalId, status);
+    this.todos.handleTerminalStatus(event.terminalId, status);
+    this.agentStartup.cancel(event.terminalId);
     if (event.success) {
       return;
     }
@@ -658,6 +700,7 @@ export class App {
         model: value.model,
         profileId: value.profileId,
         accountProfileId: value.accountProfileId,
+        autoConfirm: value.autoConfirm,
       });
       const terminal = this.state.createTerminal({
         id: terminalId,
@@ -671,6 +714,7 @@ export class App {
         workingDirectory,
         profileId: value.profileId,
         accountProfileId: value.accountProfileId,
+        autoConfirm: value.autoConfirm,
       });
       this.codexLaunchOpen.set(false);
       this.selectedTerminalDirectory.set(null);
@@ -712,6 +756,7 @@ export class App {
         profileId: value.profileId,
         mcpProfileId: value.mcpProfileId,
         accountProfileId: value.accountProfileId,
+        autoConfirm: value.autoConfirm,
       });
       const terminal = this.state.createTerminal({
         id: terminalId,
@@ -723,6 +768,7 @@ export class App {
         profileId: value.profileId,
         mcpProfileId: value.mcpProfileId,
         accountProfileId: value.accountProfileId,
+        autoConfirm: value.autoConfirm,
       });
       this.claudeLaunchOpen.set(false);
       this.selectedTerminalDirectory.set(null);
@@ -775,6 +821,13 @@ export class App {
     const terminalId = crypto.randomUUID();
     launching.set(true);
     try {
+      const reclaim: BackgroundReclaim =
+        agentType === 'claude'
+          ? await this.reclaimBackgroundSession(value.session.nativeSessionId)
+          : { proceed: true, forkSession: false };
+      if (!reclaim.proceed) {
+        return;
+      }
       const launch =
         agentType === 'claude'
           ? await this.agents.prepareLaunch({
@@ -784,6 +837,9 @@ export class App {
               profileId: value.profileId,
               mcpProfileId: value.mcpProfileId,
               accountProfileId: value.accountProfileId,
+              autoConfirm: value.autoConfirm,
+              forkSession: reclaim.forkSession,
+              attachShortId: reclaim.attachShortId,
             })
           : agentType === 'codex'
             ? await this.agents.prepareCodexLaunch({
@@ -793,6 +849,7 @@ export class App {
                 model: value.model,
                 profileId: value.profileId,
                 accountProfileId: value.accountProfileId,
+                autoConfirm: value.autoConfirm,
               })
             : await this.agents.prepareOpenCodeLaunch({
                 terminalId,
@@ -821,6 +878,7 @@ export class App {
         profileId: value.profileId,
         mcpProfileId: agentType === 'claude' ? value.mcpProfileId : undefined,
         accountProfileId: agentType === 'opencode' ? undefined : value.accountProfileId,
+        autoConfirm: value.autoConfirm,
       });
       this.sessionCenterOpen.set(false);
       if (terminal) {
@@ -842,6 +900,8 @@ export class App {
     ) {
       this.terminalMaximized.set(false);
     }
+    this.agentStartup.cancel(terminalId);
+    this.todos.handleTerminalStatus(terminalId, 'STOPPED');
     void this.terminalGateway.close(terminalId).catch(() => undefined);
     this.state.closeTerminal(terminalId);
   }
@@ -863,11 +923,7 @@ export class App {
       this.preferredTerminalIds.update((items) => ({ ...items, [workspace.id]: preferredIds }));
     }
     this.state.selectTerminal(terminalId);
-    window.requestAnimationFrame(() => {
-      document
-        .getElementById(`terminal-tab-${terminalId}`)
-        ?.scrollIntoView({ block: 'nearest', inline: 'nearest' });
-    });
+    this.scrollTabIntoView(terminalId);
   }
 
   protected handleTerminalInput(event: { terminalId: string; data: string }): void {
@@ -879,6 +935,142 @@ export class App {
 
   protected handleTerminalOutput(event: { terminalId: string; data: string }): void {
     this.handoffs.captureOutput(event.terminalId, event.data);
+    this.todos.captureTerminalOutput(event.terminalId, event.data);
+    this.agentStartup.ingest(event.terminalId, event.data);
+  }
+
+  protected handleTerminalStatus(event: { terminalId: string; status: TerminalStatus }): void {
+    this.state.updateTerminalStatus(event.terminalId, event.status);
+    this.todos.handleTerminalStatus(event.terminalId, event.status);
+    if (['FAILED', 'STOPPED', 'DISCONNECTED'].includes(event.status)) {
+      this.agentStartup.cancel(event.terminalId);
+      return;
+    }
+    // RUNNING is emitted once the PTY has actually spawned, which is when waiting for the agent
+    // to accept a prompt starts meaning anything.
+    if (event.status === 'RUNNING') {
+      this.agentStartup.markRuntimeStarted(event.terminalId);
+    }
+  }
+
+  protected async executeTodoTask(taskId: string): Promise<void> {
+    const task = this.todos.task(taskId);
+    if (!task || this.busyTodoTaskId()) return;
+    const prompt = this.initialTodoPrompt(task);
+    const reusableTerminalId =
+      task.preferredTerminalId ?? (task.executionState === 'failed' ? task.terminalId : undefined);
+    if (reusableTerminalId) {
+      const located = this.findTerminal(reusableTerminalId);
+      if (!located) {
+        if (task.attempts === 0) {
+          const message = '选择的已有终端已关闭，请编辑任务后重新选择执行终端。';
+          this.todos.setExecutionError(task.id, message);
+          this.showToast(message, 'attention');
+          return;
+        }
+      } else if (isReusableTodoTerminal(located.terminal)) {
+        await this.runTodoInExistingTerminal(task, prompt, located, task.attempts > 0);
+        return;
+      } else if (task.attempts === 0) {
+        await this.runTodoInExistingTerminal(task, prompt, located);
+        return;
+      }
+    }
+    const sessionId = compatibleTodoSessionId(task, this.agents.sessions(), this.agents.events());
+    await this.launchTodoTerminal(
+      task,
+      prompt,
+      task.attempts > 0 ? sessionId : undefined,
+      task.attempts > 0,
+    );
+  }
+
+  protected async continueTodoTask(request: TodoContinuationRequest): Promise<void> {
+    if (this.busyTodoTaskId()) return;
+    const rejected = this.todos.rejectValidation(request);
+    if (!rejected) return;
+
+    const prompt = this.continuationTodoPrompt(rejected, request.feedback);
+    const located = rejected.terminalId ? this.findTerminal(rejected.terminalId) : null;
+    const canReuseTerminal =
+      located &&
+      located.terminal.agentType === rejected.agentType &&
+      !['STOPPED', 'FAILED', 'DISCONNECTED'].includes(located.terminal.status);
+    if (located && canReuseTerminal) {
+      this.busyTodoTaskId.set(rejected.id);
+      try {
+        this.todos.beginExecution(
+          rejected.id,
+          {
+            terminalId: located.terminal.id,
+            nativeSessionId: rejected.nativeSessionId ?? located.terminal.nativeSessionId,
+            accountProfileId: located.terminal.accountProfileId,
+          },
+          true,
+        );
+        await this.submitTodoPrompt(rejected.id, located.terminal.id, prompt);
+        this.state.updateTerminalStatus(located.terminal.id, 'THINKING');
+        this.todos.handleTerminalStatus(located.terminal.id, 'THINKING');
+        this.showToast(`已把修改意见发回 ${located.terminal.name}`);
+      } catch (error) {
+        const message = this.errorMessage(error);
+        this.todos.setExecutionError(rejected.id, message, located.terminal.id);
+        this.showToast(message, 'attention');
+      } finally {
+        this.busyTodoTaskId.set(null);
+      }
+      return;
+    }
+
+    const sessionId = compatibleTodoSessionId(
+      rejected,
+      this.agents.sessions(),
+      this.agents.events(),
+    );
+    await this.launchTodoTerminal(rejected, prompt, sessionId, true);
+  }
+
+  /**
+   * Stops a running task and interrupts the agent that was working on it.
+   *
+   * The board state is updated first and synchronously, so a caller that deletes the task right
+   * afterwards — "终止并删除" from the card — still hands this the terminal it has to interrupt.
+   */
+  protected stopTodoTask(taskId: string): void {
+    const task = this.todos.task(taskId);
+    const terminalId = task?.terminalId;
+    if (!this.todos.stopExecution(taskId) || !task) return;
+    if (terminalId) {
+      this.agentStartup.cancel(terminalId);
+      void this.writeToTerminal(terminalId, AGENT_INTERRUPT_SEQUENCE).catch(() => undefined);
+    }
+    this.showToast(`已终止「${task.title}」，任务已回到待办`);
+  }
+
+  protected openTodoTerminal(terminalId: string): void {
+    const located = this.findTerminal(terminalId);
+    if (!located) {
+      this.showToast('关联终端已关闭，可从任务卡片继续执行以恢复会话。', 'attention');
+      return;
+    }
+    if (this.state.activeWorkspace()?.id !== located.workspace.id) {
+      this.selectWorkspace(located.workspace.id);
+    }
+    this.workspaceView.set('terminal');
+    window.requestAnimationFrame(() => this.selectTerminal(terminalId));
+  }
+
+  /**
+   * Closes the terminal an accepted task was running in.
+   *
+   * The task keeps its native session id, so a 常用任务 that runs again still resumes the same
+   * agent session in a fresh terminal.
+   */
+  protected closeTodoTerminal(terminalId: string): void {
+    const located = this.findTerminal(terminalId);
+    if (!located) return;
+    this.closeTerminal(terminalId);
+    this.showToast(`已关闭 ${located.terminal.name}`);
   }
 
   protected openPromptLibrary(): void {
@@ -893,8 +1085,8 @@ export class App {
       return;
     }
     try {
-      await this.promptAssets.setDraft(workspace, terminal, asset.content);
-      await this.terminalGateway.write(terminal, this.terminalPaste(asset.content, false));
+      this.rememberPromptDraft(workspace, terminal, asset.content);
+      await this.deliverTerminalPrompt(terminal.id, asset.content, false);
       this.promptLibraryOpen.set(false);
       this.showToast(this.i18n.t('prompt.restored', { name: terminal.name }));
     } catch (error) {
@@ -1011,9 +1203,9 @@ export class App {
     try {
       const { continuationPrompt } = await import('./core/models/handoff');
       const prompt = continuationPrompt(request.handoff);
-      await this.promptAssets.setDraft(workspace, terminal, prompt);
+      this.rememberPromptDraft(workspace, terminal, prompt);
+      await this.deliverTerminalPrompt(terminal.id, prompt, true);
       this.promptAssets.captureInput(workspace, terminal, '\r');
-      await this.terminalGateway.write(terminal, this.terminalPaste(prompt, true));
       this.selectTerminal(terminal.id);
       this.handoffOpen.set(false);
       this.showToast(this.i18n.t('handoff.sent', { name: terminal.name }));
@@ -1022,34 +1214,102 @@ export class App {
     }
   }
 
-  protected selectTerminalFromPicker(event: Event): void {
-    const terminalId = (event.target as HTMLSelectElement).value;
-    if (terminalId) {
-      this.selectTerminal(terminalId);
-    }
-  }
-
-  protected canMoveActiveTerminal(direction: -1 | 1): boolean {
-    const terminals = this.state.activeWorkspace()?.terminals ?? [];
-    const currentIndex = terminals.findIndex((terminal) => terminal.id === this.activeTerminalId());
-    const targetIndex = currentIndex + direction;
-    return currentIndex >= 0 && targetIndex >= 0 && targetIndex < terminals.length;
-  }
-
-  protected moveActiveTerminal(direction: -1 | 1): void {
+  private moveActiveTerminal(direction: -1 | 1): boolean {
     const terminalId = this.activeTerminalId();
     if (!terminalId || !this.state.moveTerminal(terminalId, direction)) {
+      return false;
+    }
+    this.scrollTabIntoView(terminalId, 'smooth');
+    return true;
+  }
+
+  /** Starts a tab drag, carrying the terminal id for drop targets outside this strip. */
+  protected startTabDrag(event: DragEvent, terminalId: string): void {
+    this.draggedTerminalId.set(terminalId);
+    if (event.dataTransfer) {
+      event.dataTransfer.effectAllowed = 'move';
+      event.dataTransfer.setData('text/plain', terminalId);
+    }
+  }
+
+  /** Marks the gap the dragged tab would drop into: before this tab, or after its midpoint. */
+  protected trackTabDrag(event: DragEvent, index: number): void {
+    if (!this.draggedTerminalId()) {
       return;
     }
-    window.requestAnimationFrame(() => {
-      document
-        .getElementById(`terminal-tab-${terminalId}`)
-        ?.scrollIntoView({ block: 'nearest', inline: 'nearest', behavior: 'smooth' });
-    });
+    // Without this the drop is refused and no drop event ever fires.
+    event.preventDefault();
+    const bounds = (event.currentTarget as HTMLElement).getBoundingClientRect();
+    const pastMidpoint = event.clientX > bounds.left + bounds.width / 2;
+    this.tabDropIndex.set(pastMidpoint ? index + 1 : index);
+  }
+
+  protected dropTab(event: DragEvent): void {
+    const terminalId = this.draggedTerminalId();
+    const gapIndex = this.tabDropIndex();
+    this.endTabDrag();
+    if (!terminalId || gapIndex === null) {
+      return;
+    }
+    event.preventDefault();
+    const terminals = this.state.activeWorkspace()?.terminals ?? [];
+    const currentIndex = terminals.findIndex((terminal) => terminal.id === terminalId);
+    // Gaps are counted with the dragged tab still in place, so every gap past it sits one
+    // position further right than the index the tab ends up at once it is lifted out.
+    this.state.reorderTerminal(terminalId, gapIndex > currentIndex ? gapIndex - 1 : gapIndex);
+  }
+
+  protected endTabDrag(): void {
+    this.draggedTerminalId.set(null);
+    this.tabDropIndex.set(null);
+  }
+
+  /**
+   * Scrolls the tab strip with an ordinary wheel.
+   *
+   * A trackpad or mouse only produces `deltaY` here, which a horizontal strip would ignore, so a
+   * vertical wheel is redirected sideways. Shift+wheel already scrolls horizontally on its own.
+   */
+  protected scrollTabStrip(event: WheelEvent): void {
+    const strip = event.currentTarget as HTMLElement;
+    if (event.shiftKey || event.deltaY === 0 || strip.scrollWidth <= strip.clientWidth) {
+      return;
+    }
+    event.preventDefault();
+    strip.scrollLeft += event.deltaY;
+  }
+
+  /** Closes a terminal on a middle click, as browsers and editors do for their own tabs. */
+  protected closeTerminalOnMiddleClick(event: MouseEvent, terminalId: string): void {
+    if (event.button !== MIDDLE_MOUSE_BUTTON) {
+      return;
+    }
+    event.preventDefault();
+    this.closeTerminal(terminalId);
+  }
+
+  /** Everything a tab cannot show at its width: where it runs, and what it responds to. */
+  protected terminalTabTitle(terminal: TerminalSession): string {
+    const action = this.isTerminalVisible(terminal.id)
+      ? this.i18n.t('terminal.activate')
+      : this.i18n.t('terminal.showInLayout');
+    return [
+      `${terminal.name} · ${this.statusLabel(terminal.status)}`,
+      terminal.workingDirectory,
+      `${action} · ${this.i18n.t('terminal.tabHint')}`,
+    ].join('\n');
   }
 
   protected isTerminalVisible(terminalId: string): boolean {
     return this.visibleTerminalIds().includes(terminalId);
+  }
+
+  private scrollTabIntoView(terminalId: string, behavior: ScrollBehavior = 'auto'): void {
+    window.requestAnimationFrame(() => {
+      document
+        .getElementById(`terminal-tab-${terminalId}`)
+        ?.scrollIntoView({ block: 'nearest', inline: 'nearest', behavior });
+    });
   }
 
   protected visibleTerminalLimit(): number {
@@ -1180,9 +1440,55 @@ export class App {
     this.agentMenuOpen.set(false);
   }
 
+  /**
+   * The single entry point for window-level keys.
+   *
+   * Bound to the window because the focused terminal is where these keys land; the panel declines
+   * the tab shortcuts so they arrive here instead of being written to the PTY. Angular runs one
+   * handler per host event, so a second `window:keydown` binding on this component would never
+   * fire — every window shortcut has to be dispatched from here.
+   */
   @HostListener('window:keydown', ['$event'])
-  protected restoreMaximizedView(event: KeyboardEvent): void {
-    if (event.key !== 'Escape' || !event.shiftKey) {
+  protected handleWindowKeydown(event: KeyboardEvent): void {
+    if (event.key === 'Escape') {
+      this.restoreMaximizedView(event);
+      return;
+    }
+    this.runTabShortcut(event);
+  }
+
+  private runTabShortcut(event: KeyboardEvent): void {
+    const shortcut = workbenchShortcut(event);
+    const terminals = this.state.activeWorkspace()?.terminals ?? [];
+    if (!shortcut || this.workspaceView() !== 'terminal' || terminals.length === 0) {
+      return;
+    }
+    // An open dialog owns the keyboard; the strip behind it must not react to keys typed into it.
+    const target = event.target;
+    if (target instanceof Element && target.closest('[role="dialog"]')) {
+      return;
+    }
+
+    if (shortcut.action === 'moveTab') {
+      if (this.moveActiveTerminal(shortcut.delta)) {
+        event.preventDefault();
+      }
+      return;
+    }
+
+    const activeIndex = terminals.findIndex((terminal) => terminal.id === this.activeTerminalId());
+    const terminal =
+      shortcut.action === 'selectTab'
+        ? terminals[shortcut.index]
+        : terminals[(activeIndex + shortcut.delta + terminals.length) % terminals.length];
+    if (terminal) {
+      event.preventDefault();
+      this.selectTerminal(terminal.id);
+    }
+  }
+
+  private restoreMaximizedView(event: KeyboardEvent): void {
+    if (!event.shiftKey) {
       return;
     }
     if (this.terminalMaximized()) {
@@ -1241,6 +1547,8 @@ export class App {
 
   protected createWorkspace(value: { name: string; projectPath: string }): void {
     this.state.createWorkspace(value.name, value.projectPath);
+    const workspace = this.state.activeWorkspace();
+    if (workspace) this.todos.ensureWorkspace(workspace);
     this.mountWorkspace(this.state.activeWorkspace()?.id);
     this.createWorkspaceOpen.set(false);
     this.showToast(this.i18n.t('workspace.created', { name: value.name }));
@@ -1267,18 +1575,21 @@ export class App {
 
     this.deletingWorkspace.set(true);
     try {
-      await Promise.all(
-        workspace.terminals.map((terminal) =>
-          this.terminalGateway.close(terminal.id).catch(() => undefined),
-        ),
-      );
       const removed = await this.state.deleteWorkspace(workspace.id);
       if (!removed) {
         throw new Error(this.i18n.t('workspace.notFound'));
       }
+      // Persist removal before killing PTYs: their exit events update terminal status and used to
+      // race the delete by saving the just-removed workspace back into SQLite.
+      void Promise.all(
+        workspace.terminals.map((terminal) =>
+          this.terminalGateway.close(terminal.id).catch(() => undefined),
+        ),
+      );
       this.mountedWorkspaceIds.update((workspaceIds) =>
         workspaceIds.filter((workspaceId) => workspaceId !== workspace.id),
       );
+      this.todos.deleteWorkspace(workspace.id);
       this.mountWorkspace(this.state.activeWorkspace()?.id);
       this.preferredTerminalIds.update((items) => {
         const next = { ...items };
@@ -1335,6 +1646,8 @@ export class App {
         throw new Error(this.i18n.t('workspace.mergeEndpointsNotFound'));
       }
 
+      this.todos.mergeWorkspaces(sourceWorkspace.id, mergedWorkspace);
+
       this.mountedWorkspaceIds.update((workspaceIds) =>
         workspaceIds.filter((workspaceId) => workspaceId !== sourceWorkspace.id),
       );
@@ -1379,6 +1692,8 @@ export class App {
     this.globalNoticeOpen.set(false);
     this.mountWorkspace(workspaceId);
     this.state.selectWorkspace(workspaceId);
+    const workspace = this.state.activeWorkspace();
+    if (workspace) this.todos.ensureWorkspace(workspace);
   }
 
   protected openGlobalTerminalNotice(notice: GlobalTerminalNotice): void {
@@ -1569,12 +1884,14 @@ export class App {
                 profileId: value.profileId,
                 mcpProfileId: terminal.mcpProfileId,
                 accountProfileId: terminal.accountProfileId,
+                autoConfirm: terminal.autoConfirm,
               })
             : await this.agents.prepareCodexLaunch({
                 terminalId: terminal.id,
                 workspaceId: workspace?.id,
                 profileId: value.profileId,
                 accountProfileId: terminal.accountProfileId,
+                autoConfirm: terminal.autoConfirm,
               }),
         })),
       );
@@ -1926,11 +2243,287 @@ export class App {
     return null;
   }
 
-  private terminalPaste(content: string, submit: boolean): string {
-    const safeContent = content
-      .replace(/\r\n?/g, '\n')
-      .replace(/[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]/g, '');
-    return `\u0015\u001b[200~${safeContent}\u001b[201~${submit ? '\r' : ''}`;
+  private async launchTodoTerminal(
+    task: TodoTask,
+    prompt: string,
+    sessionId?: string,
+    continuation = false,
+  ): Promise<void> {
+    const workspace = this.state.activeWorkspace();
+    const project = this.todos.project(task.projectId);
+    const workingDirectory = todoWorkingDirectory(task, project);
+    const profile = this.agents.modelProfiles().find((item) => item.id === task.profileId);
+    if (!workspace || workspace.id !== task.workspaceId || !workingDirectory) {
+      this.todos.setExecutionError(task.id, '任务缺少可用的工作目录，请先在待办中选择目录。');
+      this.showToast('任务缺少可用的工作目录，请先在待办中选择目录。', 'attention');
+      return;
+    }
+    if (!profile) {
+      this.todos.setExecutionError(task.id, '模型配置已不存在，请编辑待办后重新选择模型。');
+      this.showToast('模型配置已不存在，请编辑待办后重新选择模型。', 'attention');
+      return;
+    }
+    if (needsCredential(profile, task.agentType)) {
+      this.openModelCredentialSettings(profile.id, profile.name);
+      this.todos.setExecutionError(task.id, `模型配置 ${profile.name} 缺少凭据。`);
+      return;
+    }
+
+    this.busyTodoTaskId.set(task.id);
+    const terminalId = crypto.randomUUID();
+    try {
+      await this.assertTodoAgentAvailable(task.agentType);
+      const reclaim: BackgroundReclaim =
+        task.agentType === 'codex'
+          ? { proceed: true, forkSession: false }
+          : await this.reclaimBackgroundSession(sessionId);
+      if (!reclaim.proceed) {
+        return;
+      }
+      const launch =
+        task.agentType === 'codex'
+          ? await this.agents.prepareCodexLaunch({
+              terminalId,
+              workspaceId: workspace.id,
+              sessionId,
+              model: profileModel(profile, 'codex'),
+              profileId: profile.id,
+              accountProfileId: task.accountProfileId,
+            })
+          : await this.agents.prepareLaunch({
+              terminalId,
+              workspaceId: workspace.id,
+              sessionId,
+              profileId: profile.id,
+              accountProfileId: task.accountProfileId,
+              forkSession: reclaim.forkSession,
+              attachShortId: reclaim.attachShortId,
+            });
+      const terminal = this.state.createTerminal(
+        {
+          id: terminalId,
+          agentType: task.agentType,
+          name: `任务 · ${task.title}`,
+          command: launch.command,
+          model: profileModel(profile, task.agentType),
+          nativeSessionId: sessionId,
+          workingDirectory,
+          profileId: profile.id,
+          accountProfileId: task.accountProfileId,
+        },
+        workspace.id,
+      );
+      if (!terminal) {
+        throw new Error('任务所属工作空间已关闭，无法创建任务终端。');
+      }
+      const started = this.todos.beginExecution(
+        task.id,
+        { terminalId, nativeSessionId: sessionId, accountProfileId: task.accountProfileId },
+        continuation,
+      );
+      if (!started) {
+        throw new Error('任务已不存在，已取消终端投递。');
+      }
+      this.armTodoPrompt(terminalId, task.id, prompt);
+      this.mountWorkspace(workspace.id);
+      this.showToast(
+        sessionId
+          ? `终端已创建，正在恢复会话，Agent 就绪后自动发送：${task.title}`
+          : `终端已创建，Agent 就绪后自动发送任务到 ${terminal.name}`,
+      );
+    } catch (error) {
+      this.agentStartup.cancel(terminalId);
+      const message = this.errorMessage(error);
+      this.todos.setExecutionError(task.id, message);
+      this.showToast(message, 'attention');
+    } finally {
+      this.busyTodoTaskId.set(null);
+    }
+  }
+
+  private async runTodoInExistingTerminal(
+    task: TodoTask,
+    prompt: string,
+    located: { workspace: Workspace; terminal: TerminalSession },
+    continuation = false,
+  ): Promise<void> {
+    const terminal = located.terminal;
+    const terminalIsOccupied = this.todos
+      .tasksFor(located.workspace.id)
+      .some(
+        (candidate) =>
+          candidate.id !== task.id &&
+          candidate.stage === 'executing' &&
+          candidate.terminalId === terminal.id,
+      );
+    let unavailableReason = '';
+    if (located.workspace.id !== task.workspaceId) {
+      unavailableReason = '选择的已有终端不在当前任务的工作空间。';
+    } else if (!isReusableTodoTerminal(terminal)) {
+      unavailableReason = '选择的已有终端尚未就绪或已不可用，请重新选择。';
+    } else if (this.agentStartup.awaitingTerminalIds().includes(terminal.id)) {
+      unavailableReason = '选择的已有终端仍在启动，请稍后重试。';
+    } else if (terminal.agentType !== task.agentType) {
+      unavailableReason = '已有终端的 Agent 类型与任务配置不一致，请编辑待办后重新选择。';
+    } else if (terminalIsOccupied) {
+      unavailableReason = '选择的已有终端正在执行另一项看板任务。';
+    }
+    if (unavailableReason) {
+      this.todos.setExecutionError(task.id, unavailableReason);
+      this.showToast(unavailableReason, 'attention');
+      return;
+    }
+
+    this.busyTodoTaskId.set(task.id);
+    try {
+      this.todos.beginExecution(
+        task.id,
+        {
+          terminalId: terminal.id,
+          nativeSessionId: terminal.nativeSessionId,
+          accountProfileId: terminal.accountProfileId,
+        },
+        continuation,
+      );
+      await this.submitTodoPrompt(task.id, terminal.id, prompt);
+      this.state.updateTerminalStatus(terminal.id, 'THINKING');
+      this.todos.handleTerminalStatus(terminal.id, 'THINKING');
+      this.showToast(`已把任务发送到 ${terminal.name}`);
+    } catch (error) {
+      const message = this.errorMessage(error);
+      this.todos.setExecutionError(task.id, message, terminal.id);
+      this.showToast(message, 'attention');
+    } finally {
+      this.busyTodoTaskId.set(null);
+    }
+  }
+
+  private async assertTodoAgentAvailable(agentType: TodoTask['agentType']): Promise<void> {
+    if (!isTauriRuntime()) return;
+    if (agentType === 'claude') {
+      if (!this.agents.installation()) await this.agents.detectClaude();
+      const installation = this.agents.installation();
+      if (!installation?.healthy) {
+        throw new Error(installation?.diagnostic ?? '未检测到可用的 Claude Code。');
+      }
+      return;
+    }
+    if (!this.agents.codexInstallation()) await this.agents.detectCodex();
+    const installation = this.agents.codexInstallation();
+    if (!installation?.healthy) {
+      throw new Error(installation?.diagnostic ?? '未检测到可用的 Codex CLI。');
+    }
+  }
+
+  /**
+   * Claude Code and Codex CLI both open on a folder-trust dialog, so the prompt has to wait until
+   * the startup dialogs are answered and the agent's input is actually listening.
+   */
+  private armTodoPrompt(terminalId: string, taskId: string, prompt: string): void {
+    this.agentStartup.arm(terminalId, {
+      confirm: () => this.writeToTerminal(terminalId, AGENT_STARTUP_CONFIRM_KEY),
+      submit: () => this.submitTodoPrompt(taskId, terminalId, prompt),
+      onFailed: (message) => {
+        this.todos.setExecutionError(taskId, message, terminalId);
+        this.showToast(`任务发送失败：${message}`, 'attention');
+      },
+    });
+    // The PTY is normally still spawning here, and its RUNNING event starts the clocks. A terminal
+    // that already reported RUNNING has sent that event before this armed, and would wait forever.
+    if (this.findTerminal(terminalId)?.terminal.status === 'RUNNING') {
+      this.agentStartup.markRuntimeStarted(terminalId);
+    }
+  }
+
+  private async submitTodoPrompt(
+    taskId: string,
+    terminalId: string,
+    prompt: string,
+  ): Promise<void> {
+    if (!this.todos.markPromptSending(taskId, terminalId)) {
+      throw new Error('任务已切换到其他终端，已取消本次发送。');
+    }
+    const located = this.findTerminal(terminalId);
+    if (!located) {
+      throw new Error('目标终端在发送指令前已关闭。');
+    }
+    this.rememberPromptDraft(located.workspace, located.terminal, prompt);
+    await this.deliverTerminalPrompt(terminalId, prompt, true);
+    this.promptAssets.captureInput(located.workspace, located.terminal, '\r');
+    if (!this.todos.markPromptDelivered(taskId, terminalId)) {
+      throw new Error('任务已切换到其他终端，无法确认本次发送。');
+    }
+  }
+
+  /**
+   * The draft is only a crash-recovery copy of what was handed to the agent, so failing to store
+   * it must never cancel the delivery it exists to back up.
+   */
+  private rememberPromptDraft(
+    workspace: Workspace,
+    terminal: TerminalSession,
+    content: string,
+  ): void {
+    void this.promptAssets.setDraft(workspace, terminal, content).catch(() => undefined);
+  }
+
+  /** @see terminalPromptWrites for why the prompt cannot travel in a single write. */
+  private async deliverTerminalPrompt(
+    terminalId: string,
+    content: string,
+    submit: boolean,
+  ): Promise<void> {
+    const writes = terminalPromptWrites(content, submit);
+    for (const [index, data] of writes.entries()) {
+      if (index > 0) {
+        await this.settleTerminalInput();
+      }
+      await this.writeToTerminal(terminalId, data);
+    }
+  }
+
+  private settleTerminalInput(): Promise<void> {
+    return new Promise((resolve) => window.setTimeout(resolve, TERMINAL_INPUT_SETTLE_MS));
+  }
+
+  private async writeToTerminal(terminalId: string, data: string): Promise<void> {
+    const located = this.findTerminal(terminalId);
+    if (!located) {
+      throw new Error('目标终端在发送指令前已关闭。');
+    }
+    await this.terminalGateway.write(located.terminal, data);
+  }
+
+  private initialTodoPrompt(task: TodoTask): string {
+    const project = this.todos.project(task.projectId);
+    return [
+      '你正在执行 Termexo 任务看板中的一项任务。请直接在当前项目中完成实现。',
+      '',
+      `任务：${task.title}`,
+      `项目：${project?.name ?? '当前项目'}`,
+      `工作目录：${todoWorkingDirectory(task, project)}`,
+      task.description ? `任务说明：\n${task.description}` : '',
+      task.acceptanceCriteria ? `验收标准：\n${task.acceptanceCriteria}` : '',
+      '',
+      '请先检查现有实现，再完成所需修改并运行与风险相匹配的验证。完成后请总结改动、验证结果和仍需注意的问题。',
+    ]
+      .filter((line) => line !== '')
+      .join('\n');
+  }
+
+  private continuationTodoPrompt(task: TodoTask, feedback: string): string {
+    return [
+      '这项任务的人工验收没有通过。请在当前会话上下文中继续修改，不要丢弃已经完成的工作。',
+      '',
+      `任务：${task.title}`,
+      `未通过原因：\n${feedback.trim()}`,
+      task.description ? `更新后的任务说明：\n${task.description}` : '',
+      task.acceptanceCriteria ? `更新后的验收标准：\n${task.acceptanceCriteria}` : '',
+      '',
+      '请定位原因、完成修复并重新运行相关验证，然后清楚说明这次针对验收意见做了哪些修改。',
+    ]
+      .filter((line) => line !== '')
+      .join('\n');
   }
 
   private storePreference(key: string, value: boolean | number | string): void {
@@ -1970,6 +2563,8 @@ export class App {
 
   private async initialize(): Promise<void> {
     await this.state.initialize();
+    this.todos.initialize(this.state.workspaces());
+    this.todos.reconcileTerminals(this.state.workspaces());
     await Promise.all([
       this.agents.initialize(),
       this.promptAssets.initialize(),
@@ -2040,29 +2635,63 @@ export class App {
       return;
     }
 
+    // Session ids are resolved up front because reclaiming them asks the user one question about
+    // the whole set, rather than one dialog per terminal as the launches run.
+    const planned = restoredClaudeTerminals.map(({ workspaceId, terminal }) => {
+      const task = this.todos
+        .tasksFor(workspaceId)
+        .find((candidate) => candidate.terminalId === terminal.id);
+      return {
+        workspaceId,
+        terminal,
+        profile:
+          profiles.find((candidate) => candidate.id === terminal.profileId) ?? defaultProfile,
+        sessionId: task
+          ? compatibleTodoSessionId(task, this.agents.sessions(), this.agents.events())
+          : compatibleNativeSessionId(
+              'claude',
+              terminal.nativeSessionId,
+              undefined,
+              this.agents.sessions(),
+              this.agents.events(),
+            ),
+      };
+    });
+    const reclaim = await this.planBackgroundReclaim(planned.map((item) => item.sessionId));
+
+    let skipped = 0;
     const results = await Promise.allSettled(
-      restoredClaudeTerminals.map(async ({ workspaceId, terminal }) => {
-        const profile =
-          profiles.find((candidate) => candidate.id === terminal.profileId) ?? defaultProfile;
+      planned.map(async ({ workspaceId, terminal, profile, sessionId }) => {
         if (!profile) {
           throw new Error(this.i18n.t('restore.noModelProfile', { name: terminal.name }));
         }
-        if (needsCredential(profile, terminal.agentType === 'codex' ? 'codex' : 'claude')) {
+        if (needsCredential(profile, 'claude')) {
           throw new Error(this.i18n.t('restore.invalidCredential', { name: profile.name }));
+        }
+
+        // Present only for a session the CLI would still refuse to hand over.
+        const blocked = sessionId ? reclaim.blocking.get(sessionId) : undefined;
+        if (blocked && reclaim.resolution === 'skip') {
+          skipped += 1;
+          return;
         }
 
         const launch = await this.agents.prepareLaunch({
           terminalId: terminal.id,
           workspaceId,
-          sessionId: terminal.nativeSessionId,
+          sessionId,
           profileId: profile.id,
           mcpProfileId: terminal.mcpProfileId,
           accountProfileId: terminal.accountProfileId,
+          autoConfirm: terminal.autoConfirm,
+          forkSession: Boolean(blocked) && reclaim.resolution === 'fork',
+          attachShortId: blocked && reclaim.resolution === 'attach' ? blocked.shortId : undefined,
         });
         if (
           !this.state.updateRestoredTerminalLaunch(terminal.id, launch.command, {
             profileId: profile.id,
             model: profileModel(profile, 'claude'),
+            nativeSessionId: sessionId,
           })
         ) {
           throw new Error(
@@ -2071,10 +2700,103 @@ export class App {
         }
       }),
     );
+    if (skipped > 0) {
+      this.showToast(this.i18n.t('session.backgroundSkipped', { count: skipped }), 'attention');
+    } else if (reclaim.blocking.size > 0 && reclaim.resolution === 'attach') {
+      this.showToast(this.i18n.t('session.backgroundAttached'), 'attention');
+    }
     const failed = results.filter((result) => result.status === 'rejected').length;
     if (failed > 0) {
       this.showToast(this.i18n.t('restore.claudeFailed', { count: failed }), 'attention');
     }
+  }
+
+  /**
+   * Clears the CLI's hold on the sessions about to be resumed.
+   *
+   * Claude Code keeps a session alive when its terminal goes away and then refuses to resume it in
+   * place. An idle one is stopped so its id is free again; a busy one is left running and handed to
+   * the user, because stopping it would discard the turn it is in the middle of.
+   */
+  private async planBackgroundReclaim(sessionIds: readonly (string | undefined)[]): Promise<{
+    blocking: Map<string, ClaudeBackgroundSession>;
+    resolution: BackgroundSessionResolution;
+  }> {
+    const unique = [...new Set(sessionIds.filter((id): id is string => Boolean(id)))];
+    const running = await Promise.all(
+      unique.map((id) => this.agents.inspectClaudeBackgroundSession(id).catch(() => null)),
+    );
+
+    const blocking = new Map<string, ClaudeBackgroundSession>();
+    let reclaimed = 0;
+    for (const session of running) {
+      if (!session) {
+        continue;
+      }
+      if (session.busy) {
+        blocking.set(session.sessionId, session);
+        continue;
+      }
+      try {
+        await this.agents.stopClaudeBackgroundSession(session.shortId);
+        reclaimed += 1;
+      } catch (error) {
+        // A session that would not stop still owns its id, so it needs the same choice as a busy one.
+        this.showToast(
+          this.i18n.t('session.backgroundStopFailed', { error: this.errorMessage(error) }),
+          'attention',
+        );
+        blocking.set(session.sessionId, session);
+      }
+    }
+    if (reclaimed > 0) {
+      this.showToast(this.i18n.t('session.backgroundReclaimed', { count: reclaimed }));
+    }
+
+    // With nothing blocking, no launch consults the resolution.
+    if (blocking.size === 0) {
+      return { blocking, resolution: 'skip' };
+    }
+    return { blocking, resolution: await this.askBackgroundResolution([...blocking.values()]) };
+  }
+
+  /**
+   * Frees a single session id before it is resumed.
+   *
+   * Same rules as a restore: an idle session is stopped silently, a busy one is put to the user.
+   */
+  private async reclaimBackgroundSession(
+    sessionId: string | undefined,
+  ): Promise<BackgroundReclaim> {
+    const reclaim = await this.planBackgroundReclaim([sessionId]);
+    const blocked = sessionId ? reclaim.blocking.get(sessionId) : undefined;
+    if (!blocked) {
+      return { proceed: true, forkSession: false };
+    }
+    if (reclaim.resolution === 'skip') {
+      return { proceed: false, forkSession: false };
+    }
+    return {
+      proceed: true,
+      forkSession: reclaim.resolution === 'fork',
+      attachShortId: reclaim.resolution === 'attach' ? blocked.shortId : undefined,
+    };
+  }
+
+  private askBackgroundResolution(
+    sessions: readonly ClaudeBackgroundSession[],
+  ): Promise<BackgroundSessionResolution> {
+    this.backgroundSessions.set(sessions);
+    return new Promise((resolve) => {
+      this.backgroundSessionResolver = resolve;
+    });
+  }
+
+  protected resolveBackgroundSessions(resolution: BackgroundSessionResolution): void {
+    this.backgroundSessions.set([]);
+    const resolver = this.backgroundSessionResolver;
+    this.backgroundSessionResolver = null;
+    resolver?.(resolution);
   }
 
   private async refreshRestoredCodexLaunches(): Promise<void> {
@@ -2095,10 +2817,22 @@ export class App {
         const profile = terminal.profileId
           ? profiles.find((candidate) => candidate.id === terminal.profileId)
           : undefined;
+        const task = this.todos
+          .tasksFor(workspaceId)
+          .find((candidate) => candidate.terminalId === terminal.id);
+        const sessionId = task
+          ? compatibleTodoSessionId(task, this.agents.sessions(), this.agents.events())
+          : compatibleNativeSessionId(
+              'codex',
+              terminal.nativeSessionId,
+              undefined,
+              this.agents.sessions(),
+              this.agents.events(),
+            );
         const launch = await this.agents.prepareCodexLaunch({
           terminalId: terminal.id,
           workspaceId,
-          sessionId: terminal.nativeSessionId,
+          sessionId,
           profileId: profile?.id,
           model:
             terminal.model &&
@@ -2108,11 +2842,13 @@ export class App {
               ? terminal.model
               : undefined,
           accountProfileId: terminal.accountProfileId,
+          autoConfirm: terminal.autoConfirm,
         });
         if (
           !this.state.updateRestoredTerminalLaunch(terminal.id, launch.command, {
             profileId: profile?.id,
             model: profile ? profileModel(profile, 'codex') : terminal.model,
+            nativeSessionId: sessionId,
           })
         ) {
           throw new Error(

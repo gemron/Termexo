@@ -5,8 +5,10 @@
   display: grid;
   place-items: center;
   padding: 18px;
-  background: color-mix(in oklab, var(--color-base-100) 76%, transparent);
-  backdrop-filter: blur(10px) saturate(115%);
+  background: color-mix(in oklab, var(--color-base-100) 90%, transparent);
+  // A full-window backdrop blur reprocesses the animated terminal behind every dialog frame.
+  // The darker overlay preserves separation without keeping WebView2's GPU compositor busy.
+  backdrop-filter: none;
 }
 
 .agent-dialog {
@@ -256,6 +258,30 @@ button:disabled {
   input {
     width: 13px;
     height: 13px;
+  }
+}
+
+.agent-dialog .form-grid > label.auto-confirm-control {
+  display: flex;
+  align-items: start;
+
+  > input {
+    width: 13px;
+    height: 13px;
+    margin-top: 2px;
+    padding: 0;
+  }
+}
+
+.auto-confirm-control > span,
+.resume-auto-confirm > span {
+  display: grid;
+  gap: 2px;
+
+  small {
+    color: var(--text-muted);
+    font-size: 9px;
+    line-height: 1.35;
   }
 }
 
@@ -568,6 +594,12 @@ button:disabled {
 .resume-config-panel {
   padding: 2px 17px 13px;
   border-top: 1px solid var(--border);
+}
+
+.resume-auto-confirm {
+  align-items: start;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--border);
 }
 
 .resume-options {

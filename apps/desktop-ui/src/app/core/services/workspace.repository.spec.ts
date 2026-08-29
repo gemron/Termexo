@@ -43,4 +43,43 @@ describe('WorkspaceRepository', () => {
 
     expect(await repository.list()).toEqual([{ id: 'workspace-2', name: 'Second' }]);
   });
+
+  it('serializes desktop writes and ignores a delayed save for a deleted workspace', async () => {
+    const commands: string[] = [];
+    let releaseSave!: () => void;
+    const saveBlocked = new Promise<void>((resolve) => {
+      releaseSave = resolve;
+    });
+    const runtime = globalThis as unknown as Record<string, unknown>;
+    runtime['__TAURI_INTERNALS__'] = {
+      invoke: vi.fn(async (command: string) => {
+        commands.push(command);
+        if (command === 'save_workspace') {
+          await saveBlocked;
+        }
+      }),
+    };
+
+    try {
+      const repository = new WorkspaceRepository();
+      const workspace = { id: 'workspace-1', name: 'Race candidate' } as Parameters<
+        WorkspaceRepository['save']
+      >[0];
+
+      const initialSave = repository.save(workspace);
+      await vi.waitFor(() => expect(commands).toEqual(['save_workspace']));
+
+      const deletion = repository.delete(workspace.id);
+      const delayedSave = repository.save(workspace);
+      await Promise.resolve();
+      expect(commands).toEqual(['save_workspace']);
+
+      releaseSave();
+      await Promise.all([initialSave, deletion, delayedSave]);
+
+      expect(commands).toEqual(['save_workspace', 'delete_workspace']);
+    } finally {
+      delete runtime['__TAURI_INTERNALS__'];
+    }
+  });
 });

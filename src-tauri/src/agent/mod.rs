@@ -4,7 +4,7 @@ mod opencode;
 
 use serde::{Deserialize, Serialize};
 
-pub use claude::ClaudeCodeAdapter;
+pub use claude::{ClaudeBackgroundSession, ClaudeCodeAdapter};
 pub use codex::CodexCliAdapter;
 pub use opencode::OpenCodeAdapter;
 
@@ -46,6 +46,13 @@ pub struct ClaudeLaunchOptions {
     pub model: Option<String>,
     pub settings_path: Option<String>,
     pub mcp_config_path: Option<String>,
+    #[serde(default)]
+    pub auto_confirm: bool,
+    /// Branches the resumed conversation into a new session instead of reusing its id.
+    #[serde(default)]
+    pub fork_session: bool,
+    /// Reconnects to a session the CLI still has running, instead of starting a new process.
+    pub attach_short_id: Option<String>,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -57,6 +64,8 @@ pub struct CodexLaunchOptions {
     pub hook_configs: Vec<String>,
     /// `-c` overrides pointing Codex at a compatible provider, empty for the official endpoint.
     pub provider_configs: Vec<String>,
+    #[serde(default)]
+    pub auto_confirm: bool,
 }
 
 #[derive(Debug, Clone, Deserialize)]

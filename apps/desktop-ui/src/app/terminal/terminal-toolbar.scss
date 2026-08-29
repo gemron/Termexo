@@ -1,0 +1,239 @@
+/* Never shrinks: what it gives up as the window narrows is decided by the media queries below. */
+:host {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 4px;
+  padding: 0 7px 0 4px;
+  border-left: 1px solid var(--border);
+}
+
+.visible-count {
+  padding: 3px 5px;
+  border-radius: var(--radius-selector);
+  color: var(--text-muted);
+  background: var(--surface-inset);
+  font: 9px/1 var(--mono);
+  white-space: nowrap;
+}
+
+.tool-button {
+  display: flex;
+  height: 25px;
+  align-items: center;
+  gap: 6px;
+  padding: 0 8px;
+  border: 0;
+  border-radius: var(--radius-field);
+  color: var(--text-muted);
+  background: transparent;
+  font-size: 11px;
+  font-weight: 580;
+  white-space: nowrap;
+
+  &:hover {
+    color: var(--text);
+    background: color-mix(in srgb, var(--accent) 10%, var(--surface-2));
+  }
+}
+
+.popover-anchor {
+  position: relative;
+  display: flex;
+}
+
+.popover-trigger {
+  display: flex;
+  height: 25px;
+  align-items: center;
+  gap: 4px;
+  padding: 0 6px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-field);
+  color: var(--text-muted);
+  background: var(--surface-inset);
+  font: 9px/1 var(--sans);
+
+  &:hover,
+  &.active {
+    border-color: var(--color-primary);
+    color: var(--text);
+  }
+
+  b {
+    color: var(--text);
+    font: 500 10px/1 var(--mono);
+  }
+}
+
+/* Anchored to its trigger and above the terminals it overlaps. */
+.toolbar-popover {
+  position: absolute;
+  z-index: 40;
+  top: calc(100% + 5px);
+  right: 0;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px;
+  border: 1px solid var(--border-strong);
+  border-radius: 8px;
+  background: var(--surface-1);
+  box-shadow: 0 14px 35px rgb(0 0 0 / 40%);
+}
+
+.font-size-controls {
+  display: flex;
+  height: 25px;
+  align-items: center;
+  gap: 1px;
+  padding: 1px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-field);
+  color: var(--text-muted);
+  background: var(--surface-inset);
+
+  > span {
+    padding: 0 4px;
+    font: 9px/1 var(--sans);
+  }
+
+  output {
+    min-width: 18px;
+    color: var(--text);
+    font: 9px/1 var(--mono);
+    text-align: center;
+  }
+}
+
+.layout-controls {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+
+  button {
+    display: grid;
+    width: 25px;
+    height: 25px;
+    place-items: center;
+    border: 0;
+    border-radius: 3px;
+    color: var(--text-muted);
+    background: transparent;
+
+    &:hover,
+    &.active {
+      color: var(--text);
+      background: var(--surface-2);
+    }
+  }
+}
+
+/* Shows how many cells the current grid has and how many of them hold a terminal. */
+.grid-preview {
+  display: grid;
+  width: 22px;
+  height: 18px;
+  grid-template-columns: repeat(var(--preview-columns), minmax(0, 1fr));
+  grid-template-rows: repeat(var(--preview-rows), minmax(0, 1fr));
+  gap: 1px;
+  padding: 2px;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-selector);
+  background: var(--surface-inset);
+
+  i {
+    min-width: 1px;
+    min-height: 1px;
+    border-radius: 1px;
+    background: var(--surface-2);
+
+    &.occupied {
+      background: var(--accent);
+      box-shadow: 0 0 3px color-mix(in srgb, var(--accent) 45%, transparent);
+    }
+  }
+}
+
+.grid-dimensions {
+  color: var(--text-muted);
+
+  .dimension-stepper {
+    display: flex;
+    align-items: center;
+    gap: 1px;
+    padding: 1px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-field);
+    background: var(--surface-inset);
+  }
+
+  .dimension-axis {
+    padding: 0 3px 0 4px;
+    font-size: 9px;
+    white-space: nowrap;
+  }
+
+  output {
+    min-width: 17px;
+    color: var(--text);
+    font: 10px/1 var(--mono);
+    text-align: center;
+  }
+
+  .dimension-swap {
+    width: 18px;
+    color: var(--text-muted);
+    font-size: 10px;
+  }
+
+  .grid-capacity {
+    padding: 4px 5px;
+    border: 1px solid color-mix(in oklab, var(--color-primary) 34%, var(--border));
+    border-radius: var(--radius-selector);
+    color: color-mix(in oklab, var(--color-primary) 70%, var(--text));
+    font: 9px/1 var(--mono);
+    white-space: nowrap;
+    background: var(--primary-soft);
+  }
+}
+
+.font-size-controls button,
+.dimension-stepper button,
+.dimension-swap {
+  display: grid;
+  width: 20px;
+  height: 20px;
+  place-items: center;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-selector);
+  color: var(--text-secondary);
+  background: transparent;
+  font: 12px/1 var(--mono);
+
+  &:hover:not(:disabled) {
+    color: var(--text);
+    background: var(--surface-2);
+  }
+
+  &:disabled {
+    cursor: default;
+    opacity: 0.28;
+  }
+}
+
+/* Every label here is repeated in a tooltip or in the popover behind its trigger, so the toolbar
+   gives up its text before the tab strip gives up a tab. */
+@container terminal-tabs (max-width: 1100px) {
+  .tool-button > span,
+  .popover-trigger b {
+    display: none;
+  }
+}
+
+@container terminal-tabs (max-width: 820px) {
+  .visible-count {
+    display: none;
+  }
+}

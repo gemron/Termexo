@@ -6,7 +6,12 @@ export interface TerminalCaretPosition {
   cols: number;
   rows: number;
   cursorX: number;
+  /** Cursor row inside the active page, which is not the row it is drawn on once scrolled back. */
   cursorY: number;
+  /** First row of the active page, the row `cursorY` counts from. */
+  baseY: number;
+  /** First row currently on screen; scrolled-back output pushes the cursor below the viewport. */
+  viewportY: number;
 }
 
 interface CompositionAnchorPosition {
@@ -29,15 +34,31 @@ export class TerminalCompositionAnchor {
   /** Gives Windows a valid caret rectangle before xterm starts a composition. */
   prepare(): void {
     const textarea = this.helperTextarea();
-    if (!textarea) {
+    if (textarea) {
+      // xterm leaves this element at the previous composition's caret. Always refresh it here: a
+      // newly focused terminal may have moved its prompt since the textarea was last used.
+      this.moveTextareaToCaret(textarea);
+    }
+  }
+
+  /**
+   * Keeps the IME caret on the live cursor between compositions.
+   *
+   * xterm only syncs its helper textarea while the cursor is inside the viewport, so scrolled-back
+   * output — and agent output that arrives while the terminal merely holds focus — leaves the
+   * rectangle Windows reads on a stale row. Refreshing it every render means the candidate window
+   * is already placed when a composition starts, instead of one layout pass too late.
+   */
+  syncAfterRender(): void {
+    if (this.position) {
+      this.restoreAfterBrowserUpdate();
       return;
     }
 
-    // xterm leaves this element at the previous composition's caret. Always refresh it here: a
-    // newly focused terminal may have moved its prompt since the textarea was last used.
-    const position = this.measureCaret();
-    if (position) {
-      this.applyToTextarea(textarea, position, true);
+    const textarea = this.helperTextarea();
+    // Only the focused terminal owns the IME caret; background panes must not fight over it.
+    if (textarea && textarea.ownerDocument.activeElement === textarea) {
+      this.moveTextareaToCaret(textarea);
     }
   }
 
@@ -105,8 +126,11 @@ export class TerminalCompositionAnchor {
     const rows = Math.max(caret.rows, 1);
     const cellWidth = screen.clientWidth / cols;
     const cellHeight = screen.clientHeight / rows;
+    // The cursor is drawn this far down the viewport, which only equals cursorY at the bottom of
+    // the scrollback. Clamping keeps a cursor scrolled out of sight against the nearest edge.
+    const screenRow = caret.baseY + caret.cursorY - caret.viewportY;
     const cursorX = Math.min(Math.max(caret.cursorX, 0), cols - 1);
-    const cursorY = Math.min(Math.max(caret.cursorY, 0), rows - 1);
+    const cursorY = Math.min(Math.max(screenRow, 0), rows - 1);
 
     return {
       left: `${cursorX * cellWidth}px`,
@@ -120,11 +144,27 @@ export class TerminalCompositionAnchor {
     return this.host.querySelector<HTMLTextAreaElement>(HELPER_TEXTAREA_SELECTOR);
   }
 
+  private moveTextareaToCaret(textarea: HTMLTextAreaElement): void {
+    const position = this.measureCaret();
+    if (position) {
+      this.applyToTextarea(textarea, position, true);
+    }
+  }
+
   private applyToTextarea(
     textarea: HTMLTextAreaElement,
     position: CompositionAnchorPosition,
     initializeWidth: boolean,
   ): void {
+    // syncAfterRender runs on every frame. Rewriting an unchanged position would dirty layout and
+    // make the next frame's measurement force a reflow for nothing.
+    if (
+      textarea.style.left === position.left &&
+      textarea.style.top === position.top &&
+      textarea.style.height === position.height
+    ) {
+      return;
+    }
     textarea.style.left = position.left;
     textarea.style.top = position.top;
     textarea.style.height = position.height;

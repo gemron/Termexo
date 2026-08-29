@@ -91,6 +91,8 @@ pub fn run() {
             commands::agent::build_codex_launch_command,
             commands::agent::build_opencode_launch_command,
             commands::agent::prepare_claude_launch,
+            commands::agent::inspect_claude_background_session,
+            commands::agent::stop_claude_background_session,
             commands::agent::prepare_codex_launch,
             commands::agent::prepare_opencode_launch,
             commands::agent::prepare_account_login,

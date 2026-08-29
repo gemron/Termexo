@@ -44,6 +44,9 @@
       </span>
     </div>
     <div class="terminal-meta">
+      @if (session().autoConfirm) {
+        <span class="auto-confirm-chip" [title]="'terminal.autoConfirmActive' | t">AUTO</span>
+      }
       @if (session().agentType === 'claude' || session().agentType === 'codex') {
         <button
           type="button"

@@ -11,6 +11,7 @@ import {
   AgentInstallation,
   AgentLaunchSpec,
   AgentSession,
+  ClaudeBackgroundSession,
   ClaudeLaunchRequest,
   CliOperationPlan,
   CliOperationRequest,
@@ -178,19 +179,44 @@ export class AgentService {
   async prepareLaunch(request: ClaudeLaunchRequest): Promise<AgentLaunchSpec> {
     if (!isTauriRuntime()) {
       return {
-        command: `claude${request.sessionId ? ` --resume '${request.sessionId}'` : ''}`,
+        command: `claude${request.autoConfirm ? ' --permission-mode auto' : ''}${
+          request.sessionId ? ` --resume '${request.sessionId}'` : ''
+        }`,
         executablePath: 'claude',
       };
     }
     return invoke<AgentLaunchSpec>('prepare_claude_launch', { request });
   }
 
+  /**
+   * The Claude session the CLI still has running under this id, if any.
+   *
+   * Checked before resuming: Claude Code keeps a session alive when its terminal goes away, and
+   * `--resume` then prints "is running as a background session" and exits, leaving a dead terminal.
+   */
+  async inspectClaudeBackgroundSession(sessionId: string): Promise<ClaudeBackgroundSession | null> {
+    if (!isTauriRuntime()) {
+      return null;
+    }
+    return invoke<ClaudeBackgroundSession | null>('inspect_claude_background_session', {
+      sessionId,
+    });
+  }
+
+  /** Ends a background session so a Termexo terminal can resume its id again. */
+  async stopClaudeBackgroundSession(shortId: string): Promise<void> {
+    if (!isTauriRuntime()) {
+      return;
+    }
+    await invoke('stop_claude_background_session', { shortId });
+  }
+
   async prepareCodexLaunch(request: CodexLaunchRequest): Promise<AgentLaunchSpec> {
     if (!isTauriRuntime()) {
       return {
-        command: `codex${request.sessionId ? ` resume '${request.sessionId}'` : ''}${
-          request.model ? ` --model '${request.model}'` : ''
-        }`,
+        command: `codex${request.autoConfirm ? ' --approve-for-me' : ''}${
+          request.sessionId ? ` resume '${request.sessionId}'` : ''
+        }${request.model ? ` --model '${request.model}'` : ''}`,
         executablePath: 'codex',
       };
     }

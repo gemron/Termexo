@@ -220,7 +220,7 @@ try {
   const initialTerminalCount = await page.locator('.terminal-panel').count();
   const toolbar = page.getByRole('toolbar', { name: '工作区工具' });
   page.once('dialog', (dialog) => dialog.accept(dialog.defaultValue()));
-  await toolbar.getByRole('button', { name: '终端', exact: true }).click();
+  await toolbar.getByRole('button', { name: '新建终端', exact: true }).click();
   const createdTerminal = page.locator('.terminal-panel').nth(initialTerminalCount);
   await createdTerminal.waitFor();
   await createdTerminal.getByText('运行中', { exact: true }).waitFor();
@@ -230,6 +230,20 @@ try {
     throw new Error('creating a Shell did not add a terminal panel');
   }
 
+  // A tab closes from the strip itself, which is the only way to close one the layout hides.
+  page.once('dialog', (dialog) => dialog.accept(dialog.defaultValue()));
+  await page.locator('.tab-bar .add-tab').click();
+  await page.locator('.terminal-panel').nth(updatedTerminalCount).waitFor();
+  await page.locator('.tab-strip .tab-slot').last().locator('.tab-close').click();
+  await page.waitForTimeout(120);
+  const countAfterTabClose = await page.locator('.terminal-panel').count();
+  if (countAfterTabClose !== updatedTerminalCount) {
+    throw new Error(
+      `closing from the tab strip left ${countAfterTabClose} panels, expected ${updatedTerminalCount}`,
+    );
+  }
+
+  await page.getByRole('button', { name: '终端外观' }).click();
   const fontSizeOutput = page.locator('.font-size-controls output');
   const initialFontSize = Number(await fontSizeOutput.textContent());
   await page.getByRole('button', { name: '增大终端字体' }).click();
@@ -241,6 +255,8 @@ try {
     throw new Error('terminal font size was not persisted');
   }
   await page.getByRole('button', { name: '减小终端字体' }).click();
+  await page.keyboard.press('Escape');
+  await fontSizeOutput.waitFor({ state: 'detached' });
 
   const terminalTabLabels = page.locator('.tab-strip button[role="tab"] > span');
   const tabOrderBefore = await terminalTabLabels.allTextContents();
@@ -248,7 +264,8 @@ try {
     await page.locator('.tab-strip button.active > span').textContent()
   )?.trim();
   const activeTabIndexBefore = tabOrderBefore.findIndex((name) => name.trim() === activeTabName);
-  await page.getByRole('button', { name: '将当前终端向左移动' }).click();
+  // Ctrl+Shift+PageUp replaces the toolbar arrows the tab strip used to spend its width on.
+  await page.keyboard.press('Control+Shift+PageUp');
   await page.waitForTimeout(120);
   const tabOrderAfter = await terminalTabLabels.allTextContents();
   const activeTabIndexAfter = tabOrderAfter.findIndex((name) => name.trim() === activeTabName);
@@ -261,6 +278,18 @@ try {
       })}`,
     );
   }
+
+  // Ctrl+Tab must reach the workbench rather than being typed into the focused terminal.
+  await page.keyboard.press('Control+Tab');
+  await page.waitForTimeout(120);
+  const cycledTabName = (
+    await page.locator('.tab-strip button.active > span').textContent()
+  )?.trim();
+  if (cycledTabName === activeTabName) {
+    throw new Error(`Ctrl+Tab did not move to another terminal tab: ${cycledTabName}`);
+  }
+  await page.keyboard.press('Control+Shift+Tab');
+  await page.waitForTimeout(120);
 
   const activeTerminalPanel = page.locator('.terminal-panel.active');
   const seededScrollback = await activeTerminalPanel.evaluate((panel) => {
@@ -621,6 +650,7 @@ try {
     throw new Error('terminal layout did not switch to grid');
   }
 
+  await page.getByRole('button', { name: '网格尺寸' }).click();
   const gridDimensions = page.locator('.grid-dimensions');
   const columnOutput = gridDimensions.getByLabel('当前网格列数');
   const rowOutput = gridDimensions.getByLabel('当前网格行数');
@@ -633,6 +663,8 @@ try {
   await rowOutput.filter({ hasText: String(initialColumns + 1) }).waitFor();
   await gridDimensions.getByRole('button', { name: '交换网格行列数' }).click();
   await gridDimensions.getByRole('button', { name: '减少网格列数' }).click();
+  await page.keyboard.press('Escape');
+  await gridDimensions.waitFor({ state: 'detached' });
 
   await toolbar.getByRole('button', { name: '恢复', exact: true }).click();
   const sessionDialog = page.getByRole('dialog', { name: 'Agent 会话中心' });

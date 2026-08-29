@@ -152,10 +152,10 @@ const EN: TranslationTable = {
   'terminal.tabs': 'Terminal tabs',
   'terminal.activate': 'Activate this terminal',
   'terminal.showInLayout': 'Show this terminal in the current layout',
-  'terminal.chooseVisible': 'Choose terminals to display',
-  'terminal.reorder': 'Reorder terminals',
-  'terminal.moveLeft': 'Move current terminal left',
-  'terminal.moveRight': 'Move current terminal right',
+  'terminal.tabHint': 'Drag to reorder · middle-click to close · Ctrl+Tab to switch',
+  'terminal.visibleCount': '{visible} of {total} terminals shown, {limit} fit this layout',
+  'terminal.appearance': 'Terminal appearance',
+  'terminal.gridSettings': 'Grid size',
   'terminal.fontSize': 'Adjust terminal font size',
   'terminal.fontSizeCurrent': 'Current terminal font size {size}',
   'terminal.fontSmaller': 'Decrease terminal font size',
@@ -208,6 +208,7 @@ const EN: TranslationTable = {
   'terminal.selectDirectoryFailed': 'Could not select folder: {error}',
   'terminal.selectDirectory': 'Select terminal working folder',
   'terminal.defaultCodexModel': 'Codex default model',
+  'terminal.autoConfirmActive': 'Automatic confirmation is enabled for this terminal',
   'status.starting': 'Starting',
   'status.running': 'Running',
   'status.thinking': 'Thinking',
@@ -261,8 +262,12 @@ const EN: TranslationTable = {
   'quota.currentNone': 'No provider allowance is associated with this terminal',
   'quota.browserUnavailable': 'Browser preview cannot reach providers — run the desktop app',
   'quota.resetDue': 'Reset due',
-  'quota.resetHours': 'Resets in {count}h',
-  'quota.resetDays': 'Resets in {count}d',
+  'quota.resetMinutes': 'Resets in {minutes}m',
+  'quota.resetHoursMinutes': 'Resets in {hours}h {minutes}m',
+  'quota.resetDaysHoursMinutes': 'Resets in {days}d {hours}h {minutes}m',
+  'quota.resetAt': 'Resets at {time}',
+  'quota.remaining': 'Remaining',
+  'quota.used': 'Used {percent}%',
   'quota.thresholdAlert':
     '{name} · {label} has reached {percent}% of the allowance the provider reports.',
   'terminal.exitFailed': '{name} exited with code {code}. Check the agent and its credentials.',
@@ -381,6 +386,9 @@ const EN: TranslationTable = {
   'launch.codexModelPlaceholder': 'Leave blank to use the default model in Codex configuration',
   'launch.codexModelHelp':
     'Choose a recommended model or enter any model ID supported by the current Codex CLI.',
+  'launch.autoConfirm': 'Automatic confirmation',
+  'launch.autoConfirmHelp':
+    'Let the CLI handle permission confirmations automatically. Some actions may run without asking, so enable this only for trusted projects.',
   'launch.start': 'Start session',
   'launch.accountNotAuthenticated': 'This account is not signed in. Sign in first in Settings.',
   'launch.goToSettings': 'Go to Settings',
@@ -608,6 +616,18 @@ const EN: TranslationTable = {
     '{count} Claude terminals could not restore their model settings. Restart those terminals.',
   'restore.codexFailed':
     '{count} Codex terminals could not restore status tracking. Restart those terminals.',
+  'session.backgroundTitle': 'Sessions still running in the background',
+  'session.backgroundDescription':
+    'Claude Code kept these sessions alive after their terminal closed, and they are working right now. Stopping one would discard what it is doing, so pick how to reopen them.',
+  'session.backgroundAttach': 'Attach to it',
+  'session.backgroundFork': 'Branch a copy',
+  'session.backgroundSkip': 'Leave it alone',
+  'session.backgroundReclaimed': 'Reclaimed {count} background sessions',
+  'session.backgroundAttached':
+    'Attached to the live session. Termexo cannot track this terminal’s status while attached.',
+  'session.backgroundSkipped':
+    '{count} terminals were left unstarted; their sessions keep running.',
+  'session.backgroundStopFailed': 'Could not stop the background session: {error}',
 };
 
 const ZH_CN: TranslationTable = {
@@ -738,10 +758,10 @@ const ZH_CN: TranslationTable = {
   'terminal.tabs': '终端标签',
   'terminal.activate': '激活此终端',
   'terminal.showInLayout': '在当前布局中显示此终端',
-  'terminal.chooseVisible': '选择要显示的终端',
-  'terminal.reorder': '调整终端排序',
-  'terminal.moveLeft': '将当前终端向左移动',
-  'terminal.moveRight': '将当前终端向右移动',
+  'terminal.tabHint': '拖动排序 · 中键关闭 · Ctrl+Tab 切换',
+  'terminal.visibleCount': '已显示 {visible}/{total} 个终端，当前布局可容纳 {limit} 个',
+  'terminal.appearance': '终端外观',
+  'terminal.gridSettings': '网格尺寸',
   'terminal.fontSize': '调整终端字体大小',
   'terminal.fontSizeCurrent': '当前终端字号 {size}',
   'terminal.fontSmaller': '减小终端字体',
@@ -793,6 +813,7 @@ const ZH_CN: TranslationTable = {
   'terminal.selectDirectoryFailed': '选择目录失败：{error}',
   'terminal.selectDirectory': '选择终端工作目录',
   'terminal.defaultCodexModel': 'Codex 默认模型',
+  'terminal.autoConfirmActive': '此终端已开启自动确认模式',
   'status.starting': '启动中',
   'status.running': '运行中',
   'status.thinking': '思考中',
@@ -846,8 +867,12 @@ const ZH_CN: TranslationTable = {
   'quota.currentNone': '当前窗口暂无关联的供应商余量',
   'quota.browserUnavailable': '浏览器预览无法访问供应商，请运行桌面版',
   'quota.resetDue': '已到重置时间',
-  'quota.resetHours': '{count} 小时后重置',
-  'quota.resetDays': '{count} 天后重置',
+  'quota.resetMinutes': '{minutes} 分钟后重置',
+  'quota.resetHoursMinutes': '{hours} 小时 {minutes} 分后重置',
+  'quota.resetDaysHoursMinutes': '{days} 天 {hours} 小时 {minutes} 分后重置',
+  'quota.resetAt': '重置时间 {time}',
+  'quota.remaining': '剩余',
+  'quota.used': '已用 {percent}%',
   'quota.thresholdAlert': '{name} · {label} 已达到供应商所报额度的 {percent}%。',
   'terminal.exitFailed': '{name} 已退出（代码 {code}），请检查 Agent 与登录凭据。',
   'inspector.resize': '调整 Agent 侧栏宽度',
@@ -954,6 +979,8 @@ const ZH_CN: TranslationTable = {
   'launch.codexModel': 'Codex 模型',
   'launch.codexModelPlaceholder': '留空使用 Codex 配置的默认模型',
   'launch.codexModelHelp': '可选择推荐模型，也可输入当前 Codex CLI 支持的任意模型 ID。',
+  'launch.autoConfirm': '自动确认模式',
+  'launch.autoConfirmHelp': '由 CLI 自动处理权限确认。部分操作可能不再询问，请仅在可信项目中开启。',
   'launch.start': '启动会话',
   'launch.accountNotAuthenticated': '该账号尚未登录，请先在设置中登录。',
   'launch.goToSettings': '去设置',
@@ -1161,6 +1188,16 @@ const ZH_CN: TranslationTable = {
   'restore.terminalMissing': '{agent} 终端 {name} 已不存在',
   'restore.claudeFailed': '{count} 个 Claude 终端未能恢复模型配置，请重新启动对应终端',
   'restore.codexFailed': '{count} 个 Codex 终端未能恢复状态跟踪，请重新启动对应终端',
+  'session.backgroundTitle': '仍在后台运行的会话',
+  'session.backgroundDescription':
+    '这些 Claude 会话在终端关闭后仍然存活，并且正在干活。直接停止会丢弃它们正在做的事，请选择如何重新打开。',
+  'session.backgroundAttach': '接管会话',
+  'session.backgroundFork': '分叉副本',
+  'session.backgroundSkip': '暂不处理',
+  'session.backgroundReclaimed': '已接管 {count} 个后台会话',
+  'session.backgroundAttached': '已接管实时会话。接管期间 Termexo 无法跟踪该终端的状态。',
+  'session.backgroundSkipped': '{count} 个终端未启动，其会话仍在后台运行。',
+  'session.backgroundStopFailed': '无法停止后台会话：{error}',
 };
 
 const ES: TranslationTable = {
@@ -1253,8 +1290,6 @@ const ES: TranslationTable = {
   'workspace.restore': 'Restaurar espacio',
   'terminal.newShell': 'Nuevo terminal Shell',
   'terminal.tabs': 'Pestañas de terminal',
-  'terminal.moveLeft': 'Mover terminal a la izquierda',
-  'terminal.moveRight': 'Mover terminal a la derecha',
   'terminal.fontSize': 'Ajustar tamaño de fuente',
   'terminal.layout': 'Diseño de terminales',
   'terminal.layoutSingle': 'Un terminal',
@@ -1376,8 +1411,6 @@ const FR: TranslationTable = {
   'workspace.restore': 'Restaurer l’espace',
   'terminal.newShell': 'Nouveau terminal Shell',
   'terminal.tabs': 'Onglets des terminaux',
-  'terminal.moveLeft': 'Déplacer le terminal à gauche',
-  'terminal.moveRight': 'Déplacer le terminal à droite',
   'terminal.fontSize': 'Régler la taille de police',
   'terminal.layout': 'Disposition des terminaux',
   'terminal.layoutSingle': 'Terminal unique',
@@ -1499,8 +1532,6 @@ const DE: TranslationTable = {
   'workspace.restore': 'Arbeitsbereich wiederherstellen',
   'terminal.newShell': 'Neues Shell-Terminal',
   'terminal.tabs': 'Terminal-Tabs',
-  'terminal.moveLeft': 'Terminal nach links verschieben',
-  'terminal.moveRight': 'Terminal nach rechts verschieben',
   'terminal.fontSize': 'Terminal-Schriftgröße ändern',
   'terminal.layout': 'Terminal-Layout',
   'terminal.layoutSingle': 'Ein Terminal',
@@ -1621,8 +1652,6 @@ const JA: TranslationTable = {
   'workspace.restore': 'ワークスペースを復元',
   'terminal.newShell': '新しい Shell ターミナル',
   'terminal.tabs': 'ターミナルタブ',
-  'terminal.moveLeft': 'ターミナルを左へ移動',
-  'terminal.moveRight': 'ターミナルを右へ移動',
   'terminal.fontSize': 'ターミナルの文字サイズを調整',
   'terminal.layout': 'ターミナルレイアウト',
   'terminal.layoutSingle': '単一ターミナル',
@@ -1742,8 +1771,6 @@ const KO: TranslationTable = {
   'workspace.restore': '작업 공간 복원',
   'terminal.newShell': '새 Shell 터미널',
   'terminal.tabs': '터미널 탭',
-  'terminal.moveLeft': '터미널을 왼쪽으로 이동',
-  'terminal.moveRight': '터미널을 오른쪽으로 이동',
   'terminal.fontSize': '터미널 글꼴 크기 조정',
   'terminal.layout': '터미널 레이아웃',
   'terminal.layoutSingle': '단일 터미널',
@@ -1892,6 +1919,17 @@ export class I18nService {
       hour: '2-digit',
       minute: '2-digit',
       second: '2-digit',
+      hour12: false,
+    }).format(value);
+  }
+
+  /** Wall-clock moment for values that may fall outside today, such as an allowance reset. */
+  formatDateTime(value: number | Date): string {
+    return new Intl.DateTimeFormat(this.locale(), {
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
       hour12: false,
     }).format(value);
   }

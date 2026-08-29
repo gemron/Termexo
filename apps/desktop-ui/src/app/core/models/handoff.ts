@@ -1,6 +1,7 @@
 import type { AgentSession } from './agent.models';
 import type { PromptAsset } from './prompt-assets';
 import { redactSensitiveContent } from './prompt-assets';
+import { stripTerminalControl } from './terminal-output';
 import type { TerminalSession, Workspace } from './workspace.models';
 
 export interface GitContext {
@@ -80,9 +81,6 @@ export interface HandoffBuildInput {
   now?: number;
   id?: string;
 }
-
-const ANSI_SEQUENCE =
-  /[\u001b\u009b][[\]()#;?]*(?:(?:(?:[a-zA-Z\d]*(?:;[-a-zA-Z\d/#&.:=?%@~_]+)*)?\u0007)|(?:(?:\d{1,4}(?:[;:]\d{0,4})*)?[\dA-PR-TZcf-nq-uy=><~]))/g;
 
 export function buildHandoffPackage(input: HandoffBuildInput): HandoffPackage {
   const now = input.now ?? Date.now();
@@ -287,14 +285,6 @@ export function continuationPrompt(handoff: HandoffPackage): string {
 
 export function estimateTokens(value: string): number {
   return Math.ceil(Array.from(value).length / 4);
-}
-
-export function stripTerminalControl(value: string): string {
-  return value
-    .replace(ANSI_SEQUENCE, '')
-    .replace(/\r/g, '')
-    .replace(/[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]/g, '')
-    .slice(-40_000);
 }
 
 function enforceTokenBudget(handoff: HandoffPackage): void {

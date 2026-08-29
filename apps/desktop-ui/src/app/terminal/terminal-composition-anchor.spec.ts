@@ -21,13 +21,16 @@ describe('TerminalCompositionAnchor', () => {
     compositionView.className = 'composition-view';
     screen.append(textarea, compositionView);
     host.append(screen);
+    // Focus only moves to elements that are in the document, and the anchor checks for it.
+    document.body.append(host);
 
-    caret = { cols: 80, rows: 24, cursorX: 12, cursorY: 8 };
+    caret = { cols: 80, rows: 24, cursorX: 12, cursorY: 8, baseY: 0, viewportY: 0 };
     anchor = new TerminalCompositionAnchor(host, () => caret);
   });
 
   afterEach(() => {
     anchor.end();
+    host.remove();
     vi.useRealTimers();
   });
 
@@ -111,11 +114,60 @@ describe('TerminalCompositionAnchor', () => {
   });
 
   it('clamps the caret to the visible terminal cells', () => {
-    caret = { cols: 80, rows: 24, cursorX: 80, cursorY: 24 };
+    caret = { ...caret, cursorX: 80, cursorY: 24 };
 
     anchor.begin();
 
     expect(textarea.style.left).toBe('790px');
     expect(textarea.style.top).toBe('460px');
+  });
+
+  it('follows the row the cursor is drawn on after the user scrolls the buffer back', () => {
+    // The cursor still sits on row 8 of the active page, but three rows of it are above the view.
+    caret = { ...caret, cursorY: 8, baseY: 120, viewportY: 117 };
+
+    anchor.begin();
+
+    expect(textarea.style.top).toBe('220px');
+    expect(compositionView.style.top).toBe('220px');
+  });
+
+  it('pins a cursor scrolled out of sight to the closest visible row', () => {
+    caret = { ...caret, cursorY: 8, baseY: 200, viewportY: 100 };
+
+    anchor.begin();
+
+    expect(textarea.style.top).toBe('460px');
+  });
+
+  it('keeps the focused terminal caret on the live cursor between compositions', () => {
+    textarea.focus();
+    caret = { ...caret, cursorX: 45, cursorY: 20 };
+
+    anchor.syncAfterRender();
+
+    expect(textarea.style.left).toBe('450px');
+    expect(textarea.style.top).toBe('400px');
+  });
+
+  it('leaves the caret of an unfocused terminal alone', () => {
+    textarea.style.left = '120px';
+    caret = { ...caret, cursorX: 45, cursorY: 20 };
+
+    anchor.syncAfterRender();
+
+    expect(textarea.style.left).toBe('120px');
+  });
+
+  it('still defends the captured caret while a composition is running', () => {
+    textarea.focus();
+    anchor.begin();
+    caret = { ...caret, cursorX: 45, cursorY: 20 };
+
+    anchor.syncAfterRender();
+    vi.runAllTimers();
+
+    expect(textarea.style.left).toBe('120px');
+    expect(textarea.style.top).toBe('160px');
   });
 });

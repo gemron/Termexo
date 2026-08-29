@@ -2,7 +2,7 @@ use std::collections::HashMap;
 use std::env;
 use std::io::Read;
 use std::path::{Path, PathBuf};
-use std::process::{Command, Stdio};
+use std::process::{Child, Command, Stdio};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::thread;
 use std::time::{Duration, Instant};
@@ -556,8 +556,7 @@ fn run_npm_command(
             break status;
         }
         if started.elapsed() >= timeout {
-            let _ = child.kill();
-            let _ = child.wait();
+            terminate_process_tree(&mut child);
             let stdout = stdout_reader.join().unwrap_or_default();
             let stderr = stderr_reader.join().unwrap_or_default();
             return Ok(CommandResult {
@@ -574,6 +573,29 @@ fn run_npm_command(
         stdout: stdout_reader.join().unwrap_or_default(),
         stderr: stderr_reader.join().unwrap_or_default(),
     })
+}
+
+/// Stops npm and every process launched through its Windows `.cmd` shim.
+///
+/// Killing only `cmd.exe` leaves `node npm-cli.js` alive with the inherited stdout/stderr pipes.
+/// The reader threads then wait forever even though the advertised command timeout elapsed.
+fn terminate_process_tree(child: &mut Child) {
+    #[cfg(windows)]
+    {
+        let pid = child.id().to_string();
+        let mut taskkill = Command::new("taskkill.exe");
+        taskkill
+            .args(["/PID", &pid, "/T", "/F"])
+            .stdin(Stdio::null())
+            .stdout(Stdio::null())
+            .stderr(Stdio::null());
+        command_without_window(&mut taskkill);
+        let _ = taskkill.status();
+    }
+
+    // This is also the non-Windows implementation and a fallback if taskkill could not run.
+    let _ = child.kill();
+    let _ = child.wait();
 }
 
 fn npm_command(npm_path: &Path) -> Command {
@@ -647,6 +669,9 @@ fn definition(agent_type: &str) -> Result<CliDefinition, String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[cfg(windows)]
+    use std::fs;
 
     #[test]
     fn accepts_latest_tags_and_exact_versions() {
@@ -732,6 +757,36 @@ mod tests {
         assert_eq!(
             rollback_package_spec(&plan).as_deref(),
             Some("@anthropic-ai/claude-code@2.1.224")
+        );
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn npm_timeout_stops_the_windows_command_tree() {
+        let script_path =
+            env::temp_dir().join(format!("termexo-npm-timeout-{}.cmd", std::process::id()));
+        fs::write(
+            &script_path,
+            "@echo off\r\n%SystemRoot%\\System32\\WindowsPowerShell\\v1.0\\powershell.exe -NoProfile -Command \"Start-Sleep -Seconds 30\"\r\n",
+        )
+        .unwrap();
+
+        let started = Instant::now();
+        let result = run_npm_command(
+            &script_path,
+            &[],
+            &HashMap::new(),
+            Duration::from_millis(250),
+        )
+        .unwrap();
+        let elapsed = started.elapsed();
+        let _ = fs::remove_file(&script_path);
+
+        assert!(!result.success);
+        assert!(result.stderr.contains("npm 操作超时"), "{}", result.stderr);
+        assert!(
+            elapsed < Duration::from_secs(5),
+            "terminating the npm process tree took {elapsed:?}"
         );
     }
 }

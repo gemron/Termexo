@@ -443,6 +443,9 @@ pub fn validate_claude_profile(
             model: Some(profile.claude_model),
             settings_path: None,
             mcp_config_path: None,
+            auto_confirm: false,
+            fork_session: false,
+            attach_short_id: None,
         })
         .map(|_: AgentLaunchSpec| ())
         .map_err(|error| error.to_string())

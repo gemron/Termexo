@@ -1,4 +1,5 @@
 import {
+  compatibleNativeSessionId,
   findProviderPreset,
   groupProfilesByProvider,
   isNativeModel,
@@ -6,6 +7,29 @@ import {
   needsCredential,
   PROVIDER_PRESETS,
 } from './agent.models';
+
+describe('compatibleNativeSessionId', () => {
+  it('rejects a session proven to belong to the other Agent', () => {
+    expect(
+      compatibleNativeSessionId(
+        'codex',
+        'claude-session',
+        undefined,
+        [],
+        [{ agentType: 'claude', nativeSessionId: 'claude-session' }],
+      ),
+    ).toBeUndefined();
+  });
+
+  it('retains compatible and unknown legacy sessions', () => {
+    expect(compatibleNativeSessionId('codex', 'codex-session', 'codex', [], [])).toBe(
+      'codex-session',
+    );
+    expect(compatibleNativeSessionId('codex', 'legacy-session', undefined, [], [])).toBe(
+      'legacy-session',
+    );
+  });
+});
 
 const profile = (id: string, provider: string, overrides: Partial<ModelProfile> = {}) =>
   ({

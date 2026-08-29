@@ -4,7 +4,15 @@
       <img src="termexo-mark.svg" alt="" />
     </div>
     <strong>Termexo</strong>
-    <span class="version">0.3</span>
+    <button
+      type="button"
+      class="rail-collapse"
+      [title]="'workspace.collapseSidebar' | t"
+      [attr.aria-label]="'workspace.collapseSidebar' | t"
+      (click)="collapseRequested.emit()"
+    >
+      <app-icon name="panel-left-close" [size]="15" />
+    </button>
   </header>
 
   <div class="sidebar-tools">

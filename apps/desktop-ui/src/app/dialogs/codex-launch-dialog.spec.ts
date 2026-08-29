@@ -57,7 +57,9 @@ describe('CodexLaunchDialogComponent', () => {
   let root: HTMLElement;
 
   beforeEach(async () => {
-    await TestBed.configureTestingModule({ imports: [CodexLaunchDialogComponent] }).compileComponents();
+    await TestBed.configureTestingModule({
+      imports: [CodexLaunchDialogComponent],
+    }).compileComponents();
     fixture = TestBed.createComponent(CodexLaunchDialogComponent);
     component = fixture.componentInstance;
     root = fixture.nativeElement as HTMLElement;
@@ -95,5 +97,19 @@ describe('CodexLaunchDialogComponent', () => {
         accountProfileId: 'codex-system',
       },
     ]);
+  });
+
+  it('emits automatic confirmation only after the user enables it', async () => {
+    const autoConfirm = root.querySelector<HTMLInputElement>('.auto-confirm-control input')!;
+    expect(autoConfirm.checked).toBe(false);
+    autoConfirm.click();
+    fixture.detectChanges();
+    await fixture.whenStable();
+
+    const launches: CodexLaunchDialogValue[] = [];
+    component.launched.subscribe((value) => launches.push(value));
+    root.querySelector<HTMLButtonElement>('footer .primary')!.click();
+
+    expect(launches[0]).toEqual(expect.objectContaining({ autoConfirm: true }));
   });
 });

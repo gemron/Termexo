@@ -262,8 +262,10 @@ export class AppStateService {
     return true;
   }
 
-  createTerminal(input: CreateTerminalInput): TerminalSession | null {
-    const workspace = this.activeWorkspace();
+  createTerminal(input: CreateTerminalInput, workspaceId?: string): TerminalSession | null {
+    const workspace = workspaceId
+      ? (this.workspaceItems().find((item) => item.id === workspaceId) ?? null)
+      : this.activeWorkspace();
     if (!workspace) {
       return null;
     }
@@ -274,7 +276,9 @@ export class AppStateService {
       terminals: [...workspace.terminals, terminal],
     };
     this.replaceWorkspace(updatedWorkspace);
-    this.activeTerminalId.set(terminal.id);
+    if (this.activeWorkspace()?.id === workspace.id) {
+      this.activeTerminalId.set(terminal.id);
+    }
     void this.repository.save(updatedWorkspace);
     return terminal;
   }
@@ -285,36 +289,49 @@ export class AppStateService {
       return;
     }
 
+    const closedIndex = workspace.terminals.findIndex((terminal) => terminal.id === terminalId);
     const updatedTerminals = workspace.terminals.filter((terminal) => terminal.id !== terminalId);
     const updatedWorkspace = { ...workspace, terminals: updatedTerminals };
     this.replaceWorkspace(updatedWorkspace);
 
     if (this.activeTerminalId() === terminalId) {
-      this.activeTerminalId.set(updatedTerminals[0]?.id ?? null);
+      // Falls through to the neighbour — the tab that slid into the closed one's place, or the
+      // one before it at the end of the strip — rather than jumping back to the first tab.
+      const neighbour = updatedTerminals[Math.min(closedIndex, updatedTerminals.length - 1)];
+      this.activeTerminalId.set(neighbour?.id ?? null);
     }
     void this.repository.save(updatedWorkspace);
   }
 
-  moveTerminal(terminalId: string, direction: -1 | 1): boolean {
+  /** Lifts a terminal out of the tab order and drops it back in at `targetIndex`. */
+  reorderTerminal(terminalId: string, targetIndex: number): boolean {
     const workspace = this.activeWorkspace();
     if (!workspace) {
       return false;
     }
     const terminals = [...workspace.terminals];
     const currentIndex = terminals.findIndex((terminal) => terminal.id === terminalId);
-    const targetIndex = currentIndex + direction;
-    if (currentIndex < 0 || targetIndex < 0 || targetIndex >= terminals.length) {
+    if (
+      currentIndex < 0 ||
+      targetIndex < 0 ||
+      targetIndex >= terminals.length ||
+      targetIndex === currentIndex
+    ) {
       return false;
     }
 
-    [terminals[currentIndex], terminals[targetIndex]] = [
-      terminals[targetIndex],
-      terminals[currentIndex],
-    ];
+    terminals.splice(targetIndex, 0, ...terminals.splice(currentIndex, 1));
     const updatedWorkspace = { ...workspace, terminals };
     this.replaceWorkspace(updatedWorkspace);
     void this.repository.save(updatedWorkspace);
     return true;
+  }
+
+  moveTerminal(terminalId: string, direction: -1 | 1): boolean {
+    const currentIndex = (this.activeWorkspace()?.terminals ?? []).findIndex(
+      (terminal) => terminal.id === terminalId,
+    );
+    return currentIndex >= 0 && this.reorderTerminal(terminalId, currentIndex + direction);
   }
 
   setLayout(layout: LayoutMode): void {
@@ -347,7 +364,10 @@ export class AppStateService {
     terminalId: string,
     command: string,
     metadata: Partial<
-      Pick<TerminalSession, 'model' | 'profileId' | 'mcpProfileId' | 'accountProfileId'>
+      Pick<
+        TerminalSession,
+        'model' | 'profileId' | 'mcpProfileId' | 'accountProfileId' | 'nativeSessionId'
+      >
     > = {},
   ): boolean {
     const workspace = this.workspaceItems().find((item) =>
@@ -400,7 +420,8 @@ export class AppStateService {
     const workspace = this.workspaceItems().find((item) =>
       item.terminals.some((terminal) => terminal.id === event.terminalId),
     );
-    if (!workspace || !status) {
+    const terminal = workspace?.terminals.find((item) => item.id === event.terminalId);
+    if (!workspace || !terminal || terminal.agentType !== event.agentType || !status) {
       return;
     }
 
@@ -516,6 +537,7 @@ export class AppStateService {
       profileId: input.profileId,
       mcpProfileId: input.mcpProfileId,
       accountProfileId: input.accountProfileId,
+      autoConfirm: input.autoConfirm,
       runtimeRevision: 0,
     };
   }

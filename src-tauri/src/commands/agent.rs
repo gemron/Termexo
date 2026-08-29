@@ -7,8 +7,8 @@ use tauri::State;
 
 use crate::account;
 use crate::agent::{
-    AgentAdapter, AgentInstallation, AgentLaunchSpec, AgentSession, ClaudeCodeAdapter,
-    ClaudeLaunchOptions, CodexCliAdapter, CodexLaunchOptions, OpenCodeAdapter,
+    AgentAdapter, AgentInstallation, AgentLaunchSpec, AgentSession, ClaudeBackgroundSession,
+    ClaudeCodeAdapter, ClaudeLaunchOptions, CodexCliAdapter, CodexLaunchOptions, OpenCodeAdapter,
     OpenCodeLaunchOptions,
 };
 use crate::config::{AgentProtocol, CredentialStore, LaunchEnvironmentStore, ModelProfile};
@@ -183,6 +183,13 @@ pub struct PrepareClaudeLaunchRequest {
     pub profile_id: Option<String>,
     pub mcp_profile_id: Option<String>,
     pub account_profile_id: Option<String>,
+    #[serde(default)]
+    pub auto_confirm: bool,
+    /// Branches the resumed conversation instead of reusing its id, for a session still running.
+    #[serde(default)]
+    pub fork_session: bool,
+    /// Reconnects to a session the CLI still has running instead of starting a new process.
+    pub attach_short_id: Option<String>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -194,6 +201,8 @@ pub struct PrepareCodexLaunchRequest {
     pub model: Option<String>,
     pub profile_id: Option<String>,
     pub account_profile_id: Option<String>,
+    #[serde(default)]
+    pub auto_confirm: bool,
 }
 
 #[derive(Debug, Deserialize)]
@@ -284,8 +293,41 @@ pub fn prepare_claude_launch(
             model: profile.map(|profile| profile.claude_model),
             settings_path: Some(runtime.settings_path),
             mcp_config_path,
+            auto_confirm: request.auto_confirm,
+            fork_session: request.fork_session,
+            attach_short_id: request.attach_short_id,
         })
         .map_err(|error| error.to_string())
+}
+
+/**
+ * The Claude session still running under this id, if the CLI has one.
+ *
+ * Claude Code keeps a session alive when its terminal goes away, and then refuses to resume it in
+ * place. Callers check this before resuming so they can stop an idle one and hand a busy one back
+ * to the user rather than launching a terminal that exits on a message.
+ */
+#[tauri::command]
+pub async fn inspect_claude_background_session(
+    session_id: String,
+) -> Result<Option<ClaudeBackgroundSession>, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        ClaudeCodeAdapter::new().background_session(&session_id)
+    })
+    .await
+    .map_err(|error| error.to_string())
+}
+
+/// Ends a background session so its id can be resumed in a Termexo terminal again.
+#[tauri::command]
+pub async fn stop_claude_background_session(short_id: String) -> Result<(), String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        ClaudeCodeAdapter::new()
+            .stop_background_session(&short_id)
+            .map_err(|error| error.to_string())
+    })
+    .await
+    .map_err(|error| error.to_string())?
 }
 
 #[tauri::command]
@@ -359,6 +401,7 @@ pub fn prepare_codex_launch(
             notify_config: Some(notify_config),
             hook_configs,
             provider_configs,
+            auto_confirm: request.auto_confirm,
         })
         .map_err(|error| error.to_string())
 }

@@ -39,6 +39,34 @@ export interface AgentEvent {
   createdAt: number;
 }
 
+/**
+ * Keeps a persisted native session on the Agent that created it.
+ *
+ * `recordedAgentType` is present for new data. Session scans and hook events provide migration
+ * evidence for older records; an unknown legacy ID is retained, while a proven mismatch is
+ * discarded instead of being passed to the other CLI.
+ */
+export function compatibleNativeSessionId(
+  agentType: NativeAgentType,
+  sessionId: string | undefined,
+  recordedAgentType: NativeAgentType | undefined,
+  sessions: readonly Pick<AgentSession, 'agentType' | 'nativeSessionId'>[],
+  events: readonly Pick<AgentEvent, 'agentType' | 'nativeSessionId'>[],
+): string | undefined {
+  const normalizedId = sessionId?.trim();
+  if (!normalizedId) return undefined;
+  if (recordedAgentType) {
+    return recordedAgentType === agentType ? normalizedId : undefined;
+  }
+
+  const knownAgentTypes = new Set(
+    [...sessions, ...events]
+      .filter((item) => item.nativeSessionId === normalizedId)
+      .map((item) => item.agentType),
+  );
+  return knownAgentTypes.size > 0 && !knownAgentTypes.has(agentType) ? undefined : normalizedId;
+}
+
 export interface AgentLaunchSpec {
   command: string;
   executablePath: string;
@@ -131,6 +159,29 @@ export interface ClaudeLaunchRequest {
   profileId?: string;
   mcpProfileId?: string;
   accountProfileId?: string;
+  autoConfirm?: boolean;
+  /** Branches the resumed conversation instead of reusing an id the CLI still has running. */
+  forkSession?: boolean;
+  /** Reconnects to a session the CLI still has running instead of starting a new process. */
+  attachShortId?: string;
+}
+
+/** What to do with a session the CLI is still running when its terminal wants it back. */
+export type BackgroundSessionResolution = 'attach' | 'fork' | 'skip';
+
+/**
+ * A Claude session the CLI still has running.
+ *
+ * Claude Code keeps a session alive when its terminal goes away, and then refuses to resume it in
+ * place, so one of these has to be stopped or branched before its id can be reused.
+ */
+export interface ClaudeBackgroundSession {
+  /** The short id `claude stop` takes, distinct from the full session id. */
+  shortId: string;
+  sessionId: string;
+  name?: string;
+  /** True while the session is mid-turn, when stopping it would discard work in flight. */
+  busy: boolean;
 }
 
 export interface CodexLaunchRequest {
@@ -140,6 +191,7 @@ export interface CodexLaunchRequest {
   model?: string;
   profileId?: string;
   accountProfileId?: string;
+  autoConfirm?: boolean;
 }
 
 export interface OpenCodeLaunchRequest {
@@ -255,6 +307,27 @@ export function profileServes(profile: ModelProfile, agent: AgentProtocol): bool
  */
 export function needsCredential(profile: ModelProfile, agent: AgentProtocol): boolean {
   return Boolean(profileBaseUrl(profile, agent)) && !profile.hasCredential;
+}
+
+/**
+ * Picks the account profile whose subscription a launch will actually spend.
+ *
+ * Mirrors the backend fallback in `account_profile_environment`: an explicit choice when it still
+ * exists, otherwise the agent's default account, otherwise any account it has. Callers must record
+ * the resolved id on the terminal, because the backend resolves the same way silently and a
+ * terminal that omits the id cannot be matched to the subscription allowance it is consuming.
+ */
+export function resolveAccountProfileId(
+  profiles: readonly AccountProfile[],
+  agent: AgentProtocol,
+  preferred?: string,
+): string | undefined {
+  const candidates = profiles.filter((profile) => profile.agentType === agent);
+  return (
+    candidates.find((profile) => profile.id === preferred)?.id ??
+    candidates.find((profile) => profile.isDefault)?.id ??
+    candidates[0]?.id
+  );
 }
 
 /**

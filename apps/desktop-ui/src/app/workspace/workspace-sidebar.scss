@@ -40,29 +40,49 @@
   }
 }
 
-.version {
+/* Sits where the topbar's collapse control used to: the panel that hides owns the control. */
+.rail-collapse {
+  display: grid;
+  width: 26px;
+  height: 26px;
   margin-left: auto;
+  place-items: center;
+  border: 0;
+  border-radius: var(--radius-selector);
   color: var(--text-muted);
-  font: 10px/1 var(--mono);
+  background: transparent;
+  transition:
+    color 140ms ease,
+    background-color 140ms ease;
+
+  &:hover,
+  &:focus-visible {
+    color: var(--text);
+    background: var(--surface-2);
+    outline: 0;
+  }
 }
 
 .sidebar-tools {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) repeat(2, 30px);
-  gap: 6px;
-  padding: 12px 10px 8px;
+  grid-template-columns: minmax(0, 1fr) repeat(2, 28px);
+  gap: 4px;
+  padding: 10px 10px 6px;
 }
 
 .search-field {
   display: flex;
-  height: 30px;
+  height: 28px;
   align-items: center;
   gap: 7px;
   padding: 0 9px;
-  border: 1px solid var(--border);
+  border: 1px solid transparent;
   border-radius: var(--radius-field);
   color: var(--text-muted);
-  background: var(--surface-1);
+  background: var(--surface-2);
+  transition:
+    border-color 140ms ease,
+    box-shadow 160ms ease;
 
   &:focus-within {
     border-color: var(--color-primary);
@@ -86,17 +106,26 @@
 
 .icon-button {
   display: grid;
-  width: 30px;
-  height: 30px;
+  width: 28px;
+  height: 28px;
   place-items: center;
-  border: 1px solid var(--border);
+  border: 0;
   border-radius: var(--radius-field);
-  color: var(--text-secondary);
-  background: var(--surface-1);
+  color: var(--text-muted);
+  background: transparent;
+  transition:
+    color 140ms ease,
+    background-color 140ms ease;
 
-  &:hover {
+  &:hover:not(:disabled),
+  &:focus-visible:not(:disabled) {
     color: var(--text);
-    border-color: var(--border-strong);
+    background: var(--surface-2);
+    outline: 0;
+  }
+
+  &:disabled {
+    opacity: 0.35;
   }
 }
 
@@ -127,6 +156,8 @@ nav {
 
 .workspace-entry {
   --workspace-color: var(--accent);
+  /* Must clear every row action, or the name keeps a clickable strip underneath them. */
+  --workspace-actions-lane: 100px;
 
   position: relative;
   min-width: 0;
@@ -137,32 +168,24 @@ nav {
   display: grid;
   width: 100%;
   min-width: 0;
-  min-height: 44px;
-  grid-template-columns: 27px minmax(0, 1fr);
+  min-height: 42px;
+  grid-template-columns: 24px minmax(0, 1fr);
   align-items: center;
   justify-content: stretch;
-  gap: 7px;
-  padding: 7px 94px 7px 7px;
-  border: 1px solid transparent;
+  gap: 8px;
+  padding: 6px 8px;
+  border: 0;
   border-radius: var(--radius-field);
   color: var(--text-secondary);
   text-align: left;
   background: transparent;
   transition:
     color 140ms ease,
-    border-color 140ms ease,
-    background-color 140ms ease,
-    box-shadow 160ms ease;
-
-  &:hover {
-    color: var(--text);
-    background: var(--surface-raised);
-  }
+    background-color 140ms ease;
 
   &.active {
-    border-color: color-mix(in srgb, var(--workspace-color) 48%, var(--border));
     color: var(--text);
-    background: color-mix(in srgb, var(--workspace-color) 10%, var(--surface-1));
+    background: color-mix(in srgb, var(--workspace-color) 13%, var(--surface-1));
     box-shadow: inset 2px 0 0 var(--workspace-color);
 
     .workspace-glyph {
@@ -171,10 +194,22 @@ nav {
   }
 }
 
+// A workspace name gets the sidebar's full width in the state it is read in — at rest — and
+// yields the trailing lane only while the row actions are up, so no action ever covers the name.
+.workspace-entry:hover .workspace-item,
+.workspace-entry:focus-within .workspace-item {
+  padding-right: var(--workspace-actions-lane);
+}
+
+.workspace-entry:hover .workspace-item:not(.active) {
+  color: var(--text);
+  background: var(--surface-raised);
+}
+
 .workspace-glyph {
   display: grid;
-  width: 27px;
-  height: 27px;
+  width: 24px;
+  height: 24px;
   place-items: center;
   color: var(--text-muted);
 }
@@ -205,21 +240,20 @@ nav {
 .workspace-actions {
   position: absolute;
   z-index: 2;
-  top: 50%;
-  right: 6px;
+  top: 0;
+  right: 0;
+  bottom: 0;
   display: flex;
   align-items: center;
-  gap: 0;
-  padding: 0;
+  gap: 1px;
+  padding: 0 6px;
   opacity: 0;
   pointer-events: none;
-  transform: translateY(-50%);
   transition: opacity 140ms ease;
 }
 
 .workspace-entry:hover .workspace-actions,
-.workspace-entry:focus-within .workspace-actions,
-.workspace-item.active + .workspace-actions {
+.workspace-entry:focus-within .workspace-actions {
   opacity: 1;
   pointer-events: auto;
 }
