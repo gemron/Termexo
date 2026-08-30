@@ -77,7 +77,10 @@ const translations = {
       "Project folder, grid layout, which terminals were open, what model each was running, even the colour you picked — it all comes back with the workspace.",
     featureSessionTitle: "Nothing you close is lost",
     featureSessionBody:
-      "Find any past Claude Code or Codex session across your projects and reopen it with its full history intact.",
+      "Find any past Claude Code, Codex, or OpenCode session across your projects and reopen it with its full history intact.",
+    featureTasksTitle: "Hand a task to an agent",
+    featureTasksBody:
+      "Write down the task and what counts as done, pick an agent, and it opens as a real terminal that reports its own progress back to the board.",
     featureModelTitle: "Try a cheaper model on the same task",
     featureModelBody:
       "Point the same CLI at a different provider, switch back if the result is worse, and keep every key in secure storage.",
@@ -200,7 +203,10 @@ const translations = {
       "项目目录、网格布局、开过哪些终端、每个终端跑的什么模型，连你选的主题色，都跟着工作区一起回来。",
     featureSessionTitle: "关掉的东西没丢",
     featureSessionBody:
-      "翻出任意项目里的历史 Claude Code / Codex 会话，带着完整上下文重新打开。",
+      "翻出任意项目里的历史 Claude Code / Codex / OpenCode 会话，带着完整上下文重新打开。",
+    featureTasksTitle: "把一条任务交给 Agent",
+    featureTasksBody:
+      "写清楚任务和验收标准，选一个 Agent，它就变成一个真实终端，并把自己的进展回报到看板上。",
     featureModelTitle: "同一个活，换个便宜模型试试",
     featureModelBody:
       "把同一个 CLI 指向别的供应商，效果不好随时切回来，所有密钥都在系统安全存储里。",
