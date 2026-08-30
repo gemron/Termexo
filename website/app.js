@@ -10,7 +10,7 @@ const translations = {
     heroLine1: "One window.",
     heroLine2: "Every agent.",
     heroLead:
-      "Claude Code in one terminal, Codex in another, and three more you have stopped keeping track of. Termexo puts them all on one screen — you can see which one is waiting on you, pick up yesterday's conversation, and switch models without restarting anything.",
+      "Claude Code in one terminal, Codex in another, OpenCode in a third. Termexo puts them all on one screen — you can see which one is waiting on you, hand one a task straight off the board, pick up yesterday's conversation, and switch models without restarting anything.",
     runFromNpm: "Run it now",
     download: "Download installer",
     copyCommand: "Copy",
@@ -67,6 +67,13 @@ const translations = {
     modelCaption:
       "Keys are stored by Windows — the app only ever sees whether one exists",
 
+    taskTitle: "Hand the work to an agent.",
+    taskLead:
+      "Write down what needs doing and what counts as done, pick the agent and the project, and the task opens as a real terminal. It reports its own progress back to the board, so you can see what is running without reading four terminals at once.",
+    taskPoint1: "Todo, executing, completed, verified — the terminal moves the card",
+    taskPoint2: "Send a task to Claude Code, Codex, or OpenCode",
+    taskPoint3: "Reject a result with a note and it goes back for another round",
+    taskCaption: "A task carries its acceptance criteria from todo through to verified",
     capabilitiesTitle: "The things you keep doing by hand.",
     capabilitiesLead:
       "Most of the friction with coding agents is not the model. It is remembering which terminal was doing what, and setting it all up again tomorrow.",
@@ -147,7 +154,7 @@ const translations = {
     heroLine1: "一个窗口，",
     heroLine2: "装下所有 Agent。",
     heroLead:
-      "一个终端跑 Claude Code，另一个跑 Codex，还有三个开着但已经忘了在干嘛。Termexo 把它们收进同一块屏幕——谁在等你回话一眼就能看到，昨天聊到一半的会话点一下接着聊，换模型不用重开终端。",
+      "一个终端跑 Claude Code，另一个跑 Codex，第三个跑 OpenCode。Termexo 把它们收进同一块屏幕——谁在等你回话一眼就能看到，一条任务可以直接从看板丢给某个 Agent，昨天聊到一半的会话点一下接着聊，换模型不用重开终端。",
     runFromNpm: "立即运行",
     download: "下载安装包",
     copyCommand: "复制",
@@ -193,6 +200,13 @@ const translations = {
     modelPoint3: "一个项目里的 Claude 终端可以一次性全部切换",
     modelCaption: "密钥交给 Windows 保管，界面只知道「有没有」，看不到内容",
 
+    taskTitle: "把活儿交给 Agent。",
+    taskLead:
+      "写清楚要做什么、做到什么算完成，选好 Agent 和项目，这条任务就会变成一个真实终端。它会把自己的进展回报到看板上，你不用同时盯着四个终端也知道谁在跑。",
+    taskPoint1: "待办、执行中、已完成、已验收——卡片由终端自己推动",
+    taskPoint2: "任务可以交给 Claude Code、Codex 或 OpenCode",
+    taskPoint3: "验收不通过时写一句反馈，任务带着反馈回到执行中",
+    taskCaption: "一条任务带着验收标准从待办走到已验收",
     capabilitiesTitle: "那些你一直在手动做的事。",
     capabilitiesLead:
       "用 AI 写代码真正麻烦的往往不是模型，而是记住哪个终端在干什么，以及明天再把这一切重新搭一遍。",
