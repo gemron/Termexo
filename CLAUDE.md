@@ -141,7 +141,8 @@ compatibility with early installations — do not rename them.
   from the document root and must resolve to concrete hex values, not OKLCH-only tokens
   (`color-mix()` is a progressive enhancement only).
 - Prettier: `printWidth: 100`, single quotes, Angular parser for HTML.
-- The production build enforces bundle budgets (1100 kB initial, 20 kB per component stylesheet).
+- The production build enforces bundle budgets: the initial bundle errors above 1550 kB and warns
+  above 1450 kB, and any single component stylesheet errors above 24 kB and warns above 20 kB.
 
 ## Releasing
 
