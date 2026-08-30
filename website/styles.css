@@ -911,6 +911,9 @@ img {
 
 .bento-grid {
   display: grid;
+  /* Dense packing lets a single-column card backfill the hole a two-column card
+     leaves when it cannot start in the last column. */
+  grid-auto-flow: row dense;
   grid-template-columns: repeat(3, 1fr);
   gap: 12px;
 }
@@ -1210,6 +1213,41 @@ img {
   height: 100%;
   border-radius: inherit;
   background: var(--violet);
+}
+
+/* The task stages read as a chain: each label is a state a task moves through,
+   with the final one marked as reached. */
+.stage-flow {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-top: 39px;
+}
+
+.stage-flow > span {
+  padding: 6px 8px;
+  border: 1px solid var(--line-strong);
+  border-radius: 4px;
+  color: var(--text-muted);
+  background: #0c100e;
+  font: 10px/1 var(--mono);
+  white-space: nowrap;
+}
+
+.stage-flow > span.done {
+  border-color: var(--green);
+  color: var(--green);
+}
+
+.stage-flow > i {
+  flex: none;
+  width: 10px;
+  height: 1px;
+  background: repeating-linear-gradient(
+    90deg,
+    var(--line-strong) 0 4px,
+    transparent 4px 7px
+  );
 }
 
 .device-map {

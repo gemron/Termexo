@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta
       name="description"
-      content="Run Claude Code and Codex side by side in one window. See which agent is waiting on you, pick up yesterday's session, and switch models without restarting. Windows, local-first, no account."
+      content="Run Claude Code, Codex, and OpenCode side by side in one window. See which agent is waiting on you, pick up yesterday's session, and switch models without restarting. Windows, local-first, no account."
     />
     <meta name="theme-color" content="#0a0d0c" />
     <meta property="og:type" content="website" />
@@ -15,7 +15,7 @@
     />
     <meta
       property="og:description"
-      content="Claude Code in one terminal, Codex in another. Termexo puts them on one screen and tells you the moment one needs you."
+      content="Claude Code, Codex, and OpenCode on one screen. Termexo tells you the moment one needs you, and turns a task into a running agent."
     />
     <meta
       property="og:image"
@@ -39,7 +39,7 @@
             <img src="assets/termexo-mark.svg" alt="" />
           </span>
           <span>Termexo</span>
-          <small>0.3.10</small>
+          <small>0.6.0</small>
         </a>
 
         <nav
@@ -463,10 +463,27 @@
               <div class="card-icon orange" aria-hidden="true">↻</div>
               <h3 data-i18n="featureSessionTitle">Nothing you close is lost</h3>
               <p data-i18n="featureSessionBody">
-                Find any past Claude Code or Codex session across your projects
-                and reopen it with its full history intact.
+                Find any past Claude Code, Codex, or OpenCode session across your
+                projects and reopen it with its full history intact.
               </p>
-              <code>claude --resume · codex resume</code>
+              <code>claude --resume · codex resume · opencode --session</code>
+            </article>
+
+            <article class="bento bento-wide reveal" data-delay="2">
+              <span class="card-tag now" data-i18n="now">WORKS TODAY</span>
+              <div class="stage-flow" aria-hidden="true">
+                <span>todo</span><i></i><span>executing</span><i></i
+                ><span>completed</span><i></i><span class="done">verified</span>
+              </div>
+              <div>
+                <div class="card-icon violet" aria-hidden="true">☑</div>
+                <h3 data-i18n="featureTasksTitle">Hand a task to an agent</h3>
+                <p data-i18n="featureTasksBody">
+                  Write down the task and what counts as done, pick an agent,
+                  and it opens as a real terminal that reports its own progress
+                  back to the board.
+                </p>
+              </div>
             </article>
 
             <article class="bento reveal" data-delay="2">
@@ -524,18 +541,8 @@
               </div>
             </article>
 
-            <article class="bento reveal" data-delay="2">
-              <span class="card-tag planned" data-i18n="roadmapTag"
-                >COMING LATER</span
-              >
-              <div class="card-icon violet" aria-hidden="true">◔</div>
-              <h3 data-i18n="featureQuotaTitle">
-                See your quota before you burn it
-              </h3>
-              <p data-i18n="featureQuotaBody">
-                Check how much of your plan is left and when it resets, before
-                you decide which model to send the next task to.
-              </p>
+            <article class="bento bento-wide reveal" data-delay="2">
+              <span class="card-tag now" data-i18n="now">WORKS TODAY</span>
               <div class="quota-bars" aria-hidden="true">
                 <span
                   ><b>Anthropic</b><i><em style="width: 72%"></em></i
@@ -549,6 +556,16 @@
                   ><b>MiniMax</b><i><em style="width: 84%"></em></i
                   ><small>84%</small></span
                 >
+              </div>
+              <div>
+                <div class="card-icon violet" aria-hidden="true">◔</div>
+                <h3 data-i18n="featureQuotaTitle">
+                  See your quota before you burn it
+                </h3>
+                <p data-i18n="featureQuotaBody">
+                  Check how much of your plan is left and when it resets, before
+                  you decide which model to send the next task to.
+                </p>
               </div>
             </article>
 

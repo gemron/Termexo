@@ -49,8 +49,9 @@ npx termexo@latest
   <tr>
     <td width="50%" valign="top">
       <strong>四个 Agent，一块屏幕。</strong><br><br>
-      想开多少真实 PTY 终端就开多少，再选择当前要显示的终端，排成 1–6 行/列的自定义网格。
-      每个工作空间都会记住目录、标签、布局、模型和主题。
+      Claude Code、Codex 和 OpenCode 可以并排跑在真实 PTY 终端里，想开多少开多少，再选择当前
+      要显示的终端，排成 1–6 行/列的自定义网格。标签支持拖拽排序和中键关闭，工作台支持键盘
+      快捷键。每个工作空间都会记住目录、标签、布局、模型和主题。
       <br><br>
       <a href="website/assets/termexo-workbench.png"><img src="website/assets/termexo-workbench.png" alt="Termexo 多 Agent 工作台"></a>
     </td>
@@ -65,8 +66,9 @@ npx termexo@latest
   <tr>
     <td width="50%" valign="top">
       <strong>接着昨天的会话继续。</strong><br><br>
-      跨项目、账号、分支和模型搜索本机 Claude Code/Codex 会话。Termexo 调用 CLI 原生的
-      <code>claude --resume</code> 与 <code>codex resume</code> 恢复完整上下文，并始终只读原生会话文件。
+      跨项目、账号、分支和模型搜索本机 Claude Code/Codex/OpenCode 会话。Termexo 调用 CLI 原生的
+      <code>claude --resume</code>、<code>codex resume</code> 与 <code>opencode --session</code>
+      恢复完整上下文，也能接管 CLI 仍然持有的 Claude 后台会话，并始终只读原生会话文件。
       <br><br>
       <a href="website/assets/termexo-session-center.png"><img src="website/assets/termexo-session-center.png" alt="Termexo 原生会话中心"></a>
     </td>
@@ -76,6 +78,19 @@ npx termexo@latest
       供应商保存为 Profile，API Key 交给 Windows 凭据管理器保管，还能一次切换工作空间里的全部 Claude 终端。
       <br><br>
       <a href="website/assets/termexo-models.png"><img src="website/assets/termexo-models.png" alt="Termexo 模型供应商 Profile"></a>
+    </td>
+  </tr>
+  <tr>
+    <td width="50%" valign="top">
+      <strong>把一条任务直接跑成 Agent。</strong><br><br>
+      任务看板按项目管理任务，带优先级和验收标准。把任务交给 Claude Code、Codex 或 OpenCode，
+      它就变成一个真实终端，并随该终端上报的状态在待办、执行中、已完成、已验收之间流转。
+    </td>
+    <td width="50%" valign="top">
+      <strong>不用盯着一路点确认。</strong><br><br>
+      三个 Agent 都可以带自动确认启动——Claude 用 <code>--permission-mode auto</code>，Codex 用
+      <code>--approve-for-me</code>，OpenCode 用 <code>--auto</code>——终端上的 AUTO 标记在任意
+      Agent 下含义一致。
     </td>
   </tr>
 </table>
@@ -345,14 +360,15 @@ Termexo 以 **Workspace** 为组织单位，把这些信息集中到一个可观
 | ------------------ | --------------------------------------------------------------------------------- |
 | Workspace 管理     | 创建、改名、换色、手动排序和切换 Workspace，并持久化项目路径、布局与终端配置      |
 | 多终端工作台       | 不限终端数量、指定窗口显示、1–6 行列网格、终端/工作区最大化；桌面端启动真实 PTY   |
-| Claude Code 检测   | 在 Windows 上检测 `claude.exe` / `claude.cmd`、版本与健康状态                     |
-| 新建 Agent 会话    | 按目录启动 Claude/Codex，并选择隔离账号及 Agent 对应的模型配置                    |
-| Agent 会话中心     | 只读发现多账号 Claude/Codex 会话，支持搜索、Workspace 过滤与原生恢复              |
+| Agent 检测         | 在 Windows 上检测 Claude Code、Codex 与 OpenCode 的可执行文件、版本与健康状态     |
+| 新建 Agent 会话    | 按目录启动 Claude/Codex/OpenCode，选择隔离账号与 Agent 对应的模型配置，并可开启自动确认 |
+| Agent 会话中心     | 只读发现多账号 Claude/Codex/OpenCode 会话，支持搜索、Workspace 过滤、原生恢复，以及接管 CLI 仍持有的 Claude 后台会话 |
 | Agent 状态识别     | 为每个终端生成隔离 Hooks 设置，识别思考、工具调用、权限确认、用户输入和完成状态   |
 | 模型与 MCP Profile | 管理模型、Endpoint、API Key 与 MCP 配置；Claude CLI 可切换 Anthropic 兼容后端     |
 | 网络与 npm Profile | 按全局/Workspace 管理 HTTP/HTTPS/SOCKS 与 npm 配置，测试连通性并在启动时注入      |
 | 多账号管理         | 管理多个隔离 Claude 与 ChatGPT/Codex 登录、默认账号、认证状态和启动时选择         |
-| CLI 生命周期管理   | 预览、确认、安装或升级官方 Claude Code/Codex npm 包，并在完成后验证结果           |
+| CLI 生命周期管理   | 预览、确认、安装或升级官方 Claude Code/Codex/OpenCode npm 包，并在完成后验证结果  |
+| 任务看板           | 按项目管理任务，带优先级与验收标准；可将一条任务跑成 Claude/Codex/OpenCode 终端，并从待办跟踪到执行中、已完成、已验收 |
 | 提示词资产         | 按终端恢复实时草稿；搜索、收藏、置顶、删除和复用已提交提示词                     |
 | 会话交接           | 生成带脱敏和 Token 预算的 Git/任务包；导入导出文档并交给另一个 Agent 继续         |
 | 本地数据与密钥     | Workspace、会话索引和事件保存到 SQLite；API Key 保存到 Windows Credential Manager |
