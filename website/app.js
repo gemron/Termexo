@@ -96,8 +96,9 @@ const translations = {
 
     roadmapTitle: "What comes next.",
     roadmapLead:
-      "Everything above already works. Here is what is being built, and in what order — nothing on this list is being sold as finished.",
+      "Everything above already works. Here is what has shipped, and what is being built next — anything still marked planned is not being sold as finished.",
     current: "YOU ARE HERE",
+    shipped: "SHIPPED",
     planned: "PLANNED",
     roadmap02Title: "Run several agents side by side",
     roadmap02Body:
@@ -218,8 +219,9 @@ const translations = {
 
     roadmapTitle: "接下来做什么。",
     roadmapLead:
-      "上面写的都已经能用了。这里是正在做的部分和先后顺序——没有把还没做完的当成已完成来讲。",
+      "上面写的都已经能用了。这里是已经发布的部分和接下来要做的顺序——标着「计划中」的都还没做完，不会当成已完成来讲。",
     current: "现在在这",
+    shipped: "已发布",
     planned: "计划中",
     roadmap02Title: "几个 Agent 并排干活",
     roadmap02Body:
