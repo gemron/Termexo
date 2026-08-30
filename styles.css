@@ -1355,6 +1355,16 @@ img {
   box-shadow: inset 0 3px var(--green);
 }
 
+/* Delivered phases keep a dimmer version of the current phase's accent, so the
+   eye still lands on "you are here" first. */
+.roadmap-item.shipped {
+  box-shadow: inset 0 3px #295344;
+}
+
+.roadmap-item.shipped > div b {
+  color: var(--green);
+}
+
 .roadmap-item > div {
   display: flex;
   align-items: center;
