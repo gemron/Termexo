@@ -11,7 +11,7 @@
 </p>
 
 <p align="center">
-  <img alt="Version 0.5.0" src="https://img.shields.io/badge/version-0.5.0-58c7a0">
+  <img alt="Version 0.6.0" src="https://img.shields.io/badge/version-0.6.0-58c7a0">
   <img alt="Windows" src="https://img.shields.io/badge/platform-Windows-0078D4?logo=windows">
   <img alt="Tauri 2" src="https://img.shields.io/badge/Tauri-2-24C8DB?logo=tauri&logoColor=white">
   <img alt="Angular 22" src="https://img.shields.io/badge/Angular-22-DD0031?logo=angular">
@@ -34,9 +34,10 @@ Run the complete Windows app with one command—no Termexo account or server req
 npx termexo@latest
 ```
 
-> The current version is **V0.5.0**. It adds recoverable live prompt drafts, searchable prompt
-> history with favorites and pins, token-budgeted handoff documents, Git context extraction,
-> content redaction, and one-click continuation between Claude Code and Codex terminals.
+> The current version is **V0.6.0**. It adds OpenCode as a third first-class agent, a task board
+> that turns a task into a running agent terminal and tracks it from todo through verified,
+> automatic confirmation for every agent, Claude background-session reclaim, and a reworked
+> terminal workbench with tab reordering and keyboard shortcuts.
 
 ![Termexo multi-terminal grid workbench](website/assets/termexo-workbench.png)
 
@@ -357,6 +358,16 @@ the main toolbar and keep that choice across restarts.
 - Enforce a configurable Token budget and truncate bulky terminal output or Git diff without breaking UTF-8 content.
 - Export and import readable Markdown or machine-readable JSON handoff documents, then send the handoff directly to another Claude Code or Codex terminal to continue work.
 - Keep Chinese IME composition anchored to the active terminal caret when another terminal is producing output.
+
+## V0.6.0
+
+- Run OpenCode as a third first-class agent beside Claude Code and Codex, with the same launch, resume, restart-restore, and automatic-confirmation controls.
+- Turn a task into a running agent terminal from the task board: each task carries its project, agent, model, and acceptance criteria, and moves through todo, executing, completed, and verified as its terminal reports status.
+- Launch any agent with automatic confirmation — `--permission-mode auto` for Claude, `--approve-for-me` for Codex, and `--auto` for OpenCode — so the AUTO chip means the same thing whichever agent drew it.
+- Reclaim a Claude session the CLI still holds open through background-session inspection, fork, and attach, instead of starting a terminal that exits on its first message.
+- Reorder terminal tabs by dragging, close one with the middle mouse button, scroll the tab strip with the wheel, and drive the workbench from the keyboard.
+- Bound every CLI version and session probe with a timeout that terminates the whole Windows command tree, so an unresponsive agent no longer hangs the session centre.
+- Skip a single unreadable session record instead of failing the whole list, matching how the Claude and Codex transcript scanners already behave.
 
 ## Why Termexo
 

@@ -1,6 +1,7 @@
-import { Component, computed, input, output, signal } from '@angular/core';
+import { Component, computed, inject, input, output, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 
+import { I18nService } from '../core/i18n/i18n.service';
 import { TranslatePipe } from '../core/i18n/translate.pipe';
 import {
   AccountProfile,
@@ -12,7 +13,7 @@ import {
   resolveAccountProfileId,
   ModelProfile,
 } from '../core/models/agent.models';
-import { IconComponent } from '../shared/icon/icon';
+import { LaunchDialogShellComponent } from './launch-dialog-shell';
 
 export interface CodexLaunchDialogValue {
   name: string;
@@ -24,148 +25,119 @@ export interface CodexLaunchDialogValue {
 
 @Component({
   selector: 'app-codex-launch-dialog',
-  imports: [FormsModule, IconComponent, TranslatePipe],
+  imports: [FormsModule, LaunchDialogShellComponent, TranslatePipe],
   template: `
-    <div class="backdrop modal modal-open" (mousedown)="cancelled.emit()">
-      <section
-        class="agent-dialog compact codex-launch-dialog modal-box"
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="codex-launch-title"
-        (mousedown)="$event.stopPropagation()"
-      >
-        <header>
-          <div class="dialog-title">
-            <span class="title-icon"><app-icon name="terminal" [size]="17" /></span>
-            <div>
-              <h2 id="codex-launch-title">{{ 'launch.newCodex' | t }}</h2>
-              <p>{{ workingDirectory() }}</p>
-            </div>
-          </div>
-          <button
-            type="button"
-            class="btn btn-square btn-ghost btn-sm"
-            [title]="'common.close' | t"
-            [attr.aria-label]="'common.close' | t"
-            (click)="cancelled.emit()"
+    <app-launch-dialog-shell
+      icon="terminal"
+      [heading]="'launch.newCodex' | t"
+      [detecting]="'launch.detectingCodex' | t"
+      [installation]="installation()"
+      [workingDirectory]="workingDirectory()"
+      [canLaunch]="canLaunch()"
+      [launching]="launching()"
+      [blockedReason]="blockedReason()"
+      (launched)="submit()"
+      (cancelled)="cancelled.emit()"
+    >
+      <div class="form-grid">
+        <label class="wide session-name-field">
+          <span>{{ 'launch.sessionName' | t }}</span>
+          <input
+            type="text"
+            class="input input-bordered input-sm"
+            [placeholder]="'launch.codexNameExample' | t"
+            [ngModel]="name()"
+            (ngModelChange)="name.set($event)"
+          />
+        </label>
+        <label class="profile-field">
+          <span>{{ 'launch.modelProfile' | t }}</span>
+          <select
+            class="select select-bordered select-sm"
+            [ngModel]="resolvedProfileId()"
+            (ngModelChange)="onProfileChange($event)"
           >
-            <app-icon name="x" [size]="15" />
-          </button>
-        </header>
-
-        <div class="installation-line" [class.unavailable]="!installation()?.healthy">
-          <i></i>
-          <span>{{ installation()?.diagnostic ?? ('launch.detectingCodex' | t) }}</span>
-          <code>{{ installation()?.version ?? '' }}</code>
-        </div>
-
-        <div class="form-grid codex-launch-form">
-          <label class="wide session-name-field">
-            <span>{{ 'launch.sessionName' | t }}</span>
-            <input
-              type="text"
-              class="input input-bordered input-sm"
-              [placeholder]="'launch.codexNameExample' | t"
-              [ngModel]="name()"
-              (ngModelChange)="name.set($event)"
-              autofocus
-            />
-          </label>
-          <label class="profile-field">
-            <span>{{ 'launch.modelProfile' | t }}</span>
-            <select
-              class="select select-bordered select-sm"
-              [ngModel]="resolvedProfileId()"
-              (ngModelChange)="onProfileChange($event)"
-            >
-              @for (profile of codexProfiles(); track profile.id) {
-                <option [value]="profile.id">
-                  {{ profile.name }} · {{ modelOf(profile) }}
-                  @if (isNativeModel(profile)) {
-                    ({{ 'settings.nativeModel' | t }})
-                  }
-                </option>
-              }
-            </select>
-          </label>
-          <label class="account-field">
-            <span>{{ 'launch.chatgptAccount' | t }}</span>
-            <select
-              class="select select-bordered select-sm"
-              [ngModel]="resolvedAccountProfileId()"
-              (ngModelChange)="accountProfileId.set($event)"
-            >
-              @for (profile of codexAccounts(); track profile.id) {
-                <option [value]="profile.id">
-                  {{ profile.name }} ·
-                  {{
-                    profile.authenticated
-                      ? ('common.authenticated' | t)
-                      : ('common.unauthenticated' | t)
-                  }}
-                </option>
-              }
-            </select>
-            @if (selectedAccount() && !selectedAccount()?.authenticated) {
-              <small class="account-warning">{{ 'launch.accountNotAuthenticated' | t }}</small>
+            @for (profile of codexProfiles(); track profile.id) {
+              <option [value]="profile.id">
+                {{ profile.name }} · {{ modelOf(profile) }}
+                @if (isNativeModel(profile)) {
+                  ({{ 'settings.nativeModel' | t }})
+                }
+              </option>
             }
-          </label>
-          <label class="wide model-field">
-            <span>{{ 'launch.codexModel' | t }}</span>
-            <input
-              type="text"
-              class="input input-bordered input-sm"
-              list="codex-model-suggestions"
-              [placeholder]="'launch.codexModelPlaceholder' | t"
-              [attr.aria-label]="'launch.codexModel' | t"
-              [ngModel]="resolvedModel()"
-              (ngModelChange)="model.set($event)"
-            />
-            <datalist id="codex-model-suggestions">
-              @for (suggestion of modelSuggestions; track suggestion) {
-                <option [value]="suggestion"></option>
-              }
-            </datalist>
-            <small>{{ 'launch.codexModelHelp' | t }}</small>
-          </label>
-          <label class="wide checkbox-control auto-confirm-control">
-            <input
-              type="checkbox"
-              [ngModel]="autoConfirm()"
-              (ngModelChange)="autoConfirm.set($event)"
-            />
-            <span>
-              <strong>{{ 'launch.autoConfirm' | t }}</strong>
-              <small>{{ 'launch.autoConfirmHelp' | t }}</small>
-            </span>
-          </label>
-        </div>
-
-        <footer>
-          <button type="button" class="secondary btn btn-ghost btn-sm" (click)="cancelled.emit()">
-            {{ 'common.cancel' | t }}
-          </button>
-          <button
-            type="button"
-            class="primary btn btn-primary btn-sm"
-            [disabled]="!canLaunch()"
-            (click)="submit()"
+          </select>
+          @if (!codexProfiles().length) {
+            <small class="account-warning">{{ 'launch.noModelProfile' | t }}</small>
+          }
+        </label>
+        <label class="account-field">
+          <span>{{ 'launch.chatgptAccount' | t }}</span>
+          <select
+            class="select select-bordered select-sm"
+            [ngModel]="resolvedAccountProfileId()"
+            (ngModelChange)="accountProfileId.set($event)"
           >
-            <app-icon name="play" [size]="13" />{{ 'launch.start' | t }}
-          </button>
-        </footer>
-      </section>
-    </div>
+            @for (profile of codexAccounts(); track profile.id) {
+              <option [value]="profile.id">
+                {{ profile.name }} ·
+                {{
+                  profile.authenticated
+                    ? ('common.authenticated' | t)
+                    : ('common.unauthenticated' | t)
+                }}
+              </option>
+            }
+          </select>
+          @if (!codexAccounts().length) {
+            <small class="account-warning">{{ 'launch.noAccountProfile' | t }}</small>
+          } @else if (selectedAccount() && !selectedAccount()?.authenticated) {
+            <small class="account-warning">{{ 'launch.accountNotAuthenticated' | t }}</small>
+          }
+        </label>
+        <label class="wide model-field">
+          <span>{{ 'launch.codexModel' | t }}</span>
+          <input
+            type="text"
+            class="input input-bordered input-sm"
+            list="codex-model-suggestions"
+            [placeholder]="'launch.codexModelPlaceholder' | t"
+            [attr.aria-label]="'launch.codexModel' | t"
+            [ngModel]="resolvedModel()"
+            (ngModelChange)="model.set($event)"
+          />
+          <datalist id="codex-model-suggestions">
+            @for (suggestion of modelSuggestions; track suggestion) {
+              <option [value]="suggestion"></option>
+            }
+          </datalist>
+          <small>{{ 'launch.codexModelHelp' | t }}</small>
+        </label>
+        <label class="wide checkbox-control auto-confirm-control">
+          <input
+            type="checkbox"
+            [ngModel]="autoConfirm()"
+            (ngModelChange)="autoConfirm.set($event)"
+          />
+          <span>
+            <strong>{{ 'launch.autoConfirm' | t }}</strong>
+            <small>{{ 'launch.autoConfirmHelp' | t }}</small>
+          </span>
+        </label>
+      </div>
+    </app-launch-dialog-shell>
   `,
-  styleUrls: ['./agent-dialog.scss', './codex-launch-dialog.scss'],
+  styleUrls: ['./agent-dialog.scss', './launch-dialog.scss'],
 })
 export class CodexLaunchDialogComponent {
   readonly installation = input<AgentInstallation | null>(null);
   readonly profiles = input<ModelProfile[]>([]);
   readonly accountProfiles = input<AccountProfile[]>([]);
   readonly workingDirectory = input('');
+  readonly launching = input(false);
   readonly launched = output<CodexLaunchDialogValue>();
   readonly cancelled = output<void>();
+
+  private readonly i18n = inject(I18nService);
 
   protected readonly name = signal('');
   protected readonly model = signal('');
@@ -208,6 +180,18 @@ export class CodexLaunchDialogComponent {
       Boolean(this.resolvedProfileId()) &&
       Boolean(this.resolvedAccountProfileId()),
   );
+  protected readonly blockedReason = computed(() => {
+    if (this.canLaunch()) {
+      return '';
+    }
+    const installation = this.installation();
+    if (!installation?.healthy) {
+      return installation?.diagnostic ?? this.i18n.t('launch.detectingCodex');
+    }
+    return this.i18n.t(
+      this.resolvedProfileId() ? 'launch.noAccountProfile' : 'launch.noModelProfile',
+    );
+  });
 
   protected isNativeModel(profile: ModelProfile): boolean {
     return isNativeModel(profile, 'codex');

@@ -25,11 +25,6 @@
     0 24px 76px rgb(0 0 0 / 52%),
     inset 0 1px 0 color-mix(in oklab, white 4%, transparent);
 
-  &.compact {
-    width: min(520px, 100%);
-    grid-template-rows: 68px auto auto auto;
-  }
-
   > header {
     display: flex;
     align-items: center;
@@ -102,52 +97,6 @@
   }
 }
 
-.installation-line {
-  display: grid;
-  min-height: 34px;
-  grid-template-columns: 8px minmax(0, 1fr) auto;
-  align-items: center;
-  gap: 8px;
-  padding: 0 17px;
-  border-bottom: 1px solid var(--border);
-  color: var(--color-success);
-  background: var(--success-soft);
-  font-size: 10px;
-
-  i {
-    width: 7px;
-    height: 7px;
-    border-radius: 50%;
-    background: var(--color-success);
-  }
-
-  code {
-    color: var(--text-muted);
-    font: 9px/1 var(--mono);
-  }
-
-  &.unavailable {
-    color: var(--color-warning);
-    background: var(--warning-soft);
-
-    i {
-      background: var(--color-warning);
-    }
-  }
-}
-
-.form-grid {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 14px;
-  padding: 17px;
-
-  .wide {
-    grid-column: 1 / -1;
-  }
-}
-
-.form-grid label,
 .resume-options label,
 // A checkbox and its wording belong on one line; the grid below is for stacked fields.
 .profile-editor label.checkbox-control {
@@ -165,12 +114,6 @@
     font-size: 11px;
     font-weight: 560;
   }
-}
-
-.account-warning {
-  color: var(--color-warning);
-  font-size: 9px;
-  margin-top: 2px;
 }
 
 .model-type-label {
@@ -261,19 +204,6 @@ button:disabled {
   }
 }
 
-.agent-dialog .form-grid > label.auto-confirm-control {
-  display: flex;
-  align-items: start;
-
-  > input {
-    width: 13px;
-    height: 13px;
-    margin-top: 2px;
-    padding: 0;
-  }
-}
-
-.auto-confirm-control > span,
 .resume-auto-confirm > span {
   display: grid;
   gap: 2px;
@@ -1256,13 +1186,8 @@ button:disabled {
 
 @media (max-width: 720px) {
   .resume-options,
-  .form-grid,
   .two-columns {
     grid-template-columns: 1fr;
-  }
-
-  .form-grid .wide {
-    grid-column: auto;
   }
 
   .settings-split {

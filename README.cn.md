@@ -11,7 +11,7 @@
 </p>
 
 <p align="center">
-  <img alt="Version 0.5.0" src="https://img.shields.io/badge/version-0.5.0-58c7a0">
+  <img alt="Version 0.6.0" src="https://img.shields.io/badge/version-0.6.0-58c7a0">
   <img alt="Windows" src="https://img.shields.io/badge/platform-Windows-0078D4?logo=windows">
   <img alt="Tauri 2" src="https://img.shields.io/badge/Tauri-2-24C8DB?logo=tauri&logoColor=white">
   <img alt="Angular 22" src="https://img.shields.io/badge/Angular-22-DD0031?logo=angular">
@@ -33,9 +33,9 @@ Termexo 把 Claude Code、Codex 和围绕它们运行的终端收进一个可恢
 npx termexo@latest
 ```
 
-> 当前版本为 **V0.5.0**，新增可恢复的实时提示词草稿、可搜索/收藏/置顶的提示词历史、
-> 带 Token 预算的交接文档、Git 上下文提取、内容脱敏，以及 Claude Code 与 Codex
-> 终端之间的一键接力。
+> 当前版本为 **V0.6.0**，新增 OpenCode 第三个一等 Agent、可把任务直接跑成 Agent 终端
+> 并从待办跟踪到验收的任务看板、覆盖三个 Agent 的自动确认、Claude 后台会话接管，
+> 以及重做的终端工作台（标签拖拽排序、中键关闭、键盘快捷键）。
 
 ![Termexo 多终端网格工作台](website/assets/termexo-workbench.png)
 
@@ -315,6 +315,16 @@ SQLite，密钥保存在 Windows Credential Manager，Claude/Codex 历史会话�
 - 支持可配置 Token 预算，自动截断大段终端输出和 Git Diff，同时保证 UTF-8 内容完整。
 - 导入/导出可读 Markdown 或机器可读 JSON 交接文档，并把交接内容直接发送到另一个 Claude Code 或 Codex 终端继续工作。
 - 多终端同时输出时，将中文输入法候选框稳定锚定在当前终端光标处。
+
+## V0.6.0
+
+- OpenCode 升级为与 Claude Code、Codex 并列的一等 Agent，启动、恢复、重启还原和自动确认等控制项完全对齐。
+- 任务看板可把一条任务直接跑成 Agent 终端：任务携带项目、Agent、模型和验收标准，并随终端上报的状态在待办、执行中、已完成、已验收之间流转。
+- 三个 Agent 统一支持自动确认——Claude 用 `--permission-mode auto`，Codex 用 `--approve-for-me`，OpenCode 用 `--auto`——终端上的 AUTO 标记在任意 Agent 下含义一致。
+- 通过后台会话查看、fork 和 attach 接管 CLI 仍然持有的 Claude 会话，不再出现恢复后首条消息即退出的终端。
+- 终端标签支持拖拽排序、中键关闭、滚轮切换，工作台支持键盘快捷键操作。
+- CLI 版本探测和会话列表查询统一加上超时，并终止整个 Windows 命令树，避免无响应的 Agent 卡住会话中心。
+- 单条无法解析的会话记录不再导致整个列表失败，与 Claude、Codex 会话扫描的行为保持一致。
 
 ## 为什么做 Termexo
 

@@ -534,6 +534,7 @@
     [mcpProfiles]="agents.mcpProfiles()"
     [accountProfiles]="agents.accountProfiles()"
     [workingDirectory]="selectedTerminalDirectory() ?? ''"
+    [launching]="launchingClaude()"
     (launched)="launchClaude($event)"
     (cancelled)="closeClaudeLaunch()"
   />
@@ -545,6 +546,7 @@
     [profiles]="agents.modelProfiles()"
     [accountProfiles]="agents.accountProfiles()"
     [workingDirectory]="selectedTerminalDirectory() ?? ''"
+    [launching]="launchingCodex()"
     (launched)="launchCodex($event)"
     (cancelled)="closeCodexLaunch()"
   />
@@ -555,6 +557,7 @@
     <app-opencode-launch-dialog
       [installation]="agents.openCodeInstallation()"
       [workingDirectory]="selectedTerminalDirectory() ?? ''"
+      [launching]="launchingOpenCode()"
       (launched)="launchOpenCode($event)"
       (cancelled)="closeOpenCodeLaunch()"
     />
