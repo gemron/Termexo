@@ -56,3 +56,40 @@
 - `articles/06-v2ex.md`
 - `articles/07-ithome-submission.md`
 - `articles/08-short-posts.md`
+
+## V0.6.0 补充素材
+
+- 平台中立图文软文：`articles/09-v0.6-soft-article.md`
+- 掘金工程实践稿：`articles/10-juejin-v0.6.md`
+- CSDN 功能与安装稿：`articles/11-csdn-v0.6.md`
+- 知乎问题回答稿：`articles/12-zhihu-v0.6.md`
+- Medium 英文技术稿：`articles/13-medium-v0.6.md`
+- Product Hunt V0.6 发布字段：`articles/14-product-hunt-v0.6.md`
+- OSCHINA 开源项目稿：`articles/15-oschina-v0.6.md`
+- 微信公众号图文稿：`articles/16-wechat-v0.6.md`
+- 微信公众号可粘贴排版稿：`articles/16-wechat-v0.6.html`
+- V0.6 横版封面：`assets/termexo-cover-v0.6.png`
+- 任务看板真实截图：`assets/termexo-task-board.png`
+
+### V0.6 演示录屏
+
+由 `npm run capture:demo` 对真实桌面构建录制（不是演示动画），每个场景同时产出 MP4 与 GIF。
+MP4 用于官网、视频号与 Release Notes；GIF 用于公众号与 README，均已压到 10 MB 以内。
+
+| 文件（`media/`） | 内容 | 时长 | GIF 体积 |
+| --- | --- | --- | --- |
+| `termexo-workbench.mp4` / `.gif` | Claude Code 与 OpenCode 并排跑在网格里，标签与右侧状态面板实时变化 | 24 秒 | 2.1 MB |
+| `termexo-tasks.mp4` / `.gif` | 建任务 → 起真实 Agent 终端 → 回看板看流转 → 人工验收 | 21 秒 | 2.0 MB |
+| `termexo-sessions.mp4` / `.gif` | 会话中心列出本机原生会话，逐条可恢复 | 9 秒 | 0.7 MB |
+| `termexo-models.mp4` / `.gif` | 模型 Profile 与供应商配置 | 8 秒 | 1.0 MB |
+
+录制约束（脚本已强制，不要绕过）：
+
+- 全程在挪开真实数据库、且独立 WebView2 profile 的一次性实例中进行，画面里只有演示工作区
+  `shop-api`（`D:\devlop\termexo-demo`），不会出现真实项目名、路径或任务。
+- 终端里跑的是真实 Claude Code 与 OpenCode，工具调用和耗时都是实际发生的。
+- 中断后若残留 stash，用 `npm run capture:demo -- --restore` 还原真实数据库。
+
+补充文章覆盖 V0.4.4 之后的 V0.4.5、V0.5.0 与 V0.6.0，适合在公众号、掘金、知乎、
+OSCHINA 或 CSDN 按平台格式稍作调整后发布。封面由 OpenAI 图像模型参考 Termexo 当前界面生成；
+正文截图来自项目仓库。

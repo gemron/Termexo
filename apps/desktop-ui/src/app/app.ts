@@ -41,7 +41,6 @@ import {
 } from './core/models/workspace.models';
 import type { HandoffPackage, HandoffRecord } from './core/models/handoff';
 import type { PromptAsset } from './core/models/prompt-assets';
-import { AGENT_STARTUP_CONFIRM_KEY } from './core/models/agent-startup';
 import { TERMINAL_INPUT_SETTLE_MS, terminalPromptWrites } from './core/models/terminal-input';
 import type { TodoContinuationRequest, TodoTask } from './core/models/todo.models';
 import {
@@ -2453,11 +2452,13 @@ export class App {
 
   /**
    * Claude Code and Codex CLI both open on a folder-trust dialog, so the prompt has to wait until
-   * the startup dialogs are answered and the agent's input is actually listening.
+   * the startup dialogs are answered and the agent's input is actually listening. Claude's screen
+   * preselects "No, exit", so answering it means moving the highlight onto the option that grants
+   * trust rather than accepting whatever is highlighted.
    */
   private armTodoPrompt(terminalId: string, taskId: string, prompt: string): void {
     this.agentStartup.arm(terminalId, {
-      confirm: () => this.writeToTerminal(terminalId, AGENT_STARTUP_CONFIRM_KEY),
+      confirm: (writes) => this.writeTerminalSequence(terminalId, writes),
       submit: () => this.submitTodoPrompt(taskId, terminalId, prompt),
       onFailed: (message) => {
         this.todos.setExecutionError(taskId, message, terminalId);
@@ -2503,13 +2504,19 @@ export class App {
     void this.promptAssets.setDraft(workspace, terminal, content).catch(() => undefined);
   }
 
-  /** @see terminalPromptWrites for why the prompt cannot travel in a single write. */
-  private async deliverTerminalPrompt(
+  private deliverTerminalPrompt(
     terminalId: string,
     content: string,
     submit: boolean,
   ): Promise<void> {
-    const writes = terminalPromptWrites(content, submit);
+    return this.writeTerminalSequence(terminalId, terminalPromptWrites(content, submit));
+  }
+
+  /** @see terminalPromptWrites for why the keys cannot travel in a single write. */
+  private async writeTerminalSequence(
+    terminalId: string,
+    writes: readonly string[],
+  ): Promise<void> {
     for (const [index, data] of writes.entries()) {
       if (index > 0) {
         await this.settleTerminalInput();

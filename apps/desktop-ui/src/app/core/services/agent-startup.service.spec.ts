@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import {
+  AGENT_STARTUP_CONFIRM_KEY,
   AGENT_STARTUP_QUIET_MS,
   AGENT_STARTUP_SETTLE_FLOOR_MS,
   AGENT_STARTUP_TIMEOUT_MS,
@@ -8,13 +9,14 @@ import {
 import { AgentStartupService } from './agent-startup.service';
 
 const ESCAPE = String.fromCharCode(27);
-/** Mirrors the labels of Claude Code's current folder-trust screen. */
+const CURSOR_UP = '\x1b[A';
+/** Mirrors Claude Code's current folder-trust screen, which preselects the declining option. */
 const CLAUDE_TRUST_DIALOG = [
   'D:\\devlop\\Termexo',
   'Quick safety check: Is this a project you created or one you trust?',
   `${ESCAPE}[1mClaude Code'll be able to read, edit, and execute files here.${ESCAPE}[0m`,
-  '❯ 1. Yes, I trust this folder',
-  '  2. No, exit',
+  '  1. Yes, I trust this folder',
+  '❯ 2. No, exit',
 ].join('\n');
 /** A numbered picker with no wording we know, such as Codex CLI's first-run workspace gate. */
 const UNKNOWN_PICKER = ['› 1. Use the default setting', '  2. Change it'].join('\n');
@@ -43,6 +45,8 @@ describe('AgentStartupService', () => {
     service.ingest('terminal-1', CLAUDE_TRUST_DIALOG);
     await vi.advanceTimersByTimeAsync(AGENT_STARTUP_QUIET_MS);
     expect(handlers.calls).toEqual(['confirm']);
+    // Answering the preselected option would exit Claude, so the highlight moves onto "Yes" first.
+    expect(handlers.confirm).toHaveBeenCalledWith([CURSOR_UP, AGENT_STARTUP_CONFIRM_KEY]);
 
     service.ingest('terminal-1', READY_PROMPT);
     await vi.advanceTimersByTimeAsync(AGENT_STARTUP_QUIET_MS);
@@ -59,6 +63,7 @@ describe('AgentStartupService', () => {
     service.ingest('terminal-1', UNKNOWN_PICKER);
     await vi.advanceTimersByTimeAsync(AGENT_STARTUP_QUIET_MS);
     expect(handlers.calls).toEqual(['confirm']);
+    expect(handlers.confirm).toHaveBeenCalledWith([AGENT_STARTUP_CONFIRM_KEY]);
 
     service.ingest('terminal-1', READY_PROMPT);
     await vi.advanceTimersByTimeAsync(AGENT_STARTUP_QUIET_MS);

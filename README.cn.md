@@ -11,7 +11,7 @@
 </p>
 
 <p align="center">
-  <img alt="Version 0.6.0" src="https://img.shields.io/badge/version-0.6.0-58c7a0">
+  <img alt="Version 0.6.1" src="https://img.shields.io/badge/version-0.6.1-58c7a0">
   <img alt="Windows" src="https://img.shields.io/badge/platform-Windows-0078D4?logo=windows">
   <img alt="Tauri 2" src="https://img.shields.io/badge/Tauri-2-24C8DB?logo=tauri&logoColor=white">
   <img alt="Angular 22" src="https://img.shields.io/badge/Angular-22-DD0031?logo=angular">
@@ -33,7 +33,7 @@ Termexo 把 Claude Code、Codex 和围绕它们运行的终端收进一个可恢
 npx termexo@latest
 ```
 
-> 当前版本为 **V0.6.0**，新增 OpenCode 第三个一等 Agent、可把任务直接跑成 Agent 终端
+> 当前版本为 **V0.6.1**，新增 OpenCode 第三个一等 Agent、可把任务直接跑成 Agent 终端
 > 并从待办跟踪到验收的任务看板、覆盖三个 Agent 的自动确认、Claude 后台会话接管，
 > 以及重做的终端工作台（标签拖拽排序、中键关闭、键盘快捷键）。
 

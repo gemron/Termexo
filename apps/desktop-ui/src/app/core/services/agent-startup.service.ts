@@ -8,11 +8,12 @@ import {
   isAgentReadyForPrompt,
   isStartupConfirmation,
   normalizeStartupFrame,
+  startupConfirmationWrites,
 } from '../models/agent-startup';
 
 export interface AgentStartupRequest {
-  /** Answers a startup dialog by accepting the option the CLI already highlights. */
-  confirm: () => Promise<void>;
+  /** Answers a startup dialog by sending the keys that select and accept the option to proceed. */
+  confirm: (writes: readonly string[]) => Promise<void>;
   /** Hands the task prompt to the agent once its input is ready to receive one. */
   submit: () => Promise<void>;
   onFailed: (message: string) => void;
@@ -105,10 +106,12 @@ export class AgentStartupService {
       entry.confirmations < AGENT_STARTUP_MAX_CONFIRMATIONS
     ) {
       entry.confirmations += 1;
+      // The keys depend on which option is highlighted, so they are read before the frame resets.
+      const writes = startupConfirmationWrites(entry.frame);
       entry.frame = '';
       // A dialog that closes without repainting would otherwise wait out the deadline.
       this.scheduleSettledCheck(terminalId, entry);
-      void this.run(terminalId, entry, entry.confirm);
+      void this.run(terminalId, entry, () => entry.confirm(writes));
       return;
     }
 

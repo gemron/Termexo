@@ -2,6 +2,11 @@
 
 Release notes for every Termexo version, newest first. The current release is summarised in [README.md](README.md).
 
+## V0.6.1
+
+- Answer Claude Code's folder-trust screen by moving the highlight onto the option that grants trust. Its current build preselects "No, exit", so a task launched into a folder Claude had not seen before was declined by the automatic Enter instead of started.
+- Tighten the inspector rail — smaller type, shorter section headers, denser agent rows, session details, allowance cards, and activity entries — so a workspace with several terminals shows its whole status column without scrolling.
+
 ## V0.6.0
 
 - Run OpenCode as a third first-class agent beside Claude Code and Codex, with the same launch, resume, restart-restore, and automatic-confirmation controls.

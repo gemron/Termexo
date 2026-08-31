@@ -3,13 +3,15 @@
   min-width: 0;
   border-left: 1px solid var(--border);
   background: var(--surface-0);
+  font-size: 12px;
+  line-height: 1.4;
 }
 
 .inspector {
   display: grid;
   height: 100%;
   min-height: 0;
-  grid-template-rows: 56px minmax(0, 1fr);
+  grid-template-rows: 52px minmax(0, 1fr);
 }
 
 .inspector-heading {
@@ -33,13 +35,13 @@
 
   strong {
     color: var(--text);
-    font-size: 13px;
+    font-size: 12px;
     font-weight: 650;
     letter-spacing: 0.01em;
   }
 
   small {
-    margin-top: 3px;
+    margin-top: 2px;
     color: var(--text-muted);
     font: 11px/1.2 var(--mono);
   }
@@ -47,8 +49,8 @@
 
 .terminal-count {
   display: grid;
-  min-width: 24px;
-  height: 22px;
+  min-width: 22px;
+  height: 20px;
   flex: none;
   padding: 0 6px;
   place-items: center;
@@ -89,12 +91,12 @@
 
 section {
   border-bottom: 1px solid var(--border);
-  padding: 0 12px 14px;
+  padding: 0 12px 10px;
 }
 
 .section-header {
   display: flex;
-  height: 40px;
+  height: 30px;
   align-items: center;
   justify-content: space-between;
   gap: 8px;
@@ -105,8 +107,8 @@ section {
 
   small {
     display: grid;
-    min-width: 22px;
-    height: 20px;
+    min-width: 20px;
+    height: 18px;
     flex: none;
     padding: 0 6px;
     place-items: center;
@@ -119,16 +121,16 @@ section {
 
 .agent-list {
   display: grid;
-  gap: 5px;
+  gap: 4px;
 }
 
 .agent-row {
   display: grid;
   min-width: 0;
-  grid-template-columns: 30px minmax(0, 1fr) auto;
+  grid-template-columns: 24px minmax(0, 1fr) auto;
   align-items: center;
-  gap: 9px;
-  padding: 8px;
+  gap: 8px;
+  padding: 6px 8px;
   border: 1px solid var(--border);
   border-radius: var(--radius-field);
   background: var(--surface-raised);
@@ -169,8 +171,8 @@ section {
 }
 
 .agent-avatar {
-  width: 30px;
-  height: 30px;
+  width: 24px;
+  height: 24px;
   color: var(--color-primary);
   background: var(--primary-soft);
 
@@ -193,12 +195,13 @@ section {
 
   strong {
     color: var(--text);
-    font-size: 13px;
+    font-size: 12px;
     font-weight: 620;
+    line-height: 1.35;
   }
 
   small {
-    margin-top: 3px;
+    margin-top: 1px;
     color: var(--text-muted);
     font: 11px/1.2 var(--mono);
   }
@@ -265,9 +268,9 @@ section {
 
 .details dl {
   display: grid;
-  gap: 7px;
+  gap: 5px;
   margin: 0;
-  padding: 10px;
+  padding: 8px;
   border: 1px solid var(--border);
   border-radius: var(--radius-field);
   background: var(--surface-raised);
@@ -304,7 +307,7 @@ section {
 
 .quota-panel {
   display: grid;
-  gap: 8px;
+  gap: 6px;
 }
 
 .quota-refresh,
@@ -357,7 +360,7 @@ section {
 .quota-scope-toggle {
   width: 100%;
   border-color: var(--border);
-  padding: 6px 10px;
+  padding: 5px 8px;
   font-size: 11px;
 
   &[aria-pressed='true'] {
@@ -368,7 +371,7 @@ section {
 }
 
 .quota-row {
-  padding: 10px;
+  padding: 8px;
   border: 1px solid var(--border);
   border-radius: var(--radius-field);
   background: var(--surface-raised);
@@ -383,7 +386,7 @@ section {
   strong {
     overflow: hidden;
     color: var(--text);
-    font-size: 13px;
+    font-size: 12px;
     font-weight: 620;
     text-overflow: ellipsis;
     white-space: nowrap;
@@ -398,8 +401,8 @@ section {
 }
 
 .quota-entry {
-  margin-top: 10px;
-  padding-top: 10px;
+  margin-top: 8px;
+  padding-top: 8px;
   border-top: 1px solid var(--border);
 
   /* Warns without recolouring the reading itself, which still reads as consumption. */
@@ -444,7 +447,7 @@ section {
 
   b {
     color: var(--text);
-    font-size: 15px;
+    font-size: 14px;
     font-weight: 680;
     font-variant-numeric: tabular-nums;
     letter-spacing: -0.01em;
@@ -454,7 +457,7 @@ section {
 .quota-meter {
   overflow: hidden;
   height: 6px;
-  margin: 8px 0 7px;
+  margin: 6px 0 5px;
   border-radius: 999px;
   background: var(--surface-inset);
 
@@ -500,8 +503,8 @@ section {
 
 .quota-unavailable,
 .quota-checked {
-  margin-top: 9px;
-  padding-top: 9px;
+  margin-top: 8px;
+  padding-top: 8px;
   border-top: 1px solid var(--border);
 }
 
@@ -510,7 +513,7 @@ section {
 }
 
 .quota-empty {
-  padding: 10px;
+  padding: 8px;
   border: 1px dashed var(--border);
   border-radius: var(--radius-field);
   color: var(--text-muted);
@@ -521,15 +524,15 @@ section {
 
 .event-row {
   display: grid;
-  grid-template-columns: 24px minmax(0, 1fr);
+  grid-template-columns: 20px minmax(0, 1fr);
   align-items: start;
-  gap: 9px;
-  padding: 7px 0;
+  gap: 8px;
+  padding: 5px 0;
 
   &.attention,
   &.completed {
     margin: 2px -6px;
-    padding: 8px 6px;
+    padding: 6px;
     border-radius: var(--radius-field);
   }
 
@@ -559,7 +562,7 @@ section {
 
   small {
     overflow: hidden;
-    margin-top: 3px;
+    margin-top: 2px;
     color: var(--text-muted);
     font: 11px/1.35 var(--mono);
     text-overflow: ellipsis;
@@ -567,7 +570,7 @@ section {
   }
 
   time {
-    margin-top: 3px;
+    margin-top: 2px;
     color: color-mix(in srgb, var(--text-muted) 78%, transparent);
     font: 10px/1 var(--mono);
     font-variant-numeric: tabular-nums;
@@ -575,8 +578,8 @@ section {
 }
 
 .event-icon {
-  width: 24px;
-  height: 24px;
+  width: 20px;
+  height: 20px;
   color: var(--info);
   background: var(--info-soft);
 
@@ -587,7 +590,7 @@ section {
 }
 
 .inline-empty {
-  margin: 10px 0;
+  margin: 8px 0;
   color: var(--text-muted);
   font-size: 12px;
   text-align: center;

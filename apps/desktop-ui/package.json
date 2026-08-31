@@ -1,11 +1,12 @@
 {
   "name": "desktop-ui",
-  "version": "0.6.0",
+  "version": "0.6.1",
   "scripts": {
     "ng": "node scripts/run-angular.mjs",
     "start": "node scripts/run-angular.mjs serve",
     "build": "node scripts/run-angular.mjs build",
     "capture:readme": "node scripts/capture-readme.mjs",
+    "capture:demo": "node scripts/capture-demo.mjs",
     "watch": "node scripts/run-angular.mjs build --watch --configuration development",
     "test": "node scripts/run-angular.mjs test",
     "e2e:smoke": "node scripts/smoke.mjs",
