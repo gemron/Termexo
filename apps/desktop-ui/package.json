@@ -1,6 +1,6 @@
 {
   "name": "desktop-ui",
-  "version": "0.6.1",
+  "version": "0.6.2",
   "scripts": {
     "ng": "node scripts/run-angular.mjs",
     "start": "node scripts/run-angular.mjs serve",

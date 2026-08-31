@@ -33,6 +33,14 @@ import { createTerminalTheme } from './terminal-theme';
 /** `MouseEvent.button` value for the right button. */
 const RIGHT_MOUSE_BUTTON = 2;
 
+/**
+ * Row spacing, as a multiple of the font's own line height.
+ *
+ * 1 is what the Windows console draws, so the same command reads identically inside Termexo and
+ * in a native terminal. Anything above it visibly loosens dense output such as diffs and logs.
+ */
+const TERMINAL_LINE_HEIGHT = 1;
+
 @Component({
   selector: 'app-terminal-panel',
   imports: [IconComponent, TranslatePipe],
@@ -49,7 +57,7 @@ export class TerminalPanelComponent implements AfterViewInit {
     cursorStyle: 'bar',
     fontFamily: terminalFontFamily(DEFAULT_TERMINAL_FONT_NAME),
     fontSize: 12,
-    lineHeight: 1.35,
+    lineHeight: TERMINAL_LINE_HEIGHT,
     scrollback: 10_000,
     scrollOnUserInput: true,
     smoothScrollDuration: 0,

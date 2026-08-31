@@ -11,7 +11,7 @@
 </p>
 
 <p align="center">
-  <img alt="Version 0.6.1" src="https://img.shields.io/badge/version-0.6.1-58c7a0">
+  <img alt="Version 0.6.2" src="https://img.shields.io/badge/version-0.6.2-58c7a0">
   <img alt="Windows" src="https://img.shields.io/badge/platform-Windows-0078D4?logo=windows">
   <img alt="Tauri 2" src="https://img.shields.io/badge/Tauri-2-24C8DB?logo=tauri&logoColor=white">
   <img alt="Angular 22" src="https://img.shields.io/badge/Angular-22-DD0031?logo=angular">
@@ -34,7 +34,7 @@ Run the complete Windows app with one command—no Termexo account or server req
 npx termexo@latest
 ```
 
-> The current version is **V0.6.1**. It adds OpenCode as a third first-class agent, a task board
+> The current version is **V0.6.2**. It adds OpenCode as a third first-class agent, a task board
 > that turns a task into a running agent terminal and tracks it from todo through verified,
 > automatic confirmation for every agent, Claude background-session reclaim, and a reworked
 > terminal workbench with tab reordering and keyboard shortcuts.

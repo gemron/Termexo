@@ -2,6 +2,10 @@
 
 Release notes for every Termexo version, newest first. The current release is summarised in [README.md](README.md).
 
+## V0.6.2
+
+- Draw terminal rows at the font's own line height, the spacing the Windows console uses. Rows were 35% taller than a native terminal, which loosened dense output and broke box-drawing frames apart between lines.
+
 ## V0.6.1
 
 - Answer Claude Code's folder-trust screen by moving the highlight onto the option that grants trust. Its current build preselects "No, exit", so a task launched into a folder Claude had not seen before was declined by the automatic Enter instead of started.
