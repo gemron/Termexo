@@ -1,7 +1,12 @@
 import { describe, expect, it } from 'vitest';
 
 import type { PromptAsset } from './prompt-assets';
-import { buildHandoffPackage, handoffToMarkdown, parseHandoffDocument } from './handoff';
+import {
+  buildHandoffPackage,
+  handoffToMarkdown,
+  hasSubstantiveContext,
+  parseHandoffDocument,
+} from './handoff';
 import type { TerminalSession, Workspace } from './workspace.models';
 
 const workspace: Workspace = {
@@ -127,5 +132,50 @@ describe('handoff package', () => {
 
     expect(parseHandoffDocument(handoffToMarkdown(handoff))).toEqual(handoff);
     expect(parseHandoffDocument(JSON.stringify(handoff))).toEqual(handoff);
+  });
+
+  it('reports a package with no evidence as thin, so an empty handoff is not sent silently', () => {
+    const emptyGit = {
+      available: false,
+      branch: '',
+      status: '',
+      changedFiles: [],
+      diff: '',
+      recentCommits: [],
+      truncated: false,
+      diagnostic: '',
+    };
+    const thin = buildHandoffPackage({
+      workspace,
+      terminals: [terminal],
+      sourceTerminalId: terminal.id,
+      scope: 'terminal',
+      promptAssets: [],
+      agentSessions: [],
+      outputByTerminal: new Map(),
+      git: emptyGit,
+      tokenBudget: 2_000,
+      id: 'handoff-thin',
+    });
+
+    // Task and summary still resolve through their fallbacks, so the package looks complete.
+    expect(thin.task).toBeTruthy();
+    expect(thin.summary).toBeTruthy();
+    expect(hasSubstantiveContext(thin)).toBe(false);
+
+    const substantive = buildHandoffPackage({
+      workspace,
+      terminals: [terminal],
+      sourceTerminalId: terminal.id,
+      scope: 'terminal',
+      promptAssets: [prompt],
+      agentSessions: [],
+      outputByTerminal: new Map(),
+      git: { ...emptyGit, changedFiles: ['src/app/app.ts'] },
+      tokenBudget: 2_000,
+      id: 'handoff-substantive',
+    });
+
+    expect(hasSubstantiveContext(substantive)).toBe(true);
   });
 });

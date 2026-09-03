@@ -9,9 +9,11 @@ import {
 } from '@angular/core';
 
 import {
+  type AccountProfile,
   AccountProfileInput,
   AgentProtocol,
   BackgroundSessionResolution,
+  type AgentInstallation,
   ClaudeBackgroundSession,
   CliOperationPlan,
   CliOperationRequest,
@@ -69,12 +71,13 @@ import { AgentStartupService } from './core/services/agent-startup.service';
 import { TodoService } from './core/services/todo.service';
 import { isTauriRuntime } from './core/services/tauri-runtime';
 import { UpdateCheck, UpdateService } from './core/services/update.service';
+import { WindowControlsService } from './core/services/window-controls.service';
 import {
   TerminalExitEvent,
   terminalEventMatchesSession,
   TerminalGatewayService,
 } from './core/services/terminal-gateway.service';
-import { AgentSettingsDialogComponent, SettingsTab } from './dialogs/agent-settings-dialog';
+import { AgentSettingsDialogComponent, type SettingsTab } from './dialogs/agent-settings-dialog';
 import {
   ClaudeLaunchDialogComponent,
   ClaudeLaunchDialogValue,
@@ -92,6 +95,7 @@ import {
   WorkspaceAppearanceValue,
 } from './dialogs/edit-workspace-dialog';
 import { MergeWorkspaceDialogComponent } from './dialogs/merge-workspace-dialog';
+import { AccountSwitchDialogComponent } from './dialogs/account-switch-dialog';
 import { ModelSwitchDialogComponent, ModelSwitchValue } from './dialogs/model-switch-dialog';
 import {
   HandoffDialogComponent,
@@ -146,6 +150,16 @@ const DEFAULT_ALERT_THRESHOLD = 80;
 const QUOTA_ACTIVITY_CHECK_INTERVAL_MS = 30_000;
 /** Keeps a short completed model turn eligible for the next automatic refresh. */
 const QUOTA_RECENT_ACTIVITY_WINDOW_MS = 90_000;
+/**
+ * How a finished sign-in is noticed.
+ *
+ * The login CLI writes its credentials the moment the browser flow returns, but it does not
+ * necessarily exit — waiting for the process to end can mean waiting forever. Polling the
+ * account instead catches the new state a few seconds after the user finishes, whether or not
+ * the terminal is still open.
+ */
+const ACCOUNT_LOGIN_POLL_INTERVAL_MS = 4_000;
+const ACCOUNT_LOGIN_POLL_TIMEOUT_MS = 300_000;
 const TERMINAL_FONT_NAME_STORAGE_KEY = 'termexo.terminalFontName';
 
 function readStoredBoolean(key: string, fallback: boolean): boolean {
@@ -190,6 +204,7 @@ function readStoredString(key: string, fallback: string): string {
     InspectorPanelComponent,
     LanguageSelectorComponent,
     MergeWorkspaceDialogComponent,
+    AccountSwitchDialogComponent,
     ModelSwitchDialogComponent,
     PromptLibraryDialogComponent,
     SessionCenterDialogComponent,
@@ -223,6 +238,7 @@ export class App {
   protected readonly agents = inject(AgentService);
   protected readonly i18n = inject(I18nService);
   protected readonly updates = inject(UpdateService);
+  protected readonly windowControls = inject(WindowControlsService);
   private readonly directoryPicker = inject(DirectoryPickerService);
   private readonly desktopNotifications = inject(DesktopNotificationService);
   private readonly terminalGateway = inject(TerminalGatewayService);
@@ -249,6 +265,10 @@ export class App {
   protected readonly openCodeLaunchOpen = signal(false);
   protected readonly sessionCenterOpen = signal(false);
   protected readonly promptLibraryOpen = signal(false);
+  /** Empty until the shell reports it, and in browser preview, where there is no packaged build. */
+  protected readonly appVersion = signal('');
+  /** Login terminal id to the account it signs in, so its exit can refresh that account. */
+  private readonly pendingAccountLogins = new Map<string, string>();
   protected readonly handoffOpen = signal(false);
   protected readonly handoffPreview = signal<HandoffPackage | null>(null);
   protected readonly settingsOpen = signal(false);
@@ -267,6 +287,31 @@ export class App {
     }
     return (
       this.state.activeWorkspace()?.terminals.find((item) => item.id === terminalId)?.name ?? ''
+    );
+  });
+  protected readonly accountSwitchOpen = signal(false);
+  /** Terminal the account switch applies to; accounts are always switched one terminal at a time. */
+  protected readonly accountSwitchTerminalId = signal<string | null>(null);
+  protected readonly accountSwitchAgentType = signal<AgentProtocol | null>(null);
+  protected readonly accountSwitchTerminal = computed(() => {
+    const terminalId = this.accountSwitchTerminalId();
+    if (!terminalId) {
+      return null;
+    }
+    return this.state.activeWorkspace()?.terminals.find((item) => item.id === terminalId) ?? null;
+  });
+  /** Resolved the same way the terminal's own chip is labelled, so both name one account. */
+  protected readonly accountSwitchCurrentId = computed(() => {
+    const terminal = this.accountSwitchTerminal();
+    if (!terminal || (terminal.agentType !== 'claude' && terminal.agentType !== 'codex')) {
+      return '';
+    }
+    return (
+      resolveAccountProfileId(
+        this.agents.accountProfiles(),
+        terminal.agentType,
+        terminal.accountProfileId,
+      ) ?? ''
     );
   });
   /** Profile currently running in the one-terminal switcher. Batch switches have no single current item. */
@@ -494,6 +539,7 @@ export class App {
       }
     });
     void this.terminalGateway.onExit((event) => this.handleTerminalExit(event));
+    void this.loadAppVersion();
     // Reads allowances when the panel opens, then keeps them current while the selected model is
     // producing Agent events. The non-forced refresh preserves the backend's provider-specific
     // cache windows; the button remains the explicit way to bypass those caches.
@@ -549,7 +595,35 @@ export class App {
    * An agent that never starts — a missing executable, a rejected credential, a CLI that exits
    * immediately — otherwise leaves a tile sitting at "running" with nothing behind it.
    */
+  /**
+   * Reads the packaged version from the shell rather than from a duplicated constant — the
+   * version already lives in several manifests and adding another copy would be one more thing
+   * to forget on release. Browser preview has no package to ask, so the label stays hidden.
+   */
+  private async loadAppVersion(): Promise<void> {
+    if (!isTauriRuntime()) {
+      return;
+    }
+    try {
+      const { getVersion } = await import('@tauri-apps/api/app');
+      this.appVersion.set(await getVersion());
+    } catch {
+      // The label is informational; failing to read it must not disturb startup.
+    }
+  }
+
   private handleTerminalExit(event: TerminalExitEvent): void {
+    // The login CLI writes its credentials before exiting, so its exit is a reliable moment for
+    // the final read — and ends the poll early instead of letting it run to the timeout when the
+    // user abandoned the flow. Checked before the terminal lookup because the login terminal may
+    // already have been closed. The poll is what actually catches a success, since the CLI often
+    // keeps running after the browser returns.
+    const loggingInProfileId = this.pendingAccountLogins.get(event.terminalId);
+    if (loggingInProfileId !== undefined) {
+      this.pendingAccountLogins.delete(event.terminalId);
+      void this.refreshAccountAfterLogin(loggingInProfileId);
+    }
+
     const terminal = this.state
       .workspaces()
       .flatMap((workspace) => workspace.terminals)
@@ -602,7 +676,23 @@ export class App {
     }
 
     this.selectedTerminalDirectory.set(workingDirectory);
+    this.refreshAccountsFor('claude');
     this.claudeLaunchOpen.set(true);
+  }
+
+  /**
+   * Re-reads one agent's accounts in the background, without holding up the dialog.
+   *
+   * The launch dialog renders each account's signed-in state from the cached list, which only
+   * changes when something asks the CLI. A sign-in finished after the app started — including
+   * one done in Termexo's own login terminal — would otherwise still read as signed out here.
+   */
+  private refreshAccountsFor(agentType: AccountProfile['agentType']): void {
+    for (const profile of this.agents.accountProfiles()) {
+      if (profile.agentType === agentType) {
+        void this.agents.refreshAccountProfile(profile.id).catch(() => undefined);
+      }
+    }
   }
 
   protected async openCodexLaunch(): Promise<void> {
@@ -612,6 +702,7 @@ export class App {
       return;
     }
     this.selectedTerminalDirectory.set(workingDirectory);
+    this.refreshAccountsFor('codex');
     this.codexLaunchOpen.set(true);
   }
 
@@ -661,6 +752,7 @@ export class App {
       this.openCodeLaunchOpen.set(false);
       this.selectedTerminalDirectory.set(null);
       if (terminal) {
+        this.armStartupDialogs(terminal.id);
         this.showToast(this.i18n.t('terminal.started', { name: terminal.name }));
       }
     } catch (error) {
@@ -722,6 +814,7 @@ export class App {
       this.codexLaunchOpen.set(false);
       this.selectedTerminalDirectory.set(null);
       if (terminal) {
+        this.armStartupDialogs(terminal.id);
         this.showToast(this.i18n.t('terminal.started', { name: terminal.name }));
       }
     } catch (error) {
@@ -776,6 +869,7 @@ export class App {
       this.claudeLaunchOpen.set(false);
       this.selectedTerminalDirectory.set(null);
       if (terminal) {
+        this.armStartupDialogs(terminal.id);
         this.showToast(this.i18n.t('terminal.started', { name: terminal.name }));
       }
     } catch (error) {
@@ -886,6 +980,7 @@ export class App {
       });
       this.sessionCenterOpen.set(false);
       if (terminal) {
+        this.armStartupDialogs(terminal.id);
         this.showToast(this.i18n.t('terminal.resuming', { name: value.session.title }));
       }
     } catch (error) {
@@ -1174,7 +1269,7 @@ export class App {
 
   protected async importHandoff(): Promise<void> {
     try {
-      const handoff = await this.handoffs.importPackage();
+      const handoff = await this.handoffs.importPackage(this.state.activeWorkspace()?.id);
       if (handoff) {
         this.handoffPreview.set(handoff);
         this.showToast(this.i18n.t('handoff.imported'));
@@ -1336,6 +1431,31 @@ export class App {
   protected toggleWorkspaceMaximize(): void {
     this.workspaceMaximized.update((maximized) => !maximized);
     this.requestTerminalRefit();
+  }
+
+  protected async minimizeWindow(): Promise<void> {
+    await this.runWindowControl(() => this.windowControls.minimize());
+  }
+
+  protected async toggleWindowMaximize(): Promise<void> {
+    await this.runWindowControl(() => this.windowControls.toggleMaximize());
+    this.requestTerminalRefit();
+  }
+
+  protected async closeWindow(): Promise<void> {
+    await this.runWindowControl(() => this.windowControls.close());
+  }
+
+  /**
+   * The window buttons replace the native title bar, so a failure would otherwise look like a
+   * dead button — the toast is the only place the user can find out why nothing happened.
+   */
+  private async runWindowControl(action: () => Promise<void>): Promise<void> {
+    try {
+      await action();
+    } catch (error) {
+      this.showToast(this.errorMessage(error));
+    }
   }
 
   protected toggleWorkspaceSidebar(): void {
@@ -1821,18 +1941,102 @@ export class App {
     this.modelSwitchOpen.set(true);
   }
 
+  /** Opens the account switcher; only the two hosted Agents run on an account of their own. */
+  protected openAccountSwitch(terminalId: string): void {
+    const terminal = this.state.activeWorkspace()?.terminals.find((item) => item.id === terminalId);
+    if (!terminal || (terminal.agentType !== 'claude' && terminal.agentType !== 'codex')) {
+      return;
+    }
+    this.accountSwitchTerminalId.set(terminalId);
+    this.accountSwitchAgentType.set(terminal.agentType);
+    this.accountSwitchOpen.set(true);
+  }
+
+  protected closeAccountSwitch(): void {
+    this.accountSwitchOpen.set(false);
+    this.accountSwitchTerminalId.set(null);
+    this.accountSwitchAgentType.set(null);
+  }
+
+  /**
+   * Restarts one terminal on a different login account.
+   *
+   * The account reaches the CLI as an environment variable naming its configuration directory,
+   * which a live PTY cannot be told about, so the terminal has to be closed and started again.
+   * The launch command is built first, so a failure there leaves the running session untouched.
+   * Its native session lives in the previous account's directory and cannot be resumed under the
+   * new one, which is why the restart deliberately begins a new session.
+   */
+  protected async switchAccount(accountProfileId: string): Promise<void> {
+    const terminal = this.accountSwitchTerminal();
+    if (!terminal || (terminal.agentType !== 'claude' && terminal.agentType !== 'codex')) {
+      this.closeAccountSwitch();
+      return;
+    }
+    const isClaude = terminal.agentType === 'claude';
+    if (isClaude ? this.launchingClaude() : this.launchingCodex()) {
+      return;
+    }
+    // The dialog disables the current account; this also stops a stale event from restarting a
+    // terminal onto the account it is already running.
+    if (accountProfileId === this.accountSwitchCurrentId()) {
+      this.closeAccountSwitch();
+      return;
+    }
+
+    const workspaceId = this.state.activeWorkspace()?.id;
+    const original = { ...terminal };
+    (isClaude ? this.launchingClaude : this.launchingCodex).set(true);
+    try {
+      const launch = isClaude
+        ? await this.agents.prepareLaunch({
+            terminalId: original.id,
+            workspaceId,
+            profileId: original.profileId,
+            mcpProfileId: original.mcpProfileId,
+            accountProfileId,
+            autoConfirm: original.autoConfirm,
+          })
+        : await this.agents.prepareCodexLaunch({
+            terminalId: original.id,
+            workspaceId,
+            profileId: original.profileId,
+            accountProfileId,
+            autoConfirm: original.autoConfirm,
+          });
+      await this.terminalGateway.close(original.id);
+      if (
+        !this.state.restartTerminalWithProfile(original.id, launch.command, {
+          model: original.model,
+          profileId: original.profileId,
+          mcpProfileId: original.mcpProfileId,
+          accountProfileId,
+        })
+      ) {
+        throw new Error(
+          this.i18n.t('restore.terminalMissing', {
+            agent: isClaude ? 'Claude' : 'Codex',
+            name: original.name,
+          }),
+        );
+      }
+      const account = this.agents.accountProfiles().find((item) => item.id === accountProfileId);
+      this.closeAccountSwitch();
+      this.showToast(
+        this.i18n.t('accountSwitch.done', { name: account?.name ?? accountProfileId }),
+      );
+    } catch (error) {
+      this.showToast(this.errorMessage(error), 'attention');
+    } finally {
+      (isClaude ? this.launchingClaude : this.launchingCodex).set(false);
+    }
+  }
+
   /** Closes the switcher and clears its scope, so the next open starts as a batch switch. */
   protected closeModelSwitch(): void {
     this.modelSwitchOpen.set(false);
     this.modelSwitchTerminalId.set(null);
     this.modelSwitchAgentType.set(null);
-  }
-
-  /** Opens the switcher for every terminal of the chosen agent type. */
-  protected openBatchModelSwitch(): void {
-    this.modelSwitchTerminalId.set(null);
-    this.modelSwitchAgentType.set(null);
-    this.modelSwitchOpen.set(true);
   }
 
   protected async switchModels(value: ModelSwitchValue): Promise<void> {
@@ -1905,13 +2109,11 @@ export class App {
         try {
           await this.terminalGateway.close(plan.original.id);
           if (
-            !this.state.restartTerminalWithProfile(
-              plan.original.id,
-              plan.launch.command,
-              profileModel(profile, value.agent),
-              value.profileId,
-              isClaude ? plan.original.mcpProfileId : undefined,
-            )
+            !this.state.restartTerminalWithProfile(plan.original.id, plan.launch.command, {
+              model: profileModel(profile, value.agent),
+              profileId: value.profileId,
+              mcpProfileId: isClaude ? plan.original.mcpProfileId : undefined,
+            })
           ) {
             throw new Error(
               this.i18n.t('restore.terminalMissing', {
@@ -1936,13 +2138,12 @@ export class App {
             await this.terminalGateway.close(plan.original.id).catch(() => undefined);
             if (
               !plan.original.command ||
-              !this.state.restartTerminalWithProfile(
-                plan.original.id,
-                plan.original.command,
-                plan.original.model,
-                plan.original.profileId,
-                plan.original.mcpProfileId,
-              )
+              !this.state.restartTerminalWithProfile(plan.original.id, plan.original.command, {
+                model: plan.original.model,
+                profileId: plan.original.profileId,
+                mcpProfileId: plan.original.mcpProfileId,
+                accountProfileId: plan.original.accountProfileId,
+              })
             ) {
               rollbackFailures += 1;
             }
@@ -1988,6 +2189,10 @@ export class App {
   protected openSettings(tab: SettingsTab = 'diagnostics', modelProfileId = ''): void {
     this.settingsInitialTab.set(tab);
     this.settingsInitialModelProfileId.set(modelProfileId);
+    // Settings is where sign-in states are read and where login is started from, so the list is
+    // brought up to date on the way in rather than showing whatever was cached at startup.
+    this.refreshAccountsFor('claude');
+    this.refreshAccountsFor('codex');
     this.settingsOpen.set(true);
   }
 
@@ -2047,9 +2252,87 @@ export class App {
       this.settingsOpen.set(false);
       if (terminal) {
         this.showToast(this.i18n.t('account.loginOpened', { name: profile.name }));
+        void this.watchAccountLogin(profileId, terminalId);
       }
     } catch (error) {
       this.showToast(this.errorMessage(error));
+    }
+  }
+
+  /**
+   * Polls the account until the CLI reports it signed in, so the new state appears on its own.
+   *
+   * Waiting for the login process to exit is not enough: `claude auth login` keeps running after
+   * the browser flow returns, so the credentials land while the terminal is still open. Polling
+   * stops early once the account reads as authenticated, when the login terminal is gone (the
+   * user gave up), or at the timeout.
+   */
+  /** One last read after the login CLI exits, reporting whichever state it left behind. */
+  private async refreshAccountAfterLogin(profileId: string): Promise<void> {
+    await this.agents.refreshAccountProfile(profileId).catch(() => undefined);
+    const profile = this.agents.accountProfiles().find((item) => item.id === profileId);
+    if (!profile) {
+      return;
+    }
+    this.showToast(
+      profile.authenticated
+        ? this.i18n.t('account.loginSucceeded', { name: profile.name })
+        : this.i18n.t('account.loginIncomplete', {
+            name: profile.name,
+            detail: profile.diagnostic,
+          }),
+      profile.authenticated ? 'success' : 'attention',
+    );
+  }
+
+  private async watchAccountLogin(profileId: string, terminalId: string): Promise<void> {
+    this.pendingAccountLogins.set(terminalId, profileId);
+    const deadline = Date.now() + ACCOUNT_LOGIN_POLL_TIMEOUT_MS;
+    try {
+      while (Date.now() < deadline) {
+        await new Promise((resolve) => window.setTimeout(resolve, ACCOUNT_LOGIN_POLL_INTERVAL_MS));
+        // A watch is abandoned when its terminal is closed, or when a later login replaced it.
+        if (this.pendingAccountLogins.get(terminalId) !== profileId) {
+          return;
+        }
+        await this.agents.refreshAccountProfile(profileId).catch(() => undefined);
+        const profile = this.agents.accountProfiles().find((item) => item.id === profileId);
+        if (profile?.authenticated) {
+          this.showToast(this.i18n.t('account.loginSucceeded', { name: profile.name }));
+          return;
+        }
+      }
+      const profile = this.agents.accountProfiles().find((item) => item.id === profileId);
+      if (profile) {
+        this.showToast(
+          this.i18n.t('account.loginIncomplete', {
+            name: profile.name,
+            detail: profile.diagnostic,
+          }),
+          'attention',
+        );
+      }
+    } finally {
+      if (this.pendingAccountLogins.get(terminalId) === profileId) {
+        this.pendingAccountLogins.delete(terminalId);
+      }
+    }
+  }
+
+  protected async copyAccountConfiguration(request: {
+    sourceId: string;
+    targetId: string;
+  }): Promise<void> {
+    try {
+      const copied = await this.agents.copyAccountConfiguration(request.sourceId, request.targetId);
+      this.showToast(
+        copied.length
+          ? this.i18n.t('settings.copyConfigDone', { items: copied.join('、') })
+          : this.i18n.t('settings.copyConfigEmpty'),
+        copied.length ? 'success' : 'attention',
+      );
+    } catch (error) {
+      this.showToast(this.errorMessage(error), 'attention');
     }
   }
 
@@ -2198,6 +2481,18 @@ export class App {
     } catch (error) {
       this.showToast(this.errorMessage(error));
     }
+  }
+
+  /**
+   * What the new-terminal menu shows under each Agent: its version when the CLI is usable, and
+   * otherwise why it is not. One reading for all three, so a missing CLI is visible before the
+   * user picks it rather than after the launch dialog opens.
+   */
+  protected installationLabel(installation: AgentInstallation | null): string {
+    if (!installation?.healthy) {
+      return this.i18n.t('common.notDetected');
+    }
+    return installation.version ?? this.i18n.t('common.connected');
   }
 
   protected async detectAgentInstallations(): Promise<void> {
@@ -2456,6 +2751,26 @@ export class App {
    * preselects "No, exit", so answering it means moving the highlight onto the option that grants
    * trust rather than accepting whatever is highlighted.
    */
+  /**
+   * Answers the dialogs an agent opens on, for a terminal that carries no prompt to send.
+   *
+   * Claude and Codex both start on a folder-trust screen, and Claude's preselects "No, exit".
+   * That decision is recorded per config directory, so a workspace already trusted under one
+   * account is asked about again under another — which looks like the agent refusing to start
+   * with the account that was picked. Task dispatch has always answered these; a plain launch
+   * needs the same, only without a prompt to submit afterwards.
+   */
+  private armStartupDialogs(terminalId: string): void {
+    this.agentStartup.arm(terminalId, {
+      confirm: (writes) => this.writeTerminalSequence(terminalId, writes),
+      submit: async () => undefined,
+      onFailed: () => undefined,
+    });
+    if (this.findTerminal(terminalId)?.terminal.status === 'RUNNING') {
+      this.agentStartup.markRuntimeStarted(terminalId);
+    }
+  }
+
   private armTodoPrompt(terminalId: string, taskId: string, prompt: string): void {
     this.agentStartup.arm(terminalId, {
       confirm: (writes) => this.writeTerminalSequence(terminalId, writes),

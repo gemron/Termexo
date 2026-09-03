@@ -12,6 +12,7 @@ import {
   viewChild,
 } from '@angular/core';
 import { FitAddon } from '@xterm/addon-fit';
+import type { WebglAddon } from '@xterm/addon-webgl';
 import { Terminal } from '@xterm/xterm';
 
 import { I18nService } from '../core/i18n/i18n.service';
@@ -66,6 +67,8 @@ export class TerminalPanelComponent implements AfterViewInit {
     theme: createTerminalTheme(undefined),
   });
   private readonly fitAddon = new FitAddon();
+  /** Absent whenever the GPU renderer is unavailable or its context was lost. */
+  private webglAddon?: WebglAddon;
   private readonly resizeCoordinator = new TerminalResizeCoordinator(
     ({ cols, rows }) => this.gateway.resize(this.session().id, cols, rows),
     (error) => {
@@ -88,9 +91,13 @@ export class TerminalPanelComponent implements AfterViewInit {
   private lastRuntimeIssue: TerminalRuntimeIssue = null;
 
   readonly session = input.required<TerminalSession>();
+  /** Needed when reconnecting, to rebuild the workspace's proxy settings. */
+  readonly workspaceId = input('');
   readonly active = input(false);
   readonly visible = input(true);
   readonly maximized = input(false);
+  /** Name of the signed-in account this terminal runs on; empty for agents without one. */
+  readonly accountName = input('');
   readonly layoutRevision = input(0);
   readonly fontSize = input(12);
   readonly fontName = input(DEFAULT_TERMINAL_FONT_NAME);
@@ -101,6 +108,7 @@ export class TerminalPanelComponent implements AfterViewInit {
   readonly statusChanged = output<{ terminalId: string; status: TerminalStatus }>();
   readonly renameRequested = output<{ terminalId: string; name: string }>();
   readonly modelSwitchRequested = output<string>();
+  readonly accountSwitchRequested = output<string>();
   readonly inputCaptured = output<{ terminalId: string; data: string }>();
   readonly outputCaptured = output<{ terminalId: string; data: string }>();
 
@@ -177,6 +185,7 @@ export class TerminalPanelComponent implements AfterViewInit {
     this.terminal.loadAddon(this.fitAddon);
     const terminalContainer = this.container().nativeElement;
     this.terminal.open(terminalContainer);
+    void this.enableGpuRenderer();
     this.compositionAnchor = new TerminalCompositionAnchor(terminalContainer, () => {
       const buffer = this.terminal.buffer.active;
       return {
@@ -258,8 +267,40 @@ export class TerminalPanelComponent implements AfterViewInit {
         window.cancelAnimationFrame(this.activationFrame);
       }
       this.compositionAnchor?.end();
+      // Released before the terminal so the GPU context goes back to the pool right away; a
+      // workspace can hold many terminals and the browser caps how many contexts exist at once.
+      this.webglAddon?.dispose();
+      this.webglAddon = undefined;
       this.terminal.dispose();
     });
+  }
+
+  /**
+   * Draws the grid on the GPU instead of as DOM nodes.
+   *
+   * The DOM renderer rebuilds a row of elements per repaint, which is what makes scrolling a long
+   * scrollback stutter. The addon is imported on demand so its shaders stay out of the initial
+   * bundle — the terminal renders through the DOM until it arrives, a frame or two later.
+   *
+   * Loading is best-effort: a machine without a usable GPU, or a lost context after too many
+   * terminals, keeps the DOM renderer, which draws the same output and only costs speed.
+   */
+  private async enableGpuRenderer(): Promise<void> {
+    try {
+      const { WebglAddon } = await import('@xterm/addon-webgl');
+      if (this.destroyRef.destroyed) {
+        return;
+      }
+      const addon = new WebglAddon();
+      addon.onContextLoss(() => {
+        addon.dispose();
+        this.webglAddon = undefined;
+      });
+      this.terminal.loadAddon(addon);
+      this.webglAddon = addon;
+    } catch {
+      // Keeps the DOM renderer; nothing about the terminal's behaviour changes.
+    }
   }
 
   focus(): void {
@@ -313,6 +354,7 @@ export class TerminalPanelComponent implements AfterViewInit {
         this.session(),
         Math.max(this.terminal.cols, 20),
         Math.max(this.terminal.rows, 5),
+        this.workspaceId() || undefined,
       );
       this.runtimeReady = true;
       this.statusChanged.emit({ terminalId: this.session().id, status: 'RUNNING' });

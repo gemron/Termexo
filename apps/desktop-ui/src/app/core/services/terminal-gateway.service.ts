@@ -44,6 +44,10 @@ interface TerminalStartRequest {
   hideInitialCommand?: boolean;
   cols: number;
   rows: number;
+  agentType?: string;
+  accountProfileId?: string;
+  profileId?: string;
+  workspaceId?: string;
 }
 
 @Injectable({ providedIn: 'root' })
@@ -88,7 +92,12 @@ export class TerminalGatewayService {
     return listen<TerminalExitEvent>('terminal-exit', (event) => handler(event.payload));
   }
 
-  async start(session: TerminalSession, cols: number, rows: number): Promise<void> {
+  async start(
+    session: TerminalSession,
+    cols: number,
+    rows: number,
+    workspaceId?: string,
+  ): Promise<void> {
     const request: TerminalStartRequest = {
       terminalId: session.id,
       runtimeRevision: session.runtimeRevision ?? 0,
@@ -98,6 +107,12 @@ export class TerminalGatewayService {
       hideInitialCommand: session.agentType === 'codex' || session.agentType === 'opencode',
       cols,
       rows,
+      // Carried so a reconnecting terminal can rebuild the launch environment, which the backend
+      // hands out once and loses on restart. Without them it would start as the default account.
+      agentType: session.agentType,
+      accountProfileId: session.accountProfileId,
+      profileId: session.profileId,
+      workspaceId,
     };
 
     if (isTauriRuntime()) {

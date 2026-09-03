@@ -6,16 +6,24 @@
 .app-shell {
   --workspace-sidebar-track: clamp(152px, var(--workspace-sidebar-width, 208px), 30vw);
   --inspector-track: clamp(240px, var(--inspector-width, 280px), 32vw);
+  // The bar spans the window, so its height is the shell's to set and the panels below start
+  // beneath it. Kept as a variable because the short-viewport query shrinks it.
+  --topbar-height: 52px;
+  // First row under the bar: the tab strip in the main column, the headings in the two panels.
+  // One value keeps all three dividers on a single line now that nothing spans across them.
+  --panel-header-height: 44px;
 
   display: grid;
   height: 100%;
   min-width: 0;
   min-height: 0;
-  grid-template-areas: 'workspace-sidebar workspace-resizer workspace-main inspector-resizer inspector';
+  grid-template-areas:
+    'topbar topbar topbar topbar topbar'
+    'workspace-sidebar workspace-resizer workspace-main inspector-resizer inspector';
   grid-template-columns:
     var(--workspace-sidebar-track) 5px minmax(0, 1fr) 5px
     var(--inspector-track);
-  grid-template-rows: minmax(0, 1fr);
+  grid-template-rows: var(--topbar-height) minmax(0, 1fr);
   overflow: hidden;
   color: var(--text);
   background:
@@ -38,10 +46,13 @@
     grid-template-columns: 0 0 minmax(0, 1fr) 0 0;
   }
 
+  // Maximizing hides the panels, but never the bar: it carries the window controls.
   &.workspace-maximized {
-    grid-template-areas: 'workspace-main';
+    grid-template-areas:
+      'topbar'
+      'workspace-main';
     grid-template-columns: minmax(0, 1fr);
-    grid-template-rows: minmax(0, 1fr);
+    grid-template-rows: var(--topbar-height) minmax(0, 1fr);
 
     app-workspace-sidebar,
     app-inspector-panel,
@@ -53,7 +64,7 @@
     .workspace-main {
       width: 100%;
       height: 100%;
-      grid-template-rows: 52px 44px auto minmax(0, 1fr) 0;
+      grid-template-rows: var(--panel-header-height) auto minmax(0, 1fr) 0;
     }
   }
 
@@ -116,23 +127,24 @@ app-inspector-panel {
   height: 100%;
   min-width: 0;
   min-height: 0;
-  grid-template-rows: 52px 44px auto minmax(0, 1fr) 22px;
+  grid-template-rows: var(--panel-header-height) auto minmax(0, 1fr) 22px;
   background: var(--surface-0);
 }
 
 .workspace-main.task-board-active {
-  grid-template-rows: 52px 0 auto minmax(0, 1fr) 22px;
+  grid-template-rows: 0 auto minmax(0, 1fr) 22px;
 }
 
 .app-shell.workspace-maximized .workspace-main.task-board-active {
-  grid-template-rows: 52px 0 auto minmax(0, 1fr) 0;
+  grid-template-rows: 0 auto minmax(0, 1fr) 0;
 }
 
 .topbar {
+  grid-area: topbar;
   position: relative;
   z-index: 30;
   display: grid;
-  height: 52px;
+  height: var(--topbar-height);
   min-width: 0;
   min-height: 0;
   // Equal side columns keep the toolbar centred, but the right one may never fall below its
@@ -151,7 +163,41 @@ app-inspector-panel {
   min-width: 0;
   align-items: center;
   gap: 4px;
-  padding-left: 8px;
+  padding-left: 10px;
+}
+
+/*
+   Product identity, moved off the workspace panel so it survives that panel being hidden.
+   A separator sets it apart from the workspace title beside it, which changes per workspace.
+   --------------------------------------------------------------------------- */
+.app-brand {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 8px;
+  padding-right: 10px;
+  border-right: 1px solid var(--border);
+
+  .brand-mark {
+    display: block;
+    width: 22px;
+    height: 22px;
+    flex: 0 0 22px;
+  }
+
+  img {
+    display: block;
+    width: 100%;
+    height: 100%;
+    filter: drop-shadow(0 0 7px rgb(88 199 160 / 16%));
+  }
+
+  strong {
+    font-size: 13px;
+    font-weight: 700;
+    letter-spacing: 0.01em;
+    white-space: nowrap;
+  }
 }
 
 /* Appears only while its panel is hidden, so the topbar carries no control it does not need. */
@@ -554,6 +600,12 @@ app-inspector-panel {
         color: var(--color-warning);
         background: var(--warning-soft);
       }
+
+      /* A plain shell carries no Agent identity, so it stays neutral against the coloured three. */
+      &[data-tone='slate'] {
+        color: var(--text-secondary);
+        background: var(--surface-2);
+      }
     }
 
     strong,
@@ -571,6 +623,23 @@ app-inspector-panel {
       color: var(--text-muted);
       font: 9px/1.25 var(--mono);
     }
+  }
+
+  /* Separates the plain terminal from the Agents without spending a divider rule on it. */
+  .menu-group {
+    padding: 7px 7px 4px;
+    margin: 0;
+    color: var(--text-muted);
+    font-size: 9px;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+  }
+
+  button + .menu-group {
+    margin-top: 3px;
+    border-top: 1px solid var(--border);
+    padding-top: 8px;
   }
 }
 
@@ -599,6 +668,49 @@ app-inspector-panel {
       background: var(--surface-2);
       outline: 0;
     }
+  }
+}
+
+/*
+   System window buttons, standing in for the title bar the window no longer draws.
+
+   They are separated from the app's own tools by a rule and sit flush with the window edge, so
+   the cluster reads as window chrome rather than as three more workspace actions — the maximize
+   control right next to them belongs to the workspace, not the window.
+   --------------------------------------------------------------------------- */
+.window-controls {
+  display: flex;
+  align-items: center;
+  margin-left: 4px;
+  padding-left: 5px;
+  border-left: 1px solid var(--border);
+
+  .window-control {
+    display: grid;
+    width: 32px;
+    height: 28px;
+    place-items: center;
+    border: 0;
+    border-radius: 3px;
+    color: var(--text-muted);
+    background: transparent;
+    transition:
+      color 140ms ease,
+      background-color 140ms ease;
+
+    &:hover,
+    &:focus-visible {
+      color: var(--text);
+      background: var(--surface-2);
+      outline: 0;
+    }
+  }
+
+  /* The one destructive control in the topbar earns the Windows close-button red. */
+  .window-close:hover,
+  .window-close:focus-visible {
+    color: #fff;
+    background: var(--color-error);
   }
 }
 
@@ -831,7 +943,7 @@ app-inspector-panel {
 
 .workbench-area {
   // Pinned so the optional attention banner row above can collapse to zero when absent.
-  grid-row: 4;
+  grid-row: 3;
   min-width: 0;
   min-height: 0;
   padding: 5px;
@@ -858,7 +970,7 @@ app-inspector-panel {
 }
 
 .statusbar {
-  grid-row: 5;
+  grid-row: 4;
   display: flex;
   align-items: center;
   gap: 14px;
@@ -996,18 +1108,20 @@ app-inspector-panel {
 }
 
 @media (max-height: 560px) {
-  .workspace-main,
-  .app-shell.workspace-maximized .workspace-main {
-    grid-template-rows: 46px 40px auto minmax(0, 1fr) 0;
+  // Both rows live on the shell now, so shrinking them is two variables.
+  .app-shell {
+    --topbar-height: 46px;
+    --panel-header-height: 40px;
   }
 
-  .topbar {
-    height: 46px;
+  .workspace-main,
+  .app-shell.workspace-maximized .workspace-main {
+    grid-template-rows: var(--panel-header-height) auto minmax(0, 1fr) 0;
   }
 
   .workspace-main.task-board-active,
   .app-shell.workspace-maximized .workspace-main.task-board-active {
-    grid-template-rows: 46px 0 auto minmax(0, 1fr) 0;
+    grid-template-rows: 0 auto minmax(0, 1fr) 0;
   }
 
   .statusbar {

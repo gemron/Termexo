@@ -13,6 +13,7 @@ import {
   resolveAccountProfileId,
   ModelProfile,
 } from '../core/models/agent.models';
+import { IconComponent } from '../shared/icon/icon';
 import { LaunchDialogShellComponent } from './launch-dialog-shell';
 
 export interface CodexLaunchDialogValue {
@@ -25,7 +26,7 @@ export interface CodexLaunchDialogValue {
 
 @Component({
   selector: 'app-codex-launch-dialog',
-  imports: [FormsModule, LaunchDialogShellComponent, TranslatePipe],
+  imports: [FormsModule, IconComponent, LaunchDialogShellComponent, TranslatePipe],
   template: `
     <app-launch-dialog-shell
       icon="terminal"
@@ -91,7 +92,11 @@ export interface CodexLaunchDialogValue {
           @if (!codexAccounts().length) {
             <small class="account-warning">{{ 'launch.noAccountProfile' | t }}</small>
           } @else if (selectedAccount() && !selectedAccount()?.authenticated) {
-            <small class="account-warning">{{ 'launch.accountNotAuthenticated' | t }}</small>
+            <!-- Matches the Claude dialog: launching is allowed, but the CLI will ask to log in. -->
+            <p class="account-blocker">
+              <app-icon name="triangle-alert" [size]="13" />
+              <span>{{ 'launch.accountNotAuthenticated' | t }}</span>
+            </p>
           }
         </label>
         <label class="wide model-field">

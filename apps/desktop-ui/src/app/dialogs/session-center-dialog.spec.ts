@@ -210,11 +210,11 @@ describe('SessionCenterDialogComponent', () => {
     fixture.componentRef.setInput('sessionLaunchProfiles', () => ({ profileId: 'glm-4-6' }));
     fixture.detectChanges();
 
-    root.querySelector<HTMLButtonElement>('.resume-config-toggle')!.click();
-    fixture.detectChanges();
-    await fixture.whenStable();
+    await expandResumeConfig();
 
-    const select = root.querySelector<HTMLSelectElement>('.resume-options select');
+    const select = root.querySelector<HTMLSelectElement>(
+      '.resume-options[data-agent="claude"] select',
+    );
     select!.value = 'claude-default';
     select!.dispatchEvent(new Event('change'));
     fixture.detectChanges();
@@ -229,9 +229,7 @@ describe('SessionCenterDialogComponent', () => {
   });
 
   it('can resume a session with automatic confirmation enabled', async () => {
-    root.querySelector<HTMLButtonElement>('.resume-config-toggle')!.click();
-    fixture.detectChanges();
-    await fixture.whenStable();
+    await expandResumeConfig();
 
     root.querySelector<HTMLInputElement>('.resume-auto-confirm input')!.click();
     fixture.detectChanges();
@@ -242,6 +240,60 @@ describe('SessionCenterDialogComponent', () => {
 
     expect(resumed[0]).toEqual(expect.objectContaining({ autoConfirm: true }));
   });
+
+  it('carries the OpenCode model and automatic confirmation into a resume', async () => {
+    await expandResumeConfig();
+
+    root.querySelector<HTMLInputElement>('.resume-auto-confirm input')!.click();
+    const model = root.querySelector<HTMLInputElement>(
+      '.resume-options[data-agent="opencode"] input',
+    );
+    expect(model).toBeTruthy();
+    model!.value = 'anthropic/claude-sonnet-4-5';
+    model!.dispatchEvent(new Event('input'));
+    fixture.detectChanges();
+    await fixture.whenStable();
+
+    const resumed: ResumeSessionValue[] = [];
+    component.resumed.subscribe((value) => resumed.push(value));
+
+    clickResumeFor('OpenCode adapter');
+
+    expect(resumed[0]).toEqual({
+      session: SESSIONS[2],
+      model: 'anthropic/claude-sonnet-4-5',
+      autoConfirm: true,
+    });
+  });
+
+  it('offers the resume settings when OpenCode is the only Agent with sessions', async () => {
+    fixture.componentRef.setInput('sessions', [SESSIONS[2]]);
+    fixture.detectChanges();
+    await fixture.whenStable();
+
+    await expandResumeConfig();
+
+    expect(root.querySelector('.resume-auto-confirm')).toBeTruthy();
+    expect(root.querySelector('.resume-options[data-agent="opencode"]')).toBeTruthy();
+    expect(root.querySelector('.resume-options[data-agent="claude"]')).toBeFalsy();
+  });
+
+  it('closes on Escape rather than letting the workbench handle the key', () => {
+    let cancelled = 0;
+    component.cancelled.subscribe(() => (cancelled += 1));
+
+    const event = new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true });
+    root.querySelector('.dialog-search input')!.dispatchEvent(event);
+    fixture.detectChanges();
+
+    expect(cancelled).toBe(1);
+  });
+
+  async function expandResumeConfig(): Promise<void> {
+    root.querySelector<HTMLButtonElement>('.resume-config-toggle')!.click();
+    fixture.detectChanges();
+    await fixture.whenStable();
+  }
 
   function clickButton(label: string): void {
     const button = Array.from(root.querySelectorAll<HTMLButtonElement>('button')).find(

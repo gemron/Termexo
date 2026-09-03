@@ -13,6 +13,7 @@ import {
   McpProfile,
   ModelProfile,
 } from '../core/models/agent.models';
+import { IconComponent } from '../shared/icon/icon';
 import { LaunchDialogShellComponent } from './launch-dialog-shell';
 
 export interface ClaudeLaunchDialogValue {
@@ -25,7 +26,7 @@ export interface ClaudeLaunchDialogValue {
 
 @Component({
   selector: 'app-claude-launch-dialog',
-  imports: [FormsModule, LaunchDialogShellComponent, TranslatePipe],
+  imports: [FormsModule, IconComponent, LaunchDialogShellComponent, TranslatePipe],
   template: `
     <app-launch-dialog-shell
       icon="bot"
@@ -91,7 +92,15 @@ export interface ClaudeLaunchDialogValue {
           @if (!claudeAccounts().length) {
             <small class="account-warning">{{ 'launch.noAccountProfile' | t }}</small>
           } @else if (selectedAccount() && !selectedAccount()?.authenticated) {
-            <small class="account-warning">{{ 'launch.accountNotAuthenticated' | t }}</small>
+            <!--
+              Loud rather than a footnote: launching anyway is allowed and sometimes what the
+              user wants, but the terminal will open straight into the CLI's login prompt, and
+              that surprise reads as Termexo ignoring the account that was picked.
+            -->
+            <p class="account-blocker">
+              <app-icon name="triangle-alert" [size]="13" />
+              <span>{{ 'launch.accountNotAuthenticated' | t }}</span>
+            </p>
           }
         </label>
         <label>

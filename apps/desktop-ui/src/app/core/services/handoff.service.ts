@@ -126,7 +126,15 @@ export class HandoffService {
     });
   }
 
-  async importPackage(): Promise<HandoffPackage | null> {
+  /**
+   * Imports a document and files it under the workspace doing the importing.
+   *
+   * A package carries the workspace id of the machine that produced it, and the history list is
+   * filtered by workspace — filing an import under its original id would save a record the user
+   * can never see again once the preview closes. The package keeps its own ids, so the source
+   * workspace and project path stay visible in the preview.
+   */
+  async importPackage(targetWorkspaceId?: string): Promise<HandoffPackage | null> {
     return this.run(async () => {
       let contents: string | null;
       if (isTauriRuntime()) {
@@ -147,7 +155,7 @@ export class HandoffService {
       }
       const { parseHandoffDocument } = await import('../models/handoff');
       const handoff = parseHandoffDocument(contents);
-      await this.savePackage(handoff);
+      await this.savePackage(handoff, targetWorkspaceId);
       return handoff;
     });
   }
@@ -173,11 +181,11 @@ export class HandoffService {
     });
   }
 
-  private async savePackage(handoff: HandoffPackage): Promise<void> {
+  private async savePackage(handoff: HandoffPackage, workspaceId?: string): Promise<void> {
     const existing = this.recordItems().find((record) => record.id === handoff.id);
     const record: HandoffRecord = {
       id: handoff.id,
-      workspaceId: handoff.workspaceId,
+      workspaceId: workspaceId || handoff.workspaceId,
       sourceTerminalId: handoff.sourceTerminalId,
       title: handoff.title,
       packageJson: JSON.stringify(handoff),

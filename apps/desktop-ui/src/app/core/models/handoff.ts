@@ -283,6 +283,27 @@ export function continuationPrompt(handoff: HandoffPackage): string {
   ].join('\n');
 }
 
+/**
+ * Whether the package carries anything the receiving Agent can actually work from.
+ *
+ * Task and summary always have a value because they fall back to the workspace name, so a
+ * package can look complete while holding nothing but that fallback. Only the evidence fields
+ * count: what was done, what is left, what changed on disk, and what the terminals said.
+ */
+export function hasSubstantiveContext(handoff: HandoffPackage): boolean {
+  return (
+    handoff.completed.length > 0 ||
+    handoff.pending.length > 0 ||
+    handoff.decisions.length > 0 ||
+    handoff.changedFiles.length > 0 ||
+    handoff.validation.length > 0 ||
+    handoff.risks.length > 0 ||
+    handoff.recentPrompts.length > 0 ||
+    handoff.gitDiff.trim().length > 0 ||
+    handoff.terminalOutput.trim().length > 0
+  );
+}
+
 export function estimateTokens(value: string): number {
   return Math.ceil(Array.from(value).length / 4);
 }

@@ -6,6 +6,10 @@
   "permissions": [
     "core:default",
     "core:window:allow-request-user-attention",
+    "core:window:allow-start-dragging",
+    "core:window:allow-minimize",
+    "core:window:allow-toggle-maximize",
+    "core:window:allow-close",
     "dialog:allow-open",
     "dialog:allow-save",
     "dialog:allow-message",

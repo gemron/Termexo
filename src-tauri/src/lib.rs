@@ -126,6 +126,7 @@ pub fn run() {
             commands::config::list_account_profiles,
             commands::config::save_account_profile,
             commands::config::refresh_account_profile,
+            commands::config::copy_account_configuration,
             commands::config::delete_account_profile,
             commands::config::validate_claude_profile,
             commands::notification::show_desktop_notification,

@@ -5,6 +5,7 @@
     aria-modal="true"
     aria-labelledby="handoff-title"
     (mousedown)="$event.stopPropagation()"
+    (keydown)="handleKeydown($event)"
   >
     <header>
       <div class="dialog-heading">
@@ -132,6 +133,16 @@
               </button>
             </div>
           </div>
+
+          @if (previewIsThin()) {
+            <div class="handoff-thin" role="status">
+              <app-icon name="triangle-alert" [size]="14" />
+              <span>
+                <strong>{{ 'handoff.thinTitle' | t }}</strong>
+                <small>{{ 'handoff.thinHelp' | t }}</small>
+              </span>
+            </div>
+          }
 
           <div class="package-preview">
             <section>

@@ -2,6 +2,22 @@
 
 Release notes for every Termexo version, newest first. The current release is summarised in [README.md](README.md).
 
+## V0.7.0
+
+- Drop the system title bar and give the window its own chrome: the top bar now spans the whole window with minimise, maximise, and close at its right edge, and both side panels start beneath it the way an editor lays out. Dragging the bar moves the window and double-clicking it maximises, as before.
+- Move the product mark and the settings entry into the title bar, and put the build version at the foot of the workspace panel, so the panel can be hidden without losing either.
+- Replace the reveal button that only appeared once the workspace panel was hidden with a permanent Workspace toggle, and fold "new terminal" into the agent menu as a single New menu grouped into Terminal and AI Agents. Each agent now reports its installed version, or that it was not detected, before it is picked.
+- Render terminals on the GPU, so a long scrollback scrolls without the stutter the DOM renderer produced. Machines without a usable GPU fall back to the previous renderer.
+- Restore drag-to-reorder for terminal tabs in the desktop build, where the webview's own drag handling had been consuming the events.
+- Keep a terminal on the account it was launched with when it reconnects, including after the app restarts. Its account directory, proxy settings, and provider key are rebuilt from what the terminal records, instead of being lost with the one-shot launch environment.
+- Detect a finished sign-in on its own and refresh the account, rather than waiting for a login CLI that keeps running after the browser flow returns. Accounts are also re-read when the launch dialog or settings opens.
+- Name the login account a terminal is running on in its header, and switch it from there: picking another account restarts that terminal on it with a new session, leaving its model, MCP profile, and automatic confirmation alone. The inspector's session details name the account too.
+- Stop asking a signed-in managed Claude account to sign in again the first time a terminal opens on it. Claude runs its first-run wizard on `hasCompletedOnboarding` alone, and the wizard always includes a login step; earlier `claude auth login` builds never set the flag, so Termexo now sets it once the account directory holds credentials. An account that has not signed in still gets the wizard.
+- Copy settings, instructions, plugins, and skills from one account to another. Credentials, account identity, and session history are never copied, so both accounts stay signed in as themselves.
+- Say plainly, before launching, that a chosen account is not signed in yet and that the terminal will open on the CLI's own login prompt.
+- Offer OpenCode the same resume settings as the other agents — model and automatic confirmation — and file an imported handoff under the workspace importing it, which previously left the record invisible once the preview closed.
+- Warn when a generated handoff carries no evidence to pass on, instead of sending a package that looks complete but holds only its fallback task and summary.
+
 ## V0.6.2
 
 - Draw terminal rows at the font's own line height, the spacing the Windows console uses. Rows were 35% taller than a native terminal, which loosened dense output and broke box-drawing frames apart between lines.

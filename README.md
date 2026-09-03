@@ -11,7 +11,7 @@
 </p>
 
 <p align="center">
-  <img alt="Version 0.6.2" src="https://img.shields.io/badge/version-0.6.2-58c7a0">
+  <img alt="Version 0.7.0" src="https://img.shields.io/badge/version-0.7.0-58c7a0">
   <img alt="Windows" src="https://img.shields.io/badge/platform-Windows-0078D4?logo=windows">
   <img alt="Tauri 2" src="https://img.shields.io/badge/Tauri-2-24C8DB?logo=tauri&logoColor=white">
   <img alt="Angular 22" src="https://img.shields.io/badge/Angular-22-DD0031?logo=angular">
@@ -34,10 +34,11 @@ Run the complete Windows app with one command—no Termexo account or server req
 npx termexo@latest
 ```
 
-> The current version is **V0.6.2**. It adds OpenCode as a third first-class agent, a task board
-> that turns a task into a running agent terminal and tracks it from todo through verified,
-> automatic confirmation for every agent, Claude background-session reclaim, and a reworked
-> terminal workbench with tab reordering and keyboard shortcuts.
+> The current version is **V0.7.0**. The window drops the system title bar for chrome of its own,
+> with the top bar spanning the width and both side panels beneath it; terminals render on the
+> GPU so a long scrollback scrolls smoothly; a terminal keeps its account across reconnects and
+> restarts; and configuration, plugins, and skills can be copied between accounts without moving
+> any credentials.
 
 ![Termexo multi-terminal grid workbench](website/assets/termexo-workbench.png)
 
@@ -112,20 +113,23 @@ The interface is available in Simplified Chinese, English, Spanish, French, Germ
 and Korean. It follows the Windows language automatically, or you can choose a language from
 the main toolbar and keep that choice across restarts.
 
-## What's New in V0.6.0
+## What's New in V0.7.0
 
-- **OpenCode is a third first-class agent.** It gets the same launch, resume, restart-restore, and
-  automatic-confirmation controls that Claude Code and Codex already had.
-- **A task board that actually runs the work.** Each task carries its project, agent, model, and
-  acceptance criteria, and moves through todo, executing, completed, and verified as the terminal
-  running it reports status.
-- **Automatic confirmation on every agent** — `--permission-mode auto` for Claude,
-  `--approve-for-me` for Codex, `--auto` for OpenCode — so the AUTO chip on a terminal means the
-  same thing whichever agent drew it.
-- **Claude background sessions.** Reclaim a session the CLI still holds open through inspection,
-  fork, and attach, instead of starting a terminal that exits on its first message.
-- **A reworked workbench.** Drag to reorder tabs, middle-click to close one, scroll the strip with
-  the wheel, and drive the whole thing from the keyboard.
+- **The window draws its own chrome.** No system title bar: the top bar spans the whole window
+  with the window controls at its right edge, and both side panels start beneath it. Dragging the
+  bar still moves the window, double-clicking still maximises.
+- **Terminals render on the GPU.** A long scrollback scrolls without the stutter the DOM renderer
+  produced. Machines without a usable GPU fall back to the previous renderer.
+- **A terminal keeps its account.** Reconnecting — including after the app restarts — rebuilds the
+  account directory, proxy settings, and provider key from what the terminal records, instead of
+  quietly falling back to the CLI's default home.
+- **Switch a terminal's account from its header.** The header names the account it runs on, and
+  picking another restarts that terminal on it with a new session, leaving the model, MCP profile,
+  and automatic confirmation alone.
+- **Copy configuration between accounts.** Settings, instructions, plugins, and skills move across;
+  credentials, account identity, and session history never do.
+- **Sign-in is noticed on its own.** A finished login refreshes the account without waiting for a
+  CLI that keeps running after the browser flow returns.
 
 [![Termexo task board](website/assets/termexo-task-board.png)](website/assets/termexo-task-board.png)
 

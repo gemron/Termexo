@@ -20,6 +20,18 @@ import { WorkspaceRepository } from './workspace.repository';
 
 const DEFAULT_SHELL = 'powershell.exe';
 
+/**
+ * What a restart changes about a terminal. `model` and `profileId` always describe the terminal
+ * after the restart; the two optional ids keep whatever the terminal already had when a switch
+ * does not touch them, so switching a model cannot silently drop the account or the MCP profile.
+ */
+export interface TerminalRestartChanges {
+  model: string;
+  profileId?: string;
+  mcpProfileId?: string;
+  accountProfileId?: string;
+}
+
 @Injectable({ providedIn: 'root' })
 export class AppStateService {
   private readonly repository = inject(WorkspaceRepository);
@@ -445,9 +457,7 @@ export class AppStateService {
   restartTerminalWithProfile(
     terminalId: string,
     command: string,
-    model: string,
-    profileId?: string,
-    mcpProfileId?: string,
+    changes: TerminalRestartChanges,
   ): boolean {
     const workspace = this.activeWorkspace();
     const terminal = workspace?.terminals.find((item) => item.id === terminalId);
@@ -461,10 +471,13 @@ export class AppStateService {
         : {
             ...terminal,
             command,
-            model,
-            profileId,
+            model: changes.model,
+            profileId: changes.profileId,
             mcpProfileId:
-              terminal.agentType === 'claude' ? (mcpProfileId ?? terminal.mcpProfileId) : undefined,
+              terminal.agentType === 'claude'
+                ? (changes.mcpProfileId ?? terminal.mcpProfileId)
+                : undefined,
+            accountProfileId: changes.accountProfileId ?? terminal.accountProfileId,
             nativeSessionId: undefined,
             status: 'STARTING' as const,
             runtimeRevision: (terminal.runtimeRevision ?? 0) + 1,

@@ -1,4 +1,4 @@
-import { TerminalStatus } from './workspace.models';
+import { AgentType, TerminalStatus } from './workspace.models';
 
 export type NativeAgentType = 'claude' | 'codex' | 'opencode';
 export type AccountAgentType = 'claude' | 'codex';
@@ -329,6 +329,25 @@ export function resolveAccountProfileId(
     candidates.find((profile) => profile.isDefault)?.id ??
     candidates[0]?.id
   );
+}
+
+/**
+ * Names the account a terminal is actually signed in as, empty when the agent has none.
+ *
+ * A terminal records the account its launch resolved to, but one restored from an older build can
+ * carry none. The backend then falls back to the agent's default account, so resolving the same
+ * way here names the account the terminal is really spending, rather than leaving it blank.
+ */
+export function terminalAccountName(
+  profiles: readonly AccountProfile[],
+  agentType: AgentType,
+  accountProfileId?: string,
+): string {
+  if (agentType !== 'claude' && agentType !== 'codex') {
+    return '';
+  }
+  const resolved = resolveAccountProfileId(profiles, agentType, accountProfileId);
+  return profiles.find((profile) => profile.id === resolved)?.name ?? '';
 }
 
 /**

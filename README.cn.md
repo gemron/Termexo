@@ -11,7 +11,7 @@
 </p>
 
 <p align="center">
-  <img alt="Version 0.6.2" src="https://img.shields.io/badge/version-0.6.2-58c7a0">
+  <img alt="Version 0.7.0" src="https://img.shields.io/badge/version-0.7.0-58c7a0">
   <img alt="Windows" src="https://img.shields.io/badge/platform-Windows-0078D4?logo=windows">
   <img alt="Tauri 2" src="https://img.shields.io/badge/Tauri-2-24C8DB?logo=tauri&logoColor=white">
   <img alt="Angular 22" src="https://img.shields.io/badge/Angular-22-DD0031?logo=angular">
@@ -33,9 +33,9 @@ Termexo 把 Claude Code、Codex 和围绕它们运行的终端收进一个可恢
 npx termexo@latest
 ```
 
-> 当前版本为 **V0.6.2**，新增 OpenCode 第三个一等 Agent、可把任务直接跑成 Agent 终端
-> 并从待办跟踪到验收的任务看板、覆盖三个 Agent 的自动确认、Claude 后台会话接管，
-> 以及重做的终端工作台（标签拖拽排序、中键关闭、键盘快捷键）。
+> 当前版本为 **V0.7.0**，窗口去掉系统标题栏改由应用自绘，顶栏横跨整个窗口、左右侧栏在其下；
+> 终端改用 GPU 渲染，长回滚滚动顺滑；终端在重连和应用重启后保持在原账号上；
+> 配置、插件与技能可在账号之间复制，且不携带任何凭据。
 
 ![Termexo 多终端网格工作台](website/assets/termexo-workbench.png)
 
@@ -102,17 +102,19 @@ SQLite，密钥保存在 Windows Credential Manager，Claude/Codex 历史会话�
 界面支持简体中文、英语、西班牙语、法语、德语、日语和韩语。默认自动跟随 Windows
 系统语言，也可通过主工具栏手动切换并跨重启保留选择。
 
-## V0.6.0 新增
+## V0.7.0 新增
 
-- **OpenCode 成为第三个一等 Agent**，启动、恢复、重启还原和自动确认等控制项与 Claude Code、
-  Codex 完全对齐。
-- **任务看板可以把任务真正跑起来**：每条任务携带项目、Agent、模型和验收标准，并随执行它的
-  终端上报的状态在待办、执行中、已完成、已验收之间流转。
-- **三个 Agent 统一支持自动确认**——Claude 用 `--permission-mode auto`，Codex 用
-  `--approve-for-me`，OpenCode 用 `--auto`——终端上的 AUTO 标记在任意 Agent 下含义一致。
-- **接管 Claude 后台会话**：通过查看、fork 和 attach 接管 CLI 仍然持有的会话，不再出现恢复后
-  首条消息即退出的终端。
-- **重做的终端工作台**：标签支持拖拽排序、中键关闭、滚轮切换，整套操作都可用键盘完成。
+- **窗口由应用自己绘制**：去掉系统标题栏，顶栏横跨整个窗口、右端是窗口控制按钮，左右两个
+  侧栏都从它下面开始。拖动顶栏移动窗口、双击最大化的操作保持不变。
+- **终端改用 GPU 渲染**：长回滚滚动不再出现原先 DOM 渲染的卡顿；没有可用 GPU 的机器自动
+  回退到原渲染方式。
+- **终端保持在原账号上**：重连（包括应用重启后）会依据终端自身记录重建账号目录、代理设置和
+  供应商密钥，不再悄悄回落到 CLI 的默认目录。
+- **在终端标题栏切换账号**：标题栏显示当前使用的登录账号，换成另一个后终端会以新账号重启并
+  开始新会话，模型、MCP 和自动确认保持不变。
+- **账号之间可以复制配置**：设置、全局指令、插件与技能会一并复制，凭据、账号身份和会话历史
+  则不会。
+- **登录完成后自动识别**：不再依赖那些在浏览器流程结束后仍继续运行的登录进程。
 
 [![Termexo 任务看板](website/assets/termexo-task-board.png)](website/assets/termexo-task-board.png)
 

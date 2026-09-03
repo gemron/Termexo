@@ -30,7 +30,7 @@
             [attr.data-status]="terminal.status"
           >
             <span class="agent-avatar" [attr.data-agent]="terminal.agentType">
-              <app-icon [name]="terminal.agentType === 'shell' ? 'terminal' : 'bot'" [size]="14" />
+              <app-icon [name]="agentIcon(terminal.agentType)" [size]="14" />
             </span>
             <span class="agent-copy">
               <strong>{{ terminal.name }}</strong>
@@ -60,6 +60,12 @@
             <dt>{{ 'inspector.model' | t }}</dt>
             <dd>{{ terminal.model }}</dd>
           </div>
+          @if (activeAccountName(); as account) {
+            <div>
+              <dt>{{ 'inspector.account' | t }}</dt>
+              <dd>{{ account }}</dd>
+            </div>
+          }
           <div>
             <dt>{{ 'inspector.branch' | t }}</dt>
             <dd>{{ terminal.branch }}</dd>

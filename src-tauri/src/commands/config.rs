@@ -357,9 +357,39 @@ pub async fn refresh_account_profile(
         .find_account_profile(&profile_id)
         .map_err(|error| error.to_string())?
         .ok_or_else(|| "账号 Profile 不存在。".to_owned())?;
-    tauri::async_runtime::spawn_blocking(move || account::refresh_status(profile))
+    let refreshed = tauri::async_runtime::spawn_blocking(move || account::refresh_status(profile))
         .await
-        .map_err(|error| error.to_string())
+        .map_err(|error| error.to_string())?;
+    // Persisted, not just returned: the sign-in state is read straight from the database on the
+    // next start, so without this every restart shows a signed-in account as signed out until
+    // something happens to refresh it again.
+    database
+        .save_account_profile(&refreshed)
+        .map_err(|error| error.to_string())?;
+    Ok(refreshed)
+}
+
+/// Copies one account's user configuration onto another, leaving both sign-ins untouched.
+///
+/// Returns the entries that were copied so the caller can say what actually moved; an empty
+/// result means the source account had none of the portable files yet.
+#[tauri::command]
+pub async fn copy_account_configuration(
+    source_profile_id: String,
+    target_profile_id: String,
+    database: State<'_, WorkspaceDatabase>,
+) -> Result<Vec<String>, String> {
+    let find = |profile_id: &str| {
+        database
+            .find_account_profile(profile_id)
+            .map_err(|error| error.to_string())?
+            .ok_or_else(|| "账号 Profile 不存在。".to_owned())
+    };
+    let source = find(&source_profile_id)?;
+    let target = find(&target_profile_id)?;
+    tauri::async_runtime::spawn_blocking(move || account::copy_configuration(&source, &target))
+        .await
+        .map_err(|error| error.to_string())?
 }
 
 #[tauri::command]

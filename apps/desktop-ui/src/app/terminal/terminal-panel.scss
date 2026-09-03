@@ -266,8 +266,9 @@ header {
     white-space: nowrap;
   }
 
-  // Overrides the square icon-button sizing below, which would crush the model label.
-  .model-chip {
+  // Overrides the square icon-button sizing below, which would crush these labels.
+  .model-chip,
+  .account-chip {
     display: flex;
     width: auto;
     height: 22px;
@@ -373,7 +374,9 @@ footer {
     max-width: 92px;
   }
 
-  .terminal-meta > span {
+  // The model is the chip that gets changed; the account is still named in the inspector.
+  .terminal-meta > span,
+  .terminal-meta .account-chip {
     display: none;
   }
 

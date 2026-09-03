@@ -230,6 +230,12 @@ button:disabled {
   background: var(--info-soft);
 }
 
+/* Each Agent keeps the tone it carries in the launch menu, so a row is identifiable at a glance. */
+.session-agent[data-agent='opencode'] {
+  color: var(--color-warning);
+  background: var(--warning-soft);
+}
+
 .dialog-empty {
   display: grid;
   min-height: 220px;
@@ -316,6 +322,12 @@ button:disabled {
   background: var(--info-soft);
 }
 
+.agent-health[data-agent='opencode'] .agent-health-icon {
+  color: var(--color-warning);
+  background: var(--warning-soft);
+}
+
+/* An unavailable Agent drops its own tone so the strip reads as one warning, not three colours. */
 .agent-health.unavailable .agent-health-icon {
   color: var(--color-warning);
   background: var(--warning-soft);
@@ -830,13 +842,29 @@ button:disabled {
   }
 }
 
-.account-actions {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: flex-end;
+/* Sits apart from the identity fields above it: this acts on a second account, not this one. */
+.account-copy {
+  display: grid;
+  margin-top: 14px;
+  padding: 11px 12px;
+  gap: 8px;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: end;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-field);
+  background: var(--surface-inset);
 
-  > span {
-    flex: 1;
+  label {
+    display: grid;
+    min-width: 0;
+    gap: 5px;
+  }
+
+  small {
+    grid-column: 1 / -1;
+    color: var(--text-muted);
+    font-size: 9px;
+    line-height: 1.5;
   }
 }
 
@@ -1177,11 +1205,70 @@ button:disabled {
   font-variant-ligatures: none;
 }
 
+/* The version field and the button that acts on it share a baseline, like the editor rows. */
+.cli-version-row {
+  display: flex;
+  align-items: end;
+  gap: 8px;
+  margin-top: 13px;
+
+  label {
+    display: grid;
+    min-width: 0;
+    flex: 1;
+    gap: 5px;
+  }
+
+  button {
+    flex: 0 0 auto;
+  }
+}
+
+/* Hint on the left, the one confirming action on the right — same shape as .editor-actions. */
+.cli-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 12px;
+
+  > span {
+    flex: 1;
+    min-width: 0;
+    color: var(--text-muted);
+    font-size: 9px;
+    line-height: 1.5;
+  }
+
+  button {
+    flex: 0 0 auto;
+  }
+}
+
+/*
+   One row of editor actions: the destructive one on the left, the rest on the right.
+
+   Flex rather than fixed columns because the panels carry different numbers of buttons — the
+   network panel has six. A three-column grid pushed the extras into implicit columns, so they
+   came out unevenly sized and misaligned between panels.
+   --------------------------------------------------------------------------- */
 .editor-actions {
-  display: grid;
-  grid-template-columns: auto 1fr auto;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
   gap: 8px;
   margin-top: 17px;
+
+  /* The empty span between the destructive action and the rest. */
+  > span {
+    flex: 1;
+  }
+
+  button {
+    flex: 0 0 auto;
+  }
 }
 
 @media (max-width: 720px) {

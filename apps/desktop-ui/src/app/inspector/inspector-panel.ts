@@ -1,16 +1,19 @@
 import { Component, computed, DestroyRef, inject, input, output, signal } from '@angular/core';
 
 import {
+  AccountProfile,
   AgentEvent,
   isNativeModel,
   ModelProfile,
   ProviderQuota,
   QuotaEntry,
+  terminalAccountName,
 } from '../core/models/agent.models';
 import { I18nService } from '../core/i18n/i18n.service';
 import { TranslatePipe } from '../core/i18n/translate.pipe';
 import {
   AGENT_LABELS,
+  type AgentType,
   TerminalSession,
   TerminalStatus,
   Workspace,
@@ -55,9 +58,17 @@ export class InspectorPanelComponent {
   readonly quotas = input<ProviderQuota[]>([]);
   readonly quotaLoading = input(false);
   readonly modelProfiles = input<ModelProfile[]>([]);
+  readonly accountProfiles = input<AccountProfile[]>([]);
   readonly refreshQuotas = output<void>();
   readonly collapseRequested = output<void>();
   protected readonly showAllQuotas = signal(false);
+  /** Empty for a plain shell or OpenCode, which run on no account of their own. */
+  protected readonly activeAccountName = computed(() => {
+    const terminal = this.activeTerminal();
+    return terminal
+      ? terminalAccountName(this.accountProfiles(), terminal.agentType, terminal.accountProfileId)
+      : '';
+  });
   /** Drives the reset countdown so a panel left open does not keep showing a stale minute. */
   private readonly now = signal(Date.now());
 
@@ -134,6 +145,11 @@ export class InspectorPanelComponent {
   });
 
   protected readonly agentLabels = AGENT_LABELS;
+
+  /** OpenCode and a plain shell are terminal-shaped; only the two hosted Agents get the bot mark. */
+  protected agentIcon(agentType: AgentType): string {
+    return agentType === 'claude' || agentType === 'codex' ? 'bot' : 'terminal';
+  }
 
   protected eventLabel(event: AgentEvent): string {
     return this.i18n.t(EVENT_LABELS[event.eventType] ?? 'event.updated');

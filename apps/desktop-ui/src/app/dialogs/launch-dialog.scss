@@ -128,6 +128,30 @@
   font-size: 9px;
 }
 
+/*
+   An account that is not signed in yet. Louder than .account-warning because launching anyway
+   drops the user straight into the CLI's own login prompt, which otherwise looks like the
+   picked account was ignored.
+   --------------------------------------------------------------------------- */
+.account-blocker {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  margin: 5px 0 0;
+  padding: 6px 8px;
+  border: 1px solid color-mix(in oklab, var(--color-warning) 52%, transparent);
+  border-radius: var(--radius-field);
+  color: var(--color-warning);
+  background: color-mix(in oklab, var(--color-warning) 12%, transparent);
+  font-size: 10px;
+  line-height: 1.45;
+
+  app-icon {
+    flex: 0 0 auto;
+    margin-top: 1px;
+  }
+}
+
 app-icon.spinning {
   animation: session-center-spin 900ms linear infinite;
 }

@@ -1,20 +1,5 @@
 <aside class="workspace-sidebar bg-base-200">
-  <header class="brand-row">
-    <div class="brand-mark" aria-hidden="true">
-      <img src="termexo-mark.svg" alt="" />
-    </div>
-    <strong>Termexo</strong>
-    <button
-      type="button"
-      class="rail-collapse"
-      [title]="'workspace.collapseSidebar' | t"
-      [attr.aria-label]="'workspace.collapseSidebar' | t"
-      (click)="collapseRequested.emit()"
-    >
-      <app-icon name="panel-left-close" [size]="15" />
-    </button>
-  </header>
-
+  <!-- Occupies the shell's header row now that the brand sits in the title bar. -->
   <div class="sidebar-tools">
     <label class="search-field input input-bordered input-sm">
       <app-icon name="search" [size]="14" />
@@ -122,15 +107,9 @@
     </ul>
   </nav>
 
-  <footer>
-    <button
-      type="button"
-      class="footer-action btn btn-ghost btn-sm"
-      (click)="settingsRequested.emit()"
-    >
-      <app-icon name="settings" [size]="15" />
-      <span>{{ 'workspace.settings' | t }}</span>
-    </button>
-    <span class="runtime-state"><i></i> {{ 'workspace.localRuntime' | t }}</span>
-  </footer>
+  @if (appVersion()) {
+    <footer>
+      <span class="app-version">v{{ appVersion() }}</span>
+    </footer>
+  }
 </aside>

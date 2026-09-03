@@ -1,7 +1,8 @@
 import { DatePipe } from '@angular/common';
-import { Component, effect, input, output, signal } from '@angular/core';
+import { Component, computed, effect, input, output, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 
+import { hasSubstantiveContext } from '../core/models/handoff';
 import type { HandoffPackage, HandoffRecord } from '../core/models/handoff';
 import type { TerminalSession } from '../core/models/workspace.models';
 import { TranslatePipe } from '../core/i18n/translate.pipe';
@@ -40,6 +41,15 @@ export class HandoffDialogComponent {
   readonly sent = output<HandoffSendRequest>();
   readonly cancelled = output<void>();
 
+  /**
+   * A package whose evidence fields are all empty still sends, but the receiving Agent gets
+   * nothing to act on — the user is told before spending a turn on it.
+   */
+  protected readonly previewIsThin = computed(() => {
+    const handoff = this.preview();
+    return !!handoff && !hasSubstantiveContext(handoff);
+  });
+
   protected readonly scope = signal<'terminal' | 'workspace'>('terminal');
   protected readonly tokenBudget = signal(8_000);
   protected readonly targetTerminalId = signal('');
@@ -55,6 +65,15 @@ export class HandoffDialogComponent {
         );
       }
     });
+  }
+
+  protected handleKeydown(event: KeyboardEvent): void {
+    if (event.key !== 'Escape') {
+      return;
+    }
+    // The workbench listens for Escape on the window; an open dialog owns the key instead.
+    event.stopPropagation();
+    this.cancelled.emit();
   }
 
   protected generate(): void {

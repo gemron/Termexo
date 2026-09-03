@@ -495,6 +495,24 @@ export class AgentService {
     this.upsertAccountProfile(profile);
   }
 
+  /**
+   * Copies one account's user configuration onto another and returns what was copied.
+   *
+   * The backend decides what is portable; credentials and identity never are. The target is
+   * re-read afterwards because a copied `settings.json` can change what its CLI reports.
+   */
+  async copyAccountConfiguration(sourceId: string, targetId: string): Promise<string[]> {
+    if (!isTauriRuntime()) {
+      return [];
+    }
+    const copied = await invoke<string[]>('copy_account_configuration', {
+      sourceProfileId: sourceId,
+      targetProfileId: targetId,
+    });
+    await this.refreshAccountProfile(targetId);
+    return copied;
+  }
+
   async deleteAccountProfile(profileId: string): Promise<void> {
     if (isTauriRuntime()) {
       await invoke('delete_account_profile', { profileId });

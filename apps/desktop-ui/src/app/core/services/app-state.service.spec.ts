@@ -370,8 +370,7 @@ describe('AppStateService', () => {
     const switched = service.restartTerminalWithProfile(
       claude!.id,
       "claude --model 'deepseek-v4-pro[1m]'",
-      'DeepSeek V4 Pro',
-      'deepseek',
+      { model: 'DeepSeek V4 Pro', profileId: 'deepseek' },
     );
 
     expect(switched).toBe(true);
@@ -391,6 +390,56 @@ describe('AppStateService', () => {
     expect(
       service.activeWorkspace()?.terminals.find((terminal) => terminal.id === shell?.id)?.model,
     ).toBe('Local');
+  });
+
+  it('restarts a terminal on another account, keeping the model it was already running', async () => {
+    await service.initialize();
+    const claude = service.createTerminal({
+      agentType: 'claude',
+      command: 'claude --model sonnet',
+      profileId: 'claude-default',
+      accountProfileId: 'claude-system',
+      nativeSessionId: 'old-session',
+    });
+
+    const switched = service.restartTerminalWithProfile(claude!.id, 'claude --model sonnet', {
+      model: 'Claude Sonnet',
+      profileId: 'claude-default',
+      accountProfileId: 'claude-work',
+    });
+
+    expect(switched).toBe(true);
+    expect(
+      service.activeWorkspace()?.terminals.find((terminal) => terminal.id === claude?.id),
+    ).toEqual(
+      expect.objectContaining({
+        accountProfileId: 'claude-work',
+        model: 'Claude Sonnet',
+        profileId: 'claude-default',
+        // The account owns the transcript directory, so the old session cannot carry over.
+        nativeSessionId: undefined,
+        runtimeRevision: 1,
+      }),
+    );
+  });
+
+  it('keeps the account a terminal is signed in as when only its model changes', async () => {
+    await service.initialize();
+    const claude = service.createTerminal({
+      agentType: 'claude',
+      command: 'claude --model sonnet',
+      accountProfileId: 'claude-work',
+    });
+
+    service.restartTerminalWithProfile(claude!.id, 'claude --model opus', {
+      model: 'Claude Opus',
+      profileId: 'anthropic',
+    });
+
+    expect(
+      service.activeWorkspace()?.terminals.find((terminal) => terminal.id === claude?.id)
+        ?.accountProfileId,
+    ).toBe('claude-work');
   });
 
   it('moves terminal tabs manually and persists the new order', async () => {

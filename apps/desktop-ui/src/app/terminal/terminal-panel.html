@@ -47,6 +47,17 @@
       @if (session().autoConfirm) {
         <span class="auto-confirm-chip" [title]="'terminal.autoConfirmActive' | t">AUTO</span>
       }
+      @if (accountName(); as account) {
+        <button
+          type="button"
+          class="account-chip"
+          [title]="'terminal.switchThisAccount' | t: { name: account }"
+          (click)="$event.stopPropagation(); accountSwitchRequested.emit(session().id)"
+        >
+          <app-icon name="users" [size]="11" />
+          <span>{{ account }}</span>
+        </button>
+      }
       @if (session().agentType === 'claude' || session().agentType === 'codex') {
         <button
           type="button"

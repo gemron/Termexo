@@ -1,4 +1,13 @@
-import { Component, effect, inject, input, output, signal, untracked } from '@angular/core';
+import {
+  Component,
+  computed,
+  effect,
+  inject,
+  input,
+  output,
+  signal,
+  untracked,
+} from '@angular/core';
 import { FormsModule } from '@angular/forms';
 
 import { I18nService } from '../core/i18n/i18n.service';
@@ -547,6 +556,34 @@ const DEFAULT_ALERT_THRESHOLD = 80;
                     <span>{{ 'settings.defaultAccount' | t }}</span>
                   </label>
 
+                  @if (accountId() && copySourceCandidates().length > 0) {
+                    <div class="account-copy">
+                      <label>
+                        <span>{{ 'settings.copyConfig' | t }}</span>
+                        <select
+                          [ngModel]="copySourceId()"
+                          (ngModelChange)="copySourceId.set($event)"
+                        >
+                          <option value="">{{ 'settings.copyConfigPick' | t }}</option>
+                          @for (candidate of copySourceCandidates(); track candidate.id) {
+                            <option [value]="candidate.id">{{ candidate.name }}</option>
+                          }
+                        </select>
+                      </label>
+                      <button
+                        type="button"
+                        class="secondary"
+                        [disabled]="busy() || !copySourceId()"
+                        (click)="requestConfigCopy()"
+                      >
+                        <app-icon name="download" [size]="13" />{{
+                          'settings.copyConfigAction' | t
+                        }}
+                      </button>
+                      <small>{{ 'settings.copyConfigHelp' | t }}</small>
+                    </div>
+                  }
+
                   <p class="workspace-binding">
                     {{ 'settings.accountSafety' | t }}
                   </p>
@@ -1079,6 +1116,7 @@ export class AgentSettingsDialogComponent {
   readonly deleteAccountRequested = output<string>();
   readonly accountLoginRequested = output<string>();
   readonly accountRefreshRequested = output<string>();
+  readonly accountConfigCopyRequested = output<{ sourceId: string; targetId: string }>();
 
   protected readonly tab = signal<SettingsTab>('diagnostics');
   protected readonly modelId = signal('claude-default');
@@ -1087,6 +1125,22 @@ export class AgentSettingsDialogComponent {
   protected readonly networkId = signal('');
   protected readonly accountId = signal('');
   protected readonly accountSystem = signal(false);
+  protected readonly copySourceId = signal('');
+  /**
+   * Accounts the selected one can copy from: same agent, and not itself.
+   *
+   * Credentials never travel, so copying from the system account — where the user's real
+   * settings and plugins usually live — is the common case rather than a special one.
+   */
+  protected readonly copySourceCandidates = computed(() => {
+    const target = this.accountProfiles().find((profile) => profile.id === this.accountId());
+    if (!target) {
+      return [];
+    }
+    return this.accountProfiles().filter(
+      (profile) => profile.id !== target.id && profile.agentType === target.agentType,
+    );
+  });
   protected readonly hasNetworkCredential = signal(false);
   protected readonly allPresets = PROVIDER_PRESETS;
   protected cliAgentType: NativeAgentType = 'claude';
@@ -1186,6 +1240,17 @@ export class AgentSettingsDialogComponent {
     this.accountAgentType = profile.agentType;
     this.accountDefault = profile.isDefault;
     this.accountSystem.set(profile.isSystem);
+    // The previous pick belongs to the account being left, not this one.
+    this.copySourceId.set('');
+  }
+
+  protected requestConfigCopy(): void {
+    const sourceId = this.copySourceId();
+    const targetId = this.accountId();
+    if (!sourceId || !targetId) {
+      return;
+    }
+    this.accountConfigCopyRequested.emit({ sourceId, targetId });
   }
 
   protected newAccount(): void {

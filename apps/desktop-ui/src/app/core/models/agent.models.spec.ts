@@ -8,6 +8,7 @@ import {
   needsCredential,
   PROVIDER_PRESETS,
   resolveAccountProfileId,
+  terminalAccountName,
 } from './agent.models';
 
 describe('compatibleNativeSessionId', () => {
@@ -178,5 +179,30 @@ describe('resolveAccountProfileId', () => {
 
   it('reports nothing when the agent has no account at all', () => {
     expect(resolveAccountProfileId([account('codex-work', 'codex')], 'claude')).toBeUndefined();
+  });
+});
+
+describe('terminalAccountName', () => {
+  const accounts = [
+    { ...account('claude-system', 'claude', true), name: '系统 Claude 账号' },
+    { ...account('claude-work', 'claude'), name: '工作账号' },
+    { ...account('codex-work', 'codex'), name: 'Codex 账号' },
+  ];
+
+  it('names the account a terminal recorded when it launched', () => {
+    expect(terminalAccountName(accounts, 'claude', 'claude-work')).toBe('工作账号');
+  });
+
+  it('names the default a terminal restored without an account actually falls back to', () => {
+    expect(terminalAccountName(accounts, 'claude')).toBe('系统 Claude 账号');
+  });
+
+  it('names nothing for agents that run on no account of their own', () => {
+    expect(terminalAccountName(accounts, 'shell')).toBe('');
+    expect(terminalAccountName(accounts, 'opencode')).toBe('');
+  });
+
+  it('names nothing when the agent has no account configured at all', () => {
+    expect(terminalAccountName([], 'claude')).toBe('');
   });
 });

@@ -13,6 +13,8 @@ import { IconComponent } from '../shared/icon/icon';
 export class WorkspaceSidebarComponent {
   readonly workspaces = input.required<Workspace[]>();
   readonly activeWorkspaceId = input<string | null>(null);
+  /** Empty in browser preview, where the footer is left out entirely. */
+  readonly appVersion = input('');
 
   readonly workspaceSelected = output<string>();
   readonly favoriteToggled = output<string>();
@@ -21,8 +23,6 @@ export class WorkspaceSidebarComponent {
   readonly deleteRequested = output<string>();
   readonly moveRequested = output<{ workspaceId: string; direction: -1 | 1 }>();
   readonly createRequested = output<void>();
-  readonly settingsRequested = output<void>();
-  readonly collapseRequested = output<void>();
 
   protected workspaceColor(workspace: Workspace): string {
     return normalizeWorkspaceThemeColor(workspace.themeColor);

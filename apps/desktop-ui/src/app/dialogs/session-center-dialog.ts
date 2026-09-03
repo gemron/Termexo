@@ -1,5 +1,15 @@
 import { DatePipe } from '@angular/common';
-import { Component, computed, inject, input, output, signal } from '@angular/core';
+import {
+  afterNextRender,
+  Component,
+  computed,
+  type ElementRef,
+  inject,
+  input,
+  output,
+  signal,
+  viewChild,
+} from '@angular/core';
 import { FormsModule } from '@angular/forms';
 
 import {
@@ -37,16 +47,45 @@ export type SessionLaunchProfiles = {
 
 type SessionAgentFilter = 'all' | NativeAgentType;
 
-/** Health strip entries, in the order the agents are presented throughout the app. */
-const AGENT_HEALTH_ENTRIES: readonly { agentType: NativeAgentType; name: string }[] = [
-  { agentType: 'claude', name: 'Claude Code' },
-  { agentType: 'codex', name: 'Codex CLI' },
-  { agentType: 'opencode', name: 'OpenCode' },
+interface AgentPresentation {
+  agentType: NativeAgentType;
+  /** Full product name, used by the health strip and the row tag. */
+  name: string;
+  /** Trimmed name for the filter tabs, where the row has to stay on one line. */
+  shortName: string;
+  icon: string;
+}
+
+/**
+ * The single description of every Agent this dialog presents, in the order they appear
+ * throughout the app. The health strip, the filter tabs, and the session rows all read from
+ * here, so a new Agent is added once instead of in three places that can drift apart.
+ */
+const AGENT_PRESENTATIONS: readonly AgentPresentation[] = [
+  { agentType: 'claude', name: 'Claude Code', shortName: 'Claude', icon: 'bot' },
+  { agentType: 'codex', name: 'Codex CLI', shortName: 'Codex', icon: 'bot' },
+  { agentType: 'opencode', name: 'OpenCode', shortName: 'OpenCode', icon: 'terminal' },
 ];
 
-const AGENT_FILTERS: readonly {
-  value: SessionAgentFilter;
-}[] = [{ value: 'all' }, { value: 'claude' }, { value: 'codex' }, { value: 'opencode' }];
+const AGENT_FILTERS: readonly SessionAgentFilter[] = [
+  'all',
+  ...AGENT_PRESENTATIONS.map((entry) => entry.agentType),
+];
+
+/**
+ * A session read from disk can name an Agent this build does not know about, so the fallback
+ * shows the raw type instead of dropping the row out of the list.
+ */
+function presentationOf(agentType: NativeAgentType): AgentPresentation {
+  return (
+    AGENT_PRESENTATIONS.find((entry) => entry.agentType === agentType) ?? {
+      agentType,
+      name: agentType,
+      shortName: agentType,
+      icon: 'bot',
+    }
+  );
+}
 
 @Component({
   selector: 'app-session-center-dialog',
@@ -59,6 +98,7 @@ const AGENT_FILTERS: readonly {
         aria-modal="true"
         aria-labelledby="session-center-title"
         (mousedown)="$event.stopPropagation()"
+        (keydown)="handleKeydown($event)"
       >
         <header>
           <div class="dialog-title">
@@ -98,7 +138,7 @@ const AGENT_FILTERS: readonly {
               [class.unavailable]="!health.installation?.healthy"
             >
               <span class="agent-health-icon">
-                <app-icon [name]="health.agentType === 'codex' ? 'terminal' : 'bot'" [size]="13" />
+                <app-icon [name]="health.icon" [size]="13" />
               </span>
               <strong>{{ health.name }}</strong>
               <code [title]="health.installation?.diagnostic ?? ''">
@@ -112,6 +152,7 @@ const AGENT_FILTERS: readonly {
           <label class="dialog-search input input-bordered input-sm">
             <app-icon name="search" [size]="14" />
             <input
+              #searchInput
               type="search"
               [placeholder]="'session.searchPlaceholder' | t"
               [attr.aria-label]="'session.searchAria' | t"
@@ -135,17 +176,17 @@ const AGENT_FILTERS: readonly {
             role="tablist"
             [attr.aria-label]="'session.filterAria' | t"
           >
-            @for (filter of agentFilters; track filter.value) {
+            @for (filter of agentFilters; track filter) {
               <button
                 type="button"
                 role="tab"
                 class="tab"
-                [class.active]="agentFilter() === filter.value"
-                [attr.aria-selected]="agentFilter() === filter.value"
-                (click)="agentFilter.set(filter.value)"
+                [class.active]="agentFilter() === filter"
+                [attr.aria-selected]="agentFilter() === filter"
+                (click)="agentFilter.set(filter)"
               >
-                {{ filterLabel(filter.value) }}
-                <span>{{ countFor(filter.value) }}</span>
+                {{ filterLabel(filter) }}
+                <span>{{ countFor(filter) }}</span>
               </button>
             }
           </nav>
@@ -180,7 +221,7 @@ const AGENT_FILTERS: readonly {
           </div>
         }
 
-        @if (showsClaudeOptions() || showsCodexOptions()) {
+        @if (showsResumeConfig()) {
           <div class="resume-config" [class.expanded]="optionsExpanded()">
             <button
               type="button"
@@ -209,7 +250,7 @@ const AGENT_FILTERS: readonly {
                   </span>
                 </label>
                 @if (showsClaudeOptions()) {
-                  <section class="resume-options">
+                  <section class="resume-options" data-agent="claude">
                     <h3>
                       <span class="session-agent" data-agent="claude">
                         <app-icon name="bot" [size]="13" />
@@ -256,10 +297,10 @@ const AGENT_FILTERS: readonly {
                 }
 
                 @if (showsCodexOptions()) {
-                  <section class="resume-options">
+                  <section class="resume-options" data-agent="codex">
                     <h3>
                       <span class="session-agent" data-agent="codex">
-                        <app-icon name="terminal" [size]="13" />
+                        <app-icon name="bot" [size]="13" />
                       </span>
                       <span>
                         <strong>{{ 'session.codexResumeConfig' | t }}</strong>
@@ -306,6 +347,30 @@ const AGENT_FILTERS: readonly {
                     </label>
                   </section>
                 }
+
+                @if (showsOpenCodeOptions()) {
+                  <section class="resume-options" data-agent="opencode">
+                    <h3>
+                      <span class="session-agent" data-agent="opencode">
+                        <app-icon name="terminal" [size]="13" />
+                      </span>
+                      <span>
+                        <strong>{{ 'session.openCodeResumeConfig' | t }}</strong>
+                        <small>{{ 'session.openCodeResumeHelp' | t }}</small>
+                      </span>
+                    </h3>
+                    <label>
+                      <span>{{ 'launch.openCodeModel' | t }}</span>
+                      <input
+                        type="text"
+                        [placeholder]="'launch.openCodeModelPlaceholder' | t"
+                        [attr.aria-label]="'session.openCodeModelAria' | t"
+                        [ngModel]="openCodeModel()"
+                        (ngModelChange)="openCodeModel.set($event)"
+                      />
+                    </label>
+                  </section>
+                }
               </div>
             }
           </div>
@@ -322,7 +387,7 @@ const AGENT_FILTERS: readonly {
             @for (session of filteredSessions(); track session.id) {
               <article class="session-row" [attr.data-agent]="session.agentType">
                 <span class="session-agent" [attr.data-agent]="session.agentType">
-                  <app-icon name="bot" [size]="15" />
+                  <app-icon [name]="agentIcon(session)" [size]="15" />
                 </span>
                 <div class="session-copy">
                   <strong [title]="session.title">{{ session.title }}</strong>
@@ -402,6 +467,7 @@ const AGENT_FILTERS: readonly {
 })
 export class SessionCenterDialogComponent {
   private readonly i18n = inject(I18nService);
+  private readonly searchInput = viewChild<ElementRef<HTMLInputElement>>('searchInput');
   readonly installation = input<AgentInstallation | null>(null);
   readonly codexInstallation = input<AgentInstallation | null>(null);
   readonly openCodeInstallation = input<AgentInstallation | null>(null);
@@ -437,17 +503,13 @@ export class SessionCenterDialogComponent {
   protected readonly codexAccountProfileId = signal('');
   protected readonly codexProfileId = signal('');
   protected readonly codexModel = signal('');
+  protected readonly openCodeModel = signal('');
   protected readonly autoConfirm = signal(false);
   protected readonly agentFilters = AGENT_FILTERS;
   protected readonly agentHealth = computed(() =>
-    AGENT_HEALTH_ENTRIES.map((entry) => ({
+    AGENT_PRESENTATIONS.map((entry) => ({
       ...entry,
-      installation:
-        entry.agentType === 'claude'
-          ? this.installation()
-          : entry.agentType === 'codex'
-            ? this.codexInstallation()
-            : this.openCodeInstallation(),
+      installation: this.installationOf(entry.agentType),
     })),
   );
   protected readonly sessionCounts = computed(() => {
@@ -525,6 +587,15 @@ export class SessionCenterDialogComponent {
       (this.agentFilter() === 'all' || this.agentFilter() === 'codex') &&
       this.sessionCounts().codex > 0,
   );
+  protected readonly showsOpenCodeOptions = computed(
+    () =>
+      (this.agentFilter() === 'all' || this.agentFilter() === 'opencode') &&
+      this.sessionCounts().opencode > 0,
+  );
+  /** Automatic confirmation applies to every Agent, so one visible section is enough to offer it. */
+  protected readonly showsResumeConfig = computed(
+    () => this.showsClaudeOptions() || this.showsCodexOptions() || this.showsOpenCodeOptions(),
+  );
   /** Keeps the active model profiles visible while the configuration panel is collapsed. */
   protected readonly configSummary = computed(() => {
     const nameOf = (profiles: ModelProfile[], id: string) =>
@@ -537,6 +608,10 @@ export class SessionCenterDialogComponent {
       names.push(
         this.codexModel().trim() || nameOf(this.openaiProfiles(), this.resolvedCodexProfileId()),
       );
+    }
+    if (this.showsOpenCodeOptions()) {
+      // OpenCode resolves its own default when no model is typed, so there is no name to show.
+      names.push(this.openCodeModel().trim());
     }
     return names.filter(Boolean).join(' · ');
   });
@@ -551,7 +626,7 @@ export class SessionCenterDialogComponent {
       return this.i18n.t('session.noCodex');
     }
     if (this.agentFilter() === 'opencode') {
-      return '没有找到 OpenCode 会话';
+      return this.i18n.t('session.noOpenCode');
     }
     return this.i18n.t(this.onlyWorkspace() ? 'session.noWorkspace' : 'session.noLocal');
   });
@@ -563,11 +638,24 @@ export class SessionCenterDialogComponent {
         : this.i18n.t('session.verifyCli'),
   );
 
-  protected filterLabel(filter: SessionAgentFilter): string {
-    if (filter === 'all') {
-      return this.i18n.t('session.filterAll');
+  constructor() {
+    // `autofocus` only applies while the document is being parsed, so a dialog created later never
+    // receives it. Focusing the search field also puts Escape inside the dialog, where it closes
+    // this dialog instead of reaching the workbench shortcut on the window.
+    afterNextRender(() => this.searchInput()?.nativeElement.focus());
+  }
+
+  protected handleKeydown(event: KeyboardEvent): void {
+    if (event.key !== 'Escape') {
+      return;
     }
-    return filter === 'claude' ? 'Claude' : filter === 'codex' ? 'Codex' : 'OpenCode';
+    // The workbench listens for Escape on the window; an open dialog owns the key instead.
+    event.stopPropagation();
+    this.cancelled.emit();
+  }
+
+  protected filterLabel(filter: SessionAgentFilter): string {
+    return filter === 'all' ? this.i18n.t('session.filterAll') : presentationOf(filter).shortName;
   }
 
   protected countFor(filter: SessionAgentFilter): number {
@@ -584,9 +672,12 @@ export class SessionCenterDialogComponent {
    */
   protected resume(session: AgentSession): void {
     if (session.agentType === 'opencode') {
+      // Credentials and providers live inside OpenCode, so only the model and the confirmation
+      // mode are Termexo's to pass along.
       this.resumed.emit({
         session,
-        model: session.modelName,
+        model: this.openCodeModel().trim() || session.modelName || undefined,
+        autoConfirm: this.autoConfirm() || undefined,
       });
       return;
     }
@@ -609,18 +700,23 @@ export class SessionCenterDialogComponent {
   }
 
   protected installationFor(session: AgentSession): AgentInstallation | null {
-    return session.agentType === 'claude'
-      ? this.installation()
-      : session.agentType === 'codex'
-        ? this.codexInstallation()
-        : this.openCodeInstallation();
+    return this.installationOf(session.agentType);
   }
 
   protected agentLabel(session: AgentSession): string {
-    return (
-      AGENT_HEALTH_ENTRIES.find((entry) => entry.agentType === session.agentType)?.name ??
-      session.agentType
-    );
+    return presentationOf(session.agentType).name;
+  }
+
+  protected agentIcon(session: AgentSession): string {
+    return presentationOf(session.agentType).icon;
+  }
+
+  private installationOf(agentType: NativeAgentType): AgentInstallation | null {
+    return agentType === 'claude'
+      ? this.installation()
+      : agentType === 'codex'
+        ? this.codexInstallation()
+        : this.openCodeInstallation();
   }
 
   protected shortSessionId(session: AgentSession): string {

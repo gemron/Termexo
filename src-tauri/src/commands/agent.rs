@@ -607,6 +607,58 @@ fn select_profile(
         .cloned()
 }
 
+/// Rebuilds the environment a terminal was launched with, from what the terminal itself records.
+///
+/// The stash filled in by `prepare_*_launch` is consumed once and lives only in memory, so a
+/// terminal that reconnects — after an app restart, or any relaunch of its PTY — would otherwise
+/// start with none of it: the CLI would fall back to its default home and read as a different
+/// account, with no proxy and no provider key. Rebuilding keeps a reconnected terminal on the
+/// same account it was created with.
+pub(crate) fn relaunch_environment(
+    database: &WorkspaceDatabase,
+    credentials: &CredentialStore,
+    agent_type: &str,
+    account_profile_id: Option<&str>,
+    model_profile_id: Option<&str>,
+    workspace_id: Option<&str>,
+) -> Result<HashMap<String, String>, String> {
+    // A plain shell carries no agent identity, so it keeps the inherited environment.
+    if agent_type != "claude" && agent_type != "codex" {
+        return Ok(HashMap::new());
+    }
+    let mut environment = account_profile_environment(database, account_profile_id, agent_type)?;
+
+    let profile = match model_profile_id {
+        Some(profile_id) => database
+            .list_model_profiles()
+            .map_err(|error| error.to_string())?
+            .into_iter()
+            .find(|profile| profile.id == profile_id),
+        None => None,
+    };
+    if let Some(profile) = profile.as_ref() {
+        // Codex takes its provider from `-c` overrides on the command line, which the terminal
+        // already stores; only Claude reads the provider out of the environment.
+        if agent_type == "claude" {
+            environment.extend(claude_profile_environment(Some(profile)));
+        }
+        if let Some(target) = profile.credential_target.as_deref() {
+            // A missing key is not fatal here: the terminal is reconnecting, and refusing to
+            // start it would be worse than letting the CLI report the problem itself.
+            if let Ok(Some(token)) = credentials.get_optional(target) {
+                let key = if agent_type == "claude" {
+                    "ANTHROPIC_AUTH_TOKEN"
+                } else {
+                    "OPENAI_API_KEY"
+                };
+                environment.insert(key.into(), token);
+            }
+        }
+    }
+    environment.extend(network_environment(database, credentials, workspace_id)?);
+    Ok(environment)
+}
+
 /// Claude reads its provider from the environment, so the profile becomes env vars.
 fn claude_profile_environment(profile: Option<&ModelProfile>) -> HashMap<String, String> {
     let Some(profile) = profile else {
