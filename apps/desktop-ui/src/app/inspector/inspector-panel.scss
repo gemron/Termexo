@@ -319,6 +319,133 @@ section {
   border-bottom: 0;
 }
 
+.git-session-panel {
+  display: grid;
+  gap: 6px;
+}
+
+.git-session-summary {
+  display: flex;
+  width: 100%;
+  min-width: 0;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 7px 8px;
+  border: 1px solid color-mix(in srgb, var(--accent) 30%, var(--border));
+  border-radius: var(--radius-field);
+  color: var(--text-secondary);
+  background: color-mix(in srgb, var(--accent) 7%, var(--surface-raised));
+  cursor: pointer;
+
+  > span {
+    display: flex;
+    min-width: 0;
+    align-items: center;
+    gap: 6px;
+    color: var(--accent);
+  }
+
+  strong {
+    overflow: hidden;
+    font: 650 11px/1 var(--mono);
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  em {
+    flex: none;
+    color: var(--text-muted);
+    font-size: 10px;
+    font-style: normal;
+  }
+
+  &:hover,
+  &:focus-visible {
+    border-color: color-mix(in srgb, var(--accent) 58%, var(--border));
+    outline: 0;
+    background: color-mix(in srgb, var(--accent) 11%, var(--surface-raised));
+  }
+}
+
+.git-session-files {
+  display: grid;
+  gap: 2px;
+
+  > button {
+    display: grid;
+    width: 100%;
+    min-width: 0;
+    grid-template-columns: 16px minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 5px;
+    padding: 5px 6px;
+    border: 0;
+    border-radius: 4px;
+    color: var(--text-secondary);
+    text-align: left;
+    background: transparent;
+    cursor: pointer;
+
+    &:hover,
+    &:focus-visible {
+      outline: 0;
+      color: var(--text);
+      background: var(--surface-2);
+    }
+
+    b {
+      color: #e4a35a;
+      font: 800 10px/1 var(--mono);
+      text-align: center;
+
+      &[data-status='A'],
+      &[data-status='U'] {
+        color: #58c7a0;
+      }
+
+      &[data-status='D'] {
+        color: #ef7890;
+      }
+
+      &[data-status='R'] {
+        color: #68a9e8;
+      }
+    }
+
+    span {
+      overflow: hidden;
+      font: 10px/1.25 var(--mono);
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    i {
+      color: var(--color-warning);
+      font-size: 8px;
+      font-style: normal;
+      white-space: nowrap;
+    }
+  }
+
+  > button.git-session-more {
+    display: block;
+    padding-left: 27px;
+    color: var(--text-muted);
+    font-size: 9px;
+  }
+}
+
+.git-session-clean {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0;
+  padding: 7px 8px;
+  color: var(--text-muted);
+  font-size: 10px;
+}
+
 .quota-panel {
   display: grid;
   gap: 6px;

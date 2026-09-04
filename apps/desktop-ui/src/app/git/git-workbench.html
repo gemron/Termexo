@@ -1,0 +1,249 @@
+<section class="git-workbench">
+  <header class="git-header">
+    <div class="git-title">
+      <span class="git-mark"><app-icon name="git-branch" [size]="17" /></span>
+      <div>
+        <h1>{{ 'git.title' | t }}</h1>
+        <p>{{ overview().root }}</p>
+      </div>
+    </div>
+    <div class="git-header-actions">
+      <span class="branch-chip" [class.detached]="overview().detached">
+        <app-icon name="git-branch" [size]="12" />
+        {{ overview().branch }}
+      </span>
+      <button
+        type="button"
+        class="refresh-button"
+        [class.spinning]="refreshing()"
+        [disabled]="refreshing()"
+        [title]="'git.refresh' | t"
+        (click)="refresh()"
+      >
+        <app-icon name="refresh" [size]="14" />
+      </button>
+    </div>
+  </header>
+
+  @if (overview().historyRewritten) {
+    <div class="git-warning">
+      <app-icon name="triangle-alert" [size]="13" />{{ overview().diagnostic }}
+    </div>
+  }
+
+  <div class="git-content">
+    <aside class="git-sidebar">
+      <section class="changes-panel">
+        <header>
+          <strong>{{ 'git.sessionChanges' | t }}</strong>
+          <span>{{ overview().changes.length }}</span>
+        </header>
+        <p class="baseline-note">
+          {{ (overview().baselineCaptured ? 'git.baselineCaptured' : 'git.noBaseline') | t }}
+        </p>
+        <div class="change-list">
+          @for (change of overview().changes; track change.path) {
+            <button
+              type="button"
+              class="change-file"
+              [class.active]="change.path === selectedPath()"
+              [title]="change.path"
+              (click)="selectFile(change)"
+            >
+              <span class="status-code" [attr.data-status]="changeStatus(change)">{{
+                changeStatus(change)
+              }}</span>
+              <span class="file-copy">
+                <strong>{{ change.path.split('/').at(-1) }}</strong>
+                <small>{{
+                  change.path.includes('/')
+                    ? change.path.slice(0, change.path.lastIndexOf('/'))
+                    : '.'
+                }}</small>
+              </span>
+              @if (change.committed) {
+                <span class="change-tag">{{ 'git.committed' | t }}</span>
+              }
+              @if (change.preExisting) {
+                <span class="change-tag pre-existing">{{ 'git.preExisting' | t }}</span>
+              }
+              <span class="sr-only">{{ changeLabel(change) }}</span>
+            </button>
+          } @empty {
+            <div class="empty-state compact">
+              <app-icon name="check" [size]="20" />
+              <strong>{{ 'git.clean' | t }}</strong>
+              <span>{{ 'git.cleanHelp' | t }}</span>
+            </div>
+          }
+        </div>
+      </section>
+
+      <section class="graph-panel">
+        <header>
+          <strong>{{ 'git.graph' | t }}</strong>
+          <span>{{ overview().commits.length }}</span>
+        </header>
+        <div class="commit-list">
+          @for (row of graphRows(); track row.commit.oid) {
+            <article class="commit-row" [class.in-session]="row.commit.inSession">
+              <svg
+                class="commit-graph"
+                [attr.viewBox]="'0 0 ' + row.lanes * 16 + ' 48'"
+                [style.width.px]="row.lanes * 16"
+                aria-hidden="true"
+              >
+                @for (lane of row.laneIndexes; track lane) {
+                  <line [attr.x1]="lane * 16 + 8" y1="0" [attr.x2]="lane * 16 + 8" y2="48" />
+                }
+                @for (parentLane of row.parentLanes; track $index) {
+                  <line
+                    [attr.x1]="row.lane * 16 + 8"
+                    y1="24"
+                    [attr.x2]="parentLane * 16 + 8"
+                    y2="48"
+                  />
+                }
+                <circle [attr.cx]="row.lane * 16 + 8" cy="24" r="4" />
+              </svg>
+              <div class="commit-copy">
+                <strong>{{ row.commit.summary }}</strong>
+                <span>
+                  <code>{{ row.commit.shortOid }}</code>
+                  {{ row.commit.author }} · {{ commitTime(row.commit) }}
+                </span>
+                @if (row.commit.decorations.length > 0) {
+                  <div class="decorations">
+                    @for (decoration of row.commit.decorations; track decoration) {
+                      <em>{{ decoration }}</em>
+                    }
+                  </div>
+                }
+              </div>
+            </article>
+          } @empty {
+            <div class="empty-state compact">{{ 'git.noCommits' | t }}</div>
+          }
+        </div>
+      </section>
+    </aside>
+
+    <section class="diff-panel">
+      <header class="diff-toolbar">
+        <div class="diff-file">
+          <strong>{{ selectedPath() || ('git.noFile' | t) }}</strong>
+          @if (diff()?.truncated) {
+            <span>{{ 'git.truncated' | t }}</span>
+          }
+        </div>
+        <div class="diff-layout" role="tablist" [attr.aria-label]="'git.diffLayout' | t">
+          <button
+            type="button"
+            role="tab"
+            [class.active]="layout() === 'unified'"
+            [attr.aria-selected]="layout() === 'unified'"
+            (click)="setLayout('unified')"
+          >
+            <app-icon name="rows" [size]="13" />{{ 'git.unified' | t }}
+          </button>
+          <button
+            type="button"
+            role="tab"
+            [class.active]="layout() === 'split'"
+            [attr.aria-selected]="layout() === 'split'"
+            (click)="setLayout('split')"
+          >
+            <app-icon name="columns" [size]="13" />{{ 'git.split' | t }}
+          </button>
+        </div>
+      </header>
+
+      <div class="diff-viewport" [class.split]="layout() === 'split'">
+        @if (diffLoading()) {
+          <div class="empty-state">
+            <span class="loading loading-spinner loading-sm"></span>{{ 'git.loadingDiff' | t }}
+          </div>
+        } @else if (diffError()) {
+          <div class="empty-state error">
+            <app-icon name="triangle-alert" [size]="20" />{{ diffError() }}
+          </div>
+        } @else if (diff()?.binary) {
+          <div class="empty-state">
+            <app-icon name="package" [size]="22" /><strong>{{ 'git.binary' | t }}</strong>
+          </div>
+        } @else if (!selectedPath()) {
+          <div class="empty-state">
+            <app-icon name="git-compare" [size]="26" /><strong>{{ 'git.selectFile' | t }}</strong>
+          </div>
+        } @else if (rows().length === 0) {
+          <div class="empty-state">
+            <app-icon name="check" [size]="22" /><strong>{{ 'git.noTextChanges' | t }}</strong>
+          </div>
+        } @else if (layout() === 'split') {
+          <div class="split-head">
+            <span>{{ 'git.before' | t }}</span
+            ><span>{{ 'git.after' | t }}</span>
+          </div>
+          <div class="split-grid">
+            @for (row of rows(); track $index) {
+              <div
+                class="diff-line old"
+                [attr.data-kind]="
+                  row.oldLine === undefined
+                    ? 'blank'
+                    : row.oldText !== row.newText
+                      ? 'removed'
+                      : 'equal'
+                "
+                [class.blank]="row.oldLine === undefined"
+              >
+                <span>{{ row.oldLine ?? '' }}</span
+                ><code>{{ row.oldText }}</code>
+              </div>
+              <div
+                class="diff-line new"
+                [attr.data-kind]="
+                  row.newLine === undefined
+                    ? 'blank'
+                    : row.oldText !== row.newText
+                      ? 'added'
+                      : 'equal'
+                "
+                [class.blank]="row.newLine === undefined"
+              >
+                <span>{{ row.newLine ?? '' }}</span
+                ><code>{{ row.newText }}</code>
+              </div>
+            }
+          </div>
+        } @else {
+          <div class="unified-grid">
+            @for (row of rows(); track $index) {
+              @if (
+                row.oldLine !== undefined &&
+                row.newLine !== undefined &&
+                row.oldText !== row.newText
+              ) {
+                <div class="diff-line unified" data-kind="removed">
+                  <span>{{ row.oldLine }}</span
+                  ><span></span><b>−</b><code>{{ row.oldText }}</code>
+                </div>
+                <div class="diff-line unified" data-kind="added">
+                  <span></span><span>{{ row.newLine }}</span
+                  ><b>+</b><code>{{ row.newText }}</code>
+                </div>
+              } @else {
+                <div class="diff-line unified" [attr.data-kind]="row.kind">
+                  <span>{{ row.oldLine ?? '' }}</span
+                  ><span>{{ row.newLine ?? '' }}</span>
+                  <b>{{ row.kind === 'added' ? '+' : row.kind === 'removed' ? '−' : ' ' }}</b>
+                  <code>{{ row.kind === 'removed' ? row.oldText : row.newText }}</code>
+                </div>
+              }
+            }
+          </div>
+        }
+      </div>
+    </section>
+  </div>
+</section>

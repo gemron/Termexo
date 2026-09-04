@@ -1,0 +1,575 @@
+:host {
+  display: block;
+  width: 100%;
+  height: 100%;
+  min-width: 0;
+  min-height: 0;
+  color: var(--text);
+}
+
+button {
+  font: inherit;
+  cursor: pointer;
+}
+button:disabled {
+  cursor: wait;
+  opacity: 0.55;
+}
+
+.git-workbench {
+  display: grid;
+  height: 100%;
+  min-height: 0;
+  grid-template-rows: auto auto minmax(0, 1fr);
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  background: var(--surface-0);
+}
+
+.git-header {
+  display: flex;
+  min-width: 0;
+  min-height: 58px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 9px 12px;
+  border-bottom: 1px solid var(--border);
+  background:
+    linear-gradient(115deg, color-mix(in srgb, var(--accent) 11%, transparent), transparent 40%),
+    var(--surface-1);
+}
+
+.git-title,
+.git-header-actions,
+.branch-chip,
+.diff-toolbar,
+.diff-layout,
+.git-warning {
+  display: flex;
+  align-items: center;
+}
+
+.git-title {
+  min-width: 0;
+  gap: 10px;
+}
+.git-title > div {
+  min-width: 0;
+}
+.git-title h1 {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 700;
+}
+.git-title p {
+  margin: 3px 0 0;
+  overflow: hidden;
+  color: var(--text-muted);
+  font: 9px/1.25 var(--mono);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.git-mark {
+  display: grid;
+  width: 34px;
+  height: 34px;
+  flex: none;
+  place-items: center;
+  border: 1px solid color-mix(in srgb, var(--accent) 38%, var(--border));
+  border-radius: 7px;
+  color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 12%, var(--surface-2));
+}
+
+.git-header-actions {
+  flex: none;
+  gap: 7px;
+}
+.branch-chip {
+  max-width: 230px;
+  gap: 6px;
+  padding: 5px 9px;
+  overflow: hidden;
+  border: 1px solid color-mix(in srgb, var(--accent) 34%, var(--border));
+  border-radius: 999px;
+  color: color-mix(in srgb, var(--accent) 76%, var(--text));
+  background: color-mix(in srgb, var(--accent) 9%, var(--surface-2));
+  font: 600 10px/1 var(--mono);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.branch-chip.detached {
+  color: var(--color-warning);
+  border-color: color-mix(in srgb, var(--color-warning) 40%, var(--border));
+}
+
+.refresh-button {
+  display: grid;
+  width: 29px;
+  height: 29px;
+  place-items: center;
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  color: var(--text-muted);
+  background: var(--surface-2);
+}
+.refresh-button:hover {
+  color: var(--text);
+  border-color: var(--border-strong);
+}
+.refresh-button.spinning app-icon {
+  animation: git-spin 800ms linear infinite;
+}
+
+.git-warning {
+  gap: 7px;
+  padding: 7px 12px;
+  border-bottom: 1px solid color-mix(in srgb, var(--color-warning) 35%, var(--border));
+  color: color-mix(in srgb, var(--color-warning) 78%, var(--text));
+  background: color-mix(in srgb, var(--color-warning) 8%, var(--surface-1));
+  font-size: 10px;
+}
+
+.git-content {
+  display: grid;
+  min-width: 0;
+  min-height: 0;
+  grid-template-columns: minmax(260px, 28%) minmax(0, 1fr);
+}
+
+.git-sidebar {
+  display: grid;
+  min-width: 0;
+  min-height: 0;
+  grid-template-rows: minmax(150px, 42%) minmax(180px, 58%);
+  border-right: 1px solid var(--border);
+  background: var(--surface-1);
+}
+
+.changes-panel,
+.graph-panel {
+  display: grid;
+  min-height: 0;
+  grid-template-rows: auto auto minmax(0, 1fr);
+}
+.graph-panel {
+  grid-template-rows: auto minmax(0, 1fr);
+  border-top: 1px solid var(--border);
+}
+.changes-panel > header,
+.graph-panel > header {
+  display: flex;
+  height: 33px;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 10px;
+  color: var(--text-secondary);
+  font-size: 10px;
+  letter-spacing: 0.025em;
+}
+.changes-panel > header span,
+.graph-panel > header span {
+  min-width: 18px;
+  padding: 2px 5px;
+  border-radius: 9px;
+  text-align: center;
+  background: var(--surface-inset);
+  font: 700 8px/1 var(--mono);
+}
+
+.baseline-note {
+  margin: 0;
+  padding: 5px 10px 7px;
+  color: var(--text-muted);
+  font-size: 9px;
+  line-height: 1.35;
+}
+.change-list,
+.commit-list {
+  min-height: 0;
+  overflow: auto;
+  padding: 3px 6px 7px;
+}
+
+.change-file {
+  display: grid;
+  width: 100%;
+  min-width: 0;
+  grid-template-columns: 18px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 7px;
+  border: 1px solid transparent;
+  border-radius: 5px;
+  color: var(--text-secondary);
+  text-align: left;
+  background: transparent;
+}
+.change-file:hover {
+  color: var(--text);
+  background: var(--surface-2);
+}
+.change-file.active {
+  border-color: color-mix(in srgb, var(--accent) 27%, var(--border));
+  color: var(--text);
+  background: color-mix(in srgb, var(--accent) 9%, var(--surface-2));
+  box-shadow: inset 2px 0 0 var(--accent);
+}
+.status-code {
+  color: #e4a35a;
+  font: 800 10px/1 var(--mono);
+  text-align: center;
+}
+.status-code[data-status='A'],
+.status-code[data-status='U'] {
+  color: #58c7a0;
+}
+.status-code[data-status='D'] {
+  color: #ef7890;
+}
+.status-code[data-status='R'] {
+  color: #68a9e8;
+}
+.file-copy {
+  min-width: 0;
+}
+.file-copy strong,
+.file-copy small {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.file-copy strong {
+  font: 550 10px/1.25 var(--mono);
+}
+.file-copy small {
+  margin-top: 2px;
+  color: var(--text-muted);
+  font: 8px/1.2 var(--mono);
+}
+.change-tag {
+  grid-column: 3;
+  padding: 2px 4px;
+  border-radius: 3px;
+  color: #68a9e8;
+  background: rgb(104 169 232 / 10%);
+  font: 650 7px/1 var(--mono);
+}
+.change-tag.pre-existing {
+  color: var(--color-warning);
+  background: color-mix(in srgb, var(--color-warning) 9%, transparent);
+}
+
+.commit-row {
+  display: grid;
+  min-width: 0;
+  min-height: 48px;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: stretch;
+  border-radius: 4px;
+}
+.commit-row:hover {
+  background: var(--surface-2);
+}
+.commit-row.in-session {
+  background: color-mix(in srgb, var(--accent) 6%, transparent);
+}
+.commit-graph {
+  height: 48px;
+  min-width: 16px;
+  overflow: visible;
+}
+.commit-graph line {
+  stroke: color-mix(in srgb, var(--accent) 42%, var(--border));
+  stroke-width: 1.2;
+}
+.commit-graph circle {
+  fill: var(--surface-1);
+  stroke: var(--text-muted);
+  stroke-width: 1.5;
+}
+.in-session .commit-graph circle {
+  fill: var(--accent);
+  stroke: var(--accent);
+}
+.commit-copy {
+  min-width: 0;
+  align-self: center;
+  padding: 5px 6px;
+}
+.commit-copy strong {
+  display: block;
+  overflow: hidden;
+  font-size: 10px;
+  font-weight: 580;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.commit-copy > span {
+  display: block;
+  margin-top: 3px;
+  overflow: hidden;
+  color: var(--text-muted);
+  font-size: 8px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.commit-copy code {
+  margin-right: 5px;
+  color: color-mix(in srgb, var(--accent) 68%, var(--text));
+}
+.decorations {
+  display: flex;
+  gap: 3px;
+  margin-top: 4px;
+  overflow: hidden;
+}
+.decorations em {
+  padding: 2px 4px;
+  border-radius: 3px;
+  color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 10%, transparent);
+  font: normal 7px/1 var(--mono);
+  white-space: nowrap;
+}
+
+.diff-panel {
+  display: grid;
+  min-width: 0;
+  min-height: 0;
+  grid-template-rows: 38px minmax(0, 1fr);
+  background: var(--surface-inset);
+}
+.diff-toolbar {
+  min-width: 0;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 0 8px 0 12px;
+  border-bottom: 1px solid var(--border);
+  background: var(--surface-1);
+}
+.diff-file {
+  min-width: 0;
+  overflow: hidden;
+}
+.diff-file strong {
+  display: block;
+  overflow: hidden;
+  font: 550 10px/1 var(--mono);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.diff-file span {
+  margin-left: 7px;
+  color: var(--color-warning);
+  font-size: 8px;
+}
+.diff-layout {
+  flex: none;
+  gap: 2px;
+  padding: 2px;
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  background: var(--surface-inset);
+}
+.diff-layout button {
+  display: flex;
+  height: 24px;
+  align-items: center;
+  gap: 5px;
+  padding: 0 7px;
+  border: 0;
+  border-radius: 3px;
+  color: var(--text-muted);
+  background: transparent;
+  font-size: 9px;
+}
+.diff-layout button.active {
+  color: var(--text);
+  background: var(--surface-2);
+  box-shadow: 0 1px 5px rgb(0 0 0 / 20%);
+}
+
+.diff-viewport {
+  position: relative;
+  min-width: 0;
+  min-height: 0;
+  overflow: auto;
+  background: var(--surface-inset);
+}
+.unified-grid {
+  min-width: max-content;
+  padding: 8px 0 24px;
+}
+.split-grid {
+  display: grid;
+  min-width: 900px;
+  grid-template-columns: minmax(450px, 1fr) minmax(450px, 1fr);
+  padding-bottom: 24px;
+}
+.split-head {
+  position: sticky;
+  z-index: 3;
+  top: 0;
+  display: grid;
+  min-width: 900px;
+  grid-template-columns: 1fr 1fr;
+  border-bottom: 1px solid var(--border);
+  background: var(--surface-1);
+}
+.split-head span {
+  padding: 6px 10px;
+  color: var(--text-muted);
+  font: 8px/1 var(--mono);
+}
+.split-head span + span {
+  border-left: 1px solid var(--border);
+}
+
+.diff-line {
+  min-height: 20px;
+  font: 10px/20px var(--mono);
+  white-space: pre;
+}
+.diff-line code {
+  display: block;
+  padding: 0 12px 0 8px;
+  color: var(--text-secondary);
+  font: inherit;
+}
+.diff-line > span {
+  color: color-mix(in srgb, var(--text-muted) 72%, transparent);
+  text-align: right;
+  user-select: none;
+}
+.diff-line.old,
+.diff-line.new {
+  display: grid;
+  min-width: 0;
+  grid-template-columns: 42px minmax(max-content, 1fr);
+}
+.diff-line.old {
+  border-right: 1px solid var(--border);
+}
+.diff-line.old > span,
+.diff-line.new > span {
+  padding-right: 8px;
+  border-right: 1px solid color-mix(in srgb, var(--border) 60%, transparent);
+}
+.diff-line.unified {
+  display: grid;
+  min-width: 100%;
+  grid-template-columns: 42px 42px 18px minmax(max-content, 1fr);
+}
+.diff-line.unified > span {
+  padding-right: 7px;
+  border-right: 1px solid color-mix(in srgb, var(--border) 55%, transparent);
+}
+.diff-line.unified b {
+  color: var(--text-muted);
+  text-align: center;
+  user-select: none;
+}
+.diff-line[data-kind='added'] {
+  background: rgb(60 150 110 / 12%);
+}
+.diff-line[data-kind='added'] code,
+.diff-line[data-kind='added'] b {
+  color: #8fd9b8;
+}
+.diff-line[data-kind='removed'] {
+  background: rgb(190 75 95 / 12%);
+}
+.diff-line[data-kind='removed'] code,
+.diff-line[data-kind='removed'] b {
+  color: #ef9aaa;
+}
+.diff-line.blank {
+  background: color-mix(in srgb, var(--surface-2) 55%, var(--surface-inset));
+}
+.diff-line.blank code {
+  opacity: 0;
+}
+
+.empty-state {
+  display: grid;
+  height: 100%;
+  min-height: 140px;
+  place-content: center;
+  justify-items: center;
+  gap: 8px;
+  padding: 20px;
+  color: var(--text-muted);
+  text-align: center;
+  font-size: 10px;
+}
+.empty-state strong {
+  color: var(--text-secondary);
+  font-size: 11px;
+}
+.empty-state.compact {
+  min-height: 90px;
+}
+.empty-state.error {
+  color: var(--color-error);
+}
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+@keyframes git-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (max-width: 900px) {
+  .git-content {
+    grid-template-columns: minmax(210px, 34%) minmax(0, 1fr);
+  }
+  .git-sidebar {
+    grid-template-rows: minmax(150px, 50%) minmax(160px, 50%);
+  }
+}
+
+@media (max-width: 680px) {
+  .git-content {
+    grid-template-columns: 1fr;
+    grid-template-rows: minmax(150px, 34%) minmax(0, 1fr);
+  }
+  .git-sidebar {
+    grid-template-columns: 1fr 1fr;
+    grid-template-rows: minmax(0, 1fr);
+    border-right: 0;
+    border-bottom: 1px solid var(--border);
+  }
+  .graph-panel {
+    border-top: 0;
+    border-left: 1px solid var(--border);
+  }
+  .branch-chip {
+    max-width: 140px;
+  }
+  .diff-layout button {
+    font-size: 0;
+    gap: 0;
+  }
+  .diff-viewport.split .split-grid,
+  .diff-viewport.split .split-head {
+    min-width: 720px;
+  }
+  .diff-viewport.split .split-grid {
+    grid-template-columns: repeat(2, minmax(360px, 1fr));
+  }
+}

@@ -43,6 +43,7 @@ import {
 } from './core/models/workspace.models';
 import type { HandoffPackage, HandoffRecord } from './core/models/handoff';
 import type { PromptAsset } from './core/models/prompt-assets';
+import type { RepositoryTarget } from './core/models/git.models';
 import { TERMINAL_INPUT_SETTLE_MS, terminalPromptWrites } from './core/models/terminal-input';
 import type { TodoContinuationRequest, TodoTask } from './core/models/todo.models';
 import {
@@ -66,6 +67,7 @@ import { AppStateService } from './core/services/app-state.service';
 import { DirectoryPickerService } from './core/services/directory-picker.service';
 import { DesktopNotificationService } from './core/services/desktop-notification.service';
 import { HandoffService } from './core/services/handoff.service';
+import { GitService } from './core/services/git.service';
 import { PromptAssetService } from './core/services/prompt-asset.service';
 import { AgentStartupService } from './core/services/agent-startup.service';
 import { TodoService } from './core/services/todo.service';
@@ -122,9 +124,10 @@ import { TerminalToolbarComponent } from './terminal/terminal-toolbar';
 import { TerminalWorkbenchComponent } from './terminal/terminal-workbench';
 import { TodoBoardComponent } from './todo/todo-board';
 import { WorkspaceSidebarComponent } from './workspace/workspace-sidebar';
+import { GitWorkbenchComponent } from './git/git-workbench';
 
 type SidebarResizeTarget = 'workspace' | 'inspector';
-type WorkspaceView = 'terminal' | 'tasks';
+type WorkspaceView = 'terminal' | 'tasks' | 'git';
 
 /** How a resume should proceed once the CLI's hold on the session has been dealt with. */
 interface BackgroundReclaim {
@@ -200,6 +203,7 @@ function readStoredString(key: string, fallback: string): string {
     DeleteWorkspaceDialogComponent,
     EditWorkspaceDialogComponent,
     HandoffDialogComponent,
+    GitWorkbenchComponent,
     IconComponent,
     InspectorPanelComponent,
     LanguageSelectorComponent,
@@ -244,6 +248,7 @@ export class App {
   private readonly terminalGateway = inject(TerminalGatewayService);
   protected readonly promptAssets = inject(PromptAssetService);
   protected readonly handoffs = inject(HandoffService);
+  protected readonly git = inject(GitService);
   protected readonly todos = inject(TodoService);
   protected readonly agentStartup = inject(AgentStartupService);
   private readonly handledEventKeys = new Set<string>();
@@ -391,6 +396,16 @@ export class App {
   protected readonly cliOperationPlan = signal<CliOperationPlan | null>(null);
   protected readonly cliOperationResult = signal<CliOperationResult | null>(null);
   protected readonly activeTerminalId = computed(() => this.state.activeTerminal()?.id ?? null);
+  protected readonly gitTarget = computed<RepositoryTarget | null>(() => {
+    const workspace = this.state.activeWorkspace();
+    if (!workspace) return null;
+    const terminal = this.state.activeTerminal();
+    return {
+      workspaceId: workspace.id,
+      terminalId: terminal?.id,
+      runtimeRevision: terminal?.runtimeRevision ?? 0,
+    };
+  });
   protected readonly activeTodoCount = computed(() => {
     const workspaceId = this.state.activeWorkspace()?.id;
     return workspaceId ? this.todos.tasksFor(workspaceId).length : 0;
@@ -509,6 +524,22 @@ export class App {
             this.todos.applyAgentEvent(event);
           }
         }
+      }
+    });
+    effect((onCleanup) => {
+      const targetChanged = this.git.selectTarget(this.gitTarget());
+      const view = this.workspaceView();
+      if (view === 'git') {
+        if (!targetChanged) untracked(() => void this.git.refresh());
+        return;
+      }
+      const interval = view === 'tasks' ? 15_000 : 3_000;
+      const timer = window.setInterval(() => void this.git.refresh(), interval);
+      onCleanup(() => window.clearInterval(timer));
+    });
+    effect(() => {
+      if (this.workspaceView() === 'git' && !this.git.overview()?.available) {
+        this.workspaceView.set('terminal');
       }
     });
     effect(() => {
@@ -2004,7 +2035,7 @@ export class App {
             accountProfileId,
             autoConfirm: original.autoConfirm,
           });
-      await this.terminalGateway.close(original.id);
+      await this.terminalGateway.close(original.id, true);
       if (
         !this.state.restartTerminalWithProfile(original.id, launch.command, {
           model: original.model,
@@ -2107,7 +2138,7 @@ export class App {
       let failure: unknown = null;
       for (const plan of plans) {
         try {
-          await this.terminalGateway.close(plan.original.id);
+          await this.terminalGateway.close(plan.original.id, true);
           if (
             !this.state.restartTerminalWithProfile(plan.original.id, plan.launch.command, {
               model: profileModel(profile, value.agent),
@@ -2135,7 +2166,7 @@ export class App {
         const rollbackTargets = plans.slice(0, Math.min(switched.length + 1, plans.length));
         for (const plan of rollbackTargets.reverse()) {
           try {
-            await this.terminalGateway.close(plan.original.id).catch(() => undefined);
+            await this.terminalGateway.close(plan.original.id, true).catch(() => undefined);
             if (
               !plan.original.command ||
               !this.state.restartTerminalWithProfile(plan.original.id, plan.original.command, {

@@ -576,6 +576,7 @@ export class AppStateService {
           ...terminal,
           status: 'STARTING',
           command: terminal.command ?? this.restoredCommand(terminal),
+          runtimeRevision: (terminal.runtimeRevision ?? 0) + 1,
         })),
     }));
   }
