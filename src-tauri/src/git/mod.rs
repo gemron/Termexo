@@ -46,7 +46,7 @@ struct BaselineFile {
 #[derive(Debug, Clone)]
 pub struct RepositoryTarget {
     pub workspace_id: String,
-    pub terminal_id: Option<String>,
+    pub terminal_id: String,
     pub runtime_revision: u64,
 }
 
@@ -352,21 +352,19 @@ impl RepositoryManager {
         if target.workspace_id.trim().is_empty() {
             return Err("缺少 Git 查询所需的工作区标识。".into());
         }
-        if let Some(terminal_id) = target.terminal_id.as_deref() {
-            let key = SessionKey {
-                terminal_id: terminal_id.to_owned(),
-                runtime_revision: target.runtime_revision,
-            };
-            if let Some(baseline) = self
-                .baselines
-                .lock()
-                .map_err(|_| "Git 会话基线锁已损坏。".to_owned())?
-                .get(&key)
-                .filter(|item| item.workspace_id == target.workspace_id)
-                .cloned()
-            {
-                return Ok((baseline.root.clone(), Some(baseline)));
-            }
+        let key = SessionKey {
+            terminal_id: target.terminal_id.clone(),
+            runtime_revision: target.runtime_revision,
+        };
+        if let Some(baseline) = self
+            .baselines
+            .lock()
+            .map_err(|_| "Git 会话基线锁已损坏。".to_owned())?
+            .get(&key)
+            .filter(|item| item.workspace_id == target.workspace_id)
+            .cloned()
+        {
+            return Ok((baseline.root.clone(), Some(baseline)));
         }
 
         let workspaces = database.list().map_err(|error| error.to_string())?;
@@ -374,15 +372,12 @@ impl RepositoryManager {
             .iter()
             .find(|workspace| workspace.id == target.workspace_id)
             .ok_or_else(|| "Git 查询对应的工作区不存在。".to_owned())?;
-        if let Some(terminal_id) = target.terminal_id.as_deref() {
-            let terminal = workspace
-                .terminals
-                .iter()
-                .find(|terminal| terminal.id == terminal_id)
-                .ok_or_else(|| "Git 查询对应的终端不存在。".to_owned())?;
-            return Ok((PathBuf::from(&terminal.working_directory), None));
-        }
-        Ok((PathBuf::from(&workspace.project_path), None))
+        let terminal = workspace
+            .terminals
+            .iter()
+            .find(|terminal| terminal.id == target.terminal_id)
+            .ok_or_else(|| "Git 查询对应的终端不存在。".to_owned())?;
+        Ok((PathBuf::from(&terminal.working_directory), None))
     }
 }
 

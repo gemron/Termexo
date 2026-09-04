@@ -7,7 +7,7 @@ import { isTauriRuntime } from './tauri-runtime';
 const COMMIT_LIMIT = 50;
 
 function targetKey(target: RepositoryTarget | null): string {
-  return target ? `${target.workspaceId}:${target.terminalId ?? ''}:${target.runtimeRevision}` : '';
+  return target ? `${target.workspaceId}:${target.terminalId}:${target.runtimeRevision}` : '';
 }
 
 @Injectable({ providedIn: 'root' })

@@ -1,6 +1,6 @@
 export interface RepositoryTarget {
   workspaceId: string;
-  terminalId?: string;
+  terminalId: string;
   runtimeRevision: number;
 }
 

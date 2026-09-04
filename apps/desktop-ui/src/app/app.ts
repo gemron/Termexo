@@ -398,12 +398,12 @@ export class App {
   protected readonly activeTerminalId = computed(() => this.state.activeTerminal()?.id ?? null);
   protected readonly gitTarget = computed<RepositoryTarget | null>(() => {
     const workspace = this.state.activeWorkspace();
-    if (!workspace) return null;
     const terminal = this.state.activeTerminal();
+    if (!workspace || !terminal) return null;
     return {
       workspaceId: workspace.id,
-      terminalId: terminal?.id,
-      runtimeRevision: terminal?.runtimeRevision ?? 0,
+      terminalId: terminal.id,
+      runtimeRevision: terminal.runtimeRevision ?? 0,
     };
   });
   protected readonly activeTodoCount = computed(() => {

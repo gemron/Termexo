@@ -105,7 +105,7 @@ export class GitWorkbenchComponent {
   }
 
   private diffKey(path: string, target: RepositoryTarget): string {
-    return `${target.workspaceId}:${target.terminalId ?? ''}:${target.runtimeRevision}:${path}`;
+    return `${target.workspaceId}:${target.terminalId}:${target.runtimeRevision}:${path}`;
   }
 
   private async loadDiff(path: string, target: RepositoryTarget): Promise<void> {

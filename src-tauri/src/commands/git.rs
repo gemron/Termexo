@@ -8,7 +8,7 @@ use crate::git::{RepositoryDiff, RepositoryManager, RepositoryOverview, Reposito
 #[serde(rename_all = "camelCase")]
 pub struct RepositoryTargetRequest {
     workspace_id: String,
-    terminal_id: Option<String>,
+    terminal_id: String,
     #[serde(default)]
     runtime_revision: u64,
 }
