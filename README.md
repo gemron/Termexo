@@ -170,6 +170,7 @@ a local control plane that is observable, recoverable, and extensible.
 | Task board               | Organise projects and tasks with priorities and acceptance criteria, run one as a Claude/Codex/OpenCode terminal, and track it from todo through executing, completed, and verified |
 | Prompt assets            | Recover live per-terminal drafts; search, favorite, pin, delete, and reuse submitted prompts                       |
 | Session handoff          | Build redacted, token-budgeted Git/task packages; import/export documents and continue in another Agent            |
+| Git graph and diff       | Show the active terminal's branch, commit topology, and changes since terminal start with unified or split diff    |
 | Local data and secrets   | Store workspace/session/event data in SQLite and API keys in Windows Credential Manager                            |
 | Browser preview          | Preview the complete UI without Rust and exercise layout flows through an interactive simulated terminal           |
 
@@ -205,8 +206,8 @@ a local control plane that is observable, recoverable, and extensible.
   Termexo restores terminal configuration; historical Claude sessions must be resumed
   explicitly from the session center.
 - Claude and Codex JSONL files are read-only. Termexo never edits, renames, or deletes them.
-- Snapshot, Git, and task orchestration surfaces remain hidden until their production
-  backends are implemented.
+- Snapshot surfaces remain hidden until their production backend is implemented. Git session
+  changes are repository deltas observed since terminal start; concurrent editors may contribute.
 - V0.5 migrates a redacted context package, not a provider's private native transcript. Automatic
   permission approval, native transcript rewriting, and cross-agent batch model-switch transactions
   remain outside the current release.

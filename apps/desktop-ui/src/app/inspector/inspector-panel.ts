@@ -11,6 +11,7 @@ import {
 } from '../core/models/agent.models';
 import { I18nService } from '../core/i18n/i18n.service';
 import { TranslatePipe } from '../core/i18n/translate.pipe';
+import { RepositoryOverview, repositoryChangeStatus } from '../core/models/git.models';
 import {
   AGENT_LABELS,
   type AgentType,
@@ -59,7 +60,9 @@ export class InspectorPanelComponent {
   readonly quotaLoading = input(false);
   readonly modelProfiles = input<ModelProfile[]>([]);
   readonly accountProfiles = input<AccountProfile[]>([]);
+  readonly repository = input<RepositoryOverview | null>(null);
   readonly refreshQuotas = output<void>();
+  readonly gitRequested = output<void>();
   readonly collapseRequested = output<void>();
   protected readonly showAllQuotas = signal(false);
   /** Empty for a plain shell or OpenCode, which run on no account of their own. */
@@ -143,6 +146,10 @@ export class InspectorPanelComponent {
       .filter((event) => !terminalId || event.terminalId === terminalId)
       .slice(0, 12);
   });
+  protected readonly recentCodeChanges = computed(
+    () => this.repository()?.changes.slice(0, 8) ?? [],
+  );
+  protected readonly repositoryChangeStatus = repositoryChangeStatus;
 
   protected readonly agentLabels = AGENT_LABELS;
 

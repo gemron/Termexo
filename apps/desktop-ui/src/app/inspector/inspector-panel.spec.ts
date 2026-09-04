@@ -2,6 +2,7 @@ import { ComponentFixture, TestBed } from '@angular/core/testing';
 
 import { I18nService } from '../core/i18n/i18n.service';
 import { type ModelProfile, type ProviderQuota } from '../core/models/agent.models';
+import type { RepositoryOverview } from '../core/models/git.models';
 import { type TerminalSession } from '../core/models/workspace.models';
 import { InspectorPanelComponent } from './inspector-panel';
 
@@ -148,6 +149,38 @@ describe('InspectorPanelComponent provider allowances', () => {
     fixture.detectChanges();
     expect(root.querySelectorAll('.quota-row')).toHaveLength(1);
     expect(root.textContent).not.toContain('DeepSeek Chat');
+  });
+
+  it('shows live session code changes and opens the full Git view', () => {
+    const repository: RepositoryOverview = {
+      available: true,
+      diagnostic: '',
+      root: 'D:\\devlop\\Termexo',
+      branch: 'feature/git-view',
+      detached: false,
+      baselineCaptured: true,
+      historyRewritten: false,
+      changes: [
+        {
+          path: 'src/app.ts',
+          indexStatus: '',
+          worktreeStatus: 'M',
+          untracked: false,
+          committed: false,
+          preExisting: false,
+        },
+      ],
+      commits: [],
+    };
+    let requested = false;
+    fixture.componentInstance.gitRequested.subscribe(() => (requested = true));
+    fixture.componentRef.setInput('repository', repository);
+    fixture.detectChanges();
+
+    expect(root.querySelectorAll('.git-session-files > button')).toHaveLength(1);
+    expect(root.querySelector('.git-session-files')?.textContent).toContain('src/app.ts');
+    root.querySelector<HTMLButtonElement>('.git-session-summary')?.click();
+    expect(requested).toBe(true);
   });
 });
 

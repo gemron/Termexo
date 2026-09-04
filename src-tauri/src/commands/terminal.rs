@@ -3,6 +3,7 @@ use tauri::{AppHandle, State};
 
 use crate::config::{CredentialStore, LaunchEnvironmentStore};
 use crate::database::WorkspaceDatabase;
+use crate::git::RepositoryManager;
 use crate::pty::PtyManager;
 
 #[derive(Debug, Deserialize)]
@@ -39,6 +40,7 @@ pub fn create_terminal(
     launch_environment: State<'_, LaunchEnvironmentStore>,
     database: State<'_, WorkspaceDatabase>,
     credentials: State<'_, CredentialStore>,
+    repositories: State<'_, RepositoryManager>,
 ) -> Result<(), String> {
     let mut environment = launch_environment
         .take(&request.terminal_id)
@@ -57,6 +59,14 @@ pub fn create_terminal(
                 request.workspace_id.as_deref(),
             )?;
         }
+    }
+    if let Err(error) = repositories.capture_baseline(
+        request.workspace_id.as_deref(),
+        &request.terminal_id,
+        request.runtime_revision,
+        &request.working_directory,
+    ) {
+        tracing::warn!(terminal_id = %request.terminal_id, "无法记录 Git 会话基线：{error}");
     }
     manager
         .start(request, app, environment)
@@ -87,8 +97,17 @@ pub fn resize_terminal(
 }
 
 #[tauri::command]
-pub fn close_terminal(terminal_id: String, manager: State<'_, PtyManager>) -> Result<(), String> {
-    manager
+pub fn close_terminal(
+    terminal_id: String,
+    preserve_repository_baseline: bool,
+    manager: State<'_, PtyManager>,
+    repositories: State<'_, RepositoryManager>,
+) -> Result<(), String> {
+    let result = manager
         .close(&terminal_id)
-        .map_err(|error| error.to_string())
+        .map_err(|error| error.to_string());
+    if !preserve_repository_baseline {
+        repositories.remove_terminal(&terminal_id);
+    }
+    result
 }

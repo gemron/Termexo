@@ -78,6 +78,50 @@
       </section>
     }
 
+    @if (repository()?.available) {
+      <section class="git-session-panel">
+        <header class="section-header">
+          <span>{{ 'git.sidebarTitle' | t }}</span>
+          <small>{{ repository()?.changes?.length ?? 0 }}</small>
+        </header>
+        <button type="button" class="git-session-summary" (click)="gitRequested.emit()">
+          <span>
+            <app-icon name="git-branch" [size]="12" />
+            <strong>{{ repository()?.branch }}</strong>
+          </span>
+          <em>{{ 'git.openFull' | t }}</em>
+        </button>
+        <div class="git-session-files">
+          @for (change of recentCodeChanges(); track change.path) {
+            <button type="button" [title]="change.path" (click)="gitRequested.emit()">
+              <b [attr.data-status]="repositoryChangeStatus(change)">
+                {{ repositoryChangeStatus(change) }}
+              </b>
+              <span>{{ change.path }}</span>
+              @if (change.preExisting) {
+                <i>{{ 'git.preExisting' | t }}</i>
+              }
+            </button>
+          } @empty {
+            <p class="git-session-clean">
+              <app-icon name="check" [size]="13" />{{ 'git.clean' | t }}
+            </p>
+          }
+          @if ((repository()?.changes?.length ?? 0) > recentCodeChanges().length) {
+            <button type="button" class="git-session-more" (click)="gitRequested.emit()">
+              {{
+                'git.moreChanges'
+                  | t
+                    : {
+                        count: (repository()?.changes?.length ?? 0) - recentCodeChanges().length,
+                      }
+              }}
+            </button>
+          }
+        </div>
+      </section>
+    }
+
     <section class="quota-panel">
       <header class="section-header">
         <span>{{ 'quota.title' | t }}</span>

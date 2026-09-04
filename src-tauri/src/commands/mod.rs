@@ -3,6 +3,7 @@ pub mod assets;
 pub mod cli;
 pub mod config;
 pub mod fonts;
+pub mod git;
 pub mod hooks;
 pub mod network_export;
 pub mod notification;

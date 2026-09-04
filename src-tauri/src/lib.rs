@@ -5,6 +5,7 @@ mod commands;
 mod config;
 mod database;
 mod fonts;
+mod git;
 mod hooks;
 mod network;
 mod notification;
@@ -22,6 +23,7 @@ use crate::cli::CliOperationManager;
 use crate::commands::quota::QuotaCache;
 use crate::config::{CredentialStore, LaunchEnvironmentStore};
 use crate::database::WorkspaceDatabase;
+use crate::git::RepositoryManager;
 use crate::hooks::HookEventStore;
 use crate::pty::PtyManager;
 
@@ -77,6 +79,7 @@ pub fn run() {
             app.manage(LaunchEnvironmentStore::default());
             app.manage(hooks);
             app.manage(PtyManager::default());
+            app.manage(RepositoryManager::default());
             app.manage(QuotaCache::default());
             Ok(())
         })
@@ -120,6 +123,8 @@ pub fn run() {
             commands::config::test_network_profile,
             commands::config::discover_system_proxy,
             commands::fonts::list_system_fonts,
+            commands::git::get_repository_overview,
+            commands::git::get_repository_diff,
             commands::network_export::export_network_profiles,
             commands::network_export::write_network_profile_export,
             commands::network_export::import_network_profiles,

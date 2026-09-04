@@ -149,9 +149,9 @@ export class TerminalGatewayService {
     }
   }
 
-  async close(terminalId: string): Promise<void> {
+  async close(terminalId: string, preserveRepositoryBaseline = false): Promise<void> {
     if (isTauriRuntime()) {
-      await invoke('close_terminal', { terminalId });
+      await invoke('close_terminal', { terminalId, preserveRepositoryBaseline });
     }
     this.browserListeners.delete(terminalId);
     this.browserInputs.delete(terminalId);

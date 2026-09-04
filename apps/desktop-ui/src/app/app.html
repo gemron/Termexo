@@ -1,7 +1,7 @@
 <main
   class="app-shell bg-base-100 text-base-content"
   [class.workspace-sidebar-collapsed]="!workspaceSidebarOpen()"
-  [class.inspector-collapsed]="!inspectorOpen() || workspaceView() === 'tasks'"
+  [class.inspector-collapsed]="!inspectorOpen() || workspaceView() !== 'terminal'"
   [class.workspace-maximized]="workspaceMaximized()"
   [class.is-resizing]="resizingSidebar()"
   [style.--workspace-sidebar-width.px]="workspaceSidebarWidth()"
@@ -81,6 +81,29 @@
           <span>任务</span>
           @if (activeTodoCount() > 0) {
             <b>{{ activeTodoCount() }}</b>
+          }
+        </button>
+        <button
+          type="button"
+          role="tab"
+          class="tool-button"
+          data-testid="git-view-toggle"
+          [class.active]="workspaceView() === 'git'"
+          [attr.aria-selected]="workspaceView() === 'git'"
+          [disabled]="!git.overview()?.available"
+          [title]="
+            git.overview()?.available
+              ? ('git.open' | t)
+              : git.loading()
+                ? ('git.detecting' | t)
+                : ('git.unavailable' | t)
+          "
+          (click)="workspaceView.set('git')"
+        >
+          <app-icon name="git-branch" [size]="13" />
+          <span>{{ 'git.button' | t }}</span>
+          @if ((git.overview()?.changes?.length ?? 0) > 0) {
+            <b>{{ git.overview()?.changes?.length }}</b>
           }
         </button>
       </div>
@@ -358,8 +381,8 @@
     ></div>
   }
 
-  <section class="workspace-main" [class.task-board-active]="workspaceView() === 'tasks'">
-    <div class="terminal-tabs" [class.view-hidden]="workspaceView() === 'tasks'">
+  <section class="workspace-main" [class.auxiliary-view-active]="workspaceView() !== 'terminal'">
+    <div class="terminal-tabs" [class.view-hidden]="workspaceView() !== 'terminal'">
       <div class="tab-bar">
         <div
           class="tab-strip tabs tabs-border"
@@ -483,7 +506,7 @@
       </div>
     }
 
-    <section class="workbench-area" [class.board-active]="workspaceView() === 'tasks'">
+    <section class="workbench-area" [class.board-active]="workspaceView() !== 'terminal'">
       @if (state.activeWorkspace(); as activeWorkspace) {
         @defer (when workspaceView() === 'tasks') {
           @if (workspaceView() === 'tasks') {
@@ -502,12 +525,26 @@
             />
           }
         }
+        @defer (when workspaceView() === 'git') {
+          @if (workspaceView() === 'git' && git.overview(); as repository) {
+            @if (gitTarget(); as target) {
+              <app-git-workbench
+                [overview]="repository"
+                [target]="target"
+                [refreshing]="git.loading()"
+                (refreshRequested)="git.refresh()"
+              />
+            }
+          }
+        }
         @for (workspace of mountedWorkspaces(); track workspace.id) {
           <app-terminal-workbench
             [class.workspace-hidden]="
-              workspace.id !== activeWorkspace.id || workspaceView() === 'tasks'
+              workspace.id !== activeWorkspace.id || workspaceView() !== 'terminal'
             "
-            [attr.aria-hidden]="workspace.id !== activeWorkspace.id || workspaceView() === 'tasks'"
+            [attr.aria-hidden]="
+              workspace.id !== activeWorkspace.id || workspaceView() !== 'terminal'
+            "
             [terminals]="workspace.terminals"
             [workspaceId]="workspace.id"
             [layout]="workspace.layout"
@@ -542,11 +579,13 @@
         {{
           workspaceView() === 'tasks'
             ? activeTodoCount() + ' 个任务'
-            : ('inspector.agentActivity' | t: { count: state.runningAgentCount() })
+            : workspaceView() === 'git'
+              ? ('git.changeCount' | t: { count: git.overview()?.changes?.length ?? 0 })
+              : ('inspector.agentActivity' | t: { count: state.runningAgentCount() })
         }}
       </span>
       <span class="status-spacer"></span>
-      <span>{{ state.activeWorkspace()?.activeBranch ?? '' }}</span>
+      <span>{{ git.overview()?.branch ?? state.activeWorkspace()?.activeBranch ?? '' }}</span>
       <span>UTF-8</span>
     </footer>
   </section>
@@ -567,7 +606,9 @@
       [quotaLoading]="agents.quotaLoading()"
       [modelProfiles]="agents.modelProfiles()"
       [accountProfiles]="agents.accountProfiles()"
+      [repository]="git.overview()"
       (refreshQuotas)="refreshProviderQuotas(true)"
+      (gitRequested)="workspaceView.set('git')"
       (collapseRequested)="toggleInspector()"
     />
   }
