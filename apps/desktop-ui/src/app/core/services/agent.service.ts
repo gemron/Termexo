@@ -1,5 +1,4 @@
 import { effect, inject, Injectable, signal } from '@angular/core';
-import { invoke } from '@tauri-apps/api/core';
 import { open as openDialog, save } from '@tauri-apps/plugin-dialog';
 
 import { I18nService } from '../i18n/i18n.service';
@@ -29,7 +28,8 @@ import {
   ProviderQuota,
   SystemProxyDiscovery,
 } from '../models/agent.models';
-import { isTauriRuntime } from './tauri-runtime';
+import { invoke, listen } from './backend-bridge';
+import { hasBackend, isTauriRuntime } from './tauri-runtime';
 
 const EVENT_POLL_INTERVAL_MS = 1_000;
 const MAX_RECENT_EVENTS = 250;
@@ -71,7 +71,7 @@ export class AgentService {
   constructor() {
     effect(() => {
       this.i18n.activeLanguage();
-      if (this.initialized && !isTauriRuntime()) {
+      if (this.initialized && !hasBackend()) {
         this.initializeBrowserPreview();
       }
     });
@@ -83,7 +83,7 @@ export class AgentService {
     }
     this.initialized = true;
 
-    if (!isTauriRuntime()) {
+    if (!hasBackend()) {
       this.initializeBrowserPreview();
       return;
     }
@@ -96,6 +96,7 @@ export class AgentService {
       this.loadSessions(),
     ]);
     void this.refreshAccountStatuses();
+    await this.watchEvents();
     await this.syncEvents();
     await this.loadEvents();
     this.pollingHandle = window.setInterval(() => {
@@ -104,7 +105,7 @@ export class AgentService {
   }
 
   async detectClaude(): Promise<void> {
-    if (!isTauriRuntime()) {
+    if (!hasBackend()) {
       this.installationState.set(this.browserInstallation('claude'));
       return;
     }
@@ -114,7 +115,7 @@ export class AgentService {
   }
 
   async detectCodex(): Promise<void> {
-    if (!isTauriRuntime()) {
+    if (!hasBackend()) {
       this.codexInstallationState.set(this.browserInstallation('codex'));
       return;
     }
@@ -124,7 +125,7 @@ export class AgentService {
   }
 
   async detectOpenCode(): Promise<void> {
-    if (!isTauriRuntime()) {
+    if (!hasBackend()) {
       this.openCodeInstallationState.set(this.browserInstallation('opencode'));
       return;
     }
@@ -134,7 +135,7 @@ export class AgentService {
   }
 
   async refreshSessions(projectPath?: string): Promise<void> {
-    if (!isTauriRuntime()) {
+    if (!hasBackend()) {
       this.sessionItems.set([]);
       return;
     }
@@ -177,7 +178,7 @@ export class AgentService {
   }
 
   async prepareLaunch(request: ClaudeLaunchRequest): Promise<AgentLaunchSpec> {
-    if (!isTauriRuntime()) {
+    if (!hasBackend()) {
       return {
         command: `claude${request.autoConfirm ? ' --permission-mode auto' : ''}${
           request.sessionId ? ` --resume '${request.sessionId}'` : ''
@@ -195,7 +196,7 @@ export class AgentService {
    * `--resume` then prints "is running as a background session" and exits, leaving a dead terminal.
    */
   async inspectClaudeBackgroundSession(sessionId: string): Promise<ClaudeBackgroundSession | null> {
-    if (!isTauriRuntime()) {
+    if (!hasBackend()) {
       return null;
     }
     return invoke<ClaudeBackgroundSession | null>('inspect_claude_background_session', {
@@ -205,14 +206,14 @@ export class AgentService {
 
   /** Ends a background session so a Termexo terminal can resume its id again. */
   async stopClaudeBackgroundSession(shortId: string): Promise<void> {
-    if (!isTauriRuntime()) {
+    if (!hasBackend()) {
       return;
     }
     await invoke('stop_claude_background_session', { shortId });
   }
 
   async prepareCodexLaunch(request: CodexLaunchRequest): Promise<AgentLaunchSpec> {
-    if (!isTauriRuntime()) {
+    if (!hasBackend()) {
       return {
         command: `codex${request.autoConfirm ? ' --approve-for-me' : ''}${
           request.sessionId ? ` resume '${request.sessionId}'` : ''
@@ -224,7 +225,7 @@ export class AgentService {
   }
 
   async prepareOpenCodeLaunch(request: OpenCodeLaunchRequest): Promise<AgentLaunchSpec> {
-    if (!isTauriRuntime()) {
+    if (!hasBackend()) {
       return {
         command: `opencode${request.sessionId ? ` --session '${request.sessionId}'` : ''}${
           request.continueLast && !request.sessionId ? ' --continue' : ''
@@ -238,7 +239,7 @@ export class AgentService {
   }
 
   async prepareAccountLogin(request: AccountLoginRequest): Promise<AgentLaunchSpec> {
-    if (!isTauriRuntime()) {
+    if (!hasBackend()) {
       const profile = this.accountProfileItems().find(
         (candidate) => candidate.id === request.accountProfileId,
       );
@@ -251,7 +252,7 @@ export class AgentService {
   }
 
   async previewCliOperation(request: CliOperationRequest): Promise<CliOperationPlan> {
-    if (!isTauriRuntime()) {
+    if (!hasBackend()) {
       const installation = this.installationFor(request.agentType);
       const packageName =
         request.agentType === 'claude'
@@ -293,7 +294,7 @@ export class AgentService {
   }
 
   async executeCliOperation(request: CliOperationRequest): Promise<CliOperationResult> {
-    if (!isTauriRuntime()) {
+    if (!hasBackend()) {
       const plan = await this.previewCliOperation(request);
       const installation: AgentInstallation = {
         agentType: request.agentType,
@@ -328,7 +329,7 @@ export class AgentService {
   }
 
   async saveModelProfile(input: ModelProfileInput): Promise<void> {
-    if (!isTauriRuntime()) {
+    if (!hasBackend()) {
       const { apiKey, clearCredential, ...profile } = input;
       this.upsertModelProfile({
         ...profile,
@@ -341,14 +342,14 @@ export class AgentService {
   }
 
   async deleteModelProfile(profileId: string): Promise<void> {
-    if (isTauriRuntime()) {
+    if (hasBackend()) {
       await invoke('delete_model_profile', { profileId });
     }
     this.modelProfileItems.update((items) => items.filter((item) => item.id !== profileId));
   }
 
   async saveMcpProfile(input: McpProfileInput): Promise<void> {
-    if (!isTauriRuntime()) {
+    if (!hasBackend()) {
       this.upsertMcpProfile(input);
       return;
     }
@@ -357,14 +358,14 @@ export class AgentService {
   }
 
   async deleteMcpProfile(profileId: string): Promise<void> {
-    if (isTauriRuntime()) {
+    if (hasBackend()) {
       await invoke('delete_mcp_profile', { profileId });
     }
     this.mcpProfileItems.update((items) => items.filter((item) => item.id !== profileId));
   }
 
   async saveNetworkProfile(input: NetworkProfileInput): Promise<void> {
-    if (!isTauriRuntime()) {
+    if (!hasBackend()) {
       const existing = this.networkProfileItems().find((profile) => profile.id === input.id);
       const { proxyPassword, clearCredential, ...profile } = input;
       this.upsertNetworkProfile({
@@ -381,14 +382,14 @@ export class AgentService {
   }
 
   async deleteNetworkProfile(profileId: string): Promise<void> {
-    if (isTauriRuntime()) {
+    if (hasBackend()) {
       await invoke('delete_network_profile', { profileId });
     }
     this.networkProfileItems.update((items) => items.filter((item) => item.id !== profileId));
   }
 
   async testNetworkProfile(profileId: string): Promise<NetworkTestResult> {
-    if (!isTauriRuntime()) {
+    if (!hasBackend()) {
       return {
         profileId,
         healthy: true,
@@ -401,7 +402,7 @@ export class AgentService {
   }
 
   async discoverSystemProxy(): Promise<SystemProxyDiscovery> {
-    if (!isTauriRuntime()) {
+    if (!hasBackend()) {
       return {
         source: 'environment',
         httpProxy: 'http://127.0.0.1:7890',
@@ -421,7 +422,7 @@ export class AgentService {
    */
   async exportNetworkProfiles(): Promise<{ count: number; path: string } | null> {
     if (!isTauriRuntime()) {
-      // Browser preview has no filesystem to write to.
+      // Neither the browser preview nor a remote client can open a native save dialog.
       return null;
     }
     const path = await save({
@@ -444,6 +445,7 @@ export class AgentService {
    */
   async importNetworkProfiles(): Promise<ImportSummary | null> {
     if (!isTauriRuntime()) {
+      // The file to import lives on the machine running Termexo, not on the browsing device.
       return null;
     }
     const selected = await openDialog({
@@ -466,7 +468,7 @@ export class AgentService {
   }
 
   async saveAccountProfile(input: AccountProfileInput): Promise<void> {
-    if (!isTauriRuntime()) {
+    if (!hasBackend()) {
       const existing = this.accountProfileItems().find((profile) => profile.id === input.id);
       this.upsertAccountProfile({
         ...input,
@@ -488,7 +490,7 @@ export class AgentService {
   }
 
   async refreshAccountProfile(profileId: string): Promise<void> {
-    if (!isTauriRuntime()) {
+    if (!hasBackend()) {
       return;
     }
     const profile = await invoke<AccountProfile>('refresh_account_profile', { profileId });
@@ -502,7 +504,7 @@ export class AgentService {
    * re-read afterwards because a copied `settings.json` can change what its CLI reports.
    */
   async copyAccountConfiguration(sourceId: string, targetId: string): Promise<string[]> {
-    if (!isTauriRuntime()) {
+    if (!hasBackend()) {
       return [];
     }
     const copied = await invoke<string[]>('copy_account_configuration', {
@@ -514,7 +516,7 @@ export class AgentService {
   }
 
   async deleteAccountProfile(profileId: string): Promise<void> {
-    if (isTauriRuntime()) {
+    if (hasBackend()) {
       await invoke('delete_account_profile', { profileId });
     }
     this.accountProfileItems.update((items) => items.filter((item) => item.id !== profileId));
@@ -596,7 +598,7 @@ export class AgentService {
   }
 
   private async loadProfiles(): Promise<void> {
-    if (!isTauriRuntime()) {
+    if (!hasBackend()) {
       return;
     }
     await this.run(async () => {
@@ -633,17 +635,33 @@ export class AgentService {
     await Promise.allSettled(profileIds.map((profileId) => this.refreshAccountProfile(profileId)));
   }
 
+  /**
+   * Applies hook events as the backend broadcasts them.
+   *
+   * `sync_agent_events` moves a one-way cursor through the spool file, so whichever client polled
+   * last would be the only one to see a batch. Every client instead learns about new events from
+   * this broadcast, which makes the desktop window and a remote browser agree on terminal state.
+   */
+  private async watchEvents(): Promise<void> {
+    await listen<AgentEvent[]>('agent-events', (event) => this.applyEvents(event.payload));
+  }
+
+  private applyEvents(events: AgentEvent[]): void {
+    if (events.length === 0) {
+      return;
+    }
+    this.eventItems.update((items) =>
+      [...[...events].reverse(), ...items].slice(0, MAX_RECENT_EVENTS),
+    );
+  }
+
+  /** Drives the backend to drain the hook spool; the batch it produces arrives as an event. */
   private async syncEvents(): Promise<void> {
-    if (!isTauriRuntime()) {
+    if (!hasBackend()) {
       return;
     }
     try {
-      const events = await invoke<AgentEvent[]>('sync_agent_events');
-      if (events.length > 0) {
-        this.eventItems.update((items) =>
-          [...events.reverse(), ...items].slice(0, MAX_RECENT_EVENTS),
-        );
-      }
+      await invoke('sync_agent_events');
     } catch (error) {
       console.warn('Agent event synchronization failed', error);
     }
@@ -657,7 +675,7 @@ export class AgentService {
    * often each provider is contacted; a manual forced refresh is the only cache bypass.
    */
   async refreshProviderQuotas(workspaceId?: string, force = false): Promise<void> {
-    if (!isTauriRuntime()) {
+    if (!hasBackend()) {
       // Browser preview has no backend to reach the providers through, so every profile reports
       // the same reason rather than the panel appearing broken.
       this.providerQuotaItems.set(

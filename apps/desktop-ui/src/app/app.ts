@@ -44,6 +44,7 @@ import {
 import type { HandoffPackage, HandoffRecord } from './core/models/handoff';
 import type { PromptAsset } from './core/models/prompt-assets';
 import type { RepositoryTarget } from './core/models/git.models';
+import { createId } from './core/models/identifiers';
 import { TERMINAL_INPUT_SETTLE_MS, terminalPromptWrites } from './core/models/terminal-input';
 import type { TodoContinuationRequest, TodoTask } from './core/models/todo.models';
 import {
@@ -71,7 +72,13 @@ import { GitService } from './core/services/git.service';
 import { PromptAssetService } from './core/services/prompt-asset.service';
 import { AgentStartupService } from './core/services/agent-startup.service';
 import { TodoService } from './core/services/todo.service';
-import { isTauriRuntime } from './core/services/tauri-runtime';
+import { RemoteConnectionService } from './core/services/remote-connection.service';
+import {
+  hasBackend,
+  isTauriRuntime,
+  remoteRuntimeInfo,
+  runtimeMode,
+} from './core/services/tauri-runtime';
 import { UpdateCheck, UpdateService } from './core/services/update.service';
 import { WindowControlsService } from './core/services/window-controls.service';
 import {
@@ -107,6 +114,8 @@ import {
 import { PromptLibraryDialogComponent } from './dialogs/prompt-library-dialog';
 import { ResumeSessionValue, SessionCenterDialogComponent } from './dialogs/session-center-dialog';
 import { InspectorPanelComponent } from './inspector/inspector-panel';
+import { RemoteAccessGateComponent } from './remote/remote-access-gate';
+import { RemoteConnectionBadgeComponent } from './remote/remote-connection-badge';
 import { IconComponent } from './shared/icon/icon';
 import { LanguageSelectorComponent } from './shared/language-selector/language-selector';
 import {
@@ -211,6 +220,8 @@ function readStoredString(key: string, fallback: string): string {
     AccountSwitchDialogComponent,
     ModelSwitchDialogComponent,
     PromptLibraryDialogComponent,
+    RemoteAccessGateComponent,
+    RemoteConnectionBadgeComponent,
     SessionCenterDialogComponent,
     TerminalToolbarComponent,
     TerminalWorkbenchComponent,
@@ -243,6 +254,9 @@ export class App {
   protected readonly i18n = inject(I18nService);
   protected readonly updates = inject(UpdateService);
   protected readonly windowControls = inject(WindowControlsService);
+  protected readonly remoteConnection = inject(RemoteConnectionService);
+  /** True only in the browser client served by the desktop app's remote access server. */
+  protected readonly remoteMode = this.remoteConnection.mode === 'remote';
   private readonly directoryPicker = inject(DirectoryPickerService);
   private readonly desktopNotifications = inject(DesktopNotificationService);
   private readonly terminalGateway = inject(TerminalGatewayService);
@@ -632,6 +646,13 @@ export class App {
    * to forget on release. Browser preview has no package to ask, so the label stays hidden.
    */
   private async loadAppVersion(): Promise<void> {
+    // The app plugin is not on the remote command allowlist, so a remote client reads the version
+    // the server injected into the page instead of asking the shell for it.
+    const remote = remoteRuntimeInfo();
+    if (remote) {
+      this.appVersion.set(remote.version);
+      return;
+    }
     if (!isTauriRuntime()) {
       return;
     }
@@ -762,7 +783,7 @@ export class App {
       return;
     }
 
-    const terminalId = crypto.randomUUID();
+    const terminalId = createId();
     this.launchingOpenCode.set(true);
     try {
       const launch = await this.agents.prepareOpenCodeLaunch({
@@ -814,7 +835,7 @@ export class App {
       return;
     }
 
-    const terminalId = crypto.randomUUID();
+    const terminalId = createId();
     this.launchingCodex.set(true);
     try {
       const profile = value.profileId
@@ -873,7 +894,7 @@ export class App {
       return;
     }
 
-    const terminalId = crypto.randomUUID();
+    const terminalId = createId();
     this.launchingClaude.set(true);
     try {
       const launch = await this.agents.prepareLaunch({
@@ -946,7 +967,7 @@ export class App {
       return;
     }
 
-    const terminalId = crypto.randomUUID();
+    const terminalId = createId();
     launching.set(true);
     try {
       const reclaim: BackgroundReclaim =
@@ -2265,7 +2286,7 @@ export class App {
     if (!workingDirectory) {
       return;
     }
-    const terminalId = crypto.randomUUID();
+    const terminalId = createId();
     try {
       const launch = await this.agents.prepareAccountLogin({
         terminalId,
@@ -2437,7 +2458,7 @@ export class App {
     try {
       const discovered = await this.agents.discoverSystemProxy();
       await this.agents.saveNetworkProfile({
-        id: crypto.randomUUID(),
+        id: createId(),
         name: this.i18n.t('settings.importedSystemProxy'),
         scope: 'global',
         enabled: true,
@@ -2615,7 +2636,7 @@ export class App {
         );
 
     this.busyTodoTaskId.set(task.id);
-    const terminalId = crypto.randomUUID();
+    const terminalId = createId();
     try {
       await this.assertTodoAgentAvailable(task.agentType);
       const reclaim: BackgroundReclaim =
@@ -2752,7 +2773,7 @@ export class App {
   }
 
   private async assertTodoAgentAvailable(agentType: TodoTask['agentType']): Promise<void> {
-    if (!isTauriRuntime()) return;
+    if (!hasBackend()) return;
     if (agentType === 'claude') {
       if (!this.agents.installation()) await this.agents.detectClaude();
       const installation = this.agents.installation();
@@ -2951,6 +2972,9 @@ export class App {
   }
 
   private async initialize(): Promise<void> {
+    // Remote views render the desktop's terminal grid, which their own window may be too narrow
+    // for, so styling needs to know which kind of client this is.
+    document.documentElement.dataset['runtime'] = runtimeMode();
     await this.state.initialize();
     this.todos.initialize(this.state.workspaces());
     this.todos.reconcileTerminals(this.state.workspaces());

@@ -1,7 +1,7 @@
 import { Injectable, OnDestroy, signal } from '@angular/core';
-import { invoke } from '@tauri-apps/api/core';
 
-import { isTauriRuntime } from './tauri-runtime';
+import { invoke } from './backend-bridge';
+import { hasBackend, isTauriRuntime } from './tauri-runtime';
 
 export interface UpdateCheck {
   currentVersion: string;
@@ -86,7 +86,7 @@ export class UpdateService implements OnDestroy {
   startPeriodicChecks(onUpdate: (result: UpdateCheck) => void): void {
     // Remembered so re-enabling the preference can resume without the caller registering again.
     this.periodicHandler = onUpdate;
-    if (!isTauriRuntime() || !this.autoCheckValue() || this.timer !== undefined) {
+    if (!hasBackend() || !this.autoCheckValue() || this.timer !== undefined) {
       return;
     }
     this.timer = setInterval(() => {
@@ -112,7 +112,7 @@ export class UpdateService implements OnDestroy {
   }
 
   async check(): Promise<UpdateCheck | null> {
-    if (!isTauriRuntime()) {
+    if (!hasBackend()) {
       // Browser preview has no packaged version to compare against.
       return null;
     }
@@ -135,10 +135,16 @@ export class UpdateService implements OnDestroy {
   }
 
   async openReleasePage(): Promise<void> {
-    if (!isTauriRuntime()) {
+    const url = this.resultValue()?.releaseUrl;
+    if (!url) {
       return;
     }
-    await invoke('open_release_page', { url: this.resultValue()?.releaseUrl });
+    if (!isTauriRuntime()) {
+      // Without a native shell the browsing device opens the page itself.
+      window.open(url, '_blank', 'noopener');
+      return;
+    }
+    await invoke('open_release_page', { url });
   }
 
   /**
@@ -148,10 +154,14 @@ export class UpdateService implements OnDestroy {
    * closes as part of this call and the new build starts on its own.
    */
   async updateViaNpm(): Promise<void> {
-    if (!isTauriRuntime()) {
+    if (isTauriRuntime()) {
+      await invoke('update_via_npm');
       return;
     }
-    await invoke('update_via_npm');
+    if (hasBackend()) {
+      // Updating replaces the running executable and restarts it, which would strand this browser.
+      throw new Error('请在桌面端执行更新');
+    }
   }
 
   /** True when an update is published and the user has not dismissed that exact version. */

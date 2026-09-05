@@ -736,15 +736,30 @@ input:focus-visible,
   background-clip: padding-box;
 }
 
+/*
+ * Sized by its own column and row count rather than stretched to the container.
+ *
+ * With one client watching, the fit proposes exactly what fits and the two agree. With several,
+ * the PTY is only as wide as the narrowest of them, and stretching the canvas to fill a wider
+ * window would distort the glyphs; leaving the margin is what tmux does in the same situation.
+ */
 app-terminal-panel .terminal-host > .xterm {
-  width: 100%;
-  height: 100%;
+  max-width: 100%;
+  max-height: 100%;
 }
 
+/*
+ * xterm 6 draws the buffer to a canvas and moves its own scrollbar, and this element — which
+ * covers the whole terminal and therefore receives every touch — holds no scrollable content.
+ * Leaving the gesture to the browser would scroll nothing, so it is handed to
+ * TerminalPanelComponent, which converts the drag into buffer rows.
+ */
 app-terminal-panel .terminal-host .xterm-viewport {
   overscroll-behavior: contain;
   scrollbar-gutter: stable;
-  touch-action: pan-y;
+  // Vertical drags become buffer scrolling in TerminalPanelComponent; horizontal panning is left
+  // to the browser, which is how a phone reaches the rest of a grid wider than its window.
+  touch-action: pan-x;
 }
 
 @media (prefers-reduced-motion: reduce) {

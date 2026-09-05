@@ -290,6 +290,10 @@
           <app-icon name="panel-right-open" [size]="15" />
         </button>
       }
+      <!-- Remote mode only: the page is identical to the desktop one, so the link state needs saying. -->
+      @defer (when remoteMode) {
+        <app-remote-connection-badge />
+      }
       <app-language-selector />
       <button
         type="button"
@@ -837,4 +841,9 @@
       <span>{{ message }}</span>
     </div>
   </div>
+}
+
+<!-- Covers everything until the remote socket is authenticated; renders nothing on the desktop. -->
+@defer (when remoteMode) {
+  <app-remote-access-gate />
 }

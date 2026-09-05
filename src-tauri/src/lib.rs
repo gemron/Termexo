@@ -12,10 +12,12 @@ mod notification;
 mod process;
 mod pty;
 mod quota;
+mod remote;
 mod system_proxy;
 mod update;
 
 use std::fs;
+use std::sync::Arc;
 
 use tauri::Manager;
 
@@ -26,6 +28,7 @@ use crate::database::WorkspaceDatabase;
 use crate::git::RepositoryManager;
 use crate::hooks::HookEventStore;
 use crate::pty::PtyManager;
+use crate::remote::{RemoteAccessManager, RemoteEventHub};
 
 pub fn capture_hook_event_from_cli() -> Result<(), String> {
     hooks::capture_hook_event_from_cli().map_err(|error| error.to_string())
@@ -49,6 +52,10 @@ pub fn run() {
                 .unwrap_or_else(|_| "termexo=info,termexo_lib=info".into()),
         )
         .init();
+
+    // Installing the provider before anything can reach for one keeps a future dependency that
+    // pulls in `ring` from making the first TLS user panic on an ambiguous default.
+    let _ = rustls::crypto::aws_lc_rs::default_provider().install_default();
 
     tauri::Builder::default()
         .plugin(tauri_plugin_notification::init())
@@ -78,9 +85,18 @@ pub fn run() {
             app.manage(CliOperationManager::default());
             app.manage(LaunchEnvironmentStore::default());
             app.manage(hooks);
-            app.manage(PtyManager::default());
+
+            // One hub is shared by the PTY reader threads, the command helpers and the remote
+            // server, so events reach remote clients in the order their producer created them.
+            let events = Arc::new(RemoteEventHub::new());
+            app.manage(events.clone());
+            app.manage(PtyManager::new(events.clone()));
             app.manage(RepositoryManager::default());
             app.manage(QuotaCache::default());
+
+            let remote = Arc::new(RemoteAccessManager::new(app.handle().clone(), events));
+            app.manage(remote.clone());
+            tauri::async_runtime::spawn(async move { remote.start_if_enabled().await });
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
@@ -149,6 +165,11 @@ pub fn run() {
             commands::terminal::write_terminal,
             commands::terminal::resize_terminal,
             commands::terminal::close_terminal,
+            commands::terminal::read_terminal_scrollback,
+            commands::remote::get_remote_access_status,
+            commands::remote::update_remote_access_settings,
+            commands::remote::regenerate_remote_access_token,
+            commands::remote::render_remote_access_qr,
         ])
         .run(tauri::generate_context!())
         .expect("failed to run Termexo");

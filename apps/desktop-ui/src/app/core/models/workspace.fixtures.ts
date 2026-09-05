@@ -1,3 +1,4 @@
+import { createId } from './identifiers';
 import { Workspace } from './workspace.models';
 
 const DEFAULT_PROJECT_PATH = 'D:\\dev\\termexo';
@@ -7,7 +8,7 @@ export function createDefaultWorkspaces(): Workspace[] {
 
   return [
     {
-      id: crypto.randomUUID(),
+      id: createId(),
       name: 'Termexo',
       themeColor: '#58c7a0',
       sortOrder: 0,
@@ -21,7 +22,7 @@ export function createDefaultWorkspaces(): Workspace[] {
       gridRows: 2,
       terminals: [
         {
-          id: crypto.randomUUID(),
+          id: createId(),
           name: 'Claude - Core',
           workingDirectory: DEFAULT_PROJECT_PATH,
           shell: 'powershell.exe',
@@ -33,7 +34,7 @@ export function createDefaultWorkspaces(): Workspace[] {
           nativeSessionId: 'claude-local-01',
         },
         {
-          id: crypto.randomUUID(),
+          id: createId(),
           name: 'Codex - Tests',
           workingDirectory: DEFAULT_PROJECT_PATH,
           shell: 'powershell.exe',
@@ -47,7 +48,7 @@ export function createDefaultWorkspaces(): Workspace[] {
       ],
     },
     {
-      id: crypto.randomUUID(),
+      id: createId(),
       name: 'MTS Cloud',
       themeColor: '#a78bfa',
       sortOrder: 1,
@@ -62,7 +63,7 @@ export function createDefaultWorkspaces(): Workspace[] {
       terminals: [],
     },
     {
-      id: crypto.randomUUID(),
+      id: createId(),
       name: 'Device Health',
       themeColor: '#68a9e8',
       sortOrder: 2,

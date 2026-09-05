@@ -1,10 +1,10 @@
 [package]
 name = "termexo"
-version = "0.7.0"
+version = "0.8.0"
 description = "Local-first AI coding workspace"
 authors = ["Termexo contributors"]
 edition = "2021"
-rust-version = "1.77.2"
+rust-version = "1.88"
 
 [lib]
 name = "termexo_lib"
@@ -14,19 +14,37 @@ crate-type = ["staticlib", "cdylib", "rlib"]
 tauri-build = { version = "2.5.1", features = [] }
 
 [dependencies]
+axum = { version = "0.8.9", features = ["ws"] }
+axum-server = { version = "0.8.0", features = ["tls-rustls"] }
+base64 = "0.22"
+futures-util = { version = "0.3", default-features = false, features = [
+    "sink",
+    "std",
+] }
+getrandom = "0.4"
+if-addrs = "0.15"
 keyring = { version = "3.6.3", features = ["windows-native"] }
 portable-pty = "0.9.0"
+qrcode = { version = "0.14", default-features = false }
+rcgen = { version = "0.14", default-features = false, features = [
+    "crypto",
+    "pem",
+    "aws_lc_rs",
+] }
 reqwest = { version = "0.13.4", default-features = false, features = [
     "json",
     "rustls",
 ] }
 rusqlite = { version = "0.40.1", features = ["bundled"] }
+rustls = { version = "0.23", default-features = false, features = ["aws_lc_rs"] }
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
+subtle = "2"
 tauri = { version = "2.11.5", features = [] }
 tauri-plugin-dialog = "2.7.2"
 tauri-plugin-notification = "2.3.3"
 thiserror = "2.0"
+tokio = { version = "1", features = ["macros", "rt", "sync", "time"] }
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 url = "2.5"

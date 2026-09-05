@@ -22,7 +22,40 @@ export const SUPPORTED_LANGUAGES: readonly SupportedLanguage[] = [
 type TranslationParams = Readonly<Record<string, string | number>>;
 type TranslationTable = Readonly<Record<string, string>>;
 
+/** Wording a lazily loaded feature contributes; `en` is required because it is the fallback. */
+export type TranslationBundle = Readonly<{ en: TranslationTable }> &
+  Readonly<Partial<Record<AppLanguage, TranslationTable>>>;
+
 const STORAGE_KEY = 'termexo.language';
+
+/**
+ * Tables registered by features that only render behind an `@defer` block.
+ *
+ * Their wording ships in the same lazy chunk as the screens that use it, so it never weighs on
+ * the initial bundle. Registration happens when that chunk is evaluated — before any of its
+ * components are constructed — so no lookup can run ahead of its own strings.
+ */
+const EXTENSIONS: TranslationBundle[] = [];
+const extensionCount = signal(0);
+
+export function registerTranslations(bundle: TranslationBundle): void {
+  if (EXTENSIONS.includes(bundle)) {
+    return;
+  }
+  EXTENSIONS.push(bundle);
+  extensionCount.set(EXTENSIONS.length);
+}
+
+function lookupExtension(language: AppLanguage, key: string): string | undefined {
+  extensionCount();
+  for (const bundle of EXTENSIONS) {
+    const value = bundle[language]?.[key] ?? bundle.en[key];
+    if (value !== undefined) {
+      return value;
+    }
+  }
+  return undefined;
+}
 
 const EN: TranslationTable = {
   'prompt.title': 'Prompt library',
@@ -520,6 +553,7 @@ const EN: TranslationTable = {
   'settings.tabModels': 'Model profiles',
   'settings.tabMcp': 'MCP profiles',
   'settings.tabNetwork': 'Network and npm',
+  'settings.tabRemote': 'Remote access',
   'settings.available': '{name} available',
   'settings.unavailable': '{name} unavailable',
   'settings.awaitingDetection': 'Waiting for detection',
@@ -1169,6 +1203,7 @@ const ZH_CN: TranslationTable = {
   'settings.tabModels': '模型 Profile',
   'settings.tabMcp': 'MCP Profile',
   'settings.tabNetwork': '网络与 npm',
+  'settings.tabRemote': '远程访问',
   'settings.available': '{name} 可用',
   'settings.unavailable': '{name} 不可用',
   'settings.awaitingDetection': '等待检测',
@@ -1440,6 +1475,7 @@ const ES: TranslationTable = {
   'settings.tabModels': 'Perfiles de modelo',
   'settings.tabMcp': 'Perfiles MCP',
   'settings.tabNetwork': 'Red y npm',
+  'settings.tabRemote': 'Acceso remoto',
   'launch.newClaude': 'Nueva sesión de Claude',
   'launch.newCodex': 'Nueva sesión de Codex',
   'launch.sessionName': 'Nombre de la sesión',
@@ -1561,6 +1597,7 @@ const FR: TranslationTable = {
   'settings.tabModels': 'Profils de modèle',
   'settings.tabMcp': 'Profils MCP',
   'settings.tabNetwork': 'Réseau et npm',
+  'settings.tabRemote': 'Accès à distance',
   'launch.newClaude': 'Nouvelle session Claude',
   'launch.newCodex': 'Nouvelle session Codex',
   'launch.sessionName': 'Nom de la session',
@@ -1683,6 +1720,7 @@ const DE: TranslationTable = {
   'settings.tabModels': 'Modellprofile',
   'settings.tabMcp': 'MCP-Profile',
   'settings.tabNetwork': 'Netzwerk und npm',
+  'settings.tabRemote': 'Fernzugriff',
   'launch.newClaude': 'Neue Claude-Sitzung',
   'launch.newCodex': 'Neue Codex-Sitzung',
   'launch.sessionName': 'Sitzungsname',
@@ -1803,6 +1841,7 @@ const JA: TranslationTable = {
   'settings.tabModels': 'モデルプロファイル',
   'settings.tabMcp': 'MCP プロファイル',
   'settings.tabNetwork': 'ネットワークと npm',
+  'settings.tabRemote': 'リモートアクセス',
   'launch.newClaude': '新しい Claude セッション',
   'launch.newCodex': '新しい Codex セッション',
   'launch.sessionName': 'セッション名',
@@ -1923,6 +1962,7 @@ const KO: TranslationTable = {
   'settings.tabModels': '모델 프로필',
   'settings.tabMcp': 'MCP 프로필',
   'settings.tabNetwork': '네트워크 및 npm',
+  'settings.tabRemote': '원격 접속',
   'launch.newClaude': '새 Claude 세션',
   'launch.newCodex': '새 Codex 세션',
   'launch.sessionName': '세션 이름',
@@ -2039,7 +2079,8 @@ export class I18nService {
   }
 
   t(key: string, params: TranslationParams = {}): string {
-    const value = TRANSLATIONS[this.activeLanguage()][key] ?? EN[key] ?? key;
+    const language = this.activeLanguage();
+    const value = TRANSLATIONS[language][key] ?? EN[key] ?? lookupExtension(language, key) ?? key;
     return value.replace(/\{(\w+)\}/g, (match, name: string) =>
       Object.prototype.hasOwnProperty.call(params, name) ? String(params[name]) : match,
     );

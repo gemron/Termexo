@@ -1,0 +1,172 @@
+/* Sits above the dialogs (z-index 100 and 110) because nothing behind it can be acted on yet. */
+.remote-gate {
+  position: fixed;
+  z-index: 200;
+  inset: 0;
+  display: grid;
+  padding: 20px;
+  place-items: center;
+  background: color-mix(in oklab, var(--surface-0) 92%, transparent);
+}
+
+.remote-gate-card {
+  display: grid;
+  width: min(380px, 100%);
+  justify-items: center;
+  padding: 26px 24px 22px;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-box);
+  color: var(--text);
+  background: var(--surface-raised);
+  box-shadow: 0 24px 70px rgb(0 0 0 / 46%);
+  text-align: center;
+
+  h2 {
+    margin: 14px 0 0;
+    font-size: 15px;
+    font-weight: 650;
+  }
+}
+
+.remote-gate-icon {
+  display: grid;
+  width: 44px;
+  height: 44px;
+  place-items: center;
+  border-radius: var(--radius-field);
+  color: var(--color-primary);
+  background: var(--primary-soft);
+}
+
+.remote-gate-status {
+  margin: 8px 0 0;
+  color: var(--text-muted);
+  font-size: 11px;
+  line-height: 1.55;
+}
+
+.remote-gate-error {
+  width: 100%;
+  margin: 12px 0 0;
+  padding: 9px 11px;
+  border: 1px solid color-mix(in oklab, var(--color-error) 46%, var(--border));
+  border-radius: var(--radius-field);
+  color: var(--color-error);
+  background: var(--error-soft);
+  font-size: 10px;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+
+.remote-gate-form {
+  display: grid;
+  width: 100%;
+  margin-top: 16px;
+  gap: 6px;
+  text-align: left;
+
+  label {
+    display: grid;
+    gap: 6px;
+
+    span {
+      color: var(--text-secondary);
+      font-size: 11px;
+      font-weight: 560;
+    }
+  }
+
+  input {
+    height: 34px;
+    padding: 0 10px;
+    border: 1px solid var(--border-strong);
+    border-radius: var(--radius-field);
+    outline: 0;
+    color: var(--text);
+    background: var(--surface-inset);
+    font: 12px/1.4 var(--sans);
+
+    &:focus {
+      border-color: var(--color-primary);
+    }
+  }
+
+  small {
+    color: var(--text-muted);
+    font-size: 9px;
+    line-height: 1.5;
+  }
+}
+
+.remote-gate-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 10px;
+
+  > span {
+    flex: 1;
+  }
+}
+
+.remote-gate-submit,
+.remote-gate-forget {
+  height: 31px;
+  padding: 0 13px;
+  border-radius: var(--radius-field);
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.remote-gate-submit {
+  border: 1px solid color-mix(in oklab, var(--color-primary) 76%, black);
+  color: var(--color-primary-content);
+  background: var(--color-primary);
+
+  &:disabled {
+    opacity: 0.45;
+  }
+}
+
+.remote-gate-forget {
+  margin-top: 14px;
+  border: 1px solid var(--border-strong);
+  color: var(--text-secondary);
+  background: var(--surface-2);
+}
+
+/* A single sweep says "still working" without spinning anything for the whole reconnect wait. */
+.remote-gate-progress {
+  width: 100%;
+  height: 3px;
+  margin-top: 18px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: var(--surface-2);
+
+  i {
+    display: block;
+    width: 38%;
+    height: 100%;
+    border-radius: 999px;
+    background: var(--color-primary);
+    animation: remote-gate-sweep 1.3s ease-in-out infinite;
+  }
+}
+
+@keyframes remote-gate-sweep {
+  from {
+    transform: translateX(-100%);
+  }
+
+  to {
+    transform: translateX(300%);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .remote-gate-progress i {
+    width: 100%;
+    animation: none;
+  }
+}

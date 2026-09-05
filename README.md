@@ -11,7 +11,7 @@
 </p>
 
 <p align="center">
-  <img alt="Version 0.7.0" src="https://img.shields.io/badge/version-0.7.0-58c7a0">
+  <img alt="Version 0.8.0" src="https://img.shields.io/badge/version-0.8.0--preview-58c7a0">
   <img alt="Windows" src="https://img.shields.io/badge/platform-Windows-0078D4?logo=windows">
   <img alt="Tauri 2" src="https://img.shields.io/badge/Tauri-2-24C8DB?logo=tauri&logoColor=white">
   <img alt="Angular 22" src="https://img.shields.io/badge/Angular-22-DD0031?logo=angular">
@@ -34,11 +34,9 @@ Run the complete Windows app with one command—no Termexo account or server req
 npx termexo@latest
 ```
 
-> The current version is **V0.7.0**. The window drops the system title bar for chrome of its own,
-> with the top bar spanning the width and both side panels beneath it; terminals render on the
-> GPU so a long scrollback scrolls smoothly; a terminal keeps its account across reconnects and
-> restarts; and configuration, plugins, and skills can be copied between accounts without moving
-> any credentials.
+> The current version is **V0.8.0 (preview)**. Turn on remote access and a phone or a second
+> computer on the same network opens the whole workbench in a browser, sharing the desktop's live
+> terminals; terminals scroll by finger, and their size follows whichever view is in use.
 
 ![Termexo multi-terminal grid workbench](website/assets/termexo-workbench.png)
 
@@ -112,6 +110,21 @@ you configure under their own terms and privacy policies.
 The interface is available in Simplified Chinese, English, Spanish, French, German, Japanese,
 and Korean. It follows the Windows language automatically, or you can choose a language from
 the main toolbar and keep that choice across restarts.
+
+## What's New in V0.8.0 (preview)
+
+- **Remote access.** Turn it on in the settings and any phone, tablet, or second computer on the
+  same network or VPN opens the whole workbench in a browser: the same workspaces and terminals,
+  reading and writing the same live PTYs. Self-signed HTTPS by default, entered with an access
+  token the settings panel can reveal, turn into a QR code, or rotate.
+- **Terminals scroll by finger.** A drag synthesises a wheel event for xterm to dispatch, which
+  scrolls the normal buffer and reports the wheel to full-screen agents such as Claude Code and
+  OpenCode exactly as the desktop wheel does, with inertia after the finger lifts.
+- **Size follows the view in use.** Work on the desktop and the terminal uses the desktop's width,
+  pick up the phone and it becomes the phone's, come back and it returns. Every other client
+  renders that same grid, panning sideways when its window cannot hold it.
+- **A top bar that fits a phone.** Below 640px the product name and project path give up their
+  space, and whatever still overflows scrolls horizontally.
 
 ## What's New in V0.7.0
 

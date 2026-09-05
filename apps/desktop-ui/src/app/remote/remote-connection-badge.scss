@@ -1,0 +1,53 @@
+:host {
+  display: inline-flex;
+  align-items: center;
+  margin-right: 6px;
+}
+
+/* Colour plus wording: the dot alone would not say which of five states this is. */
+.remote-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 24px;
+  padding: 0 9px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  color: var(--text-muted);
+  background: var(--surface-2);
+  font-size: 10px;
+  font-weight: 600;
+  white-space: nowrap;
+
+  i {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: currentcolor;
+  }
+
+  &[data-state='ready'] {
+    border-color: color-mix(in oklab, var(--color-success) 40%, var(--border));
+    color: var(--color-success);
+    background: var(--success-soft);
+  }
+
+  &[data-state='connecting'],
+  &[data-state='authenticating'] {
+    border-color: color-mix(in oklab, var(--color-info) 40%, var(--border));
+    color: var(--color-info);
+    background: var(--info-soft);
+  }
+
+  &[data-state='reconnecting'] {
+    border-color: color-mix(in oklab, var(--color-warning) 44%, var(--border));
+    color: var(--color-warning);
+    background: var(--warning-soft);
+  }
+
+  &[data-state='unauthorized'] {
+    border-color: color-mix(in oklab, var(--color-error) 46%, var(--border));
+    color: var(--color-error);
+    background: var(--error-soft);
+  }
+}

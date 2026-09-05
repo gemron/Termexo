@@ -19,6 +19,7 @@ const PROVIDER_PROFILE_MIGRATION: &str =
     include_str!("../../migrations/0006_provider_profiles.sql");
 const PROVIDER_PLAN_MIGRATION: &str = include_str!("../../migrations/0007_provider_plans.sql");
 const V05_ASSETS_MIGRATION: &str = include_str!("../../migrations/0008_v05_assets.sql");
+const APP_SETTINGS_MIGRATION: &str = include_str!("../../migrations/0009_app_settings.sql");
 const LEGACY_MINIMAX_M3_MODEL: &str = "MiniMax-M3[1m]";
 const MINIMAX_M3_MODEL: &str = "MiniMax-M3";
 
@@ -164,12 +165,40 @@ impl WorkspaceDatabase {
         run_api_protocol_migration(&connection)?;
         run_provider_profile_migration(&connection)?;
         connection.execute_batch(V05_ASSETS_MIGRATION)?;
+        connection.execute_batch(APP_SETTINGS_MIGRATION)?;
         split_legacy_single_protocol_profiles(&connection)?;
         migrate_legacy_minimax_m3_model(&connection)?;
         ensure_default_profile(&connection)?;
         Ok(Self {
             connection: Mutex::new(connection),
         })
+    }
+
+    /// Reads one application-wide setting document, or `None` when it was never written.
+    pub fn read_app_setting(&self, key: &str) -> Result<Option<String>, DatabaseError> {
+        let connection = self
+            .connection
+            .lock()
+            .map_err(|_| DatabaseError::LockPoisoned)?;
+        let mut statement = connection.prepare("SELECT value FROM app_settings WHERE key = ?1")?;
+        let mut rows = statement.query_map(params![key], |row| row.get::<_, String>(0))?;
+        rows.next().transpose().map_err(DatabaseError::from)
+    }
+
+    pub fn write_app_setting(&self, key: &str, value: &str) -> Result<(), DatabaseError> {
+        let connection = self
+            .connection
+            .lock()
+            .map_err(|_| DatabaseError::LockPoisoned)?;
+        connection.execute(
+            "INSERT INTO app_settings (key, value, updated_at)
+             VALUES (?1, ?2, ?3)
+             ON CONFLICT(key) DO UPDATE SET
+                 value = excluded.value,
+                 updated_at = excluded.updated_at",
+            params![key, value, unix_timestamp_millis()],
+        )?;
+        Ok(())
     }
 
     pub fn list(&self) -> Result<Vec<Workspace>, DatabaseError> {

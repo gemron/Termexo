@@ -322,6 +322,16 @@ header {
   overflow: hidden;
 }
 
+/*
+ * A remote client draws the grid the desktop set, which its own window is often too narrow for —
+ * a phone showing a 130-column agent, say. Scrolling is what makes the rest of it reachable;
+ * the desktop never needs it, since the PTY is sized to its window in the first place.
+ */
+:root[data-runtime='remote'] .terminal-host {
+  overflow: auto;
+  overscroll-behavior: contain;
+}
+
 .runtime-alert {
   position: absolute;
   z-index: 6;

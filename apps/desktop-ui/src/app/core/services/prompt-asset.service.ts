@@ -1,13 +1,14 @@
 import { Injectable, signal } from '@angular/core';
-import { invoke } from '@tauri-apps/api/core';
 
+import { createId } from '../models/identifiers';
 import {
   type PromptAsset,
   redactSensitiveContent,
   TerminalPromptCapture,
 } from '../models/prompt-assets';
 import type { TerminalSession, Workspace } from '../models/workspace.models';
-import { isTauriRuntime } from './tauri-runtime';
+import { invoke } from './backend-bridge';
+import { hasBackend } from './tauri-runtime';
 
 const STORAGE_KEY = 'termexo.promptAssets.v1';
 const EMERGENCY_DRAFT_STORAGE_KEY = 'termexo.pendingPromptDrafts.v1';
@@ -32,7 +33,7 @@ export class PromptAssetService {
     }
     this.initialized = true;
     try {
-      const assets = isTauriRuntime()
+      const assets = hasBackend()
         ? await invoke<PromptAsset[]>('list_prompt_assets', { workspaceId: null })
         : this.readLocalAssets();
       this.assetItems.set(this.sort(this.mergeLatest(assets, this.readEmergencyDrafts())));
@@ -111,7 +112,7 @@ export class PromptAssetService {
   async delete(assetId: string): Promise<void> {
     try {
       const asset = this.assetItems().find((candidate) => candidate.id === assetId);
-      if (isTauriRuntime()) {
+      if (hasBackend()) {
         await invoke('delete_prompt_asset', { assetId });
       }
       this.assetItems.update((assets) => assets.filter((asset) => asset.id !== assetId));
@@ -215,7 +216,7 @@ export class PromptAssetService {
 
   private async saveAsset(asset: PromptAsset): Promise<void> {
     try {
-      const saved = isTauriRuntime()
+      const saved = hasBackend()
         ? await invoke<PromptAsset>('save_prompt_asset', { input: asset })
         : asset;
       this.assetItems.update((assets) =>
@@ -243,7 +244,7 @@ export class PromptAssetService {
   }
 
   private persistLocalAssets(): void {
-    if (isTauriRuntime()) {
+    if (hasBackend()) {
       return;
     }
     try {
@@ -306,8 +307,7 @@ export class PromptAssetService {
   }
 
   private uniqueId(prefix: string): string {
-    const suffix = globalThis.crypto?.randomUUID?.() ?? `${Date.now()}-${Math.random()}`;
-    return `${prefix}:${suffix}`;
+    return `${prefix}:${createId()}`;
   }
 
   private errorMessage(error: unknown): string {

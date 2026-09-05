@@ -7,6 +7,12 @@ use thiserror::Error;
 
 const CREDENTIAL_SERVICE: &str = "dev.agentdock.desktop";
 
+/// Keyring target for the remote access token.
+///
+/// Fixed rather than generated because there is exactly one token per installation and it must
+/// survive both a settings reset and a database file that was deleted by hand.
+pub const REMOTE_ACCESS_CREDENTIAL_TARGET: &str = "remote-access-token";
+
 #[derive(Debug, Error)]
 pub enum ConfigError {
     #[error("credential store operation failed: {0}")]

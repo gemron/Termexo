@@ -1,8 +1,8 @@
 import { Injectable, signal } from '@angular/core';
-import { invoke } from '@tauri-apps/api/core';
 
 import type { RepositoryDiff, RepositoryOverview, RepositoryTarget } from '../models/git.models';
-import { isTauriRuntime } from './tauri-runtime';
+import { invoke } from './backend-bridge';
+import { hasBackend } from './tauri-runtime';
 
 const COMMIT_LIMIT = 50;
 
@@ -41,7 +41,7 @@ export class GitService {
     }
     const target = this.target;
     const revision = ++this.requestRevision;
-    if (!target || !isTauriRuntime()) {
+    if (!target || !hasBackend()) {
       this.overviewValue.set(null);
       this.loadingValue.set(false);
       return;
@@ -72,7 +72,7 @@ export class GitService {
   }
 
   async loadDiff(target: RepositoryTarget, path: string): Promise<RepositoryDiff> {
-    if (!isTauriRuntime()) throw new Error('Git Diff 仅在桌面应用中可用。');
+    if (!hasBackend()) throw new Error('Git Diff 仅在桌面应用中可用。');
     return invoke<RepositoryDiff>('get_repository_diff', {
       request: { target, path },
     });

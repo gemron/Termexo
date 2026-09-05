@@ -1,11 +1,30 @@
 import { Injectable } from '@angular/core';
-import { invoke } from '@tauri-apps/api/core';
 
 import { Workspace } from '../models/workspace.models';
-import { isTauriRuntime } from './tauri-runtime';
+import { invoke, listen, UnlistenFn } from './backend-bridge';
+import { hasBackend, runtimeClientId } from './tauri-runtime';
 
 const STORAGE_KEY = 'termexo.workspaces.v1';
 const LEGACY_STORAGE_KEY = 'agentdock.workspaces.v1';
+
+const WORKSPACE_CHANGED_EVENT = 'workspace-changed';
+const WORKSPACE_DELETED_EVENT = 'workspace-deleted';
+
+interface WorkspaceChangedPayload {
+  workspace: Workspace;
+  originId?: string | null;
+}
+
+interface WorkspaceDeletedPayload {
+  workspaceId: string;
+  originId?: string | null;
+}
+
+/** Applied when another client — the desktop window or a second browser — edits the same store. */
+export interface WorkspaceChangeHandlers {
+  changed: (workspace: Workspace) => void;
+  deleted: (workspaceId: string) => void;
+}
 
 @Injectable({ providedIn: 'root' })
 export class WorkspaceRepository {
@@ -13,7 +32,7 @@ export class WorkspaceRepository {
   private readonly deletedWorkspaceIds = new Set<string>();
 
   async list(): Promise<Workspace[]> {
-    if (isTauriRuntime()) {
+    if (hasBackend()) {
       return invoke<Workspace[]>('list_workspaces');
     }
 
@@ -37,6 +56,37 @@ export class WorkspaceRepository {
     }
   }
 
+  /**
+   * Reports workspace writes made outside this client.
+   *
+   * Every write carries the id of the page that made it, so the event it triggers can be told
+   * apart from a genuine external edit and this client does not re-apply its own change.
+   */
+  async watchChanges(handlers: WorkspaceChangeHandlers): Promise<UnlistenFn> {
+    if (!hasBackend()) {
+      return () => undefined;
+    }
+
+    const originId = runtimeClientId();
+    const [unlistenChanged, unlistenDeleted] = await Promise.all([
+      listen<WorkspaceChangedPayload>(WORKSPACE_CHANGED_EVENT, (event) => {
+        if (event.payload.originId !== originId) {
+          handlers.changed(event.payload.workspace);
+        }
+      }),
+      listen<WorkspaceDeletedPayload>(WORKSPACE_DELETED_EVENT, (event) => {
+        if (event.payload.originId !== originId) {
+          handlers.deleted(event.payload.workspaceId);
+        }
+      }),
+    ]);
+
+    return () => {
+      unlistenChanged();
+      unlistenDeleted();
+    };
+  }
+
   async save(workspace: Workspace): Promise<void> {
     if (this.deletedWorkspaceIds.has(workspace.id)) {
       return;
@@ -57,7 +107,7 @@ export class WorkspaceRepository {
         (workspace) => !this.deletedWorkspaceIds.has(workspace.id),
       );
 
-      if (isTauriRuntime()) {
+      if (hasBackend()) {
         await Promise.all(retainedWorkspaces.map((workspace) => this.saveNow(workspace)));
         return;
       }
@@ -73,8 +123,8 @@ export class WorkspaceRepository {
     this.deletedWorkspaceIds.add(workspaceId);
     try {
       await this.enqueueMutation(async () => {
-        if (isTauriRuntime()) {
-          await invoke('delete_workspace', { workspaceId });
+        if (hasBackend()) {
+          await invoke('delete_workspace', { workspaceId, originId: runtimeClientId() });
           return;
         }
 
@@ -92,8 +142,8 @@ export class WorkspaceRepository {
   }
 
   private async saveNow(workspace: Workspace): Promise<void> {
-    if (isTauriRuntime()) {
-      await invoke('save_workspace', { workspace });
+    if (hasBackend()) {
+      await invoke('save_workspace', { workspace, originId: runtimeClientId() });
       return;
     }
 

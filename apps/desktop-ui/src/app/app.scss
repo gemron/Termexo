@@ -1122,6 +1122,55 @@ app-inspector-panel {
   }
 }
 
+/*
+   Phone widths, reached through remote access rather than by resizing the desktop window.
+   The toolbar carries more buttons than a phone is wide, and the topbar is a grid whose clusters
+   refuse to shrink, so controls at the right edge — settings among them — used to sit off screen
+   with no way to reach them. Identity text gives up its space first, and whatever still overflows
+   becomes horizontally scrollable rather than unreachable.
+   --------------------------------------------------------------------------- */
+@media (max-width: 640px) {
+  .app-shell {
+    --topbar-height: 48px;
+  }
+
+  .topbar {
+    // The lead may collapse to nothing here; reaching every control matters more than branding.
+    grid-template-columns: minmax(0, auto) minmax(0, 1fr) auto;
+  }
+
+  .topbar-lead {
+    padding-left: 6px;
+  }
+
+  .app-brand {
+    padding-right: 6px;
+
+    strong {
+      display: none;
+    }
+  }
+
+  .workspace-title span {
+    display: none;
+  }
+
+  .toolbar {
+    min-width: 0;
+    gap: 6px;
+    overflow-x: auto;
+    overflow-y: hidden;
+    flex-shrink: 1;
+    // A visible scrollbar would eat into the 48px the bar has to work with.
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+
+    &::-webkit-scrollbar {
+      display: none;
+    }
+  }
+}
+
 @media (max-height: 560px) {
   // Both rows live on the shell now, so shrinking them is two variables.
   .app-shell {

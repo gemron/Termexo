@@ -1,0 +1,251 @@
+/*
+   Remote access panel.
+
+   Only the pieces the shared settings styles do not already provide live here; layout, form
+   controls and button variants come from agent-dialog.scss, and the section headings, hints and
+   intro band are the same global classes the network tab uses.
+   --------------------------------------------------------------------------- */
+
+.remote-panel {
+  min-width: 0;
+}
+
+.remote-loading,
+.remote-empty {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 10px;
+  line-height: 1.55;
+}
+
+.remote-loading {
+  padding: 24px 0;
+  text-align: center;
+}
+
+/* Running / stopped / failed reads as colour and words, never colour alone. */
+.remote-state {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 9px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  color: var(--text-muted);
+  background: var(--surface-2);
+  font-size: 9px;
+  font-weight: 600;
+
+  i {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: currentcolor;
+  }
+
+  &[data-state='running'] {
+    border-color: color-mix(in oklab, var(--color-success) 42%, var(--border));
+    color: var(--color-success);
+    background: var(--success-soft);
+  }
+
+  &[data-state='failed'] {
+    border-color: color-mix(in oklab, var(--color-error) 46%, var(--border));
+    color: var(--color-error);
+    background: var(--error-soft);
+  }
+}
+
+.remote-alert {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  margin-top: 12px;
+  padding: 10px 11px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-box);
+  font-size: 10px;
+  line-height: 1.5;
+
+  > span {
+    flex: 1;
+    min-width: 0;
+  }
+
+  &.error {
+    border-color: color-mix(in oklab, var(--color-error) 46%, var(--border));
+    color: var(--color-error);
+    background: var(--error-soft);
+  }
+
+  &.warning {
+    border-color: color-mix(in oklab, var(--color-warning) 46%, var(--border));
+    color: var(--color-warning);
+    background: var(--warning-soft);
+  }
+}
+
+.remote-notice {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 12px 0 0;
+  padding: 9px 11px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-field);
+  color: var(--text-secondary);
+  background: var(--surface-inset);
+  font-size: 10px;
+  line-height: 1.5;
+}
+
+.remote-fields {
+  margin-top: 12px;
+}
+
+.remote-tls {
+  margin-top: 14px;
+}
+
+.remote-runtime {
+  margin-top: 12px;
+  color: var(--text-secondary);
+  font: 10px/1.4 var(--mono);
+}
+
+.remote-dirty {
+  flex: 0 0 auto;
+  color: var(--color-warning);
+  font-size: 9px;
+}
+
+.field-error {
+  display: block;
+  margin-top: 4px;
+  color: var(--color-error);
+  font-size: 9px;
+  line-height: 1.45;
+}
+
+/* The link and its QR code are two readings of the same address, so they sit side by side. */
+.remote-link {
+  display: grid;
+  align-items: start;
+  gap: 14px;
+  margin-top: 12px;
+  grid-template-columns: minmax(0, 1fr) auto;
+}
+
+.remote-link-value {
+  display: grid;
+  min-width: 0;
+  gap: 8px;
+
+  code {
+    padding: 9px 10px;
+    border: 1px solid var(--border-strong);
+    border-radius: var(--radius-field);
+    background: var(--surface-inset);
+    font-size: 10px;
+    line-height: 1.5;
+    overflow-wrap: anywhere;
+  }
+
+  button {
+    justify-self: start;
+  }
+}
+
+/* Scanners need real black on real white, so the code keeps its own colours in every theme. */
+.remote-qr {
+  display: grid;
+  width: 168px;
+  margin: 0;
+  justify-items: center;
+  gap: 7px;
+
+  /* The padding is the code's quiet zone: about four modules, which scanners need to lock on. */
+  svg {
+    width: 168px;
+    height: 168px;
+    padding: 16px;
+    border-radius: var(--radius-field);
+    background: #ffffff;
+  }
+
+  figcaption {
+    color: var(--text-muted);
+    font-size: 9px;
+    line-height: 1.4;
+    text-align: center;
+  }
+}
+
+.remote-token {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+
+  code {
+    flex: 1;
+    min-width: 180px;
+    padding: 9px 10px;
+    border: 1px solid var(--border-strong);
+    border-radius: var(--radius-field);
+    background: var(--surface-inset);
+    font-size: 10px;
+    line-height: 1.5;
+    overflow-wrap: anywhere;
+  }
+}
+
+.remote-regenerate {
+  margin-top: 12px;
+}
+
+/* Inline confirmation instead of a second dialog on top of the settings dialog. */
+.remote-confirm {
+  margin-top: 12px;
+  padding: 11px 12px;
+  border: 1px solid color-mix(in oklab, var(--color-error) 46%, var(--border));
+  border-radius: var(--radius-box);
+  background: var(--error-soft);
+
+  p {
+    margin: 0;
+    color: var(--text-secondary);
+    font-size: 10px;
+    line-height: 1.55;
+  }
+}
+
+.remote-confirm-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.remote-notes {
+  margin: 0;
+  padding-left: 16px;
+  color: var(--text-secondary);
+  font-size: 10px;
+  line-height: 1.6;
+
+  li + li {
+    margin-top: 6px;
+  }
+}
+
+@media (max-width: 720px) {
+  .remote-link {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .remote-qr {
+    justify-self: start;
+  }
+}

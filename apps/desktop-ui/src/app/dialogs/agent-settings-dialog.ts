@@ -34,17 +34,20 @@ import {
   NativeAgentType,
   PROVIDER_PRESETS,
 } from '../core/models/agent.models';
+import { createId } from '../core/models/identifiers';
 import { UpdateCheck } from '../core/services/update.service';
 import { IconComponent } from '../shared/icon/icon';
+import { RemoteAccessPanelComponent } from './remote-access-panel';
 
-export type SettingsTab = 'diagnostics' | 'cli' | 'accounts' | 'models' | 'mcp' | 'network';
+export type SettingsTab =
+  'diagnostics' | 'cli' | 'accounts' | 'models' | 'mcp' | 'network' | 'remote';
 
 /** Matches the backend default for a profile that has never had a threshold set. */
 const DEFAULT_ALERT_THRESHOLD = 80;
 
 @Component({
   selector: 'app-agent-settings-dialog',
-  imports: [FormsModule, IconComponent, TranslatePipe],
+  imports: [FormsModule, IconComponent, RemoteAccessPanelComponent, TranslatePipe],
   template: `
     <div class="backdrop modal modal-open" (mousedown)="cancelled.emit()">
       <section
@@ -121,6 +124,14 @@ const DEFAULT_ALERT_THRESHOLD = 80;
             (click)="selectTab('network')"
           >
             {{ 'settings.tabNetwork' | t }}
+          </button>
+          <button
+            type="button"
+            class="tab"
+            [class.active]="tab() === 'remote'"
+            (click)="selectTab('remote')"
+          >
+            {{ 'settings.tabRemote' | t }}
           </button>
         </nav>
 
@@ -1065,6 +1076,15 @@ const DEFAULT_ALERT_THRESHOLD = 80;
                 </div>
               </div>
             }
+            @case ('remote') {
+              @defer (on immediate) {
+                <app-remote-access-panel />
+              } @placeholder {
+                <div class="profile-editor">
+                  <p class="field-hint">{{ 'common.loading' | t }}</p>
+                </div>
+              }
+            }
           }
         </div>
       </section>
@@ -1262,7 +1282,7 @@ export class AgentSettingsDialogComponent {
   }
 
   protected saveAccount(): void {
-    const profileId = this.accountId() || crypto.randomUUID();
+    const profileId = this.accountId() || createId();
     this.accountId.set(profileId);
     this.accountSaved.emit({
       id: profileId,
@@ -1355,7 +1375,7 @@ export class AgentSettingsDialogComponent {
     if (!this.canSaveModel()) {
       return;
     }
-    const profileId = this.modelId() || crypto.randomUUID();
+    const profileId = this.modelId() || createId();
     this.modelId.set(profileId);
     this.modelSaved.emit({
       id: profileId,
@@ -1462,7 +1482,7 @@ export class AgentSettingsDialogComponent {
   }
 
   protected saveMcp(): void {
-    const profileId = this.mcpId() || crypto.randomUUID();
+    const profileId = this.mcpId() || createId();
     this.mcpId.set(profileId);
     this.mcpSaved.emit({
       id: profileId,
@@ -1542,7 +1562,7 @@ export class AgentSettingsDialogComponent {
   }
 
   protected saveNetwork(): void {
-    const profileId = this.networkId() || crypto.randomUUID();
+    const profileId = this.networkId() || createId();
     this.networkId.set(profileId);
     if (this.proxyPassword && !this.clearNetworkCredential) {
       this.hasNetworkCredential.set(true);

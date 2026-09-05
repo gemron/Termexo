@@ -11,7 +11,7 @@
 </p>
 
 <p align="center">
-  <img alt="Version 0.7.0" src="https://img.shields.io/badge/version-0.7.0-58c7a0">
+  <img alt="Version 0.8.0" src="https://img.shields.io/badge/version-0.8.0--preview-58c7a0">
   <img alt="Windows" src="https://img.shields.io/badge/platform-Windows-0078D4?logo=windows">
   <img alt="Tauri 2" src="https://img.shields.io/badge/Tauri-2-24C8DB?logo=tauri&logoColor=white">
   <img alt="Angular 22" src="https://img.shields.io/badge/Angular-22-DD0031?logo=angular">
@@ -33,9 +33,8 @@ Termexo 把 Claude Code、Codex 和围绕它们运行的终端收进一个可恢
 npx termexo@latest
 ```
 
-> 当前版本为 **V0.7.0**，窗口去掉系统标题栏改由应用自绘，顶栏横跨整个窗口、左右侧栏在其下；
-> 终端改用 GPU 渲染，长回滚滚动顺滑；终端在重连和应用重启后保持在原账号上；
-> 配置、插件与技能可在账号之间复制，且不携带任何凭据。
+> 当前版本为 **V0.8.0（预览）**：打开远程访问后，同一局域网内的手机或另一台电脑用浏览器就能
+> 打开完整工作台，与桌面共享同一批终端进程；终端支持手指拖拽滚动，尺寸跟随正在使用的那一端。
 
 ![Termexo 多终端网格工作台](website/assets/termexo-workbench.png)
 
@@ -101,6 +100,17 @@ SQLite，密钥保存在 Windows Credential Manager，Claude/Codex 历史会话�
 
 界面支持简体中文、英语、西班牙语、法语、德语、日语和韩语。默认自动跟随 Windows
 系统语言，也可通过主工具栏手动切换并跨重启保留选择。
+
+## V0.8.0（预览）新增
+
+- **远程访问**：在设置里打开后，同一局域网或 VPN 内的手机、平板、另一台电脑用浏览器打开完整
+  工作台，看到同一批工作空间和终端、实时读写同一批 PTY 进程。默认自签名 HTTPS，凭访问令牌
+  进入，设置面板可显示令牌、生成二维码、随时更换。
+- **手指拖拽滚动终端**：拖拽会合成滚轮事件交给 xterm 分发，普通缓冲区直接滚动，Claude Code、
+  OpenCode 这类全屏 TUI 按它们订阅的方式收到滚轮上报，行为与桌面滚轮一致，并带惯性滑动。
+- **尺寸跟随正在使用的一端**：在电脑上操作就用电脑的宽度，拿起手机操作就换成手机的，切回来
+  再变回去。其余客户端渲染同一网格，窗口装不下时可以横向滑动查看。
+- **窄屏顶栏**：640px 以下品牌文字和项目路径让出空间，仍放不下的部分改为横向滚动。
 
 ## V0.7.0 新增
 

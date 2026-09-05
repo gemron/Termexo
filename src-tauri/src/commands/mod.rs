@@ -8,6 +8,7 @@ pub mod hooks;
 pub mod network_export;
 pub mod notification;
 pub mod quota;
+pub mod remote;
 pub mod terminal;
 pub mod update;
 pub mod workspace;

@@ -30,6 +30,7 @@ import { terminalKeySequence, workbenchShortcut } from './terminal-key-sequences
 import { TerminalResizeCoordinator } from './terminal-resize-coordinator';
 import { detectTerminalRuntimeIssue, TerminalRuntimeIssue } from './terminal-runtime-diagnostics';
 import { createTerminalTheme } from './terminal-theme';
+import { decayInertia, TerminalTouchScroller } from './terminal-touch-scroll';
 
 /** `MouseEvent.button` value for the right button. */
 const RIGHT_MOUSE_BUTTON = 2;
@@ -89,6 +90,18 @@ export class TerminalPanelComponent implements AfterViewInit {
   private viewReady = false;
   private outputTail = '';
   private lastRuntimeIssue: TerminalRuntimeIssue = null;
+  private readonly touchScroller = new TerminalTouchScroller(() => this.rowHeight());
+  private inertiaFrame?: number;
+  private inertiaVelocity = 0;
+  private inertiaAt = 0;
+  /**
+   * Where the finger last was, carried into the synthetic wheel events.
+   *
+   * An agent that tracks the mouse receives the wheel as a mouse report carrying cell coordinates,
+   * and a multi-pane TUI such as OpenCode scrolls the pane under them. Reporting the top-left cell
+   * would scroll whichever pane happens to sit there instead of the one being dragged.
+   */
+  private touchPoint = { x: 0, y: 0 };
 
   readonly session = input.required<TerminalSession>();
   /** Needed when reconnecting, to rebuild the workspace's proxy settings. */
@@ -202,6 +215,11 @@ export class TerminalPanelComponent implements AfterViewInit {
       passive: true,
     });
     terminalContainer.addEventListener('wheel', this.stopWheelPropagation, { passive: true });
+    // Not passive: a drag that scrolls the buffer must stop the page from panning as well.
+    terminalContainer.addEventListener('touchstart', this.handleTouchStart, { passive: true });
+    terminalContainer.addEventListener('touchmove', this.handleTouchMove, { passive: false });
+    terminalContainer.addEventListener('touchend', this.handleTouchEnd, { passive: true });
+    terminalContainer.addEventListener('touchcancel', this.handleTouchCancel, { passive: true });
     terminalContainer.addEventListener('mousedown', this.suppressRightButtonReport, true);
     terminalContainer.addEventListener('contextmenu', this.handleContextMenu);
     terminalContainer.addEventListener('compositionstart', this.prepareComposition, true);
@@ -209,6 +227,10 @@ export class TerminalPanelComponent implements AfterViewInit {
     terminalContainer.addEventListener('compositionupdate', this.restoreCompositionAfterUpdate);
     terminalContainer.addEventListener('compositionend', this.endComposition);
     terminalContainer.addEventListener('focusin', this.prepareComposition);
+    terminalContainer.addEventListener('focusin', this.claimOnFocus);
+    // Focus alone misses the case where this view never lost it — returning to a window that was
+    // already focused fires nothing — so any press in the terminal claims it too.
+    terminalContainer.addEventListener('pointerdown', this.claimOnFocus, { passive: true });
     terminalContainer.addEventListener('focusout', this.endComposition);
     this.fitTerminal();
     this.scheduleFit();
@@ -219,6 +241,7 @@ export class TerminalPanelComponent implements AfterViewInit {
     void this.initializeRuntime();
     const inputDisposable = this.terminal.onData((data) => {
       this.inputCaptured.emit({ terminalId: this.session().id, data });
+      this.claimTerminalSize();
       if (data.includes('\r')) {
         this.terminal.scrollToBottom();
         this.runtimeIssue.set(null);
@@ -253,9 +276,16 @@ export class TerminalPanelComponent implements AfterViewInit {
       );
       terminalContainer.removeEventListener('compositionend', this.endComposition);
       terminalContainer.removeEventListener('focusin', this.prepareComposition);
+      terminalContainer.removeEventListener('focusin', this.claimOnFocus);
+      terminalContainer.removeEventListener('pointerdown', this.claimOnFocus);
       terminalContainer.removeEventListener('focusout', this.endComposition);
       terminalContainer.removeEventListener('wheel', this.prepareWheelInteraction, true);
       terminalContainer.removeEventListener('wheel', this.stopWheelPropagation);
+      terminalContainer.removeEventListener('touchstart', this.handleTouchStart);
+      terminalContainer.removeEventListener('touchmove', this.handleTouchMove);
+      terminalContainer.removeEventListener('touchend', this.handleTouchEnd);
+      terminalContainer.removeEventListener('touchcancel', this.handleTouchCancel);
+      this.stopInertia();
       this.resizeCoordinator.dispose();
       if (this.fitFrame !== undefined) {
         window.cancelAnimationFrame(this.fitFrame);
@@ -345,19 +375,41 @@ export class TerminalPanelComponent implements AfterViewInit {
         unlisten = undefined;
       });
 
+      // The PTY is shared, so its size is negotiated across every attached client; the emulator
+      // follows that rather than its own fit, or it would keep drawing columns the agent has
+      // stopped refreshing.
+      const stopResizeUpdates = await this.gateway.onResized((event) => {
+        if (event.terminalId === this.session().id) {
+          this.applyDimensions(event.cols, event.rows);
+        }
+      });
+      if (this.destroyRef.destroyed) {
+        stopResizeUpdates();
+        return;
+      }
+      this.destroyRef.onDestroy(() => stopResizeUpdates());
+
       if (this.session().agentType === 'codex' && this.session().command) {
         this.terminal.writeln(
           `\u001b[38;2;150;157;164m${this.i18n.t('terminal.codexStarting')}\u001b[0m`,
         );
       }
-      await this.gateway.start(
+      const { attached, cols, rows } = await this.gateway.start(
         this.session(),
         Math.max(this.terminal.cols, 20),
         Math.max(this.terminal.rows, 5),
         this.workspaceId() || undefined,
       );
       this.runtimeReady = true;
-      this.statusChanged.emit({ terminalId: this.session().id, status: 'RUNNING' });
+      // The PTY runs at one grid, set by the desktop window. A client whose own window differs —
+      // a phone, or the desktop joining a terminal a phone started — has to draw that grid rather
+      // than its own, or the agent's redraws would land on the wrong columns.
+      this.applyDimensions(cols, rows);
+      // Attaching to a PTY that was already running must not discard the state hook events have
+      // derived for it; only a fresh launch, or one still marked as starting, becomes RUNNING.
+      if (!attached || this.session().status === 'STARTING') {
+        this.statusChanged.emit({ terminalId: this.session().id, status: 'RUNNING' });
+      }
       this.fitTerminal();
     } catch (error) {
       unlisten?.();
@@ -369,23 +421,49 @@ export class TerminalPanelComponent implements AfterViewInit {
     }
   }
 
+  /**
+   * Reports how much this client could display, leaving the actual size to the backend.
+   *
+   * The PTY is shared, so its size is the smallest of every attached viewer. Resizing the emulator
+   * to what fits here would put it out of step with the PTY whenever another, narrower client is
+   * watching: the agent only redraws the columns it believes exist, and everything past them would
+   * keep showing stale output. The negotiated size arrives back as `terminal-resized`.
+   */
   private fitTerminal(): void {
     if (!this.visible()) {
       return;
     }
     try {
-      this.fitAddon.fit();
-      if (this.terminal.rows > 0) {
-        this.terminal.refresh(0, this.terminal.rows - 1);
+      const proposed = this.fitAddon.proposeDimensions();
+      if (!proposed || !Number.isFinite(proposed.cols) || !Number.isFinite(proposed.rows)) {
+        return;
       }
-      if (this.runtimeReady) {
-        this.resizeCoordinator.schedule({
-          cols: this.terminal.cols,
-          rows: this.terminal.rows,
-        });
+      if (!this.runtimeReady) {
+        // Nothing has been negotiated yet, so this client's own size is the best first guess.
+        this.applyDimensions(proposed.cols, proposed.rows);
+        return;
       }
+      this.resizeCoordinator.schedule({
+        cols: Math.max(proposed.cols, 1),
+        rows: Math.max(proposed.rows, 1),
+      });
     } catch {
       // The container may be temporarily hidden while the layout is changing.
+    }
+  }
+
+  /** Matches the emulator to a size, redrawing so the change is visible immediately. */
+  private applyDimensions(cols: number, rows: number): void {
+    const safeCols = Math.max(Math.trunc(cols), 1);
+    const safeRows = Math.max(Math.trunc(rows), 1);
+    if (this.terminal.cols === safeCols && this.terminal.rows === safeRows) {
+      return;
+    }
+    try {
+      this.terminal.resize(safeCols, safeRows);
+      this.terminal.refresh(0, Math.max(0, this.terminal.rows - 1));
+    } catch {
+      // A terminal being torn down rejects the resize; the next fit will settle it.
     }
   }
 
@@ -417,9 +495,134 @@ export class TerminalPanelComponent implements AfterViewInit {
     event.stopPropagation();
   };
 
-  private readonly prepareWheelInteraction = (): void => {
+  private readonly prepareWheelInteraction = (event: WheelEvent): void => {
+    // Touch scrolling synthesises wheel events; letting those focus the terminal would raise the
+    // on-screen keyboard every time the user drags to read.
+    if (!event.isTrusted) {
+      return;
+    }
     this.activateTerminal();
   };
+
+  /**
+   * Scrolls with a finger, which xterm 6 does not do on its own.
+   *
+   * It renders to a canvas and moves its own scrollbar, so a drag reaches no scrollable element
+   * and a phone can only ever see the last screenful. A tap is left alone so it still focuses the
+   * terminal and raises the on-screen keyboard.
+   */
+  private readonly handleTouchStart = (event: TouchEvent): void => {
+    if (event.touches.length !== 1) {
+      return;
+    }
+    // A second touch during a glide means the user is reaching for a spot, not extending the flick.
+    this.stopInertia();
+    this.rememberTouchPoint(event.touches[0]);
+    this.touchScroller.begin(event.touches[0].clientY, event.timeStamp, event.touches[0].clientX);
+  };
+
+  private readonly handleTouchMove = (event: TouchEvent): void => {
+    if (event.touches.length !== 1) {
+      return;
+    }
+    this.rememberTouchPoint(event.touches[0]);
+    const rows = this.touchScroller.drag(
+      event.touches[0].clientY,
+      event.timeStamp,
+      event.touches[0].clientX,
+    );
+    if (!this.touchScroller.active) {
+      return;
+    }
+    // Once this counts as a scroll, the page must not pan or rubber-band behind the terminal.
+    event.preventDefault();
+    if (rows !== 0) {
+      this.scrollByRows(rows);
+    }
+  };
+
+  private readonly handleTouchEnd = (event: TouchEvent): void => {
+    const velocity = this.touchScroller.release(event.timeStamp);
+    if (velocity !== 0) {
+      this.inertiaVelocity = velocity;
+      this.inertiaAt = performance.now();
+      this.inertiaFrame = window.requestAnimationFrame(this.stepInertia);
+    }
+  };
+
+  private readonly handleTouchCancel = (): void => {
+    this.touchScroller.cancel();
+    this.stopInertia();
+  };
+
+  /** Keeps a flick gliding after the finger lifts, the way a native scroll view does. */
+  private readonly stepInertia = (now: number): void => {
+    const frameMs = Math.max(1, now - this.inertiaAt);
+    this.inertiaAt = now;
+    const rows = this.touchScroller.glide(this.inertiaVelocity, frameMs);
+    if (rows !== 0) {
+      this.scrollByRows(rows);
+    }
+    this.inertiaVelocity = decayInertia(this.inertiaVelocity, frameMs);
+    if (this.inertiaVelocity === 0 || this.destroyRef.destroyed) {
+      this.inertiaFrame = undefined;
+      return;
+    }
+    this.inertiaFrame = window.requestAnimationFrame(this.stepInertia);
+  };
+
+  private stopInertia(): void {
+    if (this.inertiaFrame !== undefined) {
+      window.cancelAnimationFrame(this.inertiaFrame);
+      this.inertiaFrame = undefined;
+    }
+    this.inertiaVelocity = 0;
+  }
+
+  /**
+   * Scrolls by handing xterm a wheel event rather than calling `scrollLines`.
+   *
+   * A full-screen agent such as Claude Code or OpenCode runs on the alternate buffer, which has no
+   * scrollback for `scrollLines` to move through — the drag would do nothing there. xterm's own
+   * wheel handling covers every case: it scrolls the normal buffer, translates the wheel into
+   * arrow keys for the alternate buffer, and forwards a mouse event when the agent tracks the
+   * mouse. Reusing it makes a drag behave exactly like the wheel does on the desktop.
+   */
+  private scrollByRows(rows: number): void {
+    const target = this.terminal.element?.querySelector<HTMLElement>('.xterm-viewport');
+    if (!target) {
+      return;
+    }
+    target.dispatchEvent(
+      new WheelEvent('wheel', {
+        // Negative rows mean older output, which is also the direction a negative deltaY scrolls.
+        deltaY: rows * this.rowHeight(),
+        deltaMode: WheelEvent.DOM_DELTA_PIXEL,
+        clientX: this.touchPoint.x,
+        clientY: this.touchPoint.y,
+        bubbles: true,
+        cancelable: true,
+      }),
+    );
+  }
+
+  private rememberTouchPoint(touch: Touch): void {
+    this.touchPoint = { x: touch.clientX, y: touch.clientY };
+  }
+
+  /**
+   * Height of one row in CSS pixels.
+   *
+   * Measured from the rendered screen rather than the font settings, so it stays correct whatever
+   * the font, the zoom, or the device pixel ratio turn the row into.
+   */
+  private rowHeight(): number {
+    const screen = this.terminal.element?.querySelector<HTMLElement>('.xterm-screen');
+    if (!screen || this.terminal.rows <= 0) {
+      return 0;
+    }
+    return screen.clientHeight / this.terminal.rows;
+  }
 
   /**
    * Writes sequences xterm does not produce, then stops it from handling the event.
@@ -484,7 +687,8 @@ export class TerminalPanelComponent implements AfterViewInit {
     event.preventDefault();
     const selection = this.terminal.getSelection();
     if (selection) {
-      void navigator.clipboard.writeText(selection).catch(() => undefined);
+      // Clipboard access needs a secure context, which a remote client may not have.
+      void navigator.clipboard?.writeText(selection).catch(() => undefined);
       this.terminal.clearSelection();
       return;
     }
@@ -499,7 +703,7 @@ export class TerminalPanelComponent implements AfterViewInit {
    */
   private async pasteFromClipboard(): Promise<void> {
     try {
-      const text = await navigator.clipboard.readText();
+      const text = await navigator.clipboard?.readText();
       if (text) {
         await this.gateway.write(this.session(), text);
       }
@@ -522,6 +726,33 @@ export class TerminalPanelComponent implements AfterViewInit {
     });
   }
 
+  /**
+   * Hands this view the terminal's size, because the user is now working in it.
+   *
+   * Sent only when this window would draw a different grid than the terminal currently uses, so
+   * the common case — clicking around the view that already owns it — costs nothing.
+   */
+  private claimTerminalSize(): void {
+    if (!this.runtimeReady) {
+      return;
+    }
+    const proposed = this.fitAddon.proposeDimensions();
+    if (!proposed || !Number.isFinite(proposed.cols) || !Number.isFinite(proposed.rows)) {
+      return;
+    }
+    const cols = Math.max(proposed.cols, 1);
+    const rows = Math.max(proposed.rows, 1);
+    if (cols === this.terminal.cols && rows === this.terminal.rows) {
+      return;
+    }
+    void this.gateway
+      .resize(this.session().id, cols, rows, true)
+      .catch((error) => console.warn('Terminal claim failed', this.errorMessage(error)));
+  }
+
+  /** Any sign the user started working in this view hands it the terminal's size. */
+  private readonly claimOnFocus = (): void => this.claimTerminalSize();
+
   private activateTerminal(): void {
     if (this.destroyRef.destroyed || !this.visible()) {
       return;
@@ -530,6 +761,7 @@ export class TerminalPanelComponent implements AfterViewInit {
       this.selected.emit(this.session().id);
     }
     this.terminal.focus();
+    this.claimTerminalSize();
   }
 
   private handleOutput(data: string): void {

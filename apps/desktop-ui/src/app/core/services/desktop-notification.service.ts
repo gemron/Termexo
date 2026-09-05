@@ -1,12 +1,12 @@
 import { inject, Injectable } from '@angular/core';
-import { invoke } from '@tauri-apps/api/core';
 import { getCurrentWindow, UserAttentionType } from '@tauri-apps/api/window';
 import { isPermissionGranted, requestPermission } from '@tauri-apps/plugin-notification';
 import { message } from '@tauri-apps/plugin-dialog';
 
 import { createDesktopNotification, GlobalTerminalNotice } from '../models/terminal-notifications';
 import { I18nService } from '../i18n/i18n.service';
-import { isTauriRuntime } from './tauri-runtime';
+import { invoke } from './backend-bridge';
+import { hasBackend, isTauriRuntime } from './tauri-runtime';
 
 @Injectable({ providedIn: 'root' })
 export class DesktopNotificationService {
@@ -33,8 +33,12 @@ export class DesktopNotificationService {
     const notification = createDesktopNotification(notices, (key, params) =>
       this.i18n.t(key, params),
     );
+    if (!notification) {
+      return;
+    }
     const appWindow = this.appWindow;
-    if (!notification || !appWindow) {
+    if (!appWindow) {
+      await this.sendBrowserNotification(notification.title, notification.body);
       return;
     }
 
@@ -56,9 +60,33 @@ export class DesktopNotificationService {
    */
   async notifyMessage(title: string, body: string): Promise<void> {
     if (!this.appWindow) {
+      await this.sendBrowserNotification(title, body);
       return;
     }
     await this.send(title, body);
+  }
+
+  /**
+   * Raises the notification through the browser on a device with no native window.
+   *
+   * A remote client cannot flash a taskbar it does not own, and the Notification API needs the
+   * viewer's permission, so this is a best-effort fallback rather than a guaranteed delivery.
+   */
+  private async sendBrowserNotification(title: string, body: string): Promise<void> {
+    if (!hasBackend() || typeof Notification === 'undefined') {
+      return;
+    }
+    try {
+      const permission =
+        Notification.permission === 'default'
+          ? await Notification.requestPermission()
+          : Notification.permission;
+      if (permission === 'granted') {
+        new Notification(title, { body });
+      }
+    } catch {
+      // Notifications can be blocked outright, for example outside a secure context.
+    }
   }
 
   private async send(title: string, body: string): Promise<void> {

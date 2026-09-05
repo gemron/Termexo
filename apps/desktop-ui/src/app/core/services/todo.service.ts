@@ -2,6 +2,7 @@ import { Injectable, signal } from '@angular/core';
 
 import type { AgentEvent } from '../models/agent.models';
 import { EVENT_STATUS } from '../models/agent.models';
+import { createId } from '../models/identifiers';
 import { stripTerminalControl } from '../models/terminal-output';
 import {
   canRestartTodoTask,
@@ -24,12 +25,8 @@ const TERMINAL_ENDED_ERROR = 'Agent 终端已结束，请检查终端输出后�
 const TERMINAL_MISSING_ERROR = '关联终端不存在或已关闭，可重试以恢复原会话。';
 const PROMPT_INTERRUPTED_ERROR = '任务指令未送达终端，请重新发送。';
 
-function createId(prefix: string): string {
-  try {
-    return `${prefix}-${crypto.randomUUID()}`;
-  } catch {
-    return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2)}`;
-  }
+function createTodoId(prefix: string): string {
+  return `${prefix}-${createId()}`;
 }
 
 /** A project is only usable once it names both a label and a directory to run agents in. */
@@ -127,7 +124,7 @@ export class TodoService {
       return null;
     }
     const project: TodoProject = {
-      id: createId('project'),
+      id: createTodoId('project'),
       workspaceId,
       ...normalized,
       color: TODO_PROJECT_COLORS[snapshot.projects.length % TODO_PROJECT_COLORS.length],
@@ -185,7 +182,7 @@ export class TodoService {
     }
     const now = Date.now();
     const task: TodoTask = {
-      id: createId('task'),
+      id: createTodoId('task'),
       workspaceId,
       projectId: draft.projectId,
       title,
@@ -460,7 +457,7 @@ export class TodoService {
       updatedAt: now,
       validations: [
         ...located.task.validations,
-        { id: createId('validation'), outcome: 'passed', note: note.trim(), createdAt: now },
+        { id: createTodoId('validation'), outcome: 'passed', note: note.trim(), createdAt: now },
       ],
     };
     this.replaceTask(located.snapshot, task);
@@ -486,7 +483,7 @@ export class TodoService {
       updatedAt: now,
       validations: [
         ...located.task.validations,
-        { id: createId('validation'), outcome: 'failed', note: feedback, createdAt: now },
+        { id: createTodoId('validation'), outcome: 'failed', note: feedback, createdAt: now },
       ],
     };
     this.replaceTask(located.snapshot, task);

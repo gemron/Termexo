@@ -1,6 +1,7 @@
 import { computed, inject, Injectable, signal } from '@angular/core';
 
 import { AgentEvent, EVENT_STATUS } from '../models/agent.models';
+import { createId } from '../models/identifiers';
 import { createDefaultWorkspaces } from '../models/workspace.fixtures';
 import {
   AGENT_LABELS,
@@ -16,6 +17,9 @@ import {
   TerminalStatus,
   Workspace,
 } from '../models/workspace.models';
+import { UnlistenFn } from './backend-bridge';
+import { RemoteConnectionService } from './remote-connection.service';
+import { runtimeMode } from './tauri-runtime';
 import { WorkspaceRepository } from './workspace.repository';
 
 const DEFAULT_SHELL = 'powershell.exe';
@@ -35,9 +39,11 @@ export interface TerminalRestartChanges {
 @Injectable({ providedIn: 'root' })
 export class AppStateService {
   private readonly repository = inject(WorkspaceRepository);
+  private readonly remoteConnection = inject(RemoteConnectionService);
   private readonly workspaceItems = signal<Workspace[]>([]);
   private readonly activeWorkspaceId = signal<string | null>(null);
   private readonly activeTerminalId = signal<string | null>(null);
+  private unwatchWorkspaces?: UnlistenFn;
 
   readonly workspaces = this.workspaceItems.asReadonly();
   readonly activeWorkspace = computed(
@@ -82,10 +88,19 @@ export class AppStateService {
     );
   }
 
+  /**
+   * Loads the stored workspaces, either taking ownership of them or attaching to them.
+   *
+   * A remote browser shares the desktop app's terminals rather than owning them, so it must not
+   * restart what is already running, invent a default workspace or write the whole set back: the
+   * desktop window is the one that decides what those rows say.
+   */
   async initialize(): Promise<void> {
+    const attaching = this.isAttachedRuntime();
     const storedWorkspaces = await this.repository.list();
-    const initialWorkspaces =
-      storedWorkspaces.length > 0
+    const initialWorkspaces = attaching
+      ? storedWorkspaces
+      : storedWorkspaces.length > 0
         ? this.restartRestoredTerminals(storedWorkspaces)
         : createDefaultWorkspaces();
 
@@ -95,12 +110,101 @@ export class AppStateService {
     this.activeWorkspaceId.set(firstWorkspace?.id ?? null);
     this.activeTerminalId.set(firstWorkspace?.terminals[0]?.id ?? null);
 
+    await this.watchExternalChanges();
+    if (attaching) {
+      // A reconnect can have missed any number of change events, so the whole set is re-read.
+      this.remoteConnection.onReconnected(() => void this.reloadFromRepository());
+      return;
+    }
+
     await this.repository.saveAll(orderedWorkspaces);
+  }
+
+  /** Re-reads every workspace from the store, discarding whatever this client held. */
+  async reloadFromRepository(): Promise<void> {
+    const workspaces = this.normalizeWorkspaceOrder(await this.repository.list());
+    this.workspaceItems.set(workspaces);
+    const activeWorkspace =
+      workspaces.find((workspace) => workspace.id === this.activeWorkspaceId()) ??
+      workspaces[0] ??
+      null;
+    this.activeWorkspaceId.set(activeWorkspace?.id ?? null);
+    if (!activeWorkspace?.terminals.some((terminal) => terminal.id === this.activeTerminalId())) {
+      this.activeTerminalId.set(activeWorkspace?.terminals[0]?.id ?? null);
+    }
+  }
+
+  /**
+   * Applies a workspace another client saved.
+   *
+   * Deliberately never written back: the change already reached the store, and echoing it would
+   * overwrite whatever its author saved in the meantime.
+   */
+  applyExternalWorkspace(workspace: Workspace): void {
+    const workspaces = this.workspaceItems();
+    const merged = workspaces.some((item) => item.id === workspace.id)
+      ? workspaces.map((item) => (item.id === workspace.id ? workspace : item))
+      : [...workspaces, workspace];
+    const orderedWorkspaces = this.normalizeWorkspaceOrder(
+      // A workspace saved without a sort order is appended: the sort is stable, so it keeps the
+      // position it was merged into rather than jumping to the front.
+      [...merged].sort(
+        (left, right) =>
+          (left.sortOrder ?? Number.MAX_SAFE_INTEGER) -
+          (right.sortOrder ?? Number.MAX_SAFE_INTEGER),
+      ),
+    );
+    this.workspaceItems.set(orderedWorkspaces);
+
+    if (!this.activeWorkspaceId()) {
+      const firstWorkspace = orderedWorkspaces[0];
+      this.activeWorkspaceId.set(firstWorkspace?.id ?? null);
+      this.activeTerminalId.set(firstWorkspace?.terminals[0]?.id ?? null);
+      return;
+    }
+    const activeWorkspace = this.activeWorkspace();
+    if (
+      activeWorkspace?.id === workspace.id &&
+      !workspace.terminals.some((terminal) => terminal.id === this.activeTerminalId())
+    ) {
+      // The other client closed the terminal this one was looking at.
+      this.activeTerminalId.set(workspace.terminals[0]?.id ?? null);
+    }
+  }
+
+  /** Drops a workspace another client deleted, without writing anything back. */
+  removeExternalWorkspace(workspaceId: string): void {
+    const workspaces = this.workspaceItems();
+    const removedIndex = workspaces.findIndex((workspace) => workspace.id === workspaceId);
+    if (removedIndex < 0) {
+      return;
+    }
+
+    const remainingWorkspaces = this.normalizeWorkspaceOrder(
+      workspaces.filter((workspace) => workspace.id !== workspaceId),
+    );
+    this.workspaceItems.set(remainingWorkspaces);
+    if (this.activeWorkspaceId() !== workspaceId) {
+      return;
+    }
+
+    const nextWorkspace =
+      remainingWorkspaces[Math.min(removedIndex, remainingWorkspaces.length - 1)];
+    this.activeWorkspaceId.set(nextWorkspace?.id ?? null);
+    this.activeTerminalId.set(nextWorkspace?.terminals[0]?.id ?? null);
   }
 
   selectWorkspace(workspaceId: string): void {
     const workspace = this.workspaceItems().find((item) => item.id === workspaceId);
     if (!workspace) {
+      return;
+    }
+
+    if (this.isAttachedRuntime()) {
+      // Persisting `lastOpenedAt` would write the whole row back, clobbering terminal state the
+      // desktop window has changed but not yet flushed. Switching views is a local act anyway.
+      this.activeWorkspaceId.set(workspaceId);
+      this.activeTerminalId.set(workspace.terminals[0]?.id ?? null);
       return;
     }
 
@@ -123,7 +227,7 @@ export class AppStateService {
     }
 
     const workspace: Workspace = {
-      id: crypto.randomUUID(),
+      id: createId(),
       name: normalizedName,
       themeColor: DEFAULT_WORKSPACE_THEME_COLOR,
       sortOrder: this.workspaceItems().length,
@@ -519,6 +623,19 @@ export class AppStateService {
     void this.repository.save(updatedWorkspace);
   }
 
+  /** True where this client shares another Termexo's workspaces instead of owning them. */
+  private isAttachedRuntime(): boolean {
+    return runtimeMode() === 'remote';
+  }
+
+  private async watchExternalChanges(): Promise<void> {
+    this.unwatchWorkspaces?.();
+    this.unwatchWorkspaces = await this.repository.watchChanges({
+      changed: (workspace) => this.applyExternalWorkspace(workspace),
+      deleted: (workspaceId) => this.removeExternalWorkspace(workspaceId),
+    });
+  }
+
   private replaceWorkspace(workspace: Workspace): void {
     this.workspaceItems.update((items) =>
       items.map((item) => (item.id === workspace.id ? workspace : item)),
@@ -530,7 +647,7 @@ export class AppStateService {
     const agentLabel = AGENT_LABELS[agentType];
 
     return {
-      id: input.id ?? crypto.randomUUID(),
+      id: input.id ?? createId(),
       name: input.name?.trim() || `${agentLabel} ${workspace.terminals.length + 1}`,
       workingDirectory: input.workingDirectory ?? workspace.projectPath,
       shell: DEFAULT_SHELL,

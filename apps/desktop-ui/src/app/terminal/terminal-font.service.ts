@@ -1,7 +1,7 @@
 import { Injectable, signal } from '@angular/core';
-import { invoke } from '@tauri-apps/api/core';
 
-import { isTauriRuntime } from '../core/services/tauri-runtime';
+import { invoke } from '../core/services/backend-bridge';
+import { hasBackend } from '../core/services/tauri-runtime';
 import { detectTerminalFontPresets, SystemFont, usableTerminalFonts } from './terminal-font';
 
 /**
@@ -43,7 +43,7 @@ export class TerminalFontService {
     this.loadingValue.set(true);
     this.errorValue.set(null);
     try {
-      const fonts = isTauriRuntime()
+      const fonts = hasBackend()
         ? await invoke<SystemFont[]>('list_system_fonts')
         : detectTerminalFontPresets();
       const usable = usableTerminalFonts(fonts);

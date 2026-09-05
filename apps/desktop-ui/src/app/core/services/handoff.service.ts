@@ -1,12 +1,12 @@
 import { Injectable, signal } from '@angular/core';
-import { invoke } from '@tauri-apps/api/core';
 import { open, save } from '@tauri-apps/plugin-dialog';
 
 import type { AgentSession } from '../models/agent.models';
 import type { GitContext, HandoffPackage, HandoffRecord } from '../models/handoff';
 import type { PromptAsset } from '../models/prompt-assets';
 import type { TerminalSession, Workspace } from '../models/workspace.models';
-import { isTauriRuntime } from './tauri-runtime';
+import { invoke } from './backend-bridge';
+import { hasBackend, isTauriRuntime } from './tauri-runtime';
 
 const STORAGE_KEY = 'termexo.handoffPackages.v1';
 const MAX_OUTPUT_TAIL = 40_000;
@@ -29,7 +29,7 @@ export class HandoffService {
     }
     this.initialized = true;
     try {
-      const records = isTauriRuntime()
+      const records = hasBackend()
         ? await invoke<HandoffRecord[]>('list_handoff_packages', { workspaceId: null })
         : this.readLocalRecords();
       this.recordItems.set(this.sort(records));
@@ -83,7 +83,7 @@ export class HandoffService {
 
   async delete(recordId: string): Promise<void> {
     await this.run(async () => {
-      if (isTauriRuntime()) {
+      if (hasBackend()) {
         await invoke('delete_handoff_package', { packageId: recordId });
       }
       this.recordItems.update((records) => records.filter((record) => record.id !== recordId));
@@ -161,7 +161,7 @@ export class HandoffService {
   }
 
   private async collectGitContext(projectPath: string, tokenBudget: number): Promise<GitContext> {
-    if (!isTauriRuntime()) {
+    if (!hasBackend()) {
       return {
         available: false,
         branch: '',
@@ -192,7 +192,7 @@ export class HandoffService {
       createdAt: existing?.createdAt ?? handoff.createdAt,
       updatedAt: Date.now(),
     };
-    const saved = isTauriRuntime()
+    const saved = hasBackend()
       ? await invoke<HandoffRecord>('save_handoff_package', { input: record })
       : record;
     this.recordItems.update((records) =>
@@ -252,7 +252,7 @@ export class HandoffService {
   }
 
   private persistLocalRecords(): void {
-    if (isTauriRuntime()) {
+    if (hasBackend()) {
       return;
     }
     try {

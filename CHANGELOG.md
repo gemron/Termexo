@@ -2,6 +2,29 @@
 
 Release notes for every Termexo version, newest first. The current release is summarised in [README.md](README.md).
 
+## V0.8.0 (preview)
+
+- Remote access. Turn it on in the settings and any phone, tablet, or second computer on the same
+  network or VPN opens the whole workbench in a browser: the same workspaces and terminals, reading
+  and writing the same live PTYs. Self-signed HTTPS by default, entered with an access token the
+  settings panel can reveal, turn into a QR code, or rotate.
+- Remote requests replay through the desktop's own command table rather than a second backend.
+  Application commands are not covered by Tauri's ACL under a local origin, so every remote call
+  must first pass an explicit allowlist — npm self-updates, native file reads and writes, and
+  changing the remote access settings themselves are all refused.
+- Terminals scroll by finger. xterm 6 draws the buffer to a canvas and moves its own scrollbar, so
+  a drag reached nothing scrollable; it now synthesises a wheel event for xterm to dispatch, which
+  scrolls the normal buffer and reports the wheel to full-screen agents such as Claude Code and
+  OpenCode exactly as the desktop wheel does, with inertia after the finger lifts.
+- A terminal's size follows whichever view is in use: work on the desktop and it uses the desktop's
+  width, pick up the phone and it becomes the phone's, come back and it returns. Every other client
+  renders that same grid, panning sideways when its window cannot hold it.
+- The top bar fits a narrow screen. Below 640px the product name and project path give up their
+  space, and whatever still overflows scrolls horizontally, so no control sits out of reach.
+- Fixed a terminal failing to restart with "invalid handle" or "end of file". portable-pty inverts
+  the result of `TerminateProcess` on Windows, reporting a stale `GetLastError` value that has
+  nothing to do with the call.
+
 ## V0.7.0
 
 - Drop the system title bar and give the window its own chrome: the top bar now spans the whole window with minimise, maximise, and close at its right edge, and both side panels start beneath it the way an editor lays out. Dragging the bar moves the window and double-clicking it maximises, as before.

@@ -1,5 +1,6 @@
 import { TestBed } from '@angular/core/testing';
 
+import { Workspace } from '../models/workspace.models';
 import { AppStateService } from './app-state.service';
 import { WorkspaceRepository } from './workspace.repository';
 
@@ -10,11 +11,28 @@ describe('AppStateService', () => {
     save: vi.fn().mockResolvedValue(undefined),
     saveAll: vi.fn().mockResolvedValue(undefined),
     delete: vi.fn().mockResolvedValue(undefined),
+    watchChanges: vi.fn().mockResolvedValue(() => undefined),
   };
+
+  function externalWorkspace(id: string, sortOrder: number): Workspace {
+    return {
+      id,
+      name: `External ${id}`,
+      sortOrder,
+      projectPath: 'D:\\dev\\external',
+      projectType: 'Local project',
+      activeBranch: 'main',
+      favorite: false,
+      lastOpenedAt: Date.now(),
+      layout: 'single',
+      terminals: [],
+    };
+  }
 
   beforeEach(() => {
     vi.clearAllMocks();
     repository.list.mockResolvedValue([]);
+    repository.watchChanges.mockResolvedValue(() => undefined);
     TestBed.configureTestingModule({
       providers: [AppStateService, { provide: WorkspaceRepository, useValue: repository }],
     });
@@ -556,5 +574,46 @@ describe('AppStateService', () => {
 
     expect(service.activeTerminal()?.status).toBe('STARTING');
     expect(service.activeTerminal()?.nativeSessionId).toBeUndefined();
+  });
+
+  it('applies a workspace another client saved without writing it back', async () => {
+    await service.initialize();
+    const existingCount = service.workspaces().length;
+    repository.save.mockClear();
+    repository.saveAll.mockClear();
+
+    service.applyExternalWorkspace(externalWorkspace('external-1', 99));
+
+    expect(service.workspaces()).toHaveLength(existingCount + 1);
+    expect(service.workspaces().at(-1)?.id).toBe('external-1');
+    // Sort order is renormalized locally; echoing the change back would overwrite its author.
+    expect(service.workspaces().map((workspace) => workspace.sortOrder)).toEqual(
+      service.workspaces().map((_, index) => index),
+    );
+    expect(repository.save).not.toHaveBeenCalled();
+    expect(repository.saveAll).not.toHaveBeenCalled();
+  });
+
+  it('drops a workspace another client deleted without writing it back', async () => {
+    await service.initialize();
+    const removedId = service.workspaces()[0].id;
+    const survivingId = service.workspaces()[1].id;
+    repository.save.mockClear();
+    repository.saveAll.mockClear();
+    repository.delete.mockClear();
+
+    service.removeExternalWorkspace(removedId);
+
+    expect(service.workspaces().some((workspace) => workspace.id === removedId)).toBe(false);
+    expect(service.activeWorkspace()?.id).toBe(survivingId);
+    expect(repository.save).not.toHaveBeenCalled();
+    expect(repository.saveAll).not.toHaveBeenCalled();
+    expect(repository.delete).not.toHaveBeenCalled();
+  });
+
+  it('subscribes to workspace changes made outside this client', async () => {
+    await service.initialize();
+
+    expect(repository.watchChanges).toHaveBeenCalledOnce();
   });
 });
