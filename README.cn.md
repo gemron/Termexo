@@ -11,7 +11,7 @@
 </p>
 
 <p align="center">
-  <img alt="Version 0.8.0" src="https://img.shields.io/badge/version-0.8.0-58c7a0">
+  <img alt="Version 0.8.1" src="https://img.shields.io/badge/version-0.8.1-58c7a0">
   <img alt="Windows" src="https://img.shields.io/badge/platform-Windows-0078D4?logo=windows">
   <img alt="Tauri 2" src="https://img.shields.io/badge/Tauri-2-24C8DB?logo=tauri&logoColor=white">
   <img alt="Angular 22" src="https://img.shields.io/badge/Angular-22-DD0031?logo=angular">
@@ -35,7 +35,7 @@ Agent 等着授权时，人在哪里都能回它一句。
 npx termexo@latest
 ```
 
-> 当前版本为 **V0.8.0**。
+> 当前版本为 **V0.8.1**。
 
 ![Termexo 多终端网格工作台](website/assets/termexo-workbench.png)
 
@@ -120,6 +120,17 @@ SQLite，密钥保存在 Windows Credential Manager，Claude/Codex 历史会话�
 
 界面支持简体中文、英语、西班牙语、法语、德语、日语和韩语。默认自动跟随 Windows
 系统语言，也可通过主工具栏手动切换并跨重启保留选择。
+
+## V0.8.1 新增
+
+- **首次启动是一屏引导**：此前新安装会种三个示例工作空间，目录指向谁的机器上都没有的路径，里面的
+  Agent 终端还会恢复根本不存在的 session id。现在从空开始，并说明什么是工作空间、头三步做什么。
+- **「新建」归属标签栏**：它从窗口工具栏移到自己要往里加标签的那条标签栏上，Agent 菜单一并带过去，
+  按钮紧跟最后一个标签。
+- **建完就能看到**：从任务看板或 Git 视图新建终端，原先会停在原视图；现在所有入口都会切回终端视图
+  并显出新终端。
+- **远程访问设置重排**：监听地址与端口并排放在一起，不再被甩到对话框两端；复制按钮贴着它要复制的
+  链接；总开关与下方选项区分开，「已连接设备」并入开关那一行。
 
 ## V0.8.0 新增
 

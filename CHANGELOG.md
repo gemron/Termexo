@@ -2,6 +2,36 @@
 
 Release notes for every Termexo version, newest first. The current release is summarised in [README.md](README.md).
 
+## V0.8.1
+
+- Open a first run on a guide rather than on three invented workspaces. A new install seeded
+  samples named Termexo, MTS Cloud and Device Health, pointed at a path that exists on nobody's
+  machine, whose Agent terminals resumed session ids that never existed — so the first screen was
+  two terminals reporting "Invalid session ID". The workspace area now says what a workspace is,
+  what the first three steps are, and that nothing leaves the machine, with one button that opens
+  the create dialog. The browser preview keeps the samples: its simulated terminal has nothing to
+  run in without them.
+- Move new terminal onto the tab strip, where the plain + button already was, and give it the agent
+  menu. It had sat in the window's own toolbar beside the workspace toggle — workspace-level company
+  for an action that adds one tab to one strip — and the button now follows the last tab instead of
+  waiting at the far end of an empty row.
+- Open the terminal that was just created. The active terminal was set, but the task board and the
+  Git view draw no terminal at all, so one started from either of them appeared nowhere and nothing
+  said why. Every path that opens a terminal at the user's request now returns to the terminal view
+  and reveals it in the layout.
+- Light up the rows of that menu under the pointer: they hovered in a colour three shades from the
+  menu's own background, which read as no hover at all. The Agents also come before the plain shell
+  now, which is the order they are picked in, and the add button carries the accent instead of
+  looking like the tab close buttons beside it.
+- Rework the remote access settings. The listening address and the port are one setting but sat at
+  opposite edges of the dialog, with a port field wide enough for a paragraph; the copy button
+  wrapped below the link it copies; the address picker was narrower than that link; and the QR code
+  stood beside empty space. The master switch is now set apart from the HTTPS option below it, with
+  the connected-device count beside it rather than floating between two form fields.
+- Fix the listening address and port not sitting on the same line. The port cell is taller because
+  it carries the range hint, the grid stretched both labels to that height, and a grid label
+  stretches its own rows — leaving the select several pixels deeper than the input beside it.
+
 ## V0.8.0
 
 - Remote access. Turn it on in the settings and any phone, tablet, or second computer on the same

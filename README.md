@@ -11,7 +11,7 @@
 </p>
 
 <p align="center">
-  <img alt="Version 0.8.0" src="https://img.shields.io/badge/version-0.8.0-58c7a0">
+  <img alt="Version 0.8.1" src="https://img.shields.io/badge/version-0.8.1-58c7a0">
   <img alt="Windows" src="https://img.shields.io/badge/platform-Windows-0078D4?logo=windows">
   <img alt="Tauri 2" src="https://img.shields.io/badge/Tauri-2-24C8DB?logo=tauri&logoColor=white">
   <img alt="Angular 22" src="https://img.shields.io/badge/Angular-22-DD0031?logo=angular">
@@ -36,7 +36,7 @@ Run the complete Windows app with one command—no Termexo account or server req
 npx termexo@latest
 ```
 
-> The current version is **V0.8.0**.
+> The current version is **V0.8.1**.
 
 ![Termexo multi-terminal grid workbench](website/assets/termexo-workbench.png)
 
@@ -131,6 +131,19 @@ you configure under their own terms and privacy policies.
 The interface is available in Simplified Chinese, English, Spanish, French, German, Japanese,
 and Korean. It follows the Windows language automatically, or you can choose a language from
 the main toolbar and keep that choice across restarts.
+
+## What's New in V0.8.1
+
+- **A first run opens on a guide.** A new install used to seed three sample workspaces pointed at a
+  path that exists on nobody's machine, whose Agent terminals resumed session ids that never
+  existed. It now starts empty and says what a workspace is and what the first three steps are.
+- **New terminal belongs to the tab strip.** It has moved off the window's own toolbar onto the
+  strip it adds to, taking the agent menu with it, and the button follows the last tab.
+- **What you create is what you see.** Starting a terminal from the task board or the Git view left
+  it behind that view; every path that opens one now returns to the terminal view and reveals it.
+- **Remote access settings, rearranged.** The listening address and port sit together instead of at
+  opposite edges of the dialog, the copy button sits on its link, and the master switch is set apart
+  from the option below it with the connected-device count beside it.
 
 ## What's New in V0.8.0
 
