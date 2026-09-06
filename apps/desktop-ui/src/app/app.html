@@ -20,10 +20,13 @@
         </span>
         <strong>Termexo</strong>
       </div>
-      <div class="workspace-title">
-        <strong>{{ state.activeWorkspace()?.name ?? ('workspace.loading' | t) }}</strong>
-        <span>{{ state.activeWorkspace()?.projectPath ?? '' }}</span>
-      </div>
+      <!-- A first run has no workspace to name, and "loading" would sit there for good. -->
+      @if (state.activeWorkspace(); as workspace) {
+        <div class="workspace-title">
+          <strong>{{ workspace.name }}</strong>
+          <span>{{ workspace.projectPath }}</span>
+        </div>
+      }
     </div>
 
     <div class="toolbar" role="toolbar" [attr.aria-label]="'workspace.tools' | t">
@@ -361,7 +364,10 @@
   }
 
   <section class="workspace-main" [class.auxiliary-view-active]="workspaceView() !== 'terminal'">
-    <div class="terminal-tabs" [class.view-hidden]="workspaceView() !== 'terminal'">
+    <div
+      class="terminal-tabs"
+      [class.view-hidden]="workspaceView() !== 'terminal' || !state.activeWorkspace()"
+    >
       <div class="tab-bar">
         <div
           class="tab-strip tabs tabs-border"
@@ -602,6 +608,14 @@
             (terminalInput)="handleTerminalInput($event)"
             (terminalOutput)="handleTerminalOutput($event)"
           />
+        }
+      } @else {
+        <!--
+          A first run has no workspace and no longer invents one, so this is what opens instead.
+          Deferred: once a workspace exists it is never rendered again.
+        -->
+        @defer (on immediate) {
+          <app-workspace-onboarding (createRequested)="createWorkspaceOpen.set(true)" />
         }
       }
     </section>

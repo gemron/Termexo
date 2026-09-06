@@ -29,6 +29,13 @@ describe('AppStateService', () => {
     };
   }
 
+  /** The marker the runtime reads to tell the desktop app from the browser preview. */
+  const runtime = globalThis as unknown as Record<string, unknown>;
+
+  afterEach(() => {
+    delete runtime['__TAURI_INTERNALS__'];
+  });
+
   beforeEach(() => {
     vi.clearAllMocks();
     repository.list.mockResolvedValue([]);
@@ -39,13 +46,25 @@ describe('AppStateService', () => {
     service = TestBed.inject(AppStateService);
   });
 
-  it('creates default workspaces on first launch', async () => {
+  it('seeds sample workspaces for the browser preview', async () => {
     await service.initialize();
 
     expect(service.workspaces().length).toBeGreaterThan(0);
     expect(service.activeWorkspace()?.name).toBe('Termexo');
     expect(service.activeTerminal()?.status).toBe('STARTING');
     expect(repository.saveAll).toHaveBeenCalledOnce();
+  });
+
+  // The samples pointed at folders that do not exist on the machine running the app, and their
+  // Agent terminals resumed session ids that never did either.
+  it('opens empty on a first run of the desktop app', async () => {
+    runtime['__TAURI_INTERNALS__'] = {};
+
+    await service.initialize();
+
+    expect(service.workspaces()).toEqual([]);
+    expect(service.activeWorkspace()).toBeNull();
+    expect(service.activeTerminal()).toBeNull();
   });
 
   it('marks persisted terminals for automatic restart', async () => {

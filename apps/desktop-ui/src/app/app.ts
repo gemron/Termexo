@@ -120,6 +120,7 @@ import { RemoteConnectionBadgeComponent } from './remote/remote-connection-badge
 import { IconComponent } from './shared/icon/icon';
 import { LanguageSelectorComponent } from './shared/language-selector/language-selector';
 import { TopbarOverflowMenuComponent } from './shared/topbar-overflow-menu/topbar-overflow-menu';
+import { WorkspaceOnboardingComponent } from './workspace/workspace-onboarding';
 import {
   DEFAULT_TERMINAL_FONT_NAME,
   isTerminalFontAvailable,
@@ -232,6 +233,7 @@ function readStoredString(key: string, fallback: string): string {
     InspectorPanelComponent,
     LanguageSelectorComponent,
     TopbarOverflowMenuComponent,
+    WorkspaceOnboardingComponent,
     MergeWorkspaceDialogComponent,
     AccountSwitchDialogComponent,
     ModelSwitchDialogComponent,

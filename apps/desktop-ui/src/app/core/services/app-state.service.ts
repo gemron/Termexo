@@ -2,7 +2,6 @@ import { computed, inject, Injectable, signal } from '@angular/core';
 
 import { AgentEvent, EVENT_STATUS } from '../models/agent.models';
 import { createId } from '../models/identifiers';
-import { createDefaultWorkspaces } from '../models/workspace.fixtures';
 import {
   AGENT_LABELS,
   AgentType,
@@ -19,7 +18,7 @@ import {
 } from '../models/workspace.models';
 import { UnlistenFn } from './backend-bridge';
 import { RemoteConnectionService } from './remote-connection.service';
-import { runtimeMode } from './tauri-runtime';
+import { hasBackend, runtimeMode } from './tauri-runtime';
 import { WorkspaceRepository } from './workspace.repository';
 
 const DEFAULT_SHELL = 'powershell.exe';
@@ -34,6 +33,17 @@ export interface TerminalRestartChanges {
   profileId?: string;
   mcpProfileId?: string;
   accountProfileId?: string;
+}
+
+/**
+ * The sample workspaces the browser preview opens on.
+ *
+ * Imported on demand so the desktop build, which never seeds them, does not carry three
+ * workspaces' worth of fixture data in its first load.
+ */
+async function loadPreviewWorkspaces(): Promise<Workspace[]> {
+  const { createDefaultWorkspaces } = await import('../models/workspace.fixtures');
+  return createDefaultWorkspaces();
 }
 
 @Injectable({ providedIn: 'root' })
@@ -102,7 +112,13 @@ export class AppStateService {
       ? storedWorkspaces
       : storedWorkspaces.length > 0
         ? this.restartRestoredTerminals(storedWorkspaces)
-        : createDefaultWorkspaces();
+        : // A real first run opens on the guide instead: the sample workspaces pointed at folders
+          // that do not exist on this machine, and their Agent terminals resumed session ids that
+          // never did either. The browser preview keeps them — a simulated terminal with nothing
+          // to show is not a preview of anything.
+          hasBackend()
+          ? []
+          : await loadPreviewWorkspaces();
 
     const orderedWorkspaces = this.normalizeWorkspaceOrder(initialWorkspaces);
     this.workspaceItems.set(orderedWorkspaces);
