@@ -1,4 +1,4 @@
-# Termexo V0.4.4 多平台推广包
+# Termexo 多平台推广包
 
 这套内容以“真实技术经验 + 可验证产品能力”为主，不采用刷屏、互赞、夸大性能或伪装第三方报道的方式获取 Star。
 
@@ -6,10 +6,11 @@
 
 - 项目：Termexo
 - 定位：Windows 上的 Claude Code / Codex 本地多 Agent 工作台
-- 当前版本：V0.4.4
+- 当前版本：V0.8.1
 - 许可证：MIT
 - GitHub：https://github.com/gemron/Termexo
-- Release：https://github.com/gemron/Termexo/releases/tag/v0.4.4
+- Release：https://github.com/gemron/Termexo/releases/tag/v0.8.1
+- 官网：https://www.termexo.com
 - npm：https://www.npmjs.com/package/termexo
 - 快速体验：`npx termexo@latest`
 - 环境：Windows 10/11 x64、WebView2、Node.js 18.18+
@@ -93,3 +94,47 @@ MP4 用于官网、视频号与 Release Notes；GIF 用于公众号与 README，
 补充文章覆盖 V0.4.4 之后的 V0.4.5、V0.5.0 与 V0.6.0，适合在公众号、掘金、知乎、
 OSCHINA 或 CSDN 按平台格式稍作调整后发布。封面由 OpenAI 图像模型参考 Termexo 当前界面生成；
 正文截图来自项目仓库。
+
+## V0.8 补充素材
+
+覆盖 V0.7.0、V0.8.0 与 V0.8.1，主线是远程访问：打开后同一局域网或 VPN 内的手机、平板或另一台
+电脑用浏览器打开完整工作台，读写的是桌面上同一批 PTY 进程。次线是会话级 Git 视图，以及 V0.8.1
+把首次启动换成新手引导、把「新建」归位到标签栏。
+
+- 平台中立图文底稿：`articles/17-v0.8-soft-article.md`
+- 掘金工程实践稿：`articles/18-juejin-v0.8.md`
+- CSDN 功能与安装稿：`articles/19-csdn-v0.8.md`
+- 知乎问题回答稿：`articles/20-zhihu-v0.8.md`
+- OSCHINA 开源项目稿：`articles/21-oschina-v0.8.md`
+- Medium 英文技术稿：`articles/22-medium-v0.8.md`
+- Product Hunt V0.8 发布字段：`articles/23-product-hunt-v0.8.md`
+- 微信公众号图文稿：`articles/24-wechat-v0.8.md`
+- V2EX 分享创造短帖：`articles/25-v2ex-v0.8.md`
+- 短帖合集（微博 / 朋友圈 / X / 掘金沸点 / 群公告）：`articles/26-short-posts-v0.8.md`
+
+### V0.8 配图
+
+| 文件（`assets/`） | 内容 | 建议位置 |
+| --- | --- | --- |
+| `termexo-remote-v0.8.png` | 手机经远程访问打开的工作台，叠在它所连接的桌面端之上 | 远程访问段，多数稿的首图 |
+| `termexo-workbench-v0.8.png` | V0.8 桌面工作台，双终端网格与真实命令输出 | 工作台段 |
+| `termexo-git-v0.8.png` | 会话级 Git 视图：变更文件、提交图谱与 Diff | Git 视图段 |
+
+截图对真实桌面构建采集，全程使用挪开真实数据库、独立 WebView2 profile 的一次性实例，画面里只有
+演示工作区 `shop-api`。**V0.8 没有 AI 封面图**：需要封面的平台
+（掘金、CSDN、公众号、OSCHINA）请沿用 `assets/termexo-cover-v0.6.png` 或另行准备，稿件的发布声明
+里已标注「封面待补」。
+
+### V0.8 发布顺序建议
+
+1. 先发 OSCHINA 开源项目稿与 V2EX 短帖，两者对「新版本发布」这一动机最直接。
+2. 再发掘金工程实践稿；远程访问的三个取舍（复用命令表、合成滚轮、单一 PTY 尺寸）是这批稿里
+   最有技术含量的部分。
+3. CSDN 与公众号稿偏实用，可与安装步骤一起发。
+4. 知乎稿走「回答问题」而不是「发文章」，并在开头声明维护者身份。
+5. Medium 与 Product Hunt 面向英文读者，建议同日发布，Product Hunt 的 maker comment 直接用
+   稿件里的版本。
+6. 短帖合集按平台字数已分好，配 `termexo-remote-v0.8.png` 即可。
+
+远程访问涉及安全边界，各平台稿都在正文里写明了三点，发布时不要删：仅面向可信网络、自签名证书会
+提示不安全、**访问令牌等同于这台电脑上 Termexo 的完整控制权**。
