@@ -752,7 +752,9 @@ app-inspector-panel {
   display: flex;
   min-width: 0;
   height: 100%;
-  flex: 1;
+  // Sized by its tabs rather than by the row, so the add button follows the last tab instead of
+  // waiting at the far end of an empty strip. It still shrinks and scrolls once the tabs fill it.
+  flex: 0 1 auto;
   // DaisyUI's `.tabs` wraps; a second row of tabs would eat into the terminals below it, so the
   // strip scrolls sideways instead.
   flex-wrap: nowrap;
@@ -920,10 +922,10 @@ app-inspector-panel {
 .add-tab {
   display: grid;
   width: 32px;
+  height: 100%;
   flex: 0 0 auto;
   place-items: center;
   border: 0;
-  border-right: 1px solid var(--border);
 }
 
 .add-tab,

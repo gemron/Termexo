@@ -111,78 +111,8 @@
       </div>
 
       <div class="toolbar-actions join">
-        <!--
-          One menu for everything a workspace can open, so a plain shell and an Agent are picked
-          the same way instead of from two neighbouring buttons that both read as "new".
-        -->
-        <div class="menu-anchor">
-          <button
-            type="button"
-            class="tool-button btn btn-ghost btn-sm join-item"
-            data-testid="new-terminal-menu"
-            [class.active]="agentMenuOpen()"
-            [attr.aria-expanded]="agentMenuOpen()"
-            aria-haspopup="menu"
-            [title]="'terminal.newMenuHint' | t"
-            (click)="agentMenuOpen.set(!agentMenuOpen())"
-          >
-            <app-icon name="plus" [size]="14" />
-            <span>{{ 'terminal.newMenu' | t }}</span>
-            <!-- The label is hidden well before this width, leaving a plain square button. -->
-            @if (!phoneLayout()) {
-              <app-icon name="chevron-down" [size]="12" />
-            }
-          </button>
-          @if (agentMenuOpen()) {
-            <!-- Opens over the topbar, so it has to opt out of the drag region it sits in. -->
-            <div
-              class="agent-menu menu rounded-box bg-base-200 shadow-xl"
-              role="menu"
-              data-tauri-drag-region="false"
-            >
-              <p class="menu-group">{{ 'terminal.groupTerminal' | t }}</p>
-              <button type="button" role="menuitem" (click)="createTerminal('shell')">
-                <span data-tone="slate"><app-icon name="terminal" [size]="14" /></span>
-                <div>
-                  <strong>Shell</strong>
-                  <small>{{ 'terminal.shellHint' | t }}</small>
-                </div>
-              </button>
-
-              <p class="menu-group">{{ 'terminal.groupAgent' | t }}</p>
-              <button type="button" role="menuitem" (click)="openClaudeLaunch()">
-                <span data-tone="green"><app-icon name="bot" [size]="14" /></span>
-                <div>
-                  <strong>Claude Code</strong>
-                  <small>{{ installationLabel(agents.installation()) }}</small>
-                </div>
-              </button>
-              <button type="button" role="menuitem" (click)="openCodexLaunch()">
-                <span data-tone="blue"><app-icon name="bot" [size]="14" /></span>
-                <div>
-                  <strong>Codex CLI</strong>
-                  <small>{{ installationLabel(agents.codexInstallation()) }}</small>
-                </div>
-              </button>
-              <button
-                type="button"
-                role="menuitem"
-                data-agent="opencode"
-                (click)="openOpenCodeLaunch()"
-              >
-                <span data-tone="amber"><app-icon name="terminal" [size]="14" /></span>
-                <div>
-                  <strong>OpenCode</strong>
-                  <small>{{ installationLabel(agents.openCodeInstallation()) }}</small>
-                </div>
-              </button>
-            </div>
-          }
-        </div>
-
         <!-- Low-frequency next to the view switch, so a phone reaches it from the overflow menu. -->
         @if (!phoneLayout()) {
-          <span class="tool-divider"></span>
           <button
             type="button"
             class="tool-button btn btn-ghost btn-sm join-item"
@@ -487,15 +417,67 @@
             </div>
           }
         </div>
-        <button
-          type="button"
-          class="add-tab"
-          [title]="'terminal.new' | t"
-          [attr.aria-label]="'terminal.new' | t"
-          (click)="createTerminal('shell')"
-        >
-          <app-icon name="plus" [size]="14" />
-        </button>
+        <!--
+          One menu for everything a workspace can open, so a plain shell and an Agent are picked
+          the same way instead of from two neighbouring buttons that both read as "new". It lives
+          on the tab strip because that is what it adds to; from the window's own bar it read as a
+          workspace-level action and left the new terminal behind whichever view was open.
+        -->
+        <div class="menu-anchor">
+          <button
+            type="button"
+            class="add-tab"
+            data-testid="new-terminal-menu"
+            [class.active]="agentMenuOpen()"
+            [attr.aria-expanded]="agentMenuOpen()"
+            aria-haspopup="menu"
+            [title]="'terminal.newMenuHint' | t"
+            [attr.aria-label]="'terminal.newMenu' | t"
+            (click)="agentMenuOpen.set(!agentMenuOpen())"
+          >
+            <app-icon name="plus" [size]="14" />
+          </button>
+          @if (agentMenuOpen()) {
+            <div class="agent-menu menu rounded-box bg-base-200 shadow-xl" role="menu">
+              <p class="menu-group">{{ 'terminal.groupTerminal' | t }}</p>
+              <button type="button" role="menuitem" (click)="createTerminal('shell')">
+                <span data-tone="slate"><app-icon name="terminal" [size]="14" /></span>
+                <div>
+                  <strong>Shell</strong>
+                  <small>{{ 'terminal.shellHint' | t }}</small>
+                </div>
+              </button>
+
+              <p class="menu-group">{{ 'terminal.groupAgent' | t }}</p>
+              <button type="button" role="menuitem" (click)="openClaudeLaunch()">
+                <span data-tone="green"><app-icon name="bot" [size]="14" /></span>
+                <div>
+                  <strong>Claude Code</strong>
+                  <small>{{ installationLabel(agents.installation()) }}</small>
+                </div>
+              </button>
+              <button type="button" role="menuitem" (click)="openCodexLaunch()">
+                <span data-tone="blue"><app-icon name="bot" [size]="14" /></span>
+                <div>
+                  <strong>Codex CLI</strong>
+                  <small>{{ installationLabel(agents.codexInstallation()) }}</small>
+                </div>
+              </button>
+              <button
+                type="button"
+                role="menuitem"
+                data-agent="opencode"
+                (click)="openOpenCodeLaunch()"
+              >
+                <span data-tone="amber"><app-icon name="terminal" [size]="14" /></span>
+                <div>
+                  <strong>OpenCode</strong>
+                  <small>{{ installationLabel(agents.openCodeInstallation()) }}</small>
+                </div>
+              </button>
+            </div>
+          }
+        </div>
       </div>
 
       <app-terminal-toolbar

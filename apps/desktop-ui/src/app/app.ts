@@ -738,6 +738,7 @@ export class App {
 
     const terminal = this.state.createTerminal({ agentType, workingDirectory });
     if (terminal) {
+      this.revealCreatedTerminal(terminal.id);
       this.showToast(this.i18n.t('terminal.created', { name: terminal.name }));
     }
   }
@@ -827,6 +828,7 @@ export class App {
       this.selectedTerminalDirectory.set(null);
       if (terminal) {
         this.armStartupDialogs(terminal.id);
+        this.revealCreatedTerminal(terminal.id);
         this.showToast(this.i18n.t('terminal.started', { name: terminal.name }));
       }
     } catch (error) {
@@ -889,6 +891,7 @@ export class App {
       this.selectedTerminalDirectory.set(null);
       if (terminal) {
         this.armStartupDialogs(terminal.id);
+        this.revealCreatedTerminal(terminal.id);
         this.showToast(this.i18n.t('terminal.started', { name: terminal.name }));
       }
     } catch (error) {
@@ -944,6 +947,7 @@ export class App {
       this.selectedTerminalDirectory.set(null);
       if (terminal) {
         this.armStartupDialogs(terminal.id);
+        this.revealCreatedTerminal(terminal.id);
         this.showToast(this.i18n.t('terminal.started', { name: terminal.name }));
       }
     } catch (error) {
@@ -1055,6 +1059,7 @@ export class App {
       this.sessionCenterOpen.set(false);
       if (terminal) {
         this.armStartupDialogs(terminal.id);
+        this.revealCreatedTerminal(terminal.id);
         this.showToast(this.i18n.t('terminal.resuming', { name: value.session.title }));
       }
     } catch (error) {
@@ -1077,6 +1082,18 @@ export class App {
     this.todos.handleTerminalStatus(terminalId, 'STOPPED');
     void this.terminalGateway.close(terminalId).catch(() => undefined);
     this.state.closeTerminal(terminalId);
+  }
+
+  /**
+   * Brings a terminal the user just asked for onto the screen.
+   *
+   * Creating one already makes it the active terminal, but the workspace may be showing the task
+   * board or the Git view, where no terminal is drawn at all — the new one opened behind whichever
+   * view was in front, and nothing said so.
+   */
+  private revealCreatedTerminal(terminalId: string): void {
+    this.workspaceView.set('terminal');
+    this.selectTerminal(terminalId);
   }
 
   protected selectTerminal(terminalId: string): void {
@@ -2350,6 +2367,7 @@ export class App {
       });
       this.settingsOpen.set(false);
       if (terminal) {
+        this.revealCreatedTerminal(terminal.id);
         this.showToast(this.i18n.t('account.loginOpened', { name: profile.name }));
         void this.watchAccountLogin(profileId, terminalId);
       }
