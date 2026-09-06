@@ -133,6 +133,10 @@
    --------------------------------------------------------------------------- */
 .remote-fields {
   margin-top: 16px;
+  // Without this the labels stretch to the taller cell — the one carrying the port hint — and a
+  // grid label stretches its own rows with it, leaving the select several pixels deeper than the
+  // input beside it.
+  align-items: start;
   justify-content: start;
   gap: 12px 16px;
   grid-template-columns: 300px 150px;
@@ -193,7 +197,9 @@
 
 .remote-link-row {
   display: grid;
-  align-items: start;
+  // The link is one line at this width, so its button centres against it rather than sitting a
+  // few pixels proud of the bottom edge.
+  align-items: center;
   gap: 8px;
   grid-template-columns: minmax(0, 1fr) auto;
 
