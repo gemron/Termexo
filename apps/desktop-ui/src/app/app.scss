@@ -346,6 +346,8 @@ app-inspector-panel {
 
 .menu-anchor {
   position: relative;
+  display: flex;
+  align-items: center;
 }
 
 .global-notice-anchor {
@@ -583,7 +585,8 @@ app-inspector-panel {
     background: transparent;
 
     &:hover {
-      background: var(--surface-2);
+      color: var(--text);
+      background: color-mix(in srgb, var(--accent) 14%, var(--surface-2));
     }
 
     > span {
@@ -918,17 +921,6 @@ app-inspector-panel {
   }
 }
 
-/* Outside the scrolling strip so it stays reachable however many tabs are open. */
-.add-tab {
-  display: grid;
-  width: 32px;
-  height: 100%;
-  flex: 0 0 auto;
-  place-items: center;
-  border: 0;
-}
-
-.add-tab,
 .tab-close {
   color: var(--text-muted);
   background: transparent;

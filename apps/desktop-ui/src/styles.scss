@@ -761,6 +761,37 @@ input:focus-visible,
 }
 
 /*
+ * The tab strip's add button: the one action the strip exists to offer, so it carries the accent
+ * rather than reading as a third ghost icon beside the tab close buttons. These rules live here
+ * because app.scss is at its stylesheet budget; see the two blocks above.
+ */
+.tab-bar .add-tab {
+  display: grid;
+  width: 26px;
+  height: 26px;
+  flex: 0 0 auto;
+  place-items: center;
+  margin: 0 7px;
+  border: 0;
+  border-radius: var(--radius-field);
+  color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 16%, var(--surface-2));
+}
+
+.tab-bar .add-tab:hover,
+.tab-bar .add-tab.active {
+  background: color-mix(in srgb, var(--accent) 30%, var(--surface-2));
+}
+
+@media (max-width: 640px) {
+  /* A finger needs more than a mouse does; the phone rules in app.scss cover the other controls. */
+  .tab-bar .add-tab {
+    width: 32px;
+    height: 32px;
+  }
+}
+
+/*
  * Sized by its own column and row count rather than stretched to the container.
  *
  * With one client watching, the fit proposes exactly what fits and the two agree. With several,
