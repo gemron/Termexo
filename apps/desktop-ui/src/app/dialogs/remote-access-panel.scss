@@ -100,18 +100,41 @@
   line-height: 1.5;
 }
 
-.remote-fields {
-  margin-top: 12px;
-}
+/*
+   The master switch, set apart from the option below it: turning this off stops the service,
+   while HTTPS only changes how it listens. The device count belongs beside it because it is what
+   the switch is currently doing, not another field to fill in.
+   --------------------------------------------------------------------------- */
+.remote-switch {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 11px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-field);
+  background: var(--surface-inset);
 
-.remote-tls {
-  margin-top: 14px;
+  .field-hint {
+    margin-top: 5px;
+  }
 }
 
 .remote-runtime {
-  margin-top: 12px;
+  flex: 0 0 auto;
   color: var(--text-secondary);
   font: 10px/1.4 var(--mono);
+  white-space: nowrap;
+}
+
+/* A port is four or five digits; a full half of the dialog was a field with nothing to hold. */
+.remote-fields {
+  margin-top: 14px;
+  grid-template-columns: minmax(0, 1fr) 168px;
+}
+
+.remote-tls {
+  margin-top: 16px;
 }
 
 .remote-dirty {
@@ -140,7 +163,20 @@
 .remote-link-value {
   display: grid;
   min-width: 0;
+  align-content: start;
+  gap: 11px;
+}
+
+/* An address is short; stretching its picker across the dialog only pushed it off the link. */
+.remote-address-pick {
+  max-width: 340px;
+}
+
+.remote-link-row {
+  display: grid;
+  align-items: start;
   gap: 8px;
+  grid-template-columns: minmax(0, 1fr) auto;
 
   code {
     padding: 9px 10px;
@@ -153,22 +189,22 @@
   }
 
   button {
-    justify-self: start;
+    white-space: nowrap;
   }
 }
 
 /* Scanners need real black on real white, so the code keeps its own colours in every theme. */
 .remote-qr {
   display: grid;
-  width: 168px;
+  width: 148px;
   margin: 0;
   justify-items: center;
   gap: 7px;
 
   /* The padding is the code's quiet zone: about four modules, which scanners need to lock on. */
   svg {
-    width: 168px;
-    height: 168px;
+    width: 148px;
+    height: 148px;
     padding: 16px;
     border-radius: var(--radius-field);
     background: #ffffff;
@@ -228,6 +264,13 @@
   margin-top: 10px;
 }
 
+/* Both lists are short and unrelated to each other, so they read side by side and halve the scroll. */
+.remote-notes-grid {
+  display: grid;
+  gap: 0 20px;
+  grid-template-columns: 1fr 1fr;
+}
+
 .remote-notes {
   margin: 0;
   padding-left: 16px;
@@ -247,5 +290,15 @@
 
   .remote-qr {
     justify-self: start;
+  }
+
+  .remote-fields,
+  .remote-notes-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .remote-switch {
+    flex-direction: column;
+    gap: 9px;
   }
 }

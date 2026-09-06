@@ -86,16 +86,23 @@ interface AddressOption {
         <section class="network-section">
           <h3>{{ 'remote.serviceSection' | t }}</h3>
 
-          <label class="checkbox-control">
-            <input
-              type="checkbox"
-              [disabled]="readOnly || busy()"
-              [ngModel]="enabled()"
-              (ngModelChange)="enabled.set($event)"
-            />
-            <span>{{ 'remote.enable' | t }}</span>
-          </label>
-          <small class="field-hint">{{ 'remote.enableHint' | t }}</small>
+          <div class="remote-switch">
+            <div>
+              <label class="checkbox-control">
+                <input
+                  type="checkbox"
+                  [disabled]="readOnly || busy()"
+                  [ngModel]="enabled()"
+                  (ngModelChange)="enabled.set($event)"
+                />
+                <span>{{ 'remote.enable' | t }}</span>
+              </label>
+              <small class="field-hint">{{ 'remote.enableHint' | t }}</small>
+            </div>
+            <span class="remote-runtime">{{
+              'remote.connectedClients' | t: { count: status()?.connectedClients ?? 0 }
+            }}</span>
+          </div>
 
           <div class="two-columns remote-fields">
             <label>
@@ -141,12 +148,6 @@ interface AddressOption {
           </label>
           <small class="field-hint">{{ 'remote.httpsHint' | t }}</small>
 
-          <div class="remote-runtime">
-            <span>{{
-              'remote.connectedClients' | t: { count: status()?.connectedClients ?? 0 }
-            }}</span>
-          </div>
-
           @if (!readOnly) {
             <div class="editor-actions">
               @if (dirty()) {
@@ -170,23 +171,28 @@ interface AddressOption {
           } @else if (linkOptions().length === 0) {
             <p class="remote-empty">{{ 'remote.noLanAddress' | t }}</p>
           } @else {
-            @if (linkOptions().length > 1) {
-              <label>
-                <span>{{ 'remote.addressPick' | t }}</span>
-                <select [ngModel]="linkAddress()" (ngModelChange)="linkAddress.set($event)">
-                  @for (option of linkOptions(); track option.value) {
-                    <option [value]="option.value">{{ option.label }}</option>
-                  }
-                </select>
-              </label>
-            }
-
+            <!--
+              Picking the address and reading the link it produces are one step, so they share the
+              column beside the QR code rather than leaving it standing next to empty space.
+            -->
             <div class="remote-link">
               <div class="remote-link-value">
-                <code>{{ accessUrl() }}</code>
-                <button type="button" class="secondary" (click)="copy('url', accessUrl())">
-                  {{ (copiedTarget() === 'url' ? 'remote.copied' : 'remote.copyLink') | t }}
-                </button>
+                @if (linkOptions().length > 1) {
+                  <label class="remote-address-pick">
+                    <span>{{ 'remote.addressPick' | t }}</span>
+                    <select [ngModel]="linkAddress()" (ngModelChange)="linkAddress.set($event)">
+                      @for (option of linkOptions(); track option.value) {
+                        <option [value]="option.value">{{ option.label }}</option>
+                      }
+                    </select>
+                  </label>
+                }
+                <div class="remote-link-row">
+                  <code>{{ accessUrl() }}</code>
+                  <button type="button" class="secondary" (click)="copy('url', accessUrl())">
+                    {{ (copiedTarget() === 'url' ? 'remote.copied' : 'remote.copyLink') | t }}
+                  </button>
+                </div>
               </div>
               @if (qrCode(); as image) {
                 <figure class="remote-qr">
@@ -264,23 +270,25 @@ interface AddressOption {
           }
         </section>
 
-        <section class="network-section">
-          <h3>{{ 'remote.securitySection' | t }}</h3>
-          <ul class="remote-notes">
-            <li>{{ 'remote.securityTrusted' | t }}</li>
-            <li>{{ 'remote.securityToken' | t }}</li>
-            <li>{{ 'remote.securityCertificate' | t }}</li>
-          </ul>
-        </section>
+        <div class="remote-notes-grid">
+          <section class="network-section">
+            <h3>{{ 'remote.securitySection' | t }}</h3>
+            <ul class="remote-notes">
+              <li>{{ 'remote.securityTrusted' | t }}</li>
+              <li>{{ 'remote.securityToken' | t }}</li>
+              <li>{{ 'remote.securityCertificate' | t }}</li>
+            </ul>
+          </section>
 
-        <section class="network-section">
-          <h3>{{ 'remote.limitSection' | t }}</h3>
-          <ul class="remote-notes">
-            <li>{{ 'remote.limitSize' | t }}</li>
-            <li>{{ 'remote.limitTodo' | t }}</li>
-            <li>{{ 'remote.limitRemote' | t }}</li>
-          </ul>
-        </section>
+          <section class="network-section">
+            <h3>{{ 'remote.limitSection' | t }}</h3>
+            <ul class="remote-notes">
+              <li>{{ 'remote.limitSize' | t }}</li>
+              <li>{{ 'remote.limitTodo' | t }}</li>
+              <li>{{ 'remote.limitRemote' | t }}</li>
+            </ul>
+          </section>
+        </div>
       }
     </div>
   `,
