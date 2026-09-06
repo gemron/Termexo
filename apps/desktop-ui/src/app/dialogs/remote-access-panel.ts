@@ -137,28 +137,32 @@ interface AddressOption {
             </label>
           </div>
 
-          <label class="checkbox-control remote-tls">
-            <input
-              type="checkbox"
-              [disabled]="readOnly || busy()"
-              [ngModel]="tls()"
-              (ngModelChange)="tls.set($event)"
-            />
-            <span>{{ 'remote.https' | t }}</span>
-          </label>
-          <small class="field-hint">{{ 'remote.httpsHint' | t }}</small>
-
-          @if (!readOnly) {
-            <div class="editor-actions">
-              @if (dirty()) {
-                <small class="remote-dirty">{{ 'remote.unsaved' | t }}</small>
-              }
-              <span></span>
-              <button type="button" class="primary" [disabled]="!canSave()" (click)="save()">
-                {{ (saving() ? 'remote.saving' : 'remote.save') | t }}
-              </button>
+          <!-- The apply button shares the last option's row rather than sitting alone below it. -->
+          <div class="remote-apply">
+            <div class="remote-tls">
+              <label class="checkbox-control">
+                <input
+                  type="checkbox"
+                  [disabled]="readOnly || busy()"
+                  [ngModel]="tls()"
+                  (ngModelChange)="tls.set($event)"
+                />
+                <span>{{ 'remote.https' | t }}</span>
+              </label>
+              <small class="field-hint">{{ 'remote.httpsHint' | t }}</small>
             </div>
-          }
+
+            @if (!readOnly) {
+              <div class="editor-actions">
+                @if (dirty()) {
+                  <small class="remote-dirty">{{ 'remote.unsaved' | t }}</small>
+                }
+                <button type="button" class="primary" [disabled]="!canSave()" (click)="save()">
+                  {{ (saving() ? 'remote.saving' : 'remote.save') | t }}
+                </button>
+              </div>
+            }
+          </div>
         </section>
 
         <section class="network-section">

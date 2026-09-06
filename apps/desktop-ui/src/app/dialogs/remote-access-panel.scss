@@ -127,14 +127,38 @@
   white-space: nowrap;
 }
 
-/* A port is four or five digits; a full half of the dialog was a field with nothing to hold. */
+/*
+   Where to listen is one setting, so its two fields sit together at the left. Stretched across
+   the dialog they ended up at opposite edges, with a port field wide enough for a paragraph.
+   --------------------------------------------------------------------------- */
 .remote-fields {
-  margin-top: 14px;
-  grid-template-columns: minmax(0, 1fr) 168px;
+  margin-top: 16px;
+  justify-content: start;
+  gap: 12px 16px;
+  grid-template-columns: 300px 150px;
 }
 
-.remote-tls {
+/*
+   The apply button shares the row with the last option instead of standing alone under an empty
+   band — the form is a narrow column now, and a primary action far from what it applies is one
+   more thing to look for.
+   --------------------------------------------------------------------------- */
+.remote-apply {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 20px;
   margin-top: 16px;
+
+  .editor-actions {
+    flex: 0 0 auto;
+    margin-top: 0;
+  }
+}
+
+/* A flex child will not shrink below its text without this, and the hint is a full sentence. */
+.remote-tls {
+  min-width: 0;
 }
 
 .remote-dirty {
@@ -165,11 +189,6 @@
   min-width: 0;
   align-content: start;
   gap: 11px;
-}
-
-/* An address is short; stretching its picker across the dialog only pushed it off the link. */
-.remote-address-pick {
-  max-width: 340px;
 }
 
 .remote-link-row {
@@ -295,6 +314,12 @@
   .remote-fields,
   .remote-notes-grid {
     grid-template-columns: minmax(0, 1fr);
+  }
+
+  .remote-apply {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 12px;
   }
 
   .remote-switch {
