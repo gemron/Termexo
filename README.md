@@ -11,7 +11,7 @@
 </p>
 
 <p align="center">
-  <img alt="Version 0.8.0" src="https://img.shields.io/badge/version-0.8.0--preview-58c7a0">
+  <img alt="Version 0.8.0" src="https://img.shields.io/badge/version-0.8.0-58c7a0">
   <img alt="Windows" src="https://img.shields.io/badge/platform-Windows-0078D4?logo=windows">
   <img alt="Tauri 2" src="https://img.shields.io/badge/Tauri-2-24C8DB?logo=tauri&logoColor=white">
   <img alt="Angular 22" src="https://img.shields.io/badge/Angular-22-DD0031?logo=angular">
@@ -26,7 +26,9 @@
 Termexo puts Claude Code, Codex, and the terminals around them into one recoverable Windows
 workspace. Keep several agents visible at once, see immediately when one needs input or
 approval, reopen yesterday's native session, and switch the Claude CLI between compatible
-model providers without rebuilding your setup.
+model providers without rebuilding your setup. Turn on remote access and that same workbench
+opens in a browser on your phone or a second computer, driving the very same live terminals —
+so the agent waiting on an approval can be answered from wherever you are.
 
 Run the complete Windows app with one command—no Termexo account or server required:
 
@@ -34,9 +36,7 @@ Run the complete Windows app with one command—no Termexo account or server req
 npx termexo@latest
 ```
 
-> The current version is **V0.8.0 (preview)**. Turn on remote access and a phone or a second
-> computer on the same network opens the whole workbench in a browser, sharing the desktop's live
-> terminals; terminals scroll by finger, and their size follows whichever view is in use.
+> The current version is **V0.8.0**.
 
 ![Termexo multi-terminal grid workbench](website/assets/termexo-workbench.png)
 
@@ -88,6 +88,27 @@ npx termexo@latest
   </tr>
   <tr>
     <td width="50%" valign="top">
+      <strong>Answer it from your phone.</strong><br><br>
+      Turn on remote access and any phone, tablet, or second computer on your network or VPN
+      opens the whole workbench in a browser — the same workspaces and the same live terminals,
+      reading and writing the very PTYs the desktop is running. Terminals scroll by finger, the
+      layout folds down to one terminal with panels that float over it, and the link is HTTPS
+      behind an access token you can reveal, turn into a QR code, or rotate.
+      <br><br>
+      <a href="website/assets/termexo-phone.png"><img src="website/assets/termexo-phone.png" alt="The Termexo workbench open on a phone through remote access"></a>
+    </td>
+    <td width="50%" valign="top">
+      <strong>See what this session changed.</strong><br><br>
+      The Git view follows the active terminal and measures against the HEAD that terminal started
+      on: the files it touched, the commits it made, and a unified or split diff of any one of
+      them. It keeps reading while you are in it, so the list stays current without a refresh, and
+      it comes back to the file and layout you left it on.
+      <br><br>
+      <a href="website/assets/termexo-git.png"><img src="website/assets/termexo-git.png" alt="Termexo Git graph and session diff for the active terminal"></a>
+    </td>
+  </tr>
+  <tr>
+    <td width="50%" valign="top">
       <strong>Turn a task into a running agent.</strong><br><br>
       The task board keeps projects and tasks with priorities and acceptance criteria. Hand one
       to Claude Code, Codex, or OpenCode and it becomes a real terminal, moving through todo,
@@ -111,7 +132,7 @@ The interface is available in Simplified Chinese, English, Spanish, French, Germ
 and Korean. It follows the Windows language automatically, or you can choose a language from
 the main toolbar and keep that choice across restarts.
 
-## What's New in V0.8.0 (preview)
+## What's New in V0.8.0
 
 - **Remote access.** Turn it on in the settings and any phone, tablet, or second computer on the
   same network or VPN opens the whole workbench in a browser: the same workspaces and terminals,
@@ -123,8 +144,16 @@ the main toolbar and keep that choice across restarts.
 - **Size follows the view in use.** Work on the desktop and the terminal uses the desktop's width,
   pick up the phone and it becomes the phone's, come back and it returns. Every other client
   renders that same grid, panning sideways when its window cannot hold it.
-- **A top bar that fits a phone.** Below 640px the product name and project path give up their
-  space, and whatever still overflows scrolls horizontally.
+- **A workbench that fits a phone.** Below 640px the split layouts fold to a single terminal, both
+  side panels float over the workspace instead of taking a column of it, controls grow to a
+  finger's size, and the tools at the right of the top bar collapse into one menu — which is what
+  stopped the toolbar from scrolling half its buttons out of reach.
+- **Pick a folder without a native dialog.** Starting a terminal from a browser used to open
+  `window.prompt`, which some mobile browsers suppress outright. It is an in-app dialog now,
+  prefilled with the workspace folder, so accepting it is a single tap.
+- **A Git view that stays put.** It no longer drops back to the terminals when the active terminal
+  changes or a read fails, keeps reading the repository while it is open, says why it could not
+  read one, and returns to the file and layout you left it on.
 
 ## What's New in V0.7.0
 
@@ -184,6 +213,7 @@ a local control plane that is observable, recoverable, and extensible.
 | Prompt assets            | Recover live per-terminal drafts; search, favorite, pin, delete, and reuse submitted prompts                       |
 | Session handoff          | Build redacted, token-budgeted Git/task packages; import/export documents and continue in another Agent            |
 | Git graph and diff       | Show the active terminal's branch, commit topology, and changes since terminal start with unified or split diff    |
+| Remote access            | Serve the whole workbench over HTTPS to phones and other computers on the network, gated by an access token with QR entry and rotation, with every remote call passing an explicit command allowlist |
 | Local data and secrets   | Store workspace/session/event data in SQLite and API keys in Windows Credential Manager                            |
 | Browser preview          | Preview the complete UI without Rust and exercise layout flows through an interactive simulated terminal           |
 

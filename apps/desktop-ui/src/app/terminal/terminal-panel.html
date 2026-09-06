@@ -107,7 +107,14 @@
       </button>
     </div>
   }
-  <div #terminal class="terminal-host" [attr.aria-label]="'terminal.aria' | t"></div>
+  <!--
+    The padding sits on this wrapper rather than on the element xterm is opened in: the fit
+    addon measures that element's computed height, which still carries its own padding, and
+    would count the inset as usable rows.
+  -->
+  <div class="terminal-frame">
+    <div #terminal class="terminal-host" [attr.aria-label]="'terminal.aria' | t"></div>
+  </div>
   <footer>
     <span>{{ session().workingDirectory }}</span>
     <span>{{ session().branch }}</span>

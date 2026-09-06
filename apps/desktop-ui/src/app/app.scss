@@ -1132,15 +1132,19 @@ app-inspector-panel {
 @media (max-width: 640px) {
   .app-shell {
     --topbar-height: 48px;
+    position: relative;
   }
 
   .topbar {
-    // The lead may collapse to nothing here; reaching every control matters more than branding.
-    grid-template-columns: minmax(0, auto) minmax(0, 1fr) auto;
+    // The lead absorbs the slack and gives it back first: the workspace name truncates cleanly,
+    // while the two clusters beside it are icon buttons with no way to shrink. That keeps the
+    // waiting-agent bell — which only joins the toolbar while an agent waits — on screen.
+    grid-template-columns: minmax(0, 1fr) auto auto;
   }
 
   .topbar-lead {
-    padding-left: 6px;
+    // The workspace name ends right against the first toolbar button without the trailing side.
+    padding: 0 6px;
   }
 
   .app-brand {
@@ -1168,6 +1172,55 @@ app-inspector-panel {
     &::-webkit-scrollbar {
       display: none;
     }
+  }
+
+  // Rules between button groups, which each group's own border already draws. The nine pixels
+  // they cost go back to the workspace name, which has the least room here.
+  .tool-divider {
+    display: none;
+  }
+
+  // The side panels float over the workspace instead of taking a column: sharing the width three
+  // ways left the terminal a strip too narrow to read, and pushed its controls — closing a
+  // terminal among them — past the right edge with no way back.
+  // The class is repeated to outweigh the collapsed-panel rules above, which carry four classes
+  // each; a media query on its own does not raise specificity.
+  .app-shell.app-shell.app-shell:not(.workspace-maximized) {
+    grid-template-columns: 0 0 100% 0 0;
+  }
+
+  // Dismisses whichever panel floats above it; darkening the workspace is also what separates
+  // the two, so the panels themselves carry no shadow. Their placement is in styles.scss, which
+  // is where rules reaching into another component's host element live.
+  .panel-scrim {
+    position: absolute;
+    z-index: 20;
+    inset: var(--topbar-height) 0 0;
+    border: 0;
+    background: #00000075;
+  }
+
+  // The toolbar scrolls sideways here, and a scrolling ancestor clips absolutely positioned
+  // descendants: both popups were being rendered outside its box, invisible and untappable.
+  // Fixed takes them out of it, and spanning the width suits a phone better anyway.
+  .agent-menu,
+  .global-notice-panel {
+    position: fixed;
+    top: calc(var(--topbar-height) + 4px);
+    inset-inline: 8px;
+    width: auto;
+    max-height: 80dvh;
+    overflow-y: auto;
+  }
+
+  // A finger needs more than the 26px a mouse is comfortable with, and the toolbar already
+  // scrolls sideways when the row runs out of room.
+  .tool-button,
+  .window-tool,
+  .rail-reveal,
+  .tab-close {
+    min-width: 32px;
+    min-height: 32px;
   }
 }
 

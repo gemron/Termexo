@@ -76,44 +76,50 @@
   }
 </div>
 
-<div class="layout-controls join" [attr.aria-label]="'terminal.layout' | t">
-  <button
-    type="button"
-    class="btn btn-square btn-ghost btn-xs join-item"
-    [title]="'terminal.layoutSingle' | t"
-    [class.active]="layout() === 'single'"
-    (click)="layoutChange.emit('single')"
-  >
-    <app-icon name="square" [size]="13" />
-  </button>
-  <button
-    type="button"
-    class="btn btn-square btn-ghost btn-xs join-item"
-    [title]="'terminal.layoutColumns' | t"
-    [class.active]="layout() === 'columns'"
-    (click)="layoutChange.emit('columns')"
-  >
-    <app-icon name="columns" [size]="13" />
-  </button>
-  <button
-    type="button"
-    class="btn btn-square btn-ghost btn-xs join-item"
-    [title]="'terminal.layoutRows' | t"
-    [class.active]="layout() === 'rows'"
-    (click)="layoutChange.emit('rows')"
-  >
-    <app-icon name="rows" [size]="13" />
-  </button>
-  <button
-    type="button"
-    class="btn btn-square btn-ghost btn-xs join-item"
-    [title]="'terminal.layoutGrid' | t"
-    [class.active]="layout() === 'grid'"
-    (click)="layoutChange.emit('grid')"
-  >
-    <app-icon name="grid" [size]="13" />
-  </button>
-</div>
+<!--
+  A phone draws one terminal whatever the workspace stores, so the split controls would only
+  offer a choice that cannot take effect.
+-->
+@if (!compact()) {
+  <div class="layout-controls join" [attr.aria-label]="'terminal.layout' | t">
+    <button
+      type="button"
+      class="btn btn-square btn-ghost btn-xs join-item"
+      [title]="'terminal.layoutSingle' | t"
+      [class.active]="layout() === 'single'"
+      (click)="layoutChange.emit('single')"
+    >
+      <app-icon name="square" [size]="13" />
+    </button>
+    <button
+      type="button"
+      class="btn btn-square btn-ghost btn-xs join-item"
+      [title]="'terminal.layoutColumns' | t"
+      [class.active]="layout() === 'columns'"
+      (click)="layoutChange.emit('columns')"
+    >
+      <app-icon name="columns" [size]="13" />
+    </button>
+    <button
+      type="button"
+      class="btn btn-square btn-ghost btn-xs join-item"
+      [title]="'terminal.layoutRows' | t"
+      [class.active]="layout() === 'rows'"
+      (click)="layoutChange.emit('rows')"
+    >
+      <app-icon name="rows" [size]="13" />
+    </button>
+    <button
+      type="button"
+      class="btn btn-square btn-ghost btn-xs join-item"
+      [title]="'terminal.layoutGrid' | t"
+      [class.active]="layout() === 'grid'"
+      (click)="layoutChange.emit('grid')"
+    >
+      <app-icon name="grid" [size]="13" />
+    </button>
+  </div>
+}
 
 @if (layout() === 'grid') {
   <div class="popover-anchor">

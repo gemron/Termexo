@@ -114,6 +114,16 @@ header {
   align-items: center;
 }
 
+// The title gives up its width first: on a phone the header is narrower than its own contents,
+// and the close button is the one thing that must stay reachable.
+.terminal-identity {
+  flex: 1 1 auto;
+}
+
+.terminal-meta {
+  flex: 0 0 auto;
+}
+
 .terminal-identity {
   gap: 7px;
 
@@ -315,10 +325,25 @@ header {
   }
 }
 
-.terminal-host {
+/*
+ * Carries the terminal's inset so that .terminal-host measures as pure grid area.
+ *
+ * The fit addon derives the row count from the computed height of the element xterm was opened
+ * in, and subtracts only that element's own padding — which the box-sizing here reports as part
+ * of the height rather than outside it. Padding on the host was therefore counted as usable
+ * space, proposing one row more than fits, and the last line was drawn behind the footer.
+ */
+.terminal-frame {
+  display: grid;
+  grid-template-rows: minmax(0, 1fr);
   min-width: 0;
   min-height: 0;
   padding: 8px 5px 2px 9px;
+}
+
+.terminal-host {
+  min-width: 0;
+  min-height: 0;
   overflow: hidden;
 }
 
@@ -379,7 +404,7 @@ footer {
   }
 }
 
-@container terminal-panel (max-width: 360px) {
+@container terminal-panel (max-width: 480px) {
   .terminal-identity strong {
     max-width: 92px;
   }
@@ -404,7 +429,7 @@ footer {
     display: none;
   }
 
-  .terminal-host {
+  .terminal-frame {
     padding-top: 5px;
   }
 }

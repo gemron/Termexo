@@ -10,7 +10,7 @@ const translations = {
     heroLine1: "One window.",
     heroLine2: "Every agent.",
     heroLead:
-      "Claude Code in one terminal, Codex in another, OpenCode in a third. Termexo puts them all on one screen — you can see which one is waiting on you, hand one a task straight off the board, pick up yesterday's conversation, and switch models without restarting anything.",
+      "Claude Code in one terminal, Codex in another, OpenCode in a third. Termexo puts them all on one screen — you can see which one is waiting on you, hand one a task straight off the board, pick up yesterday's conversation, and switch models without restarting anything. Turn on remote access and that same workbench opens on your phone, driving the very same live terminals.",
     runFromNpm: "Run it now",
     download: "Download installer",
     copyCommand: "Copy",
@@ -102,7 +102,19 @@ const translations = {
       "Check how much of your plan is left and when it resets, before you decide which model to send the next task to.",
     featureRemoteTitle: "Approve it from your phone",
     featureRemoteBody:
-      "Step away from the desk and still let an agent through the approval it is waiting on, over an encrypted link to your own machine.",
+      "Open the workbench in your phone's browser, over an encrypted link to your own machine, and let the agent through the approval it has been waiting on.",
+
+    remoteTitle: "The same workbench, in your hand.",
+    remoteLead:
+      "Turn on remote access and a phone, a tablet, or the laptop in the other room opens the whole workbench in a browser. Not a read-only mirror: the same workspaces and the same live terminals, so the agent stopped on an approval gets its answer while you are away from the desk.",
+    remotePoint1:
+      "Encrypted to your own machine, entered with a token you can scan as a QR code and rotate whenever you like",
+    remotePoint2:
+      "Terminals scroll by finger and take the size of whichever screen is being used",
+    remotePoint3:
+      "Nothing passes through a Termexo server — the link runs between your own devices",
+    remoteCaption:
+      "The same terminal the desktop is running, one screen at a time.",
 
     roadmapTitle: "What comes next.",
     roadmapLead:
@@ -121,11 +133,11 @@ const translations = {
       "Session summaries, moving a task from one agent to another, routing work, and notifications.",
     roadmap07Title: "Reaching your desk from anywhere",
     roadmap07Body:
-      "Paired devices, encrypted remote terminals, approving from a phone, clear roles, and an audit trail.",
+      "The workbench opens on a phone or a second computer over an encrypted link to your own machine, driving the same live terminals. Paired devices, roles, and an audit trail come next.",
 
     principlesTitle: "It all stays on your computer.",
     principlesLead:
-      "Termexo has no account, no server, and nothing to sync. Later versions add remote access — but only the kind you switch on yourself and can switch off just as fast.",
+      "Termexo has no account, no server, and nothing to sync. Remote access is the one link out, and it is the kind you switch on yourself, hand a token to, and switch off just as fast.",
     principle1Title: "Local by default",
     principle1Body:
       "Your project paths, sessions, terminal state, and settings sit in a file on your disk. There is no cloud service to sign into.",
@@ -146,9 +158,10 @@ const translations = {
     indexSession: "03 / NOTHING IS LOST",
     indexModel: "04 / MODEL ROUTING",
     indexTask: "05 / TASK BOARD",
-    indexCapabilities: "06 / FEATURES",
-    indexRoadmap: "07 / ROADMAP",
-    indexPrivacy: "08 / PRIVACY",
+    indexRemote: "06 / ANY DEVICE",
+    indexCapabilities: "07 / FEATURES",
+    indexRoadmap: "08 / ROADMAP",
+    indexPrivacy: "09 / PRIVACY",
     indexCta: "BUILD WITH US",
     footerReleases: "Releases",
     footerIssues: "Issues",
@@ -165,7 +178,7 @@ const translations = {
     heroLine1: "一个窗口，",
     heroLine2: "装下所有 Agent。",
     heroLead:
-      "一个终端跑 Claude Code，另一个跑 Codex，第三个跑 OpenCode。Termexo 把它们收进同一块屏幕——谁在等你回话一眼就能看到，一条任务可以直接从看板丢给某个 Agent，昨天聊到一半的会话点一下接着聊，换模型不用重开终端。",
+      "一个终端跑 Claude Code，另一个跑 Codex，第三个跑 OpenCode。Termexo 把它们收进同一块屏幕——谁在等你回话一眼就能看到，一条任务可以直接从看板丢给某个 Agent，昨天聊到一半的会话点一下接着聊，换模型不用重开终端。打开远程访问，同一个工作台还能在手机浏览器里打开，驱动的是同一批正在运行的终端。",
     runFromNpm: "立即运行",
     download: "下载安装包",
     copyCommand: "复制",
@@ -246,7 +259,15 @@ const translations = {
       "在决定把下一个任务交给哪个模型之前，先看清套餐还剩多少、什么时候重置。",
     featureRemoteTitle: "在手机上点同意",
     featureRemoteBody:
-      "人离开工位，也能通过到自己电脑的加密连接，放行 Agent 正在等的那次授权。",
+      "用手机浏览器打开工作台，走一条到自己电脑的加密连接，把 Agent 一直在等的那次授权放行。",
+
+    remoteTitle: "同一个工作台，装进手里。",
+    remoteLead:
+      "打开远程访问，手机、平板或另一个房间的笔记本用浏览器就能打开完整工作台。不是只读的镜像，而是同一批工作空间、同一批正在运行的终端——人不在工位上，卡在授权那一步的 Agent 也能等到回答。",
+    remotePoint1: "连接加密到你自己的电脑，凭令牌进入，令牌可扫码，也可以随时更换",
+    remotePoint2: "终端支持手指拖拽滚动，尺寸跟随正在使用的那块屏幕",
+    remotePoint3: "不经过 Termexo 的任何服务器，连接只在你自己的设备之间",
+    remoteCaption: "屏幕上是同一个终端，桌面端正在跑的那个。",
 
     roadmapTitle: "接下来做什么。",
     roadmapLead:
@@ -264,11 +285,11 @@ const translations = {
     roadmap06Body: "会话摘要、把任务从一个 Agent 转给另一个、任务分派和通知。",
     roadmap07Title: "在任何地方连回工位",
     roadmap07Body:
-      "设备配对、加密远程终端、手机审批、清晰的权限角色和操作日志。",
+      "工作台已经能在手机或另一台电脑上打开，走一条到自己电脑的加密连接，驱动同一批终端。设备配对、权限角色和操作日志是接下来的部分。",
 
     principlesTitle: "一切都留在你自己的电脑上。",
     principlesLead:
-      "Termexo 没有账号、没有服务器，也没有要同步的东西。以后会加远程访问——但只会是你自己打开、也能随时关掉的那种。",
+      "Termexo 没有账号、没有服务器，也没有要同步的东西。远程访问是唯一一条对外的连接，也是你自己打开、自己发令牌、随时能关掉的那种。",
     principle1Title: "默认就在本地",
     principle1Body:
       "项目路径、会话、终端状态和设置都存在你硬盘上的文件里，没有需要登录的云服务。",
@@ -289,9 +310,10 @@ const translations = {
     indexSession: "03 / 什么都没丢",
     indexModel: "04 / 模型路由",
     indexTask: "05 / 任务看板",
-    indexCapabilities: "06 / 功能",
-    indexRoadmap: "07 / 开发计划",
-    indexPrivacy: "08 / 隐私",
+    indexRemote: "06 / 任意设备",
+    indexCapabilities: "07 / 功能",
+    indexRoadmap: "08 / 开发计划",
+    indexPrivacy: "09 / 隐私",
     indexCta: "一起来建设",
     footerReleases: "发布版本",
     footerIssues: "问题反馈",

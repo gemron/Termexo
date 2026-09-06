@@ -11,7 +11,7 @@
 </p>
 
 <p align="center">
-  <img alt="Version 0.8.0" src="https://img.shields.io/badge/version-0.8.0--preview-58c7a0">
+  <img alt="Version 0.8.0" src="https://img.shields.io/badge/version-0.8.0-58c7a0">
   <img alt="Windows" src="https://img.shields.io/badge/platform-Windows-0078D4?logo=windows">
   <img alt="Tauri 2" src="https://img.shields.io/badge/Tauri-2-24C8DB?logo=tauri&logoColor=white">
   <img alt="Angular 22" src="https://img.shields.io/badge/Angular-22-DD0031?logo=angular">
@@ -25,7 +25,9 @@
 
 Termexo 把 Claude Code、Codex 和围绕它们运行的终端收进一个可恢复的 Windows
 工作空间。你可以同时盯住多个 Agent，及时知道谁在等待输入或授权，接着昨天的原生会话
-继续工作，也可以在不重搭环境的情况下为 Claude CLI 切换兼容模型供应商。
+继续工作，也可以在不重搭环境的情况下为 Claude CLI 切换兼容模型供应商。打开远程访问，
+同一个工作台就能在手机或另一台电脑的浏览器里打开，驱动的是同一批正在运行的终端——
+Agent 等着授权时，人在哪里都能回它一句。
 
 一条命令运行完整 Windows 应用，不需要注册 Termexo 账号，也不依赖 Termexo 服务器：
 
@@ -33,8 +35,7 @@ Termexo 把 Claude Code、Codex 和围绕它们运行的终端收进一个可恢
 npx termexo@latest
 ```
 
-> 当前版本为 **V0.8.0（预览）**：打开远程访问后，同一局域网内的手机或另一台电脑用浏览器就能
-> 打开完整工作台，与桌面共享同一批终端进程；终端支持手指拖拽滚动，尺寸跟随正在使用的那一端。
+> 当前版本为 **V0.8.0**。
 
 ![Termexo 多终端网格工作台](website/assets/termexo-workbench.png)
 
@@ -81,6 +82,25 @@ npx termexo@latest
   </tr>
   <tr>
     <td width="50%" valign="top">
+      <strong>在手机上回它一句。</strong><br><br>
+      打开远程访问，同一局域网或 VPN 内的手机、平板、另一台电脑用浏览器就能打开完整工作台——
+      同一批工作空间、同一批终端，实时读写桌面正在跑的那些 PTY 进程。终端支持手指拖拽滚动，
+      布局在窄屏收成单终端、侧栏浮在工作区之上，连接是 HTTPS，凭访问令牌进入，令牌可显示、
+      可生成二维码、可随时更换。
+      <br><br>
+      <a href="website/assets/termexo-phone.png"><img src="website/assets/termexo-phone.png" alt="通过远程访问在手机上打开的 Termexo 工作台"></a>
+    </td>
+    <td width="50%" valign="top">
+      <strong>看清这次会话改了什么。</strong><br><br>
+      Git 视图跟随当前终端，以该终端启动时的 HEAD 为基线：它动过哪些文件、提交了哪些内容，
+      任意一个都能看单栏或双栏 Diff。停留在这个视图时会持续读取仓库，不用手动刷新；离开再
+      回来，还是原来那个文件、原来那种布局。
+      <br><br>
+      <a href="website/assets/termexo-git.png"><img src="website/assets/termexo-git.png" alt="Termexo 当前终端的 Git 图谱与会话 Diff"></a>
+    </td>
+  </tr>
+  <tr>
+    <td width="50%" valign="top">
       <strong>把一条任务直接跑成 Agent。</strong><br><br>
       任务看板按项目管理任务，带优先级和验收标准。把任务交给 Claude Code、Codex 或 OpenCode，
       它就变成一个真实终端，并随该终端上报的状态在待办、执行中、已完成、已验收之间流转。
@@ -101,7 +121,7 @@ SQLite，密钥保存在 Windows Credential Manager，Claude/Codex 历史会话�
 界面支持简体中文、英语、西班牙语、法语、德语、日语和韩语。默认自动跟随 Windows
 系统语言，也可通过主工具栏手动切换并跨重启保留选择。
 
-## V0.8.0（预览）新增
+## V0.8.0 新增
 
 - **远程访问**：在设置里打开后，同一局域网或 VPN 内的手机、平板、另一台电脑用浏览器打开完整
   工作台，看到同一批工作空间和终端、实时读写同一批 PTY 进程。默认自签名 HTTPS，凭访问令牌
@@ -110,7 +130,13 @@ SQLite，密钥保存在 Windows Credential Manager，Claude/Codex 历史会话�
   OpenCode 这类全屏 TUI 按它们订阅的方式收到滚轮上报，行为与桌面滚轮一致，并带惯性滑动。
 - **尺寸跟随正在使用的一端**：在电脑上操作就用电脑的宽度，拿起手机操作就换成手机的，切回来
   再变回去。其余客户端渲染同一网格，窗口装不下时可以横向滑动查看。
-- **窄屏顶栏**：640px 以下品牌文字和项目路径让出空间，仍放不下的部分改为横向滚动。
+- **能在手机上正常使用的工作台**：640px 以下分屏布局收成单终端，两侧面板改为浮在工作区之上
+  而不再占走一列，控件放大到手指能点的尺寸，顶栏右侧的工具收进一个「更多」菜单——正是这一步
+  让工具栏不再把一半按钮藏进横向滚动里。
+- **不依赖系统对话框选目录**：在浏览器里新建终端原先要弹 `window.prompt`，部分移动浏览器会
+  直接屏蔽它。现在改成应用内对话框，并预填当前工作空间目录，点一下就能确认。
+- **Git 视图不再被弹走**：切换当前终端或读取失败时不会退回终端视图，停留期间持续读取仓库，
+  读不到时会说明原因，离开再回来仍停在原来的文件和布局上。
 
 ## V0.7.0 新增
 
@@ -165,6 +191,7 @@ Termexo 以 **Workspace** 为组织单位，把这些信息集中到一个可观
 | 提示词资产         | 按终端恢复实时草稿；搜索、收藏、置顶、删除和复用已提交提示词                     |
 | 会话交接           | 生成带脱敏和 Token 预算的 Git/任务包；导入导出文档并交给另一个 Agent 继续         |
 | Git Graph 与 Diff  | 展示当前终端的分支、提交拓扑和启动后的代码变更，支持单栏或双栏 Diff              |
+| 远程访问           | 以 HTTPS 把完整工作台提供给同网络的手机和其他电脑，凭访问令牌进入，支持二维码与令牌更换；远程调用需通过显式命令白名单 |
 | 本地数据与密钥     | Workspace、会话索引和事件保存到 SQLite；API Key 保存到 Windows Credential Manager |
 | 浏览器预览         | 无需 Rust 即可预览完整 UI，并使用可交互的模拟终端验证布局与基础流程               |
 

@@ -45,6 +45,8 @@ button:disabled {
 .git-header-actions,
 .branch-chip,
 .diff-toolbar,
+.diff-file,
+.diff-meta,
 .diff-layout,
 .git-warning {
   display: flex;
@@ -104,6 +106,13 @@ button:disabled {
 .branch-chip.detached {
   color: var(--color-warning);
   border-color: color-mix(in srgb, var(--color-warning) 40%, var(--border));
+}
+/* Neutral beside the branch, which is the identifier this view is organised around. */
+.branch-chip.session-chip {
+  max-width: 170px;
+  border-color: var(--border);
+  color: var(--text-secondary);
+  background: var(--surface-2);
 }
 
 .refresh-button {
@@ -354,17 +363,31 @@ button:disabled {
 }
 .diff-file {
   min-width: 0;
+  gap: 9px;
   overflow: hidden;
 }
 .diff-file strong {
-  display: block;
+  min-width: 0;
   overflow: hidden;
   font: 550 10px/1 var(--mono);
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+/* Counts first, so the size of a change reads without scrolling the diff. */
+.diff-meta {
+  flex: none;
+  gap: 7px;
+}
+.diff-meta b {
+  font: 700 9px/1 var(--mono);
+}
+.diff-meta b.added {
+  color: #8fd9b8;
+}
+.diff-meta b.removed {
+  color: #ef9aaa;
+}
 .diff-file span {
-  margin-left: 7px;
   color: var(--color-warning);
   font-size: 8px;
 }
@@ -516,6 +539,26 @@ button:disabled {
 }
 .empty-state.error {
   color: var(--color-error);
+}
+/*
+   Stands in for the whole body while the repository read has no answer, so it spans the rows the
+   content would have used instead of sitting at its own height.
+   --------------------------------------------------------------------------- */
+.git-workbench > .empty-state {
+  grid-row: 2 / -1;
+}
+.retry-button {
+  margin-top: 2px;
+  padding: 5px 12px;
+  border: 1px solid var(--border-strong);
+  border-radius: 6px;
+  color: var(--text-secondary);
+  background: var(--surface-2);
+  font-size: 10px;
+}
+.retry-button:hover {
+  color: var(--text);
+  border-color: color-mix(in srgb, var(--accent) 45%, var(--border-strong));
 }
 .sr-only {
   position: absolute;

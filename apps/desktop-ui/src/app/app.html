@@ -94,9 +94,11 @@
           [title]="
             git.overview()?.available
               ? ('git.open' | t)
-              : git.loading()
-                ? ('git.detecting' | t)
-                : ('git.unavailable' | t)
+              : git.error()
+                ? ('git.overviewFailed' | t) + ': ' + git.error()
+                : git.loading() || !git.overview()
+                  ? ('git.detecting' | t)
+                  : ('git.unavailable' | t)
           "
           (click)="workspaceView.set('git')"
         >
@@ -126,7 +128,10 @@
           >
             <app-icon name="plus" [size]="14" />
             <span>{{ 'terminal.newMenu' | t }}</span>
-            <app-icon name="chevron-down" [size]="12" />
+            <!-- The label is hidden well before this width, leaving a plain square button. -->
+            @if (!phoneLayout()) {
+              <app-icon name="chevron-down" [size]="12" />
+            }
           </button>
           @if (agentMenuOpen()) {
             <!-- Opens over the topbar, so it has to opt out of the drag region it sits in. -->
@@ -175,17 +180,20 @@
           }
         </div>
 
-        <span class="tool-divider"></span>
-        <button
-          type="button"
-          class="tool-button btn btn-ghost btn-sm join-item"
-          data-testid="session-center-open"
-          [title]="'terminal.sessionCenterHint' | t"
-          (click)="openSessionCenter()"
-        >
-          <app-icon name="history" [size]="14" />
-          <span>{{ 'terminal.sessionCenter' | t }}</span>
-        </button>
+        <!-- Low-frequency next to the view switch, so a phone reaches it from the overflow menu. -->
+        @if (!phoneLayout()) {
+          <span class="tool-divider"></span>
+          <button
+            type="button"
+            class="tool-button btn btn-ghost btn-sm join-item"
+            data-testid="session-center-open"
+            [title]="'terminal.sessionCenterHint' | t"
+            (click)="openSessionCenter()"
+          >
+            <app-icon name="history" [size]="14" />
+            <span>{{ 'terminal.sessionCenter' | t }}</span>
+          </button>
+        }
 
         @if (globalTerminalNotices().length > 0) {
           <span class="tool-divider"></span>
@@ -278,48 +286,69 @@
     </div>
 
     <div class="window-tools">
-      @if (!inspectorOpen() && workspaceView() === 'terminal' && !workspaceMaximized()) {
-        <button
-          type="button"
-          class="rail-reveal"
-          data-testid="inspector-reveal"
-          [title]="'inspector.expand' | t"
-          [attr.aria-label]="'inspector.expand' | t"
-          (click)="toggleInspector()"
-        >
-          <app-icon name="panel-right-open" [size]="15" />
-        </button>
-      }
       <!-- Remote mode only: the page is identical to the desktop one, so the link state needs saying. -->
       @defer (when remoteMode) {
         <app-remote-connection-badge />
       }
-      <app-language-selector />
-      <button
-        type="button"
-        class="window-tool"
-        data-testid="settings-open"
-        [title]="'workspace.settings' | t"
-        [attr.aria-label]="'workspace.settings' | t"
-        (click)="openSettings()"
-      >
-        <app-icon name="settings" [size]="15" />
-      </button>
-      <button
-        type="button"
-        class="window-tool"
-        data-testid="workspace-maximize-toggle"
-        [title]="
-          workspaceMaximized() ? ('workspace.restoreShortcut' | t) : ('workspace.maximize' | t)
-        "
-        [attr.aria-label]="
-          workspaceMaximized() ? ('workspace.restore' | t) : ('workspace.maximize' | t)
-        "
-        [class.active]="workspaceMaximized()"
-        (click)="toggleWorkspaceMaximize()"
-      >
-        <app-icon [name]="workspaceMaximized() ? 'minimize' : 'maximize'" [size]="15" />
-      </button>
+
+      @if (phoneLayout()) {
+        <!--
+          One menu instead of the cluster below. Every tool in it is occasional, and together they
+          took enough of a phone's width to push the toolbar into a sideways scroll — which left
+          the controls that are not occasional, new terminal among them, behind an invisible
+          gesture. Maximizing is left out entirely: it hides the panels that float over the
+          workspace here, and the workspace already spans the window. Its chunk is loaded only at
+          this width, which is what keeps it out of the desktop bundle.
+        -->
+        @defer (on immediate) {
+          <app-topbar-overflow-menu
+            [showInspector]="workspaceView() === 'terminal'"
+            [inspectorOpen]="inspectorOpen()"
+            (inspectorToggled)="toggleInspector()"
+            (sessionCenterOpened)="openSessionCenter()"
+            (settingsOpened)="openSettings()"
+          />
+        }
+      } @else {
+        @if (!inspectorOpen() && workspaceView() === 'terminal' && !workspaceMaximized()) {
+          <button
+            type="button"
+            class="rail-reveal"
+            data-testid="inspector-reveal"
+            [title]="'inspector.expand' | t"
+            [attr.aria-label]="'inspector.expand' | t"
+            (click)="toggleInspector()"
+          >
+            <app-icon name="panel-right-open" [size]="15" />
+          </button>
+        }
+        <app-language-selector />
+        <button
+          type="button"
+          class="window-tool"
+          data-testid="settings-open"
+          [title]="'workspace.settings' | t"
+          [attr.aria-label]="'workspace.settings' | t"
+          (click)="openSettings()"
+        >
+          <app-icon name="settings" [size]="15" />
+        </button>
+        <button
+          type="button"
+          class="window-tool"
+          data-testid="workspace-maximize-toggle"
+          [title]="
+            workspaceMaximized() ? ('workspace.restoreShortcut' | t) : ('workspace.maximize' | t)
+          "
+          [attr.aria-label]="
+            workspaceMaximized() ? ('workspace.restore' | t) : ('workspace.maximize' | t)
+          "
+          [class.active]="workspaceMaximized()"
+          (click)="toggleWorkspaceMaximize()"
+        >
+          <app-icon [name]="workspaceMaximized() ? 'minimize' : 'maximize'" [size]="15" />
+        </button>
+      }
 
       @if (windowControls.available) {
         <div class="window-controls">
@@ -363,6 +392,19 @@
     </div>
   </header>
 
+  <!--
+    On a phone both side panels float over the workspace, so this catches the tap that dismisses
+    them; on wider windows they take a column of their own and no scrim is rendered.
+  -->
+  @if (phoneLayout() && overlayPanelOpen()) {
+    <button
+      type="button"
+      class="panel-scrim"
+      [attr.aria-label]="'workspace.dismissPanel' | t"
+      (click)="closeOverlayPanels()"
+    ></button>
+  }
+
   @if (workspaceSidebarOpen()) {
     <app-workspace-sidebar
       [workspaces]="state.workspaces()"
@@ -376,13 +418,16 @@
       (moveRequested)="state.moveWorkspace($event.workspaceId, $event.direction)"
       (createRequested)="createWorkspaceOpen.set(true)"
     />
-    <div
-      class="sidebar-resizer workspace-sidebar-resizer"
-      role="separator"
-      [attr.aria-label]="'workspace.resizeSidebar' | t"
-      aria-orientation="vertical"
-      (pointerdown)="startSidebarResize('workspace', $event)"
-    ></div>
+    <!-- Dragging an edge needs a pointer; on a phone the panel floats and is either open or not. -->
+    @if (!phoneLayout()) {
+      <div
+        class="sidebar-resizer workspace-sidebar-resizer"
+        role="separator"
+        [attr.aria-label]="'workspace.resizeSidebar' | t"
+        aria-orientation="vertical"
+        (pointerdown)="startSidebarResize('workspace', $event)"
+      ></div>
+    }
   }
 
   <section class="workspace-main" [class.auxiliary-view-active]="workspaceView() !== 'terminal'">
@@ -457,7 +502,8 @@
         [visibleCount]="visibleTerminalIds().length"
         [visibleLimit]="visibleTerminalLimit()"
         [terminalCount]="(state.activeWorkspace()?.terminals ?? []).length"
-        [layout]="state.activeWorkspace()?.layout ?? 'single'"
+        [layout]="renderedLayout(state.activeWorkspace()?.layout ?? 'single')"
+        [compact]="phoneLayout()"
         [gridColumns]="gridColumns()"
         [gridRows]="gridRows()"
         [fontSize]="terminalFontSize()"
@@ -529,16 +575,17 @@
             />
           }
         }
+        <!-- Mounted for every state: the view draws its own waiting and failed states. -->
         @defer (when workspaceView() === 'git') {
-          @if (workspaceView() === 'git' && git.overview(); as repository) {
-            @if (gitTarget(); as target) {
-              <app-git-workbench
-                [overview]="repository"
-                [target]="target"
-                [refreshing]="git.loading()"
-                (refreshRequested)="git.refresh()"
-              />
-            }
+          @if (workspaceView() === 'git') {
+            <app-git-workbench
+              [overview]="git.overview()"
+              [target]="gitTarget()"
+              [terminalName]="state.activeTerminal()?.name ?? ''"
+              [overviewError]="git.error()"
+              [refreshing]="git.loading()"
+              (refreshRequested)="git.refresh()"
+            />
           }
         }
         @for (workspace of mountedWorkspaces(); track workspace.id) {
@@ -551,7 +598,7 @@
             "
             [terminals]="workspace.terminals"
             [workspaceId]="workspace.id"
-            [layout]="workspace.layout"
+            [layout]="renderedLayout(workspace.layout)"
             [activeTerminalId]="workspace.id === activeWorkspace.id ? activeTerminalId() : null"
             [visibleTerminalIds]="workspace.id === activeWorkspace.id ? visibleTerminalIds() : []"
             [terminalMaximized]="workspace.id === activeWorkspace.id && terminalMaximized()"
@@ -595,13 +642,15 @@
   </section>
 
   @if (inspectorOpen() && workspaceView() === 'terminal') {
-    <div
-      class="sidebar-resizer inspector-resizer"
-      role="separator"
-      [attr.aria-label]="'inspector.resize' | t"
-      aria-orientation="vertical"
-      (pointerdown)="startSidebarResize('inspector', $event)"
-    ></div>
+    @if (!phoneLayout()) {
+      <div
+        class="sidebar-resizer inspector-resizer"
+        role="separator"
+        [attr.aria-label]="'inspector.resize' | t"
+        aria-orientation="vertical"
+        (pointerdown)="startSidebarResize('inspector', $event)"
+      ></div>
+    }
     <app-inspector-panel
       [workspace]="state.activeWorkspace()"
       [activeTerminal]="state.activeTerminal()"
@@ -617,6 +666,21 @@
     />
   }
 </main>
+
+<!--
+  Stands in for the native directory dialog outside the Tauri window; on a phone it is what makes
+  starting a terminal possible at all.
+-->
+@defer (when directoryPicker.prompt() !== null) {
+  @if (directoryPicker.prompt(); as request) {
+    <app-directory-prompt-dialog
+      [title]="request.title"
+      [initialDirectory]="request.initialDirectory"
+      (submitted)="directoryPicker.resolvePrompt($event)"
+      (cancelled)="directoryPicker.resolvePrompt(null)"
+    />
+  }
+}
 
 @if (createWorkspaceOpen()) {
   <app-create-workspace-dialog

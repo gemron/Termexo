@@ -48,6 +48,8 @@ export class TerminalToolbarComponent {
   readonly gridRows = input.required<number>();
   readonly fontSize = input.required<number>();
   readonly fontName = input(DEFAULT_TERMINAL_FONT_NAME);
+  /** Drops the controls that only steer split layouts, which a phone cannot draw. */
+  readonly compact = input(false);
 
   readonly promptLibraryRequested = output<void>();
   readonly handoffRequested = output<void>();

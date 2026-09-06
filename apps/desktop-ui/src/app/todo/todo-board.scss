@@ -27,6 +27,9 @@ button:disabled {
   display: grid;
   height: 100%;
   min-height: 0;
+  // The board scrolls sideways inside its own row. Without this the column stretches to the
+  // kanban's minimum width, which drags the header along and hides its buttons off the edge.
+  grid-template-columns: minmax(0, 1fr);
   grid-template-rows: auto auto minmax(0, 1fr);
   overflow: hidden;
   border: 1px solid var(--border);
@@ -1281,6 +1284,16 @@ button:disabled {
 @media (max-width: 560px) {
   .board-header {
     padding: 10px;
+  }
+  // A quarter of a column tells the reader nothing, so a phone shows one at a time and snaps
+  // to the next; the sliver of the neighbour is what says there is more to swipe to.
+  .kanban {
+    min-width: 0;
+    grid-template-columns: repeat(4, 82vw);
+    scroll-snap-type: x mandatory;
+  }
+  .kanban-column {
+    scroll-snap-align: start;
   }
   .board-dialog footer {
     grid-template-columns: 1fr 1fr;

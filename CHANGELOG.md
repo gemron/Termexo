@@ -2,7 +2,7 @@
 
 Release notes for every Termexo version, newest first. The current release is summarised in [README.md](README.md).
 
-## V0.8.0 (preview)
+## V0.8.0
 
 - Remote access. Turn it on in the settings and any phone, tablet, or second computer on the same
   network or VPN opens the whole workbench in a browser: the same workspaces and terminals, reading
@@ -19,8 +19,21 @@ Release notes for every Termexo version, newest first. The current release is su
 - A terminal's size follows whichever view is in use: work on the desktop and it uses the desktop's
   width, pick up the phone and it becomes the phone's, come back and it returns. Every other client
   renders that same grid, panning sideways when its window cannot hold it.
-- The top bar fits a narrow screen. Below 640px the product name and project path give up their
-  space, and whatever still overflows scrolls horizontally, so no control sits out of reach.
+- The workbench fits a phone. Below 640px the split layouts fold to a single terminal, both side
+  panels float over the workspace instead of taking a column of it, controls grow to a finger's
+  size, and the tools at the right of the top bar collapse into one menu — the toolbar was
+  scrolling nearly half its buttons, new terminal among them, out of reach behind a gesture
+  nothing hinted at.
+- Ask for a working folder in an in-app dialog rather than `window.prompt`, which some mobile
+  browsers suppress outright, leaving a remote client no way to start a terminal at all. It arrives
+  prefilled with the workspace folder, since the path names a folder on the machine running the
+  desktop app and cannot be browsed from the phone holding the page.
+- Keep the Git view on screen. It dropped back to the terminals whenever the repository overview
+  went missing — which happens on every change of active terminal, and on any failed read — and it
+  stopped polling the moment it was opened, so the one view that shows these changes was the only
+  place they went stale. It now leaves only on a finished read that reports no repository, says why
+  a read failed instead of rendering nothing, and returns to the file and diff layout it was left
+  on.
 - Fixed a terminal failing to restart with "invalid handle" or "end of file". portable-pty inverts
   the result of `TerminateProcess` on Windows, reporting a stale `GetLastError` value that has
   nothing to do with the call.

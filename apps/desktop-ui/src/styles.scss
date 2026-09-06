@@ -737,6 +737,30 @@ input:focus-visible,
 }
 
 /*
+ * On a phone the two side panels float over the workspace instead of taking a column of their
+ * own. Sharing the width three ways left the terminal a strip too narrow to read and pushed its
+ * controls — closing a terminal among them — past the right edge with no way back. The shell
+ * collapses their grid tracks at the same width; see app.scss.
+ */
+@media (max-width: 640px) {
+  app-workspace-sidebar,
+  app-inspector-panel {
+    position: absolute;
+    z-index: 30;
+    inset-block: var(--topbar-height) 0;
+    width: min(82vw, 300px);
+  }
+
+  app-workspace-sidebar {
+    left: 0;
+  }
+
+  app-inspector-panel {
+    right: 0;
+  }
+}
+
+/*
  * Sized by its own column and row count rather than stretched to the container.
  *
  * With one client watching, the fit proposes exactly what fits and the two agree. With several,

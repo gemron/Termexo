@@ -71,6 +71,7 @@ try {
       ];
       const screens = panels.map((panel) => panel.querySelector('.xterm-screen')).filter(Boolean);
       const gridStyle = grid ? getComputedStyle(grid) : null;
+      const toolbar = document.querySelector('.topbar .toolbar');
 
       return {
         viewport: { width: innerWidth, height: innerHeight },
@@ -98,6 +99,10 @@ try {
         panels: panels.map(toRect),
         screens: screens.map(toRect),
         footers: panels.map((panel) => getComputedStyle(panel.querySelector('footer')).display),
+        headerControls: panels
+          .flatMap((panel) => [...panel.querySelectorAll('header button')])
+          .map(toRect),
+        toolbarClipped: toolbar ? toolbar.scrollWidth - toolbar.clientWidth : 0,
       };
     });
 
@@ -138,6 +143,20 @@ try {
     }
     if (snapshot.statusDisplay !== expected.statusDisplay) {
       throw new Error(`${label}: status bar visibility is incorrect`);
+    }
+    // Closing and maximizing a terminal live here; a header wider than the panel used to push
+    // them past the right edge with no way to scroll to them.
+    if (snapshot.headerControls.some((rect) => !rect || rect.right > viewport.width + 1)) {
+      throw new Error(
+        `${label}: terminal header controls are off screen: ${JSON.stringify(snapshot.headerControls)}`,
+      );
+    }
+    // The bar scrolls sideways rather than overlapping, but nothing hints that it does: whatever
+    // ends up past its right edge — new terminal, the view switch — is unreachable in practice.
+    if (snapshot.toolbarClipped > 1) {
+      throw new Error(
+        `${label}: ${snapshot.toolbarClipped}px of the topbar toolbar is hidden behind a scroll`,
+      );
     }
     if (
       snapshot.screens.length !== snapshot.visibleCount ||
@@ -262,6 +281,24 @@ try {
     }),
   );
   await workspaceMaximizeButton.click();
+
+  // A phone reached through remote access. The workspace still stores the grid layout; drawing
+  // falls back to a single terminal, and both side panels float instead of taking a column.
+  results.push(
+    await inspectViewport({
+      label: 'phone',
+      width: 390,
+      height: 844,
+      expected: {
+        workspaceSidebar: false,
+        inspector: false,
+        visibleCount: 1,
+        columnTracks: 1,
+        rowTracks: 1,
+        statusDisplay: 'flex',
+      },
+    }),
+  );
 
   await page.setViewportSize({ width: 1220, height: 480 });
   const sidebarsReopened = await page.evaluate(() => {

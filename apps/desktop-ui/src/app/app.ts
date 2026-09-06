@@ -97,6 +97,7 @@ import {
   type OpenCodeLaunchDialogValue,
 } from './dialogs/opencode-launch-dialog';
 import { CreateWorkspaceDialogComponent } from './dialogs/create-workspace-dialog';
+import { DirectoryPromptDialogComponent } from './dialogs/directory-prompt-dialog';
 import { BackgroundSessionDialogComponent } from './dialogs/background-session-dialog';
 import { DeleteWorkspaceDialogComponent } from './dialogs/delete-workspace-dialog';
 import {
@@ -118,6 +119,7 @@ import { RemoteAccessGateComponent } from './remote/remote-access-gate';
 import { RemoteConnectionBadgeComponent } from './remote/remote-connection-badge';
 import { IconComponent } from './shared/icon/icon';
 import { LanguageSelectorComponent } from './shared/language-selector/language-selector';
+import { TopbarOverflowMenuComponent } from './shared/topbar-overflow-menu/topbar-overflow-menu';
 import {
   DEFAULT_TERMINAL_FONT_NAME,
   isTerminalFontAvailable,
@@ -156,6 +158,18 @@ const INSPECTOR_MIN_WIDTH = 240;
 const INSPECTOR_MAX_WIDTH = 460;
 const INSPECTOR_AUTO_COLLAPSE_WIDTH = 900;
 const WORKSPACE_SIDEBAR_AUTO_COLLAPSE_WIDTH = 760;
+/**
+ * Below this the window is a phone held upright, reached through remote access.
+ *
+ * At that width the split layouts stop being usable — two panels would each get a strip too
+ * short to read a wrapped agent reply in — so the workspace is drawn single, and the controls
+ * that only steer splitting leave the toolbar to the tab strip.
+ */
+const PHONE_LAYOUT_MAX_WIDTH = 640;
+/** How often the repository is re-read while a view that shows it is open. */
+const GIT_POLL_INTERVAL_MS = 3_000;
+/** The task board needs the repository only for the count on the Git tab, so it checks rarely. */
+const GIT_IDLE_POLL_INTERVAL_MS = 15_000;
 /** Matches the backend default for a profile that has never had a threshold set. */
 const DEFAULT_ALERT_THRESHOLD = 80;
 /** Checks for model activity often, while the backend cache controls actual provider requests. */
@@ -208,6 +222,7 @@ function readStoredString(key: string, fallback: string): string {
     CodexLaunchDialogComponent,
     OpenCodeLaunchDialogComponent,
     CreateWorkspaceDialogComponent,
+    DirectoryPromptDialogComponent,
     BackgroundSessionDialogComponent,
     DeleteWorkspaceDialogComponent,
     EditWorkspaceDialogComponent,
@@ -216,6 +231,7 @@ function readStoredString(key: string, fallback: string): string {
     IconComponent,
     InspectorPanelComponent,
     LanguageSelectorComponent,
+    TopbarOverflowMenuComponent,
     MergeWorkspaceDialogComponent,
     AccountSwitchDialogComponent,
     ModelSwitchDialogComponent,
@@ -257,7 +273,7 @@ export class App {
   protected readonly remoteConnection = inject(RemoteConnectionService);
   /** True only in the browser client served by the desktop app's remote access server. */
   protected readonly remoteMode = this.remoteConnection.mode === 'remote';
-  private readonly directoryPicker = inject(DirectoryPickerService);
+  protected readonly directoryPicker = inject(DirectoryPickerService);
   private readonly desktopNotifications = inject(DesktopNotificationService);
   private readonly terminalGateway = inject(TerminalGatewayService);
   protected readonly promptAssets = inject(PromptAssetService);
@@ -275,6 +291,8 @@ export class App {
   private resizeStartWidth = 0;
   private previousViewportWidth = Number.POSITIVE_INFINITY;
 
+  /** True while the window is phone width; kept in step by `adaptLayoutToViewport`. */
+  protected readonly phoneLayout = signal(window.innerWidth <= PHONE_LAYOUT_MAX_WIDTH);
   protected readonly createWorkspaceOpen = signal(false);
   protected readonly workspaceView = signal<WorkspaceView>('terminal');
   protected readonly busyTodoTaskId = signal<string | null>(null);
@@ -519,7 +537,7 @@ export class App {
       workspace.terminals,
       this.activeTerminalId(),
       this.preferredTerminalIds()[workspace.id] ?? [],
-      workspace.layout,
+      this.renderedLayout(workspace.layout),
       this.terminalMaximized(),
       this.gridColumns(),
       this.gridRows(),
@@ -543,16 +561,20 @@ export class App {
     effect((onCleanup) => {
       const targetChanged = this.git.selectTarget(this.gitTarget());
       const view = this.workspaceView();
-      if (view === 'git') {
-        if (!targetChanged) untracked(() => void this.git.refresh());
-        return;
+      if (view === 'git' && !targetChanged) {
+        untracked(() => void this.git.refresh());
       }
-      const interval = view === 'tasks' ? 15_000 : 3_000;
+      // Polling used to stop the moment the Git view was opened, so the one view that shows these
+      // changes was the only one where they went stale until the user pressed refresh.
+      const interval = view === 'tasks' ? GIT_IDLE_POLL_INTERVAL_MS : GIT_POLL_INTERVAL_MS;
       const timer = window.setInterval(() => void this.git.refresh(), interval);
       onCleanup(() => window.clearInterval(timer));
     });
     effect(() => {
-      if (this.workspaceView() === 'git' && !this.git.overview()?.available) {
+      // Only a finished read that reports no repository sends the user back to the terminals. A
+      // missing overview means the read is still running or has failed, and leaving on that threw
+      // the user out of the view every time they switched the active terminal.
+      if (this.workspaceView() === 'git' && this.git.overview()?.available === false) {
         this.workspaceView.set('terminal');
       }
     });
@@ -1586,6 +1608,7 @@ export class App {
     ) {
       this.workspaceSidebarOpen.set(false);
     }
+    this.phoneLayout.set(width <= PHONE_LAYOUT_MAX_WIDTH);
     this.previousViewportWidth = width;
     this.requestTerminalRefit();
   }
@@ -1676,6 +1699,30 @@ export class App {
       event.preventDefault();
       this.workspaceMaximized.set(false);
     }
+  }
+
+  /** Whether a panel is currently floating over the workspace, which only happens on a phone. */
+  protected readonly overlayPanelOpen = computed(
+    () =>
+      !this.workspaceMaximized() &&
+      (this.workspaceSidebarOpen() ||
+        (this.inspectorOpen() && this.workspaceView() === 'terminal')),
+  );
+
+  /** Dismisses whichever floating panel is open; on a phone they cover the workspace. */
+  protected closeOverlayPanels(): void {
+    this.workspaceSidebarOpen.set(false);
+    this.inspectorOpen.set(false);
+  }
+
+  /**
+   * The layout a workspace is drawn with, which is its own everywhere but on a phone.
+   *
+   * The stored layout is left untouched: it is the choice the user made on the desktop, and the
+   * window widening again has to bring it back.
+   */
+  protected renderedLayout(layout: LayoutMode): LayoutMode {
+    return this.phoneLayout() ? 'single' : layout;
   }
 
   protected changeLayout(layout: LayoutMode): void {
