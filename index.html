@@ -39,7 +39,7 @@
             <img src="assets/termexo-mark.svg" alt="" />
           </span>
           <span>Termexo</span>
-          <small>0.6.0</small>
+          <small>0.8.0</small>
         </a>
 
         <nav
@@ -105,7 +105,8 @@
             Termexo puts them all on one screen — you can see which one is
             waiting on you, hand one a task straight off the board, pick up
             yesterday's conversation, and switch models without restarting
-            anything.
+            anything. Turn on remote access and that same workbench opens on
+            your phone, driving the very same live terminals.
           </p>
           <div class="hero-actions">
             <a
@@ -243,9 +244,9 @@
           </div>
           <img
             src="assets/termexo-workbench.png"
-            alt="Termexo with a Claude Code terminal and a Codex CLI terminal side by side, each showing its current status"
-            width="2880"
-            height="1800"
+            alt="Termexo with two terminals side by side in a grid, each showing its own command output"
+            width="1800"
+            height="1125"
             loading="lazy"
           />
         </figure>
@@ -461,11 +462,57 @@
         </div>
       </section>
 
+      <section class="section model-section shell">
+        <div class="model-copy reveal">
+          <span class="section-index" data-i18n="indexRemote">06 / ANY DEVICE</span>
+          <h2 data-i18n="remoteTitle">The same workbench, in your hand.</h2>
+          <p data-i18n="remoteLead">
+            Turn on remote access and a phone, a tablet, or the laptop in the
+            other room opens the whole workbench in a browser. Not a read-only
+            mirror: the same workspaces and the same live terminals, so the
+            agent stopped on an approval gets its answer while you are away from
+            the desk.
+          </p>
+          <ul>
+            <li data-i18n="remotePoint1">
+              Encrypted to your own machine, entered with a token you can scan
+              as a QR code and rotate whenever you like
+            </li>
+            <li data-i18n="remotePoint2">
+              Terminals scroll by finger and take the size of whichever screen
+              is being used
+            </li>
+            <li data-i18n="remotePoint3">
+              Nothing passes through a Termexo server — the link runs between
+              your own devices
+            </li>
+          </ul>
+        </div>
+        <figure class="settings-frame reveal" data-delay="1">
+          <img
+            src="assets/termexo-phone.png"
+            alt="A phone showing the Termexo Git view over remote access, in front of the desktop workbench it is connected to"
+            width="2880"
+            height="1800"
+            loading="lazy"
+          />
+          <figcaption>
+            <span
+              ><i></i>
+              <span data-i18n="remoteCaption"
+                >The same terminal the desktop is running, one screen at a
+                time.</span
+              ></span
+            >
+          </figcaption>
+        </figure>
+      </section>
+
       <section class="section capabilities-section" id="capabilities">
         <div class="shell">
           <div class="section-heading reveal">
             <div>
-              <span class="section-index" data-i18n="indexCapabilities">06 / FEATURES</span>
+              <span class="section-index" data-i18n="indexCapabilities">07 / FEATURES</span>
               <h2 data-i18n="capabilitiesTitle">
                 The things you keep doing by hand.
               </h2>
@@ -614,15 +661,13 @@
             </article>
 
             <article class="bento reveal" data-delay="3">
-              <span class="card-tag planned" data-i18n="roadmapTag"
-                >COMING LATER</span
-              >
+              <span class="card-tag now" data-i18n="now">WORKS TODAY</span>
               <div class="card-icon cyan" aria-hidden="true">⌁</div>
               <h3 data-i18n="featureRemoteTitle">Approve it from your phone</h3>
               <p data-i18n="featureRemoteBody">
-                Step away from the desk and still let an agent through the
-                approval it is waiting on, over an encrypted link to your own
-                machine.
+                Open the workbench in your phone's browser, over an encrypted
+                link to your own machine, and let the agent through the approval
+                it has been waiting on.
               </p>
               <div class="device-map" aria-hidden="true">
                 <span class="device desktop">▱</span><i></i
@@ -638,7 +683,7 @@
         <div class="shell">
           <div class="section-heading reveal">
             <div>
-              <span class="section-index" data-i18n="indexRoadmap">07 / ROADMAP</span>
+              <span class="section-index" data-i18n="indexRoadmap">08 / ROADMAP</span>
               <h2 data-i18n="roadmapTitle">What comes next.</h2>
             </div>
             <p data-i18n="roadmapLead">
@@ -673,22 +718,25 @@
                 plan quota is left.
               </p>
             </article>
-            <article class="roadmap-item current reveal" data-delay="2">
-              <div><span>V0.5–0.6</span><b data-i18n="current">YOU ARE HERE</b></div>
+            <article class="roadmap-item shipped reveal" data-delay="2">
+              <div><span>V0.5–0.6</span><b data-i18n="shipped">SHIPPED</b></div>
               <h3 data-i18n="roadmap06Title">Handing work between agents</h3>
               <p data-i18n="roadmap06Body">
                 Session summaries, moving a task from one agent to another,
                 routing work, and notifications.
               </p>
             </article>
-            <article class="roadmap-item reveal" data-delay="3">
-              <div><span>V0.7</span><b data-i18n="planned">PLANNED</b></div>
+            <article class="roadmap-item current reveal" data-delay="3">
+              <div>
+                <span>V0.7–0.8</span><b data-i18n="current">YOU ARE HERE</b>
+              </div>
               <h3 data-i18n="roadmap07Title">
                 Reaching your desk from anywhere
               </h3>
               <p data-i18n="roadmap07Body">
-                Paired devices, encrypted remote terminals, approving from a
-                phone, clear roles, and an audit trail.
+                The workbench opens on a phone or a second computer over an
+                encrypted link to your own machine, driving the same live
+                terminals. Paired devices, roles, and an audit trail come next.
               </p>
             </article>
           </div>
@@ -697,12 +745,12 @@
 
       <section class="section principles-section shell" id="principles">
         <div class="principles-copy reveal">
-          <span class="section-index" data-i18n="indexPrivacy">08 / PRIVACY</span>
+          <span class="section-index" data-i18n="indexPrivacy">09 / PRIVACY</span>
           <h2 data-i18n="principlesTitle">It all stays on your computer.</h2>
           <p data-i18n="principlesLead">
-            Termexo has no account, no server, and nothing to sync. Later
-            versions add remote access — but only the kind you switch on
-            yourself and can switch off just as fast.
+            Termexo has no account, no server, and nothing to sync. Remote
+            access is the one link out, and it is the kind you switch on
+            yourself, hand a token to, and switch off just as fast.
           </p>
         </div>
         <div class="principles-list">
