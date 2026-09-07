@@ -152,7 +152,8 @@ const translations = {
     ctaLead:
       "The npm package ships the whole Windows app. Run it, and if you do not like it, delete it — nothing was created anywhere else.",
     getRelease: "Download installer",
-    starGithub: "Explore on GitHub",
+    starGithub: "Star on GitHub",
+    supportProject: "Built in the open, under the MIT license. If Termexo helps your workflow, a GitHub Star helps others discover it. Bug reports and contributions are welcome too.",
     indexWorkbench: "01 / WORKBENCH",
     indexAttention: "02 / NEVER MISS ONE",
     indexSession: "03 / NOTHING IS LOST",
@@ -304,7 +305,8 @@ const translations = {
     ctaLead:
       "npm 包里带着完整的 Windows 应用。跑起来看看，不喜欢直接删掉——它不会在别处留下任何东西。",
     getRelease: "下载安装包",
-    starGithub: "前往 GitHub",
+    starGithub: "在 GitHub 上 Star",
+    supportProject: "MIT 开源。如果 Termexo 帮到了你的工作，欢迎在 GitHub 点个 Star，让更多开发者发现它；也欢迎反馈问题和参与贡献。",
     indexWorkbench: "01 / 工作台",
     indexAttention: "02 / 一个都不漏",
     indexSession: "03 / 什么都没丢",
