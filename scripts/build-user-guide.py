@@ -1,4 +1,4 @@
-"""Build the downloadable PDF from website/guide.html (the only content source).
+"""Build each downloadable PDF from its matching website guide HTML source.
 
 Requires reportlab. On Windows, Microsoft YaHei is used and subset-embedded.
 Override fonts with --font / --bold-font when building on another platform.
@@ -82,18 +82,21 @@ def inline(node):
     return content
 
 
-def build(output, regular_font, bold_font):
+def build(output, regular_font, bold_font, language="zh"):
+    english = language == "en"
+    title = "Termexo User Guide" if english else "Termexo 使用说明"
+    source = SITE / ("guide.en.html" if english else "guide.html")
     pdfmetrics.registerFont(TTFont("Guide", str(regular_font)))
     pdfmetrics.registerFont(TTFont("GuideBold", str(bold_font)))
     pdfmetrics.registerFontFamily("Guide", normal="Guide", bold="GuideBold", italic="Guide", boldItalic="GuideBold")
     parser = GuideParser()
-    parser.feed((SITE / "guide.html").read_text(encoding="utf-8"))
+    parser.feed(source.read_text(encoding="utf-8"))
     parser.close()
     assert len(parser.stack) == 1, "HTML contains unclosed tags"
     article = next(node for node in walk(parser.root) if node.attrs.get("id") == "guide-content")
-    base = ParagraphStyle("body", fontName="Guide", fontSize=9.6, leading=16,
+    base = ParagraphStyle("body", fontName="Guide", fontSize=9.6, leading=14 if english else 16,
                           textColor=colors.HexColor("#273b32"), spaceAfter=8,
-                          wordWrap="CJK", alignment=TA_LEFT)
+                          wordWrap=None if english else "CJK", alignment=TA_LEFT)
     styles = {
         "body": base,
         "h1": ParagraphStyle("title", parent=base, fontName="GuideBold", fontSize=28, leading=36, spaceAfter=12),
@@ -160,22 +163,24 @@ def build(output, regular_font, bold_font):
         canvas.line(46, 40, A4[0] - 46, 40)
         canvas.setFont("Guide", 8)
         canvas.setFillColor(colors.HexColor("#52685d"))
-        canvas.drawString(46, 26, "Termexo 使用说明 | V0.8.1")
+        canvas.drawString(46, 26, f"{title} | V0.8.1")
         canvas.drawRightString(A4[0] - 46, 26, f"www.termexo.com  /  {doc.page}")
         canvas.restoreState()
 
     output.parent.mkdir(parents=True, exist_ok=True)
     document = GuideDocument(str(output), pagesize=A4, rightMargin=46, leftMargin=46,
-                             topMargin=38, bottomMargin=58, title="Termexo 使用说明 V0.8.1",
-                             author="Termexo", subject="安装、Agent 会话、模型配置与远程访问")
+                             topMargin=38, bottomMargin=58, title=f"{title} V0.8.1",
+                             author="Termexo", subject="Setup, Agent sessions, model profiles and remote access" if english else "安装、Agent 会话、模型配置与远程访问")
     document.build(story, onFirstPage=page_chrome, onLaterPages=page_chrome)
     print(f"Built {output} ({output.stat().st_size:,} bytes)")
 
 
 if __name__ == "__main__":
     args = argparse.ArgumentParser(description=__doc__)
-    args.add_argument("--output", type=Path, default=SITE / "downloads" / "termexo-user-guide.pdf")
+    args.add_argument("--language", choices=["zh", "en"], default="zh")
+    args.add_argument("--output", type=Path)
     args.add_argument("--font", type=Path, default=Path("C:/Windows/Fonts/msyh.ttc"))
     args.add_argument("--bold-font", type=Path, default=Path("C:/Windows/Fonts/msyhbd.ttc"))
     options = args.parse_args()
-    build(options.output, options.font, options.bold_font)
+    output = options.output or SITE / "downloads" / ("termexo-user-guide-en.pdf" if options.language == "en" else "termexo-user-guide.pdf")
+    build(output, options.font, options.bold_font, options.language)

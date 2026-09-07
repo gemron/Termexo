@@ -31,23 +31,29 @@ GitHub Pages 从 `gh-pages` 分支根目录发布。仅修改 `main` 下的 `web
 
 ## 使用说明与 PDF
 
-- 在线入口：`https://www.termexo.com/guide.html`；首页导航和页脚均有「使用说明」。
-- 下载地址：`https://www.termexo.com/downloads/termexo-user-guide.pdf`。
-- `guide.html` 是唯一正文源；`guide.css` 提供阅读、手机和打印布局。文档目前为中文。
-- `guide.js` 为菜单、目录、下载操作和页脚提供中英文切换，与首页共用
-  `termexo.website.language` 语言偏好；正文及 PDF 仍为中文，英文菜单会说明这一点。
-- 修改正文后运行 `scripts/build-user-guide.py`，从同一份 HTML 重新生成 PDF；不要单独修改 PDF 内容。
+- 中文在线入口：`https://www.termexo.com/guide.html`；英文入口：`https://www.termexo.com/guide.en.html`。
+- 中文 PDF：`https://www.termexo.com/downloads/termexo-user-guide.pdf`；英文 PDF：
+  `https://www.termexo.com/downloads/termexo-user-guide-en.pdf`。
+- `guide.html` / `guide.en.html` 分别是中英文正文源；`guide.css` 提供共用阅读、手机和打印布局。
+- 每页菜单、正文、PDF 均为该页语言；互链使用真实链接，禁用 JavaScript 仍可阅读和下载。
+  `guide.js` 记录语言偏好并在切换时保留章节锚点。显式访问的语言网址优先，不按旧偏好重定向。
+- 首页导航和页脚的使用说明链接随首页语言变化，与文档共用 `termexo.website.language` 偏好。
+- 更新正文时同步维护两个语言版本，运行 `scripts/build-user-guide.py --language zh` / `--language en`
+  从对应 HTML 重新生成 PDF；不要单独修改 PDF 内容。
 - 构建需要 Python 与 `reportlab`，默认使用 Windows 微软雅黑并嵌入字体子集；其他系统用
   `--font` / `--bold-font` 指定支持中文且允许嵌入的 TrueType 字体。
 - 版本变更时同时更新正文版本、下载文件名及脚本页脚版本；使用 `data-pdf-page` 控制 PDF 分页。
 - 发布前将 PDF 每页渲染成图片检查中文与分页，并确认目录链接、下载文件、正文版本一致。
 - `scripts/verify-user-guide.py` 使用 `pypdf` 验证正文完整性、书签和中文文本，使用 `pymupdf`
   检查页面文字边界；传入 `--render-dir` 可渲染全部页面供人工检查。
-- 部署需要同步 `guide.html`、`guide.css`、`guide.js` 和整个 `downloads/` 文档目录，保留其余官网资源。
+- 部署需要同步两份指南 HTML、`guide.css`、`guide.js` 和整个 `downloads/` 文档目录，保留其余官网资源。
+  两份页面各有独立 canonical 和互相对应的 hreflang，并包含在 sitemap 中。
 
 ```powershell
 python scripts/build-user-guide.py
+python scripts/build-user-guide.py --language en
 python scripts/verify-user-guide.py --render-dir .tooling/guide-qa
+python scripts/verify-user-guide.py --language en --render-dir .tooling/guide-qa-en
 node --test scripts/website-guide.test.mjs
 ```
 

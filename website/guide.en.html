@@ -1,0 +1,218 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Termexo User Guide | Setup, Agent Sessions and Remote Access</title>
+    <meta name="description" content="The complete Termexo user guide: installation, workspaces, Agent terminals, session recovery, model profiles, task boards and remote access. Read online or download the English PDF." />
+    <meta name="theme-color" content="#0a0d0c" />
+    <meta name="referrer" content="strict-origin-when-cross-origin" />
+    <meta property="og:type" content="article" />
+    <meta property="og:title" content="Termexo User Guide" />
+    <meta property="og:description" content="Installation, workspaces, Agent sessions, tasks and remote access. Read in English online or download the PDF for offline use." />
+    <meta property="og:url" content="https://www.termexo.com/guide.en.html" />
+    <meta property="og:site_name" content="Termexo" />
+    <meta property="og:locale" content="en_US" />
+    <link rel="canonical" href="https://www.termexo.com/guide.en.html" />
+    <link rel="alternate" hreflang="en" href="https://www.termexo.com/guide.en.html" />
+    <link rel="alternate" hreflang="zh-CN" href="https://www.termexo.com/guide.html" />
+    <link rel="alternate" hreflang="x-default" href="https://www.termexo.com/guide.en.html" />
+    <link rel="icon" href="assets/termexo-mark.svg" type="image/svg+xml" />
+    <link rel="stylesheet" href="styles.css" />
+    <link rel="stylesheet" href="guide.css" />
+    <script src="guide.js" defer></script>
+    <script src="analytics.js" defer></script>
+  </head>
+  <body class="guide-page">
+    <a class="skip-link" href="#guide-content">Skip to content</a>
+    <header class="guide-header">
+      <div class="shell">
+        <a class="brand" href="./" aria-label="Return to the Termexo website">
+          <span class="brand-mark" aria-hidden="true"><img src="assets/termexo-mark.svg" alt="" /></span>
+          <span>Termexo</span>
+        </a>
+        <nav aria-label="Guide navigation">
+          <a href="./">Home</a>
+          <a class="guide-download" href="downloads/termexo-user-guide-en.pdf" download="Termexo-User-Guide-v0.8.1-en.pdf">Download PDF</a>
+        </nav>
+        <div class="language-switch" role="group" aria-label="Guide language">
+          <a href="guide.en.html" data-lang="en" lang="en" hreflang="en" aria-label="Read in English" aria-current="page" class="active">EN</a>
+          <span aria-hidden="true">/</span>
+          <a href="guide.html" data-lang="zh" lang="zh-CN" hreflang="zh-CN" aria-label="阅读中文版">中文</a>
+        </div>
+      </div>
+    </header>
+    <main class="shell guide-layout">
+      <aside class="guide-sidebar" aria-label="On this page">
+        <p class="guide-label">USER GUIDE / CONTENTS</p>
+        <nav aria-label="Chapters">
+          <a href="#quick-start">01　Install &amp; get started</a>
+          <a href="#workbench">02　Workspaces &amp; terminals</a>
+          <a href="#sessions">03　Resume sessions</a>
+          <a href="#profiles">04　Accounts, models &amp; network</a>
+          <a href="#tasks">05　Tasks, Git &amp; handoffs</a>
+          <a href="#remote">06　Mobile &amp; remote access</a>
+          <a href="#faq">07　FAQ</a>
+          <a href="#privacy">08　Data &amp; security</a>
+        </nav>
+        <p class="guide-sidebar-note">Windows desktop edition<br />V0.8.1 · English</p>
+      </aside>
+      <article id="guide-content" class="guide-content" lang="en">
+        <header class="guide-intro">
+          <p class="guide-label">TERMEXO / USER GUIDE</p>
+          <h1>User guide</h1>
+          <p class="guide-lead">Start with your first workspace. Keep your terminals, Agents and project progress together.</p>
+          <p class="guide-meta">For V0.8.1 · Updated 2026-09-07 · Windows 10/11 x64</p>
+          <div class="guide-actions" data-pdf-skip>
+            <a class="button primary" href="downloads/termexo-user-guide-en.pdf" download="Termexo-User-Guide-v0.8.1-en.pdf">Download English guide · PDF</a>
+            <a class="button secondary" href="#quick-start">Start reading ↓</a>
+          </div>
+          <p class="guide-note" data-pdf-skip>The English PDF matches this page and works offline. Labels and button locations may vary by app language or version. The workbench screenshot shows the Chinese interface.</p>
+        </header>
+
+        <section id="quick-start" class="guide-section">
+          <h2>01 / Install and get started</h2>
+          <p>Termexo is a Windows workbench for real terminals and coding Agents. No Termexo account is required. To use an Agent, you still need its CLI and a signed-in account or a model provider's API key.</p>
+          <h3>Choose an installation method</h3>
+          <ul>
+            <li><strong>Download the installer:</strong> open the <a href="https://github.com/gemron/Termexo/releases/latest">latest GitHub release</a>, download the Windows x64 installer from Assets, and run it. The desktop app requires WebView2. Installer users do not need Rust or the source development toolchain.</li>
+            <li><strong>Run through npm:</strong> with Node.js 18.18 or later installed, run the following command in Windows PowerShell. The npm package includes the desktop executable; WebView2 is still required.</li>
+          </ul>
+          <pre><code>npx termexo@latest</code></pre>
+          <p>For a global command, run <code>npm install --global termexo</code>, then launch <code>termexo</code>. Run the installation command again to update a global installation.</p>
+          <h3>Your first session in three steps</h3>
+          <ol>
+            <li><strong>Create a workspace.</strong> Use the first-run guide to create a workspace. Enter a project name and select a project folder that actually exists on this computer.</li>
+            <li><strong>Prepare an Agent.</strong> Check the detection status of Claude Code, Codex or OpenCode in Settings. If needed, use the CLI install/update entry, review the installation preview and confirm. Complete the selected Agent's sign-in or model configuration.</li>
+            <li><strong>Open a terminal.</strong> Click New on the tab bar, select an Agent, and confirm the working folder, account and model. Start it and enter a task. You can also open a regular terminal first to check the project path and command environment.</li>
+          </ol>
+          <p class="guide-callout">Start with a small check, such as: "Read this project and explain how to run its tests. Do not change any files yet." Confirm the folder, account and connection before assigning code changes.</p>
+        </section>
+
+        <section id="workbench" class="guide-section" data-pdf-page>
+          <h2>02 / Workspaces and terminals</h2>
+          <p>A workspace groups a project folder, terminal tabs and a layout. Create separate workspaces for different projects, then rename, color-code and reorder them. Switching projects does not require rearranging every terminal.</p>
+          <figure>
+            <img src="assets/termexo-workbench.png" alt="Termexo workbench in Chinese: workspaces on the left, terminal grid in the center, status and session information on the right" width="1800" height="1125" loading="lazy" />
+            <figcaption>Workspaces organize projects; tabs organize terminals; the grid controls which terminals you see. Screenshot: Chinese interface.</figcaption>
+          </figure>
+          <h3>Arrange your workbench</h3>
+          <ul>
+            <li>Use New on the tab bar to start a regular shell, Claude Code, Codex or OpenCode. The working folder is a local directory, not a GitHub web address.</li>
+            <li>Open several tabs, select the terminals to display, and adjust the grid. Choose 1 to 6 rows/columns or maximize a terminal. Drag tabs to reorder them.</li>
+            <li>Each terminal runs a separate real process. Agents editing the same folder can affect each other's work. Use separate directories or Git worktrees when changes need isolation.</li>
+          </ul>
+          <h3>Understand status alerts</h3>
+          <ul>
+            <li><strong>Running / thinking:</strong> the Agent is processing a task or using tools.</li>
+            <li><strong>Waiting for input / approval:</strong> answer a question or authorize an operation. Click the persistent alert to reach that terminal, then read the full request.</li>
+            <li><strong>Completed / failed / stopped:</strong> inspect terminal output and file changes before accepting, troubleshooting or restarting. A status badge does not prove the code passed validation.</li>
+          </ul>
+          <p class="guide-callout">Automatic confirmation reduces approval prompts and expands what an Agent may execute without asking each time. Keep manual confirmation for unfamiliar or sensitive projects. An AUTO badge is not a security review.</p>
+        </section>
+
+        <section id="sessions" class="guide-section" data-pdf-page>
+          <h2>03 / Resume sessions</h2>
+          <ol>
+            <li>Open the Session Center and search for local Claude Code, Codex or OpenCode sessions. Narrow the list by project, account or other available filters.</li>
+            <li>Check the folder, Agent, account and recent activity to identify the session you want.</li>
+            <li>Select Resume and confirm the launch options. Termexo uses the CLI's native resume capability, then lets you continue in a terminal.</li>
+          </ol>
+          <p>Termexo discovers native session records read-only; it does not rewrite history to simulate recovery. Resuming context depends on the original session files, account, CLI version and project path still being available.</p>
+          <p class="guide-callout">Restoring a workspace layout does not bring an exited process back to life. After closing the app or restarting Windows, unsaved work in a regular shell cannot be recovered from the layout. Use native session recovery for an Agent's saved context.</p>
+        </section>
+
+        <section id="profiles" class="guide-section">
+          <h2>04 / Accounts, models and network</h2>
+          <h3>Sign-in accounts</h3>
+          <p>Manage isolated sign-in accounts in Settings and follow the corresponding CLI's authorization flow. Select an account when launching a terminal; its header shows the current account. Switching accounts there restarts the terminal with a new session, so save or hand off current work first.</p>
+          <h3>Model profiles</h3>
+          <ol>
+            <li>Open model settings and create a profile with a name, model identifier, endpoint and API key. Use the actual values provided by your supplier; documentation examples are not credentials.</li>
+            <li>Check that the protocol matches the selected Agent. A compatible Claude Code backend must support the relevant Anthropic API. An arbitrary model URL is not necessarily usable.</li>
+            <li>Save the profile, select it when starting or resuming a terminal, and send a short test request. Before switching an existing terminal, read the app's notice and make sure the current task can be interrupted.</li>
+          </ol>
+          <p>API keys are stored in Windows Credential Manager. Not every provider supports balance or quota queries. Values marked as estimates or unavailable are not official billing data.</p>
+          <h3>Proxies and npm networking</h3>
+          <p>If you need a proxy, create a global or workspace network profile. Enter the real proxy and npm registry settings, test connectivity, then start terminals or install CLIs. Workspace settings take precedence over global settings. Restart affected terminals after changing the profile so they receive the new environment.</p>
+        </section>
+
+        <section id="tasks" class="guide-section" data-pdf-page>
+          <h2>05 / Tasks, Git and handoffs</h2>
+          <h3>Assign a task to an Agent</h3>
+          <ol>
+            <li>Open the task board and create a task with a clear goal, project folder, priority and acceptance criteria. For example: "Add a search box; an empty query shows all items; tests pass."</li>
+            <li>Select an Agent and model, then start execution. The task is linked to a real terminal and the app returns to the terminal view, where you can check startup and handle approvals.</li>
+            <li>Track the task through stages such as To do, Executing, Completed and Verified. When the Agent finishes, check its output against your criteria. Give follow-up feedback if needed; verify the task only after it passes your review.</li>
+          </ol>
+          <h3>Review Git changes</h3>
+          <p>Select the relevant terminal and open the Git view to inspect branches, commits and file diffs, in a single-column or side-by-side layout. The Git view follows the active terminal's working folder and uses the HEAD recorded when that terminal started as the session baseline.</p>
+          <p class="guide-callout">Session changes are repository differences observed during that period, not an exclusive record of this Agent's actions. Edits from an editor, other terminals or other Agents may also appear. Review each change before committing.</p>
+          <h3>Reuse prompts and hand off context</h3>
+          <ul>
+            <li>Prompt assets let you save, search, favorite and reuse submitted prompts. Drafts are restored per terminal. Check paths, accounts and task context before reusing a prompt.</li>
+            <li>Create a terminal- or workspace-scoped handoff that gathers tasks, prompts, terminal output and Git information within a chosen token budget.</li>
+            <li>Preview the package and check its goal, completed work, validation results, risks and next steps. Then export Markdown/JSON or pass it to another Agent to continue.</li>
+          </ul>
+          <p>Automatic redaction cannot guarantee removal of every secret. Before sharing, manually check for API keys, access tokens, internal addresses, customer data and source-code access restrictions. A handoff is a context document, not a lossless conversion of a native session file.</p>
+        </section>
+
+        <section id="remote" class="guide-section" data-pdf-page>
+          <h2>06 / Mobile and remote access</h2>
+          <p>Remote access is off by default. When enabled, a phone, tablet or another computer can operate the desktop's existing workspaces and terminals in a browser. You do not need to install the Agents on your phone.</p>
+          <h3>Enable it on the desktop</h3>
+          <ol>
+            <li>Open Remote Access in Settings and turn on the main switch. Follow the UI to configure and save the listening address and port. The default port is <code>7420</code>.</li>
+            <li>For devices on your LAN, choose a reachable LAN listening address or listen on all interfaces. Listening only on <code>127.0.0.1</code> limits access to the host itself. Keep HTTPS enabled.</li>
+            <li>Confirm that the service is running. Select a reachable computer address in the address picker, then copy the generated link or display its QR code for your own device to scan.</li>
+            <li>Connect your phone to the same LAN or a VPN that can reach the computer. Open the link in a browser and use the access token as prompted. Any working folder you enter refers to a path on the computer running the desktop app.</li>
+          </ol>
+          <p>HTTPS uses a self-signed certificate by default, so the browser may warn that it is not trusted on first access. Confirm that this is your own computer, the correct address and a trusted network before handling the warning according to your browser's rules. Do not ignore certificate warnings on unrelated websites.</p>
+          <h3>If you cannot connect, check in this order</h3>
+          <ul>
+            <li>Is the desktop app still running? Is the computer asleep? Does the remote service show an error?</li>
+            <li>Does the link use the actual LAN IP? <code>0.0.0.0</code> is a listening setting, not the address to open on a phone. On a phone, <code>localhost</code> refers to the phone itself.</li>
+            <li>Can the devices reach each other? Guest Wi-Fi may isolate clients. Check that Windows Firewall permits the selected port on the trusted network; do not disable the entire firewall.</li>
+            <li>Has the port, IP address or token changed? Does the URL's protocol match the HTTPS setting?</li>
+          </ul>
+          <h3>Limits and disconnecting</h3>
+          <p>The terminal size follows the client currently in use. A narrow phone view shows one terminal, and other clients may need to pan horizontally. Input from both devices affects the same process; avoid typing from both at once.</p>
+          <p>The remote page does not expose all desktop file import/export or app self-update features. When finished, turn off remote access in desktop Settings. Rotating the access token invalidates the old token and disconnects existing clients.</p>
+          <p class="guide-callout">The token and QR code are remote-control credentials. Anyone holding them may operate terminals and affect files on the host. Never post them in public chats, Issues or screenshots. Do not expose the service directly to the public internet; use a trusted LAN or controlled VPN.</p>
+        </section>
+
+        <section id="faq" class="guide-section" data-pdf-page>
+          <h2>07 / Frequently asked questions</h2>
+          <h3>An Agent is not detected, or its command will not start.</h3>
+          <p>Check its installation status in Settings, then confirm that the CLI can start in a system terminal. Run detection again after installation. Check PATH, Node/npm, the working folder and network settings. For sign-in failures, confirm that the selected isolated account has completed authorization.</p>
+          <h3>History is missing, or resuming reports an invalid session.</h3>
+          <p>Check that you are using the original account and project folder, that native session files still exist, and that the CLI can read them. Changing accounts, deleting CLI data or moving a project can affect recovery. Do not manually edit native session IDs. If necessary, start a new session and continue with a reviewed handoff package.</p>
+          <h3>A model request fails with an authentication or API error.</h3>
+          <p>Check the selected profile, model name, API key, and endpoint protocol and path. Confirm that the provider supports the interfaces required by the CLI. Then check balance and proxy settings. Keep error codes for troubleshooting, but do not publish full request headers or secrets.</p>
+          <h3>I can see the terminal on my phone, but cannot copy or paste.</h3>
+          <p>Browser clipboard access depends on a secure context and permissions. Use HTTPS and grant permission when prompted. If it remains unavailable, select text to copy or paste manually. Drag with a finger to scroll the terminal on a narrow screen.</p>
+          <h3>How do I update Termexo?</h3>
+          <p>Installer users can download from the <a href="https://github.com/gemron/Termexo/releases/latest">latest release page</a>. npm users can run <code>npx termexo@latest</code> or update the global installation. Save files and finish or hand off running tasks before updating. Updating Termexo and updating an Agent CLI are separate operations; upgrade CLIs in their own management entry.</p>
+        </section>
+
+        <section id="privacy" class="guide-section">
+          <h2>08 / Data and security</h2>
+          <ul>
+            <li>Termexo works locally by default, with no Termexo account or mandatory cloud sync. Workspace state stays on the host, and API keys are stored in Windows Credential Manager.</li>
+            <li>Agent CLIs still send requests to the model services you choose. Which code and context leave the computer depends on the CLI, provider configuration and privacy policy.</li>
+            <li>The public website has separate third-party visit statistics. These do not track desktop or remote-workbench sessions and are not download counts.</li>
+          </ul>
+          <p>Report problems through <a href="https://github.com/gemron/Termexo/issues">GitHub Issues</a>. Include your Termexo, Windows and CLI versions, reproduction steps, expected and actual behavior, and redacted error details. Hide accounts, keys, tokens, QR codes and sensitive paths before submitting.</p>
+          <p>Latest online guide: <a href="https://www.termexo.com/guide.en.html">https://www.termexo.com/guide.en.html</a><br />Release history: <a href="https://github.com/gemron/Termexo/releases">GitHub Releases</a></p>
+        </section>
+      </article>
+    </main>
+    <footer class="guide-footer">
+      <div class="shell guide-footer-links"><span>Termexo User Guide · V0.8.1</span><a href="#guide-content">Back to top ↑</a><a href="downloads/termexo-user-guide-en.pdf" download="Termexo-User-Guide-v0.8.1-en.pdf">Download PDF</a></div>
+      <div class="shell site-counter">
+        <p>Website visits (PV): <span id="busuanzi_value_site_pv" class="site-counter-value">—</span></p>
+        <p>Third-party website statistics only; “—” means unavailable.</p>
+      </div>
+    </footer>
+  </body>
+</html>

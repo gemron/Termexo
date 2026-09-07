@@ -35,17 +35,19 @@ def blocks(node):
             yield from blocks(child)
 
 
-def verify(render_dir):
+def verify(render_dir, language="zh"):
+    source = "guide.en.html" if language == "en" else "guide.html"
+    filename = "termexo-user-guide-en.pdf" if language == "en" else "termexo-user-guide.pdf"
     parser = GuideParser()
-    parser.feed((ROOT / "website" / "guide.html").read_text(encoding="utf-8"))
+    parser.feed((ROOT / "website" / source).read_text(encoding="utf-8"))
     article = next(node for node in builder["walk"](parser.root) if node.attrs.get("id") == "guide-content")
-    reader = PdfReader(ROOT / "website" / "downloads" / "termexo-user-guide.pdf")
+    reader = PdfReader(ROOT / "website" / "downloads" / filename)
     text = normalize("".join(page.extract_text() for page in reader.pages))
     expected = list(blocks(article))
     for index, block in enumerate(expected):
         assert normalize(block) in text, f"HTML block {index} is missing or corrupted in PDF"
     assert len(reader.outline) == 8, "Each chapter needs a PDF bookmark"
-    document = pymupdf.open(ROOT / "website" / "downloads" / "termexo-user-guide.pdf")
+    document = pymupdf.open(ROOT / "website" / "downloads" / filename)
     assert len(document) == 6, "Check unexpected pagination before publishing"
     if render_dir:
         render_dir.mkdir(parents=True, exist_ok=True)
@@ -68,4 +70,6 @@ def verify(render_dir):
 if __name__ == "__main__":
     args = argparse.ArgumentParser(description=__doc__)
     args.add_argument("--render-dir", type=Path)
-    verify(args.parse_args().render_dir)
+    args.add_argument("--language", choices=["zh", "en"], default="zh")
+    options = args.parse_args()
+    verify(options.render_dir, options.language)
