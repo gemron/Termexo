@@ -4,40 +4,40 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
 const source = readFileSync(new URL('../website/analytics.js', import.meta.url), 'utf8');
-const validToken = '0123456789abcdef0123456789abcdef';
-
-function run(hostname, token, installed = false) {
+function run(hostname, installed = false) {
   const scripts = [];
   const document = {
-    querySelector: (selector) => selector.startsWith('meta') ? { content: token } : installed ? {} : null,
-    createElement: () => ({ dataset: {} }),
+    getElementById: () => installed ? {} : null,
+    createElement: () => ({}),
     head: { append: (script) => scripts.push(script) },
   };
   vm.runInNewContext(source, { document, location: { hostname } });
   return scripts;
 }
 
-test('unconfigured, malformed and local previews send no analytics', () => {
-  for (const token of ['', 'not-a-site-token', '0123']) {
-    assert.equal(run('www.termexo.com', token).length, 0);
-  }
+test('local previews and lookalike domains send no counter requests', () => {
   for (const host of ['localhost', '127.0.0.1', '192.168.1.10', 'www.termexo.com.example.org']) {
-    assert.equal(run(host, validToken).length, 0);
+    assert.equal(run(host).length, 0);
   }
 });
 
-test('production uses only the configured public token and official beacon', () => {
+test('production loads the public counter without an account token', () => {
   for (const host of ['www.termexo.com', 'termexo.com']) {
-    const scripts = run(host, validToken);
+    const scripts = run(host);
     assert.equal(scripts.length, 1);
-    assert.equal(scripts[0].src, 'https://static.cloudflareinsights.com/beacon.min.js');
-    assert.equal(JSON.parse(scripts[0].dataset.cfBeacon).token, validToken);
-    assert.equal(scripts[0].defer, true);
+    assert.equal(scripts[0].src, 'https://busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js');
+    assert.equal(scripts[0].async, true);
   }
 });
 
-test('does not add another beacon when one is already present', () => {
-  assert.equal(run('www.termexo.com', validToken, true).length, 0);
+test('does not add another counter when one is already present', () => {
+  assert.equal(run('www.termexo.com', true).length, 0);
+});
+
+test('the counter starts with an unavailable marker, never a fabricated count', () => {
+  const html = readFileSync(new URL('../website/index.html', import.meta.url), 'utf8');
+  assert.match(html, /id="busuanzi_value_site_pv"[^>]*>—<\/span>/);
+  assert.doesNotMatch(html, /termexo-analytics-token/);
 });
 
 test('search and social metadata refer to real local assets', () => {

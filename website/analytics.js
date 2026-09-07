@@ -1,15 +1,12 @@
 (() => {
   const productionHosts = new Set(["www.termexo.com", "termexo.com"]);
-  const token = document.querySelector('meta[name="termexo-analytics-token"]')?.content.trim();
-
-  // The public site token comes from the owner's Cloudflare Web Analytics dashboard.
-  // Local previews and unconfigured builds must not pollute production traffic.
-  if (!productionHosts.has(location.hostname) || !/^[a-f0-9]{32}$/i.test(token ?? "")) return;
-  if (document.querySelector('script[data-cf-beacon]')) return;
+  // Local previews must not pollute the public website's visit count.
+  if (!productionHosts.has(location.hostname)) return;
+  if (document.getElementById("termexo-public-counter")) return;
 
   const script = document.createElement("script");
-  script.defer = true;
-  script.src = "https://static.cloudflareinsights.com/beacon.min.js";
-  script.dataset.cfBeacon = JSON.stringify({ token });
+  script.id = "termexo-public-counter";
+  script.async = true;
+  script.src = "https://busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js";
   document.head.append(script);
 })();

@@ -1514,6 +1514,22 @@ img {
   background: #080b0a;
 }
 
+.site-counter {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 8px 24px;
+  padding-block: 16px 24px;
+  border-top: 1px solid var(--line);
+  color: var(--text-soft);
+  font-size: 12px;
+}
+
+.site-counter p { margin: 0; }
+.site-counter a { color: var(--green); text-underline-offset: 3px; }
+.site-counter a:hover { color: var(--green-bright); }
+.site-counter-value { font-variant-numeric: tabular-nums; }
+
 .footer-inner {
   display: grid;
   min-height: 120px;
