@@ -1526,8 +1526,6 @@ img {
 }
 
 .site-counter p { margin: 0; }
-.site-counter a { color: var(--green); text-underline-offset: 3px; }
-.site-counter a:hover { color: var(--green-bright); }
 .site-counter-value { font-variant-numeric: tabular-nums; }
 
 .footer-inner {
