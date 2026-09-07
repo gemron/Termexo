@@ -167,6 +167,9 @@ const translations = {
     footerReleases: "Releases",
     footerIssues: "Issues",
     footerTagline: "One window for every coding agent",
+    siteVisits: "Website visits (PV)",
+    counterProvider: "Public website counter by",
+    counterNotice: ". Counts website visits only; “—” means unavailable.",
   },
   zh: {
     skip: "跳到主要内容",
@@ -320,6 +323,9 @@ const translations = {
     footerReleases: "发布版本",
     footerIssues: "问题反馈",
     footerTagline: "一个窗口，装下所有编程 Agent",
+    siteVisits: "官网累计访问量（PV）",
+    counterProvider: "第三方公开统计：",
+    counterNotice: "。仅统计官网访问；“—”表示暂不可用。",
   },
 };
 
