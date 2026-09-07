@@ -1,0 +1,208 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Termexo 使用说明 | 安装、Agent 会话与远程访问</title>
+    <meta name="description" content="Termexo 中文使用说明：从安装和创建工作空间开始，学习多 Agent 终端、会话恢复、模型配置、任务看板和手机远程访问。支持在线阅读和 PDF 下载。" />
+    <meta name="theme-color" content="#0a0d0c" />
+    <meta name="referrer" content="strict-origin-when-cross-origin" />
+    <meta property="og:type" content="article" />
+    <meta property="og:title" content="Termexo 使用说明" />
+    <meta property="og:description" content="安装、工作空间、Agent 会话、任务看板与远程访问。在线阅读，也可下载 PDF 离线查看。" />
+    <meta property="og:url" content="https://www.termexo.com/guide.html" />
+    <meta property="og:site_name" content="Termexo" />
+    <link rel="canonical" href="https://www.termexo.com/guide.html" />
+    <link rel="icon" href="assets/termexo-mark.svg" type="image/svg+xml" />
+    <link rel="stylesheet" href="styles.css" />
+    <link rel="stylesheet" href="guide.css" />
+    <script src="analytics.js" defer></script>
+  </head>
+  <body class="guide-page">
+    <a class="skip-link" href="#guide-content">跳转到正文</a>
+    <header class="guide-header">
+      <div class="shell">
+        <a class="brand" href="./" aria-label="返回 Termexo 官网">
+          <span class="brand-mark" aria-hidden="true"><img src="assets/termexo-mark.svg" alt="" /></span>
+          <span>Termexo</span>
+        </a>
+        <nav aria-label="文档导航">
+          <a href="./">返回官网</a>
+          <a class="guide-download" href="downloads/termexo-user-guide.pdf" download="Termexo-使用说明-v0.8.1.pdf">下载 PDF</a>
+        </nav>
+      </div>
+    </header>
+    <main class="shell guide-layout">
+      <aside class="guide-sidebar" aria-label="本页目录">
+        <p class="guide-label">使用说明 / CONTENTS</p>
+        <nav aria-label="章节目录">
+          <a href="#quick-start">01　安装与第一次运行</a>
+          <a href="#workbench">02　工作空间与终端</a>
+          <a href="#sessions">03　恢复会话</a>
+          <a href="#profiles">04　账号、模型与网络</a>
+          <a href="#tasks">05　任务、Git 与交接</a>
+          <a href="#remote">06　手机与远程访问</a>
+          <a href="#faq">07　常见问题</a>
+          <a href="#privacy">08　数据与安全</a>
+        </nav>
+        <p class="guide-sidebar-note">适用于 Windows 桌面版<br />V0.8.1 · 简体中文</p>
+      </aside>
+      <article id="guide-content" class="guide-content">
+        <header class="guide-intro">
+          <p class="guide-label">TERMEXO / USER GUIDE</p>
+          <h1>使用说明</h1>
+          <p class="guide-lead">从第一个工作空间开始，把终端、Agent 和项目进度放在一起。</p>
+          <p class="guide-meta">适用版本 V0.8.1 · 更新日期 2026-09-07 · Windows 10/11 x64</p>
+          <div class="guide-actions" data-pdf-skip>
+            <a class="button primary" href="downloads/termexo-user-guide.pdf" download="Termexo-使用说明-v0.8.1.pdf">下载使用说明 · PDF</a>
+            <a class="button secondary" href="#quick-start">开始阅读 ↓</a>
+          </div>
+          <p class="guide-note" data-pdf-skip>PDF 与本页内容同步，可离线阅读。本文以中文界面为例；其他版本的按钮位置可能略有不同。</p>
+        </header>
+
+        <section id="quick-start" class="guide-section">
+          <h2>01 / 安装与第一次运行</h2>
+          <p>Termexo 是管理真实终端与编程 Agent 的 Windows 工作台。无需注册 Termexo 账号；使用 Agent 时，仍需对应 CLI 及其登录账号或供应商 API Key。</p>
+          <h3>选择一种安装方式</h3>
+          <ul>
+            <li><strong>下载安装包：</strong>打开 <a href="https://github.com/gemron/Termexo/releases/latest">GitHub 最新版本</a>，在 Assets 中下载 Windows x64 安装包并运行。运行桌面应用需要 WebView2；普通安装包使用者不需要 Rust 或源码开发工具。</li>
+            <li><strong>通过 npm 运行：</strong>在已安装 Node.js 18.18 或更高版本的 Windows PowerShell 中执行以下命令。npm 包已包含桌面程序，同样需要 WebView2。</li>
+          </ul>
+          <pre><code>npx termexo@latest</code></pre>
+          <p>如习惯全局命令，也可执行 <code>npm install --global termexo</code>，之后运行 <code>termexo</code>。更新全局安装时再次执行安装命令。</p>
+          <h3>第一次使用：完成这三步</h3>
+          <ol>
+            <li><strong>创建工作空间。</strong>在首次启动引导中创建工作空间，填写项目名称并选择这台电脑上实际存在的项目目录。</li>
+            <li><strong>准备 Agent。</strong>在设置中检查 Claude Code、Codex 或 OpenCode 的检测状态。未安装时，可使用 CLI 安装/升级入口，确认安装预览后继续；按提示完成所选 Agent 的登录或模型配置。</li>
+            <li><strong>新建终端。</strong>点击标签栏的「新建」，选择 Agent，确认工作目录、账号与模型，启动后输入任务。也可以先选择普通终端，检查项目目录与命令环境。</li>
+          </ol>
+          <p class="guide-callout">先用一条小任务验证环境，例如「阅读这个项目，说明如何运行测试，先不要修改文件」。确认目录、账号和连接正确后，再安排修改代码的任务。</p>
+        </section>
+
+        <section id="workbench" class="guide-section" data-pdf-page>
+          <h2>02 / 工作空间与终端</h2>
+          <p>一个工作空间对应一组项目目录、终端标签和布局。不同项目可以分别创建工作空间，并为它们改名、换色、排序；切换项目不必重新排列所有终端。</p>
+          <figure>
+            <img src="assets/termexo-workbench.png" alt="Termexo 工作台：左侧工作空间、中间多终端网格、右侧状态与会话信息" width="1800" height="1125" loading="lazy" />
+            <figcaption>工作空间组织项目，标签组织终端，网格决定当前看到哪些终端。</figcaption>
+          </figure>
+          <h3>安排你的工作台</h3>
+          <ul>
+            <li>从标签栏「新建」启动普通 Shell、Claude Code、Codex 或 OpenCode。工作目录指向本机文件夹，不是 GitHub 网页地址。</li>
+            <li>打开多个标签后，选择要显示的终端，再调整网格行列；支持 1 至 6 行/列以及最大化查看。拖动标签可以调整顺序。</li>
+            <li>每个终端运行独立的真实进程。多个 Agent 在同一目录中修改文件会相互影响；需要隔离改动时，请使用不同目录或 Git worktree。</li>
+          </ul>
+          <h3>看懂状态提醒</h3>
+          <ul>
+            <li><strong>运行 / 思考：</strong>Agent 正在处理任务或执行工具。</li>
+            <li><strong>等待输入 / 等待授权：</strong>需要你回答问题或确认操作。点击常驻提示条可定位到对应终端，再阅读完整请求。</li>
+            <li><strong>已完成 / 失败 / 已停止：</strong>检查终端输出和文件变更，决定验收、排错或重新启动。状态提示不等于代码已经验证通过。</li>
+          </ul>
+          <p class="guide-callout">自动确认会减少逐次授权提示，也会扩大 Agent 自动执行操作的范围。首次使用或处理敏感项目时，建议保留人工确认；不要把 AUTO 标记理解成安全审查。</p>
+        </section>
+
+        <section id="sessions" class="guide-section" data-pdf-page>
+          <h2>03 / 恢复会话</h2>
+          <ol>
+            <li>打开「会话中心」，搜索本机已有的 Claude Code、Codex 或 OpenCode 会话；可结合项目、账号等条件筛选。</li>
+            <li>查看会话的目录、Agent、账号与最近活动，确认是要继续的那一次。</li>
+            <li>选择恢复，确认启动选项。Termexo 调用 CLI 的原生会话恢复能力，再在终端中继续对话。</li>
+          </ol>
+          <p>Termexo 只读发现原生会话记录，不通过改写历史来伪造恢复。能否继续上下文取决于原生会话文件、对应账号、CLI 版本和项目路径是否仍可用。</p>
+          <p class="guide-callout">恢复工作空间布局，不等于让已经退出的进程原地继续。退出应用或重启电脑后，普通 Shell 中未保存的工作不能靠布局恢复找回；Agent 历史上下文应通过原生会话恢复。</p>
+        </section>
+
+        <section id="profiles" class="guide-section">
+          <h2>04 / 账号、模型与网络</h2>
+          <h3>登录账号</h3>
+          <p>在设置中管理隔离的登录账号，按对应 CLI 的提示完成授权。启动终端时选定账号；终端标题栏会显示当前账号。切换标题栏账号会重启该终端并开始新会话，先保存或交接当前工作。</p>
+          <h3>模型 Profile</h3>
+          <ol>
+            <li>打开模型配置，创建 Profile，填写名称、模型标识、Endpoint 和 API Key。按供应商提供的真实参数填写，不要使用文档示例当作凭据。</li>
+            <li>确认协议与所选 Agent 相匹配。Claude Code 的兼容后端需要支持相应 Anthropic 接口；不是任意模型地址都能直接使用。</li>
+            <li>保存后，在启动或恢复终端时选择 Profile，先发起一条简短请求验证。切换现有终端前，阅读界面提示并确认当前任务可以中断。</li>
+          </ol>
+          <p>API Key 由 Windows 凭据管理器保存。供应商余额与额度并非都支持查询；界面标为估算或不可用的数据，不应当作官方账单。</p>
+          <h3>代理与 npm 网络</h3>
+          <p>需要代理时，在网络配置中创建全局或工作空间 Profile，按实际环境填写代理和 npm registry，测试连接后再启动终端或安装 CLI。工作空间配置优先于全局配置；调整后应重新启动相关终端，使新环境生效。</p>
+        </section>
+
+        <section id="tasks" class="guide-section" data-pdf-page>
+          <h2>05 / 任务、Git 与交接</h2>
+          <h3>把任务交给 Agent</h3>
+          <ol>
+            <li>进入任务看板，新建任务，写清目标、项目目录、优先级和验收标准，例如「新增搜索框；空输入显示全部；测试通过」。</li>
+            <li>选择 Agent 与模型后启动执行。任务会关联一个真实终端，并切回终端视图，便于检查启动状态和处理授权。</li>
+            <li>跟踪待办、执行中、已完成、已验收等状态。Agent 完成后，检查实际输出和验收标准；不符合时补充反馈继续处理，通过后再验收。</li>
+          </ol>
+          <h3>检查 Git 改动</h3>
+          <p>选中对应终端后打开 Git 视图，查看分支、提交和文件 Diff；可切换单栏/双栏显示。Git 视图跟随当前终端的工作目录，以该终端启动时的 HEAD 为会话基线。</p>
+          <p class="guide-callout">「会话改动」是这段时间里观察到的仓库差异，不是该 Agent 独占的操作记录。编辑器、其他终端和其他 Agent 的同期修改也可能出现。提交前仍应逐项审查。</p>
+          <h3>复用提示词与交接上下文</h3>
+          <ul>
+            <li>提示词资产可保存、搜索、收藏和复用已提交的提示词；草稿按终端分别恢复。复用前检查路径、账号和任务背景。</li>
+            <li>会话交接可按终端或工作空间整理任务、提示词、终端输出和 Git 信息，并控制 Token 预算。</li>
+            <li>先预览交接包，核对目标、已做事项、验证结果、风险和下一步，再导出 Markdown/JSON，或交给另一 Agent 继续。</li>
+          </ul>
+          <p>自动脱敏不能保证覆盖所有秘密。分享前人工检查 API Key、访问令牌、内部地址、客户数据和源代码权限。交接包是上下文文档，不是原生会话文件的无损转换。</p>
+        </section>
+
+        <section id="remote" class="guide-section" data-pdf-page>
+          <h2>06 / 手机与远程访问</h2>
+          <p>远程访问默认关闭。打开后，手机、平板或另一台电脑通过浏览器操作桌面端同一批工作空间和终端；不需要在手机上重新安装 Agent。</p>
+          <h3>在电脑端开启</h3>
+          <ol>
+            <li>打开设置中的「远程访问」，开启总开关。根据界面提示设置并保存监听地址与端口，默认端口为 <code>7420</code>。</li>
+            <li>供同一局域网设备使用时，选择可达的局域网监听地址，或监听所有网卡；仅监听 <code>127.0.0.1</code> 时只能本机访问。保留默认 HTTPS。</li>
+            <li>确认服务状态正常，在地址选择中选取当前可达的电脑地址，复制界面生成的访问链接，或显示二维码供自己的设备扫描。</li>
+            <li>手机连接同一局域网或可达该电脑的 VPN，在浏览器打开链接，按页面要求使用访问令牌连接。所填写的工作目录始终是运行桌面端那台电脑上的路径。</li>
+          </ol>
+          <p>默认使用自签名 HTTPS，首次访问时浏览器可能提示证书不受信任。先核对确实是自己的电脑、正确地址和可信网络，再按浏览器规则处理；不要忽略其他网站的证书警告。</p>
+          <h3>访问不了时，按顺序检查</h3>
+          <ul>
+            <li>桌面应用是否仍在运行，电脑是否休眠，远程服务是否显示错误。</li>
+            <li>链接是否用了实际局域网 IP。<code>0.0.0.0</code> 是监听设置，不是手机应打开的地址；手机上的 <code>localhost</code> 指的是手机自身。</li>
+            <li>两端网络是否可互通，访客 Wi-Fi 是否启用了设备隔离，Windows 防火墙是否允许所选端口在可信网络中访问。不要为此关闭整个防火墙。</li>
+            <li>端口或 IP 是否已改变，令牌是否已更换，HTTPS 与链接协议是否匹配。</li>
+          </ul>
+          <h3>使用边界与退出</h3>
+          <p>终端尺寸跟随当前正在操作的一端；手机窄屏会收为单终端，其他客户端可能需要横向查看。同一个终端上的输入会影响同一进程，避免两端同时输入。</p>
+          <p>远程页面不提供全部桌面本地文件导入导出或应用自更新能力。完成后可在电脑设置中关闭远程访问；更换访问令牌会使旧令牌失效，并断开已有连接。</p>
+          <p class="guide-callout">访问令牌和二维码相当于远程控制凭证：持有者可能操作终端并影响电脑文件。不要发到公开群、Issue 或截图中；不要直接暴露到公网。优先使用可信局域网或受控 VPN。</p>
+        </section>
+
+        <section id="faq" class="guide-section" data-pdf-page>
+          <h2>07 / 常见问题</h2>
+          <h3>提示未检测到 Agent，或命令无法启动？</h3>
+          <p>先在设置中确认安装状态，再检查对应 CLI 是否能在系统终端启动。安装后重新检测；核对 PATH、Node/npm 环境、工作目录和网络配置。登录失败时，确认当前选择的隔离账号已完成授权。</p>
+          <h3>会话中心找不到历史，或恢复时提示会话无效？</h3>
+          <p>确认使用的是原账号与原项目目录，原生会话文件仍在，CLI 可以读取。更换账号、删除 CLI 数据或移动项目都可能影响恢复。不要手动修改原生会话 ID；必要时新建会话，并用经过检查的交接包继续。</p>
+          <h3>模型请求失败，提示认证或接口错误？</h3>
+          <p>核对所选 Profile、模型名称、API Key、Endpoint 协议与路径；查看供应商是否支持该 CLI 所需接口。再检查余额与代理，保留错误码排查，但不要公开完整请求头或密钥。</p>
+          <h3>手机能看终端，但复制粘贴受限？</h3>
+          <p>浏览器剪贴板受安全上下文和权限限制。使用 HTTPS，按浏览器提示授权；仍不可用时手动选择复制或粘贴。窄屏终端可用手指拖拽滚动。</p>
+          <h3>如何更新 Termexo？</h3>
+          <p>安装包用户从 <a href="https://github.com/gemron/Termexo/releases/latest">最新版本页面</a>下载安装；npm 用户运行 <code>npx termexo@latest</code>，或更新全局安装。更新前保存文件，结束或交接正在运行的任务。应用更新与 Agent CLI 升级是两件事，CLI 在相应管理入口单独升级。</p>
+        </section>
+
+        <section id="privacy" class="guide-section">
+          <h2>08 / 数据与安全</h2>
+          <ul>
+            <li>Termexo 默认本地工作，没有 Termexo 账号或强制云同步；工作空间等状态保存在本机，API Key 由 Windows 凭据管理器保存。</li>
+            <li>Agent CLI 仍会按你选择的模型服务发送请求。哪些代码和上下文会离开电脑，取决于 CLI、供应商配置及其隐私政策。</li>
+            <li>官网有独立的第三方访问统计；它不是桌面应用或远程工作台的会话统计，也不代表下载量。</li>
+          </ul>
+          <p>遇到问题可在 <a href="https://github.com/gemron/Termexo/issues">GitHub Issues</a> 提交：注明 Termexo/Windows/CLI 版本、复现步骤、预期和实际结果，附脱敏后的错误信息。提交前遮盖账号、密钥、令牌、二维码与敏感路径。</p>
+          <p>在线最新版：<a href="https://www.termexo.com/guide.html">https://www.termexo.com/guide.html</a><br />版本更新记录：<a href="https://github.com/gemron/Termexo/releases">GitHub Releases</a></p>
+        </section>
+      </article>
+    </main>
+    <footer class="guide-footer">
+      <div class="shell guide-footer-links"><span>Termexo 使用说明 · V0.8.1</span><a href="#guide-content">回到顶部 ↑</a><a href="downloads/termexo-user-guide.pdf" download="Termexo-使用说明-v0.8.1.pdf">下载 PDF</a></div>
+      <div class="shell site-counter">
+        <p>官网累计访问量（PV）：<span id="busuanzi_value_site_pv" class="site-counter-value">—</span></p>
+        <p>第三方统计仅记录官网访问；“—”表示暂不可用。</p>
+      </div>
+    </footer>
+  </body>
+</html>

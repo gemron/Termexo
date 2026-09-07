@@ -1,0 +1,2 @@
+# Preserve downloadable documents byte-for-byte on all platforms.
+*.pdf binary
