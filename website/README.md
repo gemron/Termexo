@@ -29,7 +29,27 @@ GitHub Pages 从 `gh-pages` 分支根目录发布。仅修改 `main` 下的 `web
 官网顶部和支持按钮跳转 GitHub 使用 `noopener` 与仅发送来源域名的 Referrer-Policy，
 便于 GitHub Traffic 识别官网来源。新增 Star 应单独从仓库统计。
 
-## 校验与发布
+## 使用说明与 PDF
+
+- 在线入口：`https://www.termexo.com/guide.html`；首页导航和页脚均有「使用说明」。
+- 下载地址：`https://www.termexo.com/downloads/termexo-user-guide.pdf`。
+- `guide.html` 是唯一正文源；`guide.css` 提供阅读、手机和打印布局。文档目前为中文。
+- 修改正文后运行 `scripts/build-user-guide.py`，从同一份 HTML 重新生成 PDF；不要单独修改 PDF 内容。
+- 构建需要 Python 与 `reportlab`，默认使用 Windows 微软雅黑并嵌入字体子集；其他系统用
+  `--font` / `--bold-font` 指定支持中文且允许嵌入的 TrueType 字体。
+- 版本变更时同时更新正文版本、下载文件名及脚本页脚版本；使用 `data-pdf-page` 控制 PDF 分页。
+- 发布前将 PDF 每页渲染成图片检查中文与分页，并确认目录链接、下载文件、正文版本一致。
+- `scripts/verify-user-guide.py` 使用 `pypdf` 验证正文完整性、书签和中文文本，使用 `pymupdf`
+  检查页面文字边界；传入 `--render-dir` 可渲染全部页面供人工检查。
+- 部署需要同步 `guide.html`、`guide.css` 和整个 `downloads/` 文档目录，保留其余官网资源。
+
+```powershell
+python scripts/build-user-guide.py
+python scripts/verify-user-guide.py --render-dir .tooling/guide-qa
+node --test scripts/website-guide.test.mjs
+```
+
+## 校验与发布命令
 
 ```powershell
 node --check website/app.js
