@@ -3,9 +3,8 @@
 .guide-header > .shell { display: flex; align-items: center; justify-content: space-between; gap: 16px; min-height: 76px; }
 .guide-header nav { display: flex; align-items: center; gap: 24px; margin-left: auto; font-size: .875rem; }
 .guide-header .language-switch { font-size: .875rem; }
-.guide-header .language-switch[hidden] { display: none; }
-.guide-header .language-switch button { min-width: 40px; min-height: 40px; color: var(--text-soft); }
-.guide-header .language-switch button.active, .guide-header .language-switch button:hover { color: var(--green-bright); }
+.guide-header .language-switch a { display: inline-flex; align-items: center; justify-content: center; min-width: 40px; min-height: 40px; color: var(--text-soft); }
+.guide-header .language-switch a.active, .guide-header .language-switch a:hover { color: var(--green-bright); }
 .guide-download { border: 1px solid var(--line-strong); border-radius: 6px; padding: 10px 16px; color: var(--green-bright); }
 .guide-layout { display: grid; grid-template-columns: 228px minmax(0, 1fr); gap: 64px; align-items: start; padding-block: 56px 80px; }
 .guide-sidebar { position: sticky; top: 108px; }

@@ -350,6 +350,9 @@ function setLanguage(language) {
   translatedElements.forEach((element) => {
     const value = dictionary[element.dataset.i18n];
     if (value) element.textContent = value;
+    if (element.dataset.i18n === "navGuide") {
+      element.setAttribute("href", language === "zh" ? "guide.html" : "guide.en.html");
+    }
   });
 
   languageButtons.forEach((button) => {
