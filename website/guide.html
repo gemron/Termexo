@@ -16,48 +16,54 @@
     <link rel="icon" href="assets/termexo-mark.svg" type="image/svg+xml" />
     <link rel="stylesheet" href="styles.css" />
     <link rel="stylesheet" href="guide.css" />
+    <script src="guide.js" defer></script>
     <script src="analytics.js" defer></script>
   </head>
   <body class="guide-page">
-    <a class="skip-link" href="#guide-content">跳转到正文</a>
+    <a class="skip-link" href="#guide-content" data-guide-i18n="skip">跳转到正文</a>
     <header class="guide-header">
       <div class="shell">
-        <a class="brand" href="./" aria-label="返回 Termexo 官网">
+        <a class="brand" href="./" aria-label="返回 Termexo 官网" data-guide-aria="homeLabel">
           <span class="brand-mark" aria-hidden="true"><img src="assets/termexo-mark.svg" alt="" /></span>
           <span>Termexo</span>
         </a>
-        <nav aria-label="文档导航">
-          <a href="./">返回官网</a>
-          <a class="guide-download" href="downloads/termexo-user-guide.pdf" download="Termexo-使用说明-v0.8.1.pdf">下载 PDF</a>
+        <nav aria-label="文档导航" data-guide-aria="navigation">
+          <a href="./" data-guide-i18n="home">返回官网</a>
+          <a class="guide-download" href="downloads/termexo-user-guide.pdf" download="Termexo-使用说明-v0.8.1.pdf" data-guide-i18n="download">下载 PDF</a>
         </nav>
+        <div class="language-switch" role="group" aria-label="菜单语言" data-guide-aria="language" data-guide-language-switch hidden>
+          <button type="button" data-lang="en" lang="en" aria-label="Switch menus to English" aria-pressed="false">EN</button>
+          <span aria-hidden="true">/</span>
+          <button type="button" data-lang="zh" lang="zh-CN" aria-label="切换为中文菜单" aria-pressed="true" class="active">中文</button>
+        </div>
       </div>
     </header>
     <main class="shell guide-layout">
-      <aside class="guide-sidebar" aria-label="本页目录">
-        <p class="guide-label">使用说明 / CONTENTS</p>
-        <nav aria-label="章节目录">
-          <a href="#quick-start">01　安装与第一次运行</a>
-          <a href="#workbench">02　工作空间与终端</a>
-          <a href="#sessions">03　恢复会话</a>
-          <a href="#profiles">04　账号、模型与网络</a>
-          <a href="#tasks">05　任务、Git 与交接</a>
-          <a href="#remote">06　手机与远程访问</a>
-          <a href="#faq">07　常见问题</a>
-          <a href="#privacy">08　数据与安全</a>
+      <aside class="guide-sidebar" aria-label="本页目录" data-guide-aria="contents">
+        <p class="guide-label" data-guide-i18n="contentsTitle">使用说明 / CONTENTS</p>
+        <nav aria-label="章节目录" data-guide-aria="chapters">
+          <a href="#quick-start" data-guide-i18n="quickStart">01　安装与第一次运行</a>
+          <a href="#workbench" data-guide-i18n="workbench">02　工作空间与终端</a>
+          <a href="#sessions" data-guide-i18n="sessions">03　恢复会话</a>
+          <a href="#profiles" data-guide-i18n="profiles">04　账号、模型与网络</a>
+          <a href="#tasks" data-guide-i18n="tasks">05　任务、Git 与交接</a>
+          <a href="#remote" data-guide-i18n="remote">06　手机与远程访问</a>
+          <a href="#faq" data-guide-i18n="faq">07　常见问题</a>
+          <a href="#privacy" data-guide-i18n="privacy">08　数据与安全</a>
         </nav>
-        <p class="guide-sidebar-note">适用于 Windows 桌面版<br />V0.8.1 · 简体中文</p>
+        <p class="guide-sidebar-note" data-guide-i18n="edition">适用于 Windows 桌面版<br />V0.8.1 · 简体中文</p>
       </aside>
-      <article id="guide-content" class="guide-content">
+      <article id="guide-content" class="guide-content" lang="zh-CN">
         <header class="guide-intro">
           <p class="guide-label">TERMEXO / USER GUIDE</p>
           <h1>使用说明</h1>
           <p class="guide-lead">从第一个工作空间开始，把终端、Agent 和项目进度放在一起。</p>
           <p class="guide-meta">适用版本 V0.8.1 · 更新日期 2026-09-07 · Windows 10/11 x64</p>
           <div class="guide-actions" data-pdf-skip>
-            <a class="button primary" href="downloads/termexo-user-guide.pdf" download="Termexo-使用说明-v0.8.1.pdf">下载使用说明 · PDF</a>
-            <a class="button secondary" href="#quick-start">开始阅读 ↓</a>
+            <a class="button primary" href="downloads/termexo-user-guide.pdf" download="Termexo-使用说明-v0.8.1.pdf" data-guide-i18n="downloadGuide">下载使用说明 · PDF</a>
+            <a class="button secondary" href="#quick-start" data-guide-i18n="startReading">开始阅读 ↓</a>
           </div>
-          <p class="guide-note" data-pdf-skip>PDF 与本页内容同步，可离线阅读。本文以中文界面为例；其他版本的按钮位置可能略有不同。</p>
+          <p class="guide-note" data-pdf-skip data-guide-i18n="contentNotice">PDF 与本页内容同步，可离线阅读。本文以中文界面为例；其他版本的按钮位置可能略有不同。</p>
         </header>
 
         <section id="quick-start" class="guide-section">
@@ -198,10 +204,10 @@
       </article>
     </main>
     <footer class="guide-footer">
-      <div class="shell guide-footer-links"><span>Termexo 使用说明 · V0.8.1</span><a href="#guide-content">回到顶部 ↑</a><a href="downloads/termexo-user-guide.pdf" download="Termexo-使用说明-v0.8.1.pdf">下载 PDF</a></div>
+      <div class="shell guide-footer-links"><span data-guide-i18n="footerTitle">Termexo 使用说明 · V0.8.1</span><a href="#guide-content" data-guide-i18n="backToTop">回到顶部 ↑</a><a href="downloads/termexo-user-guide.pdf" download="Termexo-使用说明-v0.8.1.pdf" data-guide-i18n="download">下载 PDF</a></div>
       <div class="shell site-counter">
-        <p>官网累计访问量（PV）：<span id="busuanzi_value_site_pv" class="site-counter-value">—</span></p>
-        <p>第三方统计仅记录官网访问；“—”表示暂不可用。</p>
+        <p><span data-guide-i18n="siteVisits">官网累计访问量（PV）：</span> <span id="busuanzi_value_site_pv" class="site-counter-value">—</span></p>
+        <p data-guide-i18n="counterNotice">第三方统计仅记录官网访问；“—”表示暂不可用。</p>
       </div>
     </footer>
   </body>
