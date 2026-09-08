@@ -1,7 +1,11 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 
 import { I18nService } from '../core/i18n/i18n.service';
-import { type ModelProfile, type ProviderQuota } from '../core/models/agent.models';
+import {
+  type AgentEvent,
+  type ModelProfile,
+  type ProviderQuota,
+} from '../core/models/agent.models';
 import type { RepositoryOverview } from '../core/models/git.models';
 import { type TerminalSession } from '../core/models/workspace.models';
 import { InspectorPanelComponent } from './inspector-panel';
@@ -181,6 +185,30 @@ describe('InspectorPanelComponent provider allowances', () => {
     expect(root.querySelector('.git-session-files')?.textContent).toContain('src/app.ts');
     root.querySelector<HTMLButtonElement>('.git-session-summary')?.click();
     expect(requested).toBe(true);
+  });
+
+  it('names OpenCode in its thinking event', async () => {
+    const terminal: TerminalSession = {
+      ...TERMINAL,
+      id: 'terminal-opencode',
+      name: 'OpenCode',
+      agentType: 'opencode',
+    };
+    const event: AgentEvent = {
+      eventKey: 'event-opencode-thinking',
+      agentType: 'opencode',
+      terminalId: terminal.id,
+      eventType: 'agent.thinking',
+      detail: {},
+      createdAt: Date.now(),
+    };
+    TestBed.inject(I18nService).setPreference('zh-CN');
+    fixture.componentRef.setInput('activeTerminal', terminal);
+    fixture.componentRef.setInput('events', [event]);
+    fixture.detectChanges();
+    await fixture.whenStable();
+
+    expect(root.querySelector('.event-row strong')?.textContent?.trim()).toBe('OpenCode 正在思考');
   });
 });
 
