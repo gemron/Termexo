@@ -274,11 +274,12 @@ img {
 
 .hero {
   display: grid;
-  min-height: 790px;
-  grid-template-columns: minmax(0, 0.82fr) minmax(520px, 1.18fr);
+  min-height: 820px;
+  grid-template-columns: minmax(0, 0.9fr) minmax(560px, 1.1fr);
   align-items: center;
-  gap: 68px;
-  padding-top: 112px;
+  gap: 44px;
+  padding-top: 132px;
+  padding-bottom: 64px;
 }
 
 .eyebrow,
@@ -293,6 +294,8 @@ img {
   display: flex;
   align-items: center;
   gap: 10px;
+  font-size: 0.75rem;
+  line-height: 1.6;
 }
 
 .live-dot {
@@ -305,10 +308,10 @@ img {
 
 .hero h1 {
   margin: 25px 0 25px;
-  font-size: clamp(54px, 6.3vw, 92px);
+  font-size: clamp(3rem, 4.6vw, 4.5rem);
   font-weight: 780;
   letter-spacing: -0.065em;
-  line-height: 0.94;
+  line-height: 1.12;
 }
 
 .hero h1 span,
@@ -329,6 +332,161 @@ img {
   font-size: 17px;
   line-height: 1.75;
 }
+
+.hero-remote-note {
+  max-width: 38rem;
+  margin: 18px 0 0;
+  padding-left: 14px;
+  border-left: 2px solid var(--green);
+  color: var(--text-soft);
+  font-size: 0.875rem;
+  line-height: 1.65;
+}
+
+.hero-guide-link {
+  display: inline-block;
+  margin-top: 16px;
+  color: var(--green);
+  font-size: 0.875rem;
+  text-underline-offset: 5px;
+}
+
+.hero-guide-link:hover { text-decoration: underline; }
+
+.hero-scene {
+  min-width: 0;
+  width: 100%;
+  margin: 0;
+  padding: 22px;
+  border: 1px solid #293e34;
+  border-radius: 16px;
+  background: radial-gradient(ellipse at 90% 80%, #173f303b, transparent 70%), #0e1512;
+  box-shadow: 0 30px 100px #0005;
+}
+
+.scene-heading {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 30px;
+  color: #d6e6dc;
+  font-size: 0.875rem;
+  line-height: 1.5;
+}
+
+.scene-dot, .scene-footer i, .mobile-agent i {
+  flex: 0 0 6px;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--green);
+}
+
+.scene-protocol {
+  margin-left: auto;
+  color: var(--green);
+  font: 0.75rem/1.5 var(--mono);
+  white-space: nowrap;
+}
+
+.device-scenes {
+  display: grid;
+  grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr);
+  gap: 18px;
+  align-items: start;
+}
+
+.desktop-scene, .mobile-scene { min-width: 0; }
+.desktop-scene { padding-top: 32px; }
+.device-label {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  margin-bottom: 12px;
+  font-size: 0.75rem;
+  line-height: 1.5;
+}
+.device-label span { color: var(--green); font-family: var(--mono); }
+.device-label b { color: #c3d2ca; font-weight: 500; }
+
+.desktop-window, .mobile-window {
+  overflow: hidden;
+  border: 1px solid #35453d;
+  background: #0b100d;
+  box-shadow: 0 16px 32px #0004;
+}
+.desktop-window { border-radius: 8px; }
+.mobile-window { border-radius: 16px; border-color: #527665; }
+.scene-topbar, .mobile-workspace, .scene-workspace {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px;
+  border-bottom: 1px solid #233229;
+  font-size: 0.875rem;
+}
+.scene-topbar { background: #1b241f; }
+.scene-topbar > span, .scene-workspace code {
+  margin-left: auto;
+  color: #9bada2;
+  font-size: 0.75rem;
+}
+.scene-workspace { color: #d6e6dc; }
+.scene-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  padding: 10px 12px;
+  border-bottom: 1px solid #233229;
+  color: #a2b1a8;
+  font-size: 0.75rem;
+}
+.scene-tabs .selected { color: var(--green); }
+.scene-terminal, .mobile-output {
+  padding: 16px 12px;
+  color: #d8e4de;
+  font: 0.875rem/1.65 var(--mono);
+  overflow-wrap: anywhere;
+}
+.scene-terminal p, .mobile-output p { margin: 0 0 18px; }
+.terminal-muted { color: #9aaca0; font-size: 0.75rem; }
+.terminal-request { color: #d8e4de; }
+.terminal-success { color: var(--green); }
+.terminal-waiting { color: #e7ba76; }
+.terminal-prompt { display: flex; align-items: center; gap: 8px; color: var(--green); }
+.scene-cursor { width: 7px; height: 16px; background: var(--green); }
+.scene-footer {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px;
+  border-top: 1px solid #233229;
+  color: #a5b9ac;
+  font-size: 0.75rem;
+  line-height: 1.5;
+}
+.scene-desktop-note { margin: 16px 0 0; color: #a5b9ac; font-size: 0.875rem; line-height: 1.6; }
+.mobile-browser {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 7px;
+  padding: 12px 8px;
+  background: #21392c;
+  color: #c5d8cc;
+  font-size: 0.75rem;
+}
+.mobile-browser svg { width: 14px; height: 14px; fill: none; stroke: currentColor; stroke-width: 1.6; }
+.mobile-workspace > span { margin-left: auto; }
+.mobile-agent { display: flex; align-items: center; gap: 8px; padding: 12px; color: var(--green); font-size: 0.875rem; }
+.mobile-output { min-height: 250px; padding-top: 4px; }
+.mobile-instruction { padding: 10px; border-left: 2px solid var(--green); background: #192c22; }
+.mobile-input { display: flex; align-items: center; gap: 8px; padding: 12px; border-top: 1px solid #35453d; color: #a5b9ac; font-size: 0.875rem; line-height: 1.5; }
+.mobile-input > span:last-child { margin-left: auto; color: var(--green); }
+.mobile-shortcuts { display: flex; gap: 6px; padding: 0 12px 14px; }
+.mobile-shortcuts span { flex: 1; padding: 5px 0; border: 1px solid #35453d; border-radius: 4px; text-align: center; color: #b3c6b9; font: 0.75rem/1.4 var(--mono); }
+.hero-scene figcaption { display: flex; align-items: center; gap: 12px; margin-top: 24px; border-top: 1px solid #293e34; padding-top: 16px; color: #9db3a6; font-size: 0.75rem; line-height: 1.65; }
+.scene-link-line { color: var(--green); font-size: 1.5rem; }
 
 .hero-actions,
 .cta-actions {
@@ -1630,8 +1788,8 @@ img {
   .hero {
     min-height: auto;
     grid-template-columns: 1fr;
-    gap: 58px;
-    padding-top: 170px;
+    gap: 40px;
+    padding-top: 128px;
     padding-bottom: 100px;
   }
 
@@ -1640,8 +1798,10 @@ img {
   }
 
   .hero h1 {
-    font-size: clamp(62px, 11vw, 96px);
+    font-size: clamp(3rem, 7vw, 4.5rem);
   }
+
+  .hero-scene { max-width: 800px; justify-self: center; }
 
   .hero-console {
     width: min(760px, 100%);
@@ -1738,12 +1898,22 @@ img {
   }
 
   .hero h1 {
-    font-size: clamp(50px, 16.5vw, 74px);
+    font-size: clamp(2.4rem, 8.5vw, 3.8rem);
   }
 
   .hero-lead {
-    font-size: 15px;
+    font-size: 1rem;
   }
+
+  .hero-scene { padding: 16px; }
+  .scene-heading { flex-wrap: wrap; margin-bottom: 20px; }
+  .scene-protocol { margin-left: 16px; }
+  .device-scenes { grid-template-columns: 1fr; gap: 26px; }
+  .desktop-scene { padding-top: 0; }
+  .mobile-scene { width: min(100%, 300px); justify-self: end; }
+  .scene-terminal { padding: 14px; }
+  .scene-terminal p { margin-bottom: 12px; }
+  .mobile-output { min-height: 0; }
 
   .hero-actions .button,
   .cta-actions .button {
