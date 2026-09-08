@@ -11,7 +11,7 @@
 </p>
 
 <p align="center">
-  <img alt="Version 0.8.2" src="https://img.shields.io/badge/version-0.8.2-58c7a0">
+  <img alt="Version 0.8.3" src="https://img.shields.io/badge/version-0.8.3-58c7a0">
   <img alt="Windows" src="https://img.shields.io/badge/platform-Windows-0078D4?logo=windows">
   <img alt="Tauri 2" src="https://img.shields.io/badge/Tauri-2-24C8DB?logo=tauri&logoColor=white">
   <img alt="Angular 22" src="https://img.shields.io/badge/Angular-22-DD0031?logo=angular">
@@ -36,7 +36,7 @@ Run the complete Windows app with one command—no Termexo account or server req
 npx termexo@latest
 ```
 
-> The current version is **V0.8.2**.
+> The current version is **V0.8.3**.
 
 ![Termexo multi-terminal grid workbench](website/assets/termexo-workbench.png)
 
@@ -131,6 +131,30 @@ you configure under their own terms and privacy policies.
 The interface is available in Simplified Chinese, English, Spanish, French, German, Japanese,
 and Korean. It follows the Windows language automatically, or you can choose a language from
 the main toolbar and keep that choice across restarts.
+
+## What's New in V0.8.3
+
+- **Typing keeps up with a busy Agent.** Every synchronous backend command ran on the one IPC
+  thread, so the 3-second Git poll (around half a second each) and the per-second event sync queued
+  ahead of each keystroke; keys arrived in bursts. Those commands now run on a thread pool, and
+  `write_terminal` — the keystroke path — has the IPC thread to itself. Measured p99 keystroke
+  latency fell from 514 ms to 19 ms.
+- **Git status is watched, not polled.** The repository shown in the sidebar is now watched for
+  file changes and re-read only when something actually changes, instead of every three seconds.
+  Idle Git work drops to zero, and an edit shows up in about a second. One `git status` reads HEAD,
+  branch and the working tree together where three separate git processes ran before.
+- **Hook events stop piling up.** The event spool and its database table grew without bound — into
+  hundreds of megabytes that every launch re-read from the start. Events now carry only the fields
+  the UI shows, the read position survives restarts, a drained spool is truncated, an index serves
+  the newest-first read, and events past 30 days are pruned. The startup event read fell from over
+  a second to a few milliseconds.
+- **Tasks can be interrupted and amended mid-run.** Stopping a running task now keeps its terminal
+  and session so it can be resumed or handed back to 待办, and a running task can be sent extra
+  instructions through the same Agent session instead of only after a failed verification.
+- **The Agent status panel is reorganised.** A pinned overview shows the current Agent with its
+  allowance, change count, branch and running count; the details below — active Agents, session
+  details, code changes, provider allowances, recent activity — are grouped into collapsible
+  sections that remember what you left open.
 
 ## What's New in V0.8.2
 

@@ -14,7 +14,9 @@ import {
   TodoStage,
   TodoTask,
   TodoTaskDraft,
+  canAmendTodoTask,
   canRestartTodoTask,
+  canResumeTodoTask,
   isReusableTodoTerminal,
   isTodoAgentTerminal,
   todoWorkingDirectory,
@@ -79,7 +81,11 @@ export class TodoBoardComponent {
   readonly executionRequested = output<string>();
   /** Asks the shell to interrupt the agent behind a running task; the board frees the task itself. */
   readonly stopRequested = output<string>();
+  readonly resumeRequested = output<string>();
+  readonly backlogRequested = output<string>();
   readonly continuationRequested = output<TodoContinuationRequest>();
+  /** New instructions for the agent already working on the task. */
+  readonly amendRequested = output<TodoContinuationRequest>();
   readonly terminalRequested = output<string>();
   /** Asks the shell to close a terminal the board no longer needs once a run is accepted. */
   readonly terminalCloseRequested = output<string>();
@@ -127,6 +133,8 @@ export class TodoBoardComponent {
   /** Drives the elapsed-time readout; only ticks while a task is actually running. */
   private readonly now = signal(Date.now());
 
+  /** The feedback dialog serves two jobs: rejecting a verification, and amending a live run. */
+  protected readonly validationMode = signal<'reject' | 'amend'>('reject');
   protected readonly validationFeedback = signal('');
   protected readonly validationDescription = signal('');
   protected readonly validationAcceptance = signal('');
@@ -243,9 +251,33 @@ export class TodoBoardComponent {
     const taskId = this.editingTaskId();
     return taskId ? this.todos.task(taskId) : null;
   });
+  /**
+   * Fields a run in flight cannot change under it — which terminal it runs in, and where.
+   *
+   * A stopped run is not in flight: nothing is reading its terminal, so those choices open back up
+   * without having to throw the attempt away first.
+   */
   protected readonly taskExecutionLocked = computed(() => {
     const task = this.editingTask();
-    return task?.stage === 'executing' && task.executionState !== 'failed';
+    if (!task) return false;
+    return (
+      task.stage === 'executing' && task.executionState !== 'failed' && !canResumeTodoTask(task)
+    );
+  });
+  /** Wording for the shared feedback dialog, so the template carries no branching of its own. */
+  protected readonly validationDialogCopy = computed(() => {
+    const amending = this.validationMode() === 'amend';
+    return {
+      heading: amending ? '补充指令' : '验收不通过',
+      hint: amending
+        ? '会发送给正在执行的 Agent，任务继续跑，不会重新开始。'
+        : '将回到执行中，并继续原来的 Agent 会话。',
+      feedbackLabel: amending ? '补充要求 *' : '需要修改的问题 *',
+      feedbackPlaceholder: amending
+        ? '说明要补充或调整的要求'
+        : '说明未通过的现象、复现方式和期望结果',
+      submit: amending ? '发送给 Agent' : '继续原会话修改',
+    };
   });
   protected readonly validationTask = computed(() => {
     const taskId = this.validationTaskId();
@@ -551,7 +583,9 @@ export class TodoBoardComponent {
         profileId: terminal?.profileId ?? option?.profileId ?? '',
         modelName:
           terminal?.model ??
-          (option?.agentType === 'opencode' ? this.taskOpenCodeModel().trim() : option?.modelName) ??
+          (option?.agentType === 'opencode'
+            ? this.taskOpenCodeModel().trim()
+            : option?.modelName) ??
           '',
         preferredTerminalId: terminal?.id,
         recurring: this.taskRecurring(),
@@ -891,6 +925,17 @@ export class TodoBoardComponent {
   }
 
   protected openValidationFailure(task: TodoTask): void {
+    this.validationMode.set('reject');
+    this.openFeedbackDialog(task);
+  }
+
+  /** Opens the same dialog to add instructions to a run that is still going. */
+  protected openAmendment(task: TodoTask): void {
+    this.validationMode.set('amend');
+    this.openFeedbackDialog(task);
+  }
+
+  private openFeedbackDialog(task: TodoTask): void {
     this.validationTaskId.set(task.id);
     this.validationFeedback.set('');
     this.validationDescription.set(task.description);
@@ -905,13 +950,26 @@ export class TodoBoardComponent {
   protected continueAfterFailure(): void {
     const taskId = this.validationTaskId();
     if (!taskId || !this.validationFeedback().trim()) return;
-    this.continuationRequested.emit({
+    const request: TodoContinuationRequest = {
       taskId,
       feedback: this.validationFeedback(),
       description: this.validationDescription(),
       acceptanceCriteria: this.validationAcceptance(),
-    });
+    };
+    if (this.validationMode() === 'amend') {
+      this.amendRequested.emit(request);
+    } else {
+      this.continuationRequested.emit(request);
+    }
     this.closeValidationFailure();
+  }
+
+  protected canResume(task: TodoTask): boolean {
+    return canResumeTodoTask(task);
+  }
+
+  protected canAmend(task: TodoTask): boolean {
+    return canAmendTodoTask(task);
   }
 
   protected priorityLabel(priority: TodoPriority): string {
@@ -946,6 +1004,7 @@ export class TodoBoardComponent {
       waiting: '等待人工处理',
       failed: '执行异常',
       completed: '执行完成',
+      stopped: '已中止，可继续或放回待办',
     } as const;
     return labels[task.executionState];
   }

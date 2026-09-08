@@ -52,7 +52,7 @@ pub async fn detect_opencode() -> Result<AgentInstallation, String> {
     .map_err(|error| error.to_string())?
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn scan_claude_sessions(
     project_path: Option<String>,
     database: State<'_, WorkspaceDatabase>,
@@ -85,7 +85,7 @@ pub fn scan_claude_sessions(
     Ok(sessions)
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn scan_codex_sessions(
     project_path: Option<String>,
     database: State<'_, WorkspaceDatabase>,
@@ -142,7 +142,7 @@ pub async fn scan_opencode_sessions(
     Ok(sessions)
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn list_agent_sessions(
     database: State<'_, WorkspaceDatabase>,
 ) -> Result<Vec<AgentSession>, String> {
@@ -151,7 +151,7 @@ pub fn list_agent_sessions(
         .map_err(|error| error.to_string())
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn build_claude_launch_command(
     options: ClaudeLaunchOptions,
 ) -> Result<AgentLaunchSpec, String> {
@@ -160,14 +160,14 @@ pub fn build_claude_launch_command(
         .map_err(|error| error.to_string())
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn build_codex_launch_command(options: CodexLaunchOptions) -> Result<AgentLaunchSpec, String> {
     CodexCliAdapter::new()
         .build_launch_command(&options)
         .map_err(|error| error.to_string())
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn build_opencode_launch_command(
     options: OpenCodeLaunchOptions,
 ) -> Result<AgentLaunchSpec, String> {
@@ -238,7 +238,7 @@ pub struct PrepareAccountLoginRequest {
     pub account_profile_id: String,
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn prepare_claude_launch(
     request: PrepareClaudeLaunchRequest,
     database: State<'_, WorkspaceDatabase>,
@@ -368,7 +368,7 @@ pub async fn stop_claude_background_session(short_id: String) -> Result<(), Stri
     .map_err(|error| error.to_string())?
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn prepare_codex_launch(
     request: PrepareCodexLaunchRequest,
     database: State<'_, WorkspaceDatabase>,
@@ -458,7 +458,7 @@ pub fn prepare_codex_launch(
         .map_err(|error| error.to_string())
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn prepare_opencode_launch(
     request: PrepareOpenCodeLaunchRequest,
     database: State<'_, WorkspaceDatabase>,
@@ -490,7 +490,7 @@ pub fn prepare_opencode_launch(
         .map_err(|error| error.to_string())
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn prepare_account_login(
     request: PrepareAccountLoginRequest,
     database: State<'_, WorkspaceDatabase>,

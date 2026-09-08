@@ -31,7 +31,7 @@ pub struct GitContext {
     pub diagnostic: String,
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn list_prompt_assets(
     workspace_id: Option<String>,
     database: State<'_, WorkspaceDatabase>,
@@ -41,7 +41,7 @@ pub fn list_prompt_assets(
         .map_err(|error| error.to_string())
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn save_prompt_asset(
     input: PromptAsset,
     database: State<'_, WorkspaceDatabase>,
@@ -53,7 +53,7 @@ pub fn save_prompt_asset(
     Ok(input)
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn delete_prompt_asset(
     asset_id: String,
     database: State<'_, WorkspaceDatabase>,
@@ -63,7 +63,7 @@ pub fn delete_prompt_asset(
         .map_err(|error| error.to_string())
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn list_handoff_packages(
     workspace_id: Option<String>,
     database: State<'_, WorkspaceDatabase>,
@@ -73,7 +73,7 @@ pub fn list_handoff_packages(
         .map_err(|error| error.to_string())
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn save_handoff_package(
     input: HandoffRecord,
     database: State<'_, WorkspaceDatabase>,
@@ -85,7 +85,7 @@ pub fn save_handoff_package(
     Ok(input)
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn delete_handoff_package(
     package_id: String,
     database: State<'_, WorkspaceDatabase>,
@@ -95,7 +95,7 @@ pub fn delete_handoff_package(
         .map_err(|error| error.to_string())
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn collect_git_context(request: GitContextRequest) -> Result<GitContext, String> {
     let project_path = PathBuf::from(request.project_path.trim());
     if !project_path.is_dir() {
@@ -202,7 +202,7 @@ pub fn collect_git_context(request: GitContextRequest) -> Result<GitContext, Str
     })
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn write_handoff_document(path: String, contents: String) -> Result<(), String> {
     if contents.len() > MAX_HANDOFF_DOCUMENT_BYTES {
         return Err("The handoff document exceeds the 2 MB safety limit.".into());
@@ -211,7 +211,7 @@ pub fn write_handoff_document(path: String, contents: String) -> Result<(), Stri
     fs::write(path, contents).map_err(|error| format!("Failed to write handoff document: {error}"))
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn read_handoff_document(path: String) -> Result<String, String> {
     let path = validate_handoff_path(&path)?;
     let metadata =

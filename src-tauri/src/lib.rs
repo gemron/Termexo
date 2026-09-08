@@ -25,6 +25,7 @@ use crate::cli::CliOperationManager;
 use crate::commands::quota::QuotaCache;
 use crate::config::{CredentialStore, LaunchEnvironmentStore};
 use crate::database::WorkspaceDatabase;
+use crate::git::watch::RepositoryWatcher;
 use crate::git::RepositoryManager;
 use crate::hooks::HookEventStore;
 use crate::pty::PtyManager;
@@ -92,6 +93,7 @@ pub fn run() {
             app.manage(events.clone());
             app.manage(PtyManager::new(events.clone()));
             app.manage(RepositoryManager::default());
+            app.manage(RepositoryWatcher::new(app.handle().clone(), events.clone()));
             app.manage(QuotaCache::default());
 
             let remote = Arc::new(RemoteAccessManager::new(app.handle().clone(), events));

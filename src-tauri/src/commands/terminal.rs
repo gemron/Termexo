@@ -3,6 +3,7 @@ use tauri::{AppHandle, State};
 
 use crate::config::{CredentialStore, LaunchEnvironmentStore};
 use crate::database::WorkspaceDatabase;
+use crate::git::watch::RepositoryWatcher;
 use crate::git::RepositoryManager;
 use crate::pty::{PtyManager, TerminalScrollback};
 
@@ -47,7 +48,7 @@ pub struct TerminalStartResult {
     pub rows: u16,
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn create_terminal(
     request: TerminalStartRequest,
     app: AppHandle,
@@ -129,7 +130,7 @@ pub fn create_terminal(
 }
 
 /// Returns everything a client needs to catch up with a terminal it was not connected to.
-#[tauri::command]
+#[tauri::command(async)]
 pub fn read_terminal_scrollback(
     terminal_id: String,
     manager: State<'_, PtyManager>,
@@ -167,16 +168,18 @@ pub fn resize_terminal(
         .map_err(|error| error.to_string())
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn close_terminal(
     terminal_id: String,
     preserve_repository_baseline: bool,
     manager: State<'_, PtyManager>,
     repositories: State<'_, RepositoryManager>,
+    watcher: State<'_, RepositoryWatcher>,
 ) -> Result<(), String> {
     let result = manager
         .close(&terminal_id)
         .map_err(|error| error.to_string());
+    watcher.release(&terminal_id);
     if !preserve_repository_baseline {
         repositories.remove_terminal(&terminal_id);
     }

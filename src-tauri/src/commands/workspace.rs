@@ -26,12 +26,12 @@ struct WorkspaceDeletedEvent {
     origin_id: Option<String>,
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn list_workspaces(database: State<'_, WorkspaceDatabase>) -> Result<Vec<Workspace>, String> {
     database.list().map_err(|error| error.to_string())
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn save_workspace(
     workspace: Workspace,
     origin_id: Option<String>,
@@ -54,7 +54,7 @@ pub fn save_workspace(
     Ok(())
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn delete_workspace(
     workspace_id: String,
     origin_id: Option<String>,

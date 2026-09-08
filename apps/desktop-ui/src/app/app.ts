@@ -167,8 +167,13 @@ const WORKSPACE_SIDEBAR_AUTO_COLLAPSE_WIDTH = 760;
  * that only steer splitting leave the toolbar to the tab strip.
  */
 const PHONE_LAYOUT_MAX_WIDTH = 640;
-/** How often the repository is re-read while a view that shows it is open. */
+/** How often the repository is re-read while a view that shows it is open and unwatched. */
 const GIT_POLL_INTERVAL_MS = 3_000;
+/**
+ * The safety net once the backend watches the repository: changes arrive as events, and this only
+ * catches one the watcher missed — a file system that delivers them late, or not at all.
+ */
+const GIT_WATCHED_POLL_INTERVAL_MS = 60_000;
 /** The task board needs the repository only for the count on the Git tab, so it checks rarely. */
 const GIT_IDLE_POLL_INTERVAL_MS = 15_000;
 /** Matches the backend default for a profile that has never had a threshold set. */
@@ -568,8 +573,13 @@ export class App {
         untracked(() => void this.git.refresh());
       }
       // Polling used to stop the moment the Git view was opened, so the one view that shows these
-      // changes was the only one where they went stale until the user pressed refresh.
-      const interval = view === 'tasks' ? GIT_IDLE_POLL_INTERVAL_MS : GIT_POLL_INTERVAL_MS;
+      // changes was the only one where they went stale until the user pressed refresh. Once the
+      // backend watches the repository the poll is only a safety net, so it backs right off.
+      const interval = this.git.watched()
+        ? GIT_WATCHED_POLL_INTERVAL_MS
+        : view === 'tasks'
+          ? GIT_IDLE_POLL_INTERVAL_MS
+          : GIT_POLL_INTERVAL_MS;
       const timer = window.setInterval(() => void this.git.refresh(), interval);
       onCleanup(() => window.clearInterval(timer));
     });
@@ -1261,7 +1271,68 @@ export class App {
       this.agentStartup.cancel(terminalId);
       void this.writeToTerminal(terminalId, AGENT_INTERRUPT_SEQUENCE).catch(() => undefined);
     }
-    this.showToast(`已终止「${task.title}」，任务已回到待办`);
+    this.showToast(`已中止「${task.title}」，可继续执行或放回待办`);
+  }
+
+  /**
+   * Picks a stopped run back up in the terminal that still holds its session.
+   *
+   * The agent is told to carry on rather than restart, because the work it already did is still in
+   * front of it — that is the whole point of stopping without discarding the run.
+   */
+  protected async resumeTodoTask(taskId: string): Promise<void> {
+    const task = this.todos.task(taskId);
+    if (!task || this.busyTodoTaskId()) return;
+    const located = task.terminalId ? this.findTerminal(task.terminalId) : null;
+    if (!located) {
+      const message = '原终端已关闭，请放回待办后重新执行。';
+      this.todos.setExecutionError(task.id, message);
+      this.showToast(message, 'attention');
+      return;
+    }
+    await this.runTodoInExistingTerminal(task, this.resumeTodoPrompt(task), located, true);
+  }
+
+  protected returnTodoTaskToBacklog(taskId: string): void {
+    const task = this.todos.task(taskId);
+    if (!task || !this.todos.returnToBacklog(taskId)) return;
+    this.showToast(`已把「${task.title}」放回待办`);
+  }
+
+  /**
+   * Hands new instructions to the agent already working on the task.
+   *
+   * Editing a running task only ever changed the board; the agent kept working from what it was
+   * told at the start. This sends the change through the same terminal, so both sides agree.
+   */
+  protected async amendTodoTask(request: TodoContinuationRequest): Promise<void> {
+    if (this.busyTodoTaskId()) return;
+    const amended = this.todos.amendExecution(request);
+    if (!amended) return;
+    const located = amended.terminalId ? this.findTerminal(amended.terminalId) : null;
+    if (!located) {
+      const message = '关联终端已关闭，补充指令未能送达。';
+      this.todos.setExecutionError(amended.id, message);
+      this.showToast(message, 'attention');
+      return;
+    }
+    this.busyTodoTaskId.set(amended.id);
+    try {
+      await this.submitTodoPrompt(
+        amended.id,
+        located.terminal.id,
+        this.amendmentTodoPrompt(amended, request.feedback),
+      );
+      this.state.updateTerminalStatus(located.terminal.id, 'THINKING');
+      this.todos.handleTerminalStatus(located.terminal.id, 'THINKING');
+      this.showToast(`已把补充指令发送到 ${located.terminal.name}`);
+    } catch (error) {
+      const message = this.errorMessage(error);
+      this.todos.setExecutionError(amended.id, message, located.terminal.id);
+      this.showToast(message, 'attention');
+    } finally {
+      this.busyTodoTaskId.set(null);
+    }
   }
 
   protected openTodoTerminal(terminalId: string): void {
@@ -2996,6 +3067,37 @@ export class App {
       task.acceptanceCriteria ? `验收标准：\n${task.acceptanceCriteria}` : '',
       '',
       '请先检查现有实现，再完成所需修改并运行与风险相匹配的验证。完成后请总结改动、验证结果和仍需注意的问题。',
+    ]
+      .filter((line) => line !== '')
+      .join('\n');
+  }
+
+  /** What a run that was stopped by hand is told when the user picks it back up. */
+  private resumeTodoPrompt(task: TodoTask): string {
+    return [
+      '刚才的执行被手动中止。请在当前会话上下文中继续完成这项任务，不要从头开始。',
+      '',
+      `任务：${task.title}`,
+      task.description ? `任务说明：\n${task.description}` : '',
+      task.acceptanceCriteria ? `验收标准：\n${task.acceptanceCriteria}` : '',
+      '',
+      '请先说明已经完成到哪一步，再继续剩余工作并运行与风险相匹配的验证。',
+    ]
+      .filter((line) => line !== '')
+      .join('\n');
+  }
+
+  /** What the agent hears when the task it is working on gains new requirements. */
+  private amendmentTodoPrompt(task: TodoTask, instruction: string): string {
+    return [
+      '这项任务的要求有更新。请在当前会话上下文中继续，不要丢弃已经完成的工作。',
+      '',
+      `任务：${task.title}`,
+      `补充要求：\n${instruction.trim()}`,
+      task.description ? `更新后的任务说明：\n${task.description}` : '',
+      task.acceptanceCriteria ? `更新后的验收标准：\n${task.acceptanceCriteria}` : '',
+      '',
+      '请先说明这条补充要求对已完成部分的影响，再完成相应修改并运行匹配的验证。',
     ]
       .filter((line) => line !== '')
       .join('\n');

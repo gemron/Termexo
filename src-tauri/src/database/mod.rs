@@ -21,6 +21,12 @@ const PROVIDER_PLAN_MIGRATION: &str = include_str!("../../migrations/0007_provid
 const REASONING_EFFORT_MIGRATION: &str = include_str!("../../migrations/0010_reasoning_effort.sql");
 const V05_ASSETS_MIGRATION: &str = include_str!("../../migrations/0008_v05_assets.sql");
 const APP_SETTINGS_MIGRATION: &str = include_str!("../../migrations/0009_app_settings.sql");
+const AGENT_EVENT_INDEX_MIGRATION: &str =
+    include_str!("../../migrations/0011_agent_events_created_index.sql");
+
+/// How long an agent event is kept. Nothing reads further back: the inspector shows the latest
+/// batch and a task only matches a session through its recent events.
+const AGENT_EVENT_RETENTION_MS: i64 = 30 * 24 * 60 * 60 * 1000;
 const LEGACY_MINIMAX_M3_MODEL: &str = "MiniMax-M3[1m]";
 const MINIMAX_M3_MODEL: &str = "MiniMax-M3";
 
@@ -170,6 +176,8 @@ impl WorkspaceDatabase {
         split_legacy_single_protocol_profiles(&connection)?;
         migrate_legacy_minimax_m3_model(&connection)?;
         ensure_default_profile(&connection)?;
+        connection.execute_batch(AGENT_EVENT_INDEX_MIGRATION)?;
+        prune_stale_agent_events(&connection)?;
         Ok(Self {
             connection: Mutex::new(connection),
         })
@@ -520,6 +528,10 @@ impl WorkspaceDatabase {
     }
 
     pub fn save_agent_events(&self, events: &[AgentEvent]) -> Result<(), DatabaseError> {
+        // Called once a second by the poll; an empty batch must not pay for a transaction commit.
+        if events.is_empty() {
+            return Ok(());
+        }
         let mut connection = self
             .connection
             .lock()
@@ -1177,6 +1189,17 @@ fn run_provider_profile_migration(connection: &Connection) -> Result<(), Databas
             }
         }
     }
+    Ok(())
+}
+
+/// Drops events past the retention window on every startup.
+///
+/// The table grew without bound — thirty thousand rows carrying six kilobytes each — and every
+/// startup read its newest rows through a full scan. The read is fixed by an index; this keeps the
+/// table from growing back into a problem. Deleting by `created_at` walks that same index.
+fn prune_stale_agent_events(connection: &Connection) -> Result<(), DatabaseError> {
+    let cutoff = unix_timestamp_millis() - AGENT_EVENT_RETENTION_MS;
+    connection.execute("DELETE FROM agent_events WHERE created_at < ?1", [cutoff])?;
     Ok(())
 }
 

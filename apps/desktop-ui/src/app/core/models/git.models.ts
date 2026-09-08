@@ -37,6 +37,8 @@ export interface RepositoryOverview {
   historyRewritten: boolean;
   changes: RepositoryChange[];
   commits: RepositoryCommit[];
+  /** The backend is watching this repository and will announce changes; polling can rest. */
+  watched: boolean;
 }
 
 export interface RepositoryDiff {

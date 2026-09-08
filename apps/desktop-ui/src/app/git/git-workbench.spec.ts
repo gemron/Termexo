@@ -30,6 +30,7 @@ const OVERVIEW: RepositoryOverview = {
   historyRewritten: false,
   changes: [change('src/app/app.ts'), change('src/app/git/git-workbench.ts')],
   commits: [],
+  watched: false,
 };
 
 function commit(oid: string, parentOids: string[]): RepositoryCommit {

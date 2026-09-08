@@ -174,15 +174,61 @@ describe('TodoService', () => {
     });
   });
 
-  it('returns a stopped task to 待办 and stops it from tracking the terminal it left', () => {
+  it('keeps a stopped run and everything it was bound to, so it can go on', () => {
     const service = new TodoService();
     service.initialize([workspace]);
     const task = service.createTask(workspace.id, draft(service.projectsFor(workspace.id)[0].id))!;
     service.beginExecution(task.id, { terminalId: 'terminal-1', nativeSessionId: 'thread-1' });
     service.markPromptDelivered(task.id, 'terminal-1');
-    service.captureTerminalOutput('terminal-1', 'half of the work\r\n');
+    service.captureTerminalOutput('terminal-1', 'half of the work');
 
     expect(service.stopExecution(task.id)).toMatchObject({
+      stage: 'executing',
+      executionState: 'stopped',
+      promptDeliveryState: 'idle',
+      terminalId: 'terminal-1',
+      nativeSessionId: 'thread-1',
+      attempts: 1,
+    });
+    expect(service.task(task.id)?.outputTail).toContain('half of the work');
+
+    // An interrupted agent prints a little more before it settles; that must not undo the stop.
+    service.handleTerminalStatus('terminal-1', 'RUNNING');
+    expect(service.task(task.id)).toMatchObject({ executionState: 'stopped' });
+
+    // Resuming reuses the same terminal and session, and carries the output across.
+    expect(service.beginExecution(task.id, { terminalId: 'terminal-1' }, true)).toMatchObject({
+      stage: 'executing',
+      executionState: 'starting',
+      attempts: 2,
+    });
+    expect(service.task(task.id)?.outputTail).toContain('half of the work');
+  });
+
+  it('tells a stopped run that its terminal is gone, because resuming then cannot work', () => {
+    const service = new TodoService();
+    service.initialize([workspace]);
+    const task = service.createTask(workspace.id, draft(service.projectsFor(workspace.id)[0].id))!;
+    service.beginExecution(task.id, { terminalId: 'terminal-1' });
+    service.stopExecution(task.id);
+
+    service.handleTerminalStatus('terminal-1', 'DISCONNECTED');
+
+    expect(service.task(task.id)).toMatchObject({
+      executionState: 'failed',
+      lastTerminalStatus: 'DISCONNECTED',
+    });
+  });
+
+  it('returns a task to 待办 and stops it from tracking the terminal it left', () => {
+    const service = new TodoService();
+    service.initialize([workspace]);
+    const task = service.createTask(workspace.id, draft(service.projectsFor(workspace.id)[0].id))!;
+    service.beginExecution(task.id, { terminalId: 'terminal-1', nativeSessionId: 'thread-1' });
+    service.markPromptDelivered(task.id, 'terminal-1');
+    service.captureTerminalOutput('terminal-1', 'half of the work');
+
+    expect(service.returnToBacklog(task.id)).toMatchObject({
       stage: 'todo',
       executionState: 'idle',
       promptDeliveryState: 'idle',
@@ -195,15 +241,59 @@ describe('TodoService', () => {
 
     // The terminal keeps running until the shell interrupts it; none of it belongs to the task now.
     service.handleTerminalStatus('terminal-1', 'COMPLETED');
-    service.captureTerminalOutput('terminal-1', 'work that is no longer the task\r\n');
+    service.captureTerminalOutput('terminal-1', 'work that is no longer the task');
     expect(service.task(task.id)).toMatchObject({ stage: 'todo', outputTail: undefined });
 
-    // Only a running task can be stopped, and the next attempt resumes the session it kept.
+    // Only a live run can be stopped or dropped, and the next attempt keeps the session it had.
     expect(service.stopExecution(task.id)).toBeNull();
+    expect(service.returnToBacklog(task.id)).toBeNull();
     expect(service.beginExecution(task.id, { terminalId: 'terminal-2' }, true)).toMatchObject({
       stage: 'executing',
       attempts: 2,
     });
+  });
+
+  it('sends amended instructions through the run already under way', () => {
+    const service = new TodoService();
+    service.initialize([workspace]);
+    const task = service.createTask(workspace.id, draft(service.projectsFor(workspace.id)[0].id))!;
+    service.beginExecution(task.id, { terminalId: 'terminal-1' });
+    service.markPromptDelivered(task.id, 'terminal-1');
+
+    const amended = service.amendExecution({
+      taskId: task.id,
+      feedback: '再补一个导出按钮',
+      description: '更新后的说明',
+      acceptanceCriteria: '更新后的验收标准',
+    });
+
+    // Amending is not another attempt: the same run simply learns more.
+    expect(amended).toMatchObject({
+      stage: 'executing',
+      description: '更新后的说明',
+      acceptanceCriteria: '更新后的验收标准',
+      promptDeliveryState: 'pending',
+      attempts: 1,
+    });
+
+    // Only a live run can be amended, and only with something to say.
+    expect(
+      service.amendExecution({
+        taskId: task.id,
+        feedback: '   ',
+        description: '',
+        acceptanceCriteria: '',
+      }),
+    ).toBeNull();
+    service.returnToBacklog(task.id);
+    expect(
+      service.amendExecution({
+        taskId: task.id,
+        feedback: '改点别的',
+        description: '',
+        acceptanceCriteria: '',
+      }),
+    ).toBeNull();
   });
 
   it('guards prompt delivery updates against a stale terminal attempt', () => {

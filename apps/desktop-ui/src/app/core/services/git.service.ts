@@ -1,4 +1,4 @@
-import { Injectable, signal } from '@angular/core';
+import { computed, Injectable, signal } from '@angular/core';
 
 import type {
   DiffLayout,
@@ -6,10 +6,17 @@ import type {
   RepositoryOverview,
   RepositoryTarget,
 } from '../models/git.models';
-import { invoke } from './backend-bridge';
+import { invoke, listen } from './backend-bridge';
 import { hasBackend } from './tauri-runtime';
 
 const COMMIT_LIMIT = 50;
+/** Raised by the backend once a watched repository has been quiet after a change. */
+const REPOSITORY_CHANGED_EVENT = 'repository-changed';
+
+/** Structural equality; an overview is a few dozen small records, so serialising it is cheap. */
+function sameOverview(current: RepositoryOverview | null, next: RepositoryOverview): boolean {
+  return current !== null && JSON.stringify(current) === JSON.stringify(next);
+}
 const DIFF_LAYOUT_STORAGE_KEY = 'termexo.git.diffLayout';
 
 function readStoredDiffLayout(): DiffLayout {
@@ -44,10 +51,32 @@ export class GitService {
   private readonly diffLayoutValue = signal<DiffLayout>(readStoredDiffLayout());
 
   readonly overview = this.overviewValue.asReadonly();
+  /** True while the backend watches the shown repository, which is when polling can back off. */
+  readonly watched = computed(() => this.overviewValue()?.watched === true);
   readonly loading = this.loadingValue.asReadonly();
   readonly error = this.errorValue.asReadonly();
   readonly selectedPath = this.selectedPathValue.asReadonly();
   readonly diffLayout = this.diffLayoutValue.asReadonly();
+
+  constructor() {
+    if (hasBackend()) {
+      void this.followRepositoryChanges();
+    }
+  }
+
+  /**
+   * Refreshes when the backend reports a change to the repository on screen.
+   *
+   * The event names the root it saw change; anything else belongs to a repository another
+   * terminal is showing, or one nobody is, and is not worth a read.
+   */
+  private async followRepositoryChanges(): Promise<void> {
+    await listen<{ root: string }>(REPOSITORY_CHANGED_EVENT, (event) => {
+      if (this.overviewValue()?.root === event.payload.root) {
+        void this.refresh();
+      }
+    });
+  }
 
   selectPath(path: string): void {
     this.selectedPathValue.set(path);
@@ -94,7 +123,11 @@ export class GitService {
         request: { target, commitLimit: COMMIT_LIMIT },
       });
       if (revision === this.requestRevision) {
-        this.overviewValue.set(overview);
+        // The poll usually brings back the same picture it did three seconds ago. Publishing an
+        // identical object would still run change detection over every reader of the overview.
+        if (!sameOverview(this.overviewValue(), overview)) {
+          this.overviewValue.set(overview);
+        }
         this.errorValue.set('');
       }
     } catch (error) {

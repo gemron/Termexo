@@ -89,6 +89,33 @@ describe('TodoBoardComponent verification', () => {
     projectId = todos.projectsFor(WORKSPACE.id)[0].id;
   });
 
+  it('offers continuing or dropping a stopped run, and amending a live one', async () => {
+    const task = todos.createTask(WORKSPACE.id, draft(projectId, '可中止的任务'))!;
+    todos.beginExecution(task.id, { terminalId: TERMINAL.id });
+    await render([TERMINAL]);
+
+    // A live run can be interrupted or given more to do, but not resumed — it never stopped.
+    expect(root.querySelector('[data-testid="task-amend-button"]')).toBeTruthy();
+    expect(root.querySelector('[data-testid="task-stop-button"]')).toBeTruthy();
+    expect(root.querySelector('[data-testid="task-resume-button"]')).toBeNull();
+
+    const resumed: string[] = [];
+    const dropped: string[] = [];
+    fixture.componentInstance.resumeRequested.subscribe((id) => resumed.push(id));
+    fixture.componentInstance.backlogRequested.subscribe((id) => dropped.push(id));
+
+    todos.stopExecution(task.id);
+    fixture.detectChanges();
+
+    // Stopping keeps the run, so both ways out of it are offered and neither is forced.
+    expect(root.querySelector('[data-testid="task-amend-button"]')).toBeNull();
+    click('[data-testid="task-resume-button"]');
+    click('[data-testid="task-backlog-button"]');
+
+    expect(resumed).toEqual([task.id]);
+    expect(dropped).toEqual([task.id]);
+  });
+
   it('accepts the run and closes its terminal when that action is chosen', async () => {
     const task = completedTask('验收并关闭', TERMINAL.id);
     await render([TERMINAL]);

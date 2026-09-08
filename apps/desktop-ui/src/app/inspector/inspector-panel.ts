@@ -39,6 +39,43 @@ const EVENT_LABELS: Readonly<Record<string, string>> = {
 /** Matches the backend default for a profile that has never had a threshold set. */
 const DEFAULT_ALERT_THRESHOLD = 80;
 
+/** The collapsible sections below the overview; the overview itself is always open. */
+type SectionKey = 'agents' | 'details' | 'changes' | 'quota' | 'activity';
+
+/** What opens on a first run: the code changes, since that is what a working Agent produces. */
+const DEFAULT_SECTIONS: Record<SectionKey, boolean> = {
+  agents: false,
+  details: false,
+  changes: true,
+  quota: false,
+  activity: false,
+};
+
+/** Statuses that count an Agent as working, for the "running" figure in the overview. */
+const ACTIVE_STATUSES: readonly TerminalStatus[] = [
+  'STARTING',
+  'RUNNING',
+  'THINKING',
+  'WAITING_INPUT',
+  'WAITING_APPROVAL',
+];
+
+const SECTION_STATE_KEY = 'termexo.inspector.sections.v1';
+
+/** Reads the remembered open/closed state, falling back to the defaults for anything missing. */
+function readStoredSections(): Record<SectionKey, boolean> {
+  try {
+    const raw = window.localStorage.getItem(SECTION_STATE_KEY);
+    const parsed: unknown = raw ? JSON.parse(raw) : {};
+    if (parsed && typeof parsed === 'object') {
+      return { ...DEFAULT_SECTIONS, ...(parsed as Partial<Record<SectionKey, boolean>>) };
+    }
+  } catch {
+    // A restricted or corrupt store only costs the remembered layout, not the panel.
+  }
+  return { ...DEFAULT_SECTIONS };
+}
+
 const MINUTE_MS = 60_000;
 const HOUR_MINUTES = 60;
 const DAY_MINUTES = 24 * HOUR_MINUTES;
@@ -84,42 +121,57 @@ export class InspectorPanelComponent {
    * Shows only the allowance sources used by the active terminal unless the user explicitly asks
    * for the complete list. Model profiles and signed-in Agent accounts have separate readings.
    */
-  protected readonly quotaRows = computed(() => {
-    const thresholds = new Map(
-      this.modelProfiles().map((profile) => [
-        profile.id,
-        profile.planAlertThreshold ?? DEFAULT_ALERT_THRESHOLD,
-      ]),
-    );
+  /** Alert thresholds by profile id, so a reading can be judged against the profile that owns it. */
+  private readonly thresholds = computed(
+    () =>
+      new Map(
+        this.modelProfiles().map((profile) => [
+          profile.id,
+          profile.planAlertThreshold ?? DEFAULT_ALERT_THRESHOLD,
+        ]),
+      ),
+  );
+
+  /** The allowance sources the active terminal actually spends, used to scope the current view. */
+  private readonly currentQuotaIds = computed<Set<string>>(() => {
     const terminal = this.activeTerminal();
-    const activeProfile = terminal?.profileId
+    const ids = new Set<string>();
+    if (!terminal) {
+      return ids;
+    }
+    const activeProfile = terminal.profileId
       ? this.modelProfiles().find((profile) => profile.id === terminal.profileId)
       : undefined;
-    const currentQuotaIds = new Set<string>();
-    if (
-      terminal &&
-      (terminal.agentType === 'claude' || terminal.agentType === 'codex') &&
-      activeProfile
-    ) {
+    if ((terminal.agentType === 'claude' || terminal.agentType === 'codex') && activeProfile) {
       if (isNativeModel(activeProfile, terminal.agentType)) {
         // Official models spend the subscription belonging to the login account selected for this
         // terminal, not an API-key allowance attached to the model profile.
         if (terminal.accountProfileId) {
-          currentQuotaIds.add(`agent:${terminal.accountProfileId}`);
+          ids.add(`agent:${terminal.accountProfileId}`);
         }
       } else if (terminal.profileId) {
         // Compatibility providers authenticate with the model profile's own API key.
-        currentQuotaIds.add(terminal.profileId);
+        ids.add(terminal.profileId);
       }
     } else {
       // Keep restored legacy terminals useful when their old model profile no longer exists.
-      if (terminal?.profileId) {
-        currentQuotaIds.add(terminal.profileId);
+      if (terminal.profileId) {
+        ids.add(terminal.profileId);
       }
-      if (terminal?.accountProfileId) {
-        currentQuotaIds.add(`agent:${terminal.accountProfileId}`);
+      if (terminal.accountProfileId) {
+        ids.add(`agent:${terminal.accountProfileId}`);
       }
     }
+    return ids;
+  });
+
+  /**
+   * Shows only the allowance sources used by the active terminal unless the user explicitly asks
+   * for the complete list. Model profiles and signed-in Agent accounts have separate readings.
+   */
+  protected readonly quotaRows = computed(() => {
+    const thresholds = this.thresholds();
+    const currentQuotaIds = this.currentQuotaIds();
     const quotas = this.showAllQuotas()
       ? this.quotas()
       : this.quotas().filter((quota) => currentQuotaIds.has(quota.profileId));
@@ -135,6 +187,80 @@ export class InspectorPanelComponent {
       };
     });
   });
+
+  /**
+   * The tightest allowance the active terminal spends, for the overview headline.
+   *
+   * Always scoped to the current terminal regardless of the "show all" toggle: the headline is
+   * about what this session is running on. `percent` is consumption, so the lowest remaining is
+   * the highest used, and that is the one worth surfacing.
+   */
+  protected readonly overviewQuota = computed<{ remaining: number; alerting: boolean } | null>(
+    () => {
+      const ids = this.currentQuotaIds();
+      const thresholds = this.thresholds();
+      let worst: { remaining: number; alerting: boolean } | null = null;
+      for (const quota of this.quotas()) {
+        if (!ids.has(quota.profileId)) {
+          continue;
+        }
+        const threshold = thresholds.get(quota.profileId) ?? DEFAULT_ALERT_THRESHOLD;
+        for (const entry of quota.entries) {
+          if (entry.percent === undefined) {
+            continue;
+          }
+          const remaining = Math.max(0, Math.round(100 - entry.percent));
+          if (worst === null || remaining < worst.remaining) {
+            worst = { remaining, alerting: entry.percent >= threshold };
+          }
+        }
+      }
+      return worst;
+    },
+  );
+
+  /** Agents actively working right now, for the overview figure; a plain shell is not counted. */
+  protected readonly runningAgentCount = computed(
+    () =>
+      (this.workspace()?.terminals ?? []).filter(
+        (terminal) => terminal.agentType !== 'shell' && ACTIVE_STATUSES.includes(terminal.status),
+      ).length,
+  );
+
+  protected readonly changeCount = computed(() => this.repository()?.changes.length ?? 0);
+
+  /** The branch shown in the overview: the repository's when known, else the terminal's record. */
+  protected readonly overviewBranch = computed(
+    () => this.repository()?.branch || this.activeTerminal()?.branch || '',
+  );
+
+  /** Which collapsible sections are open; seeded from the last visit and remembered on change. */
+  protected readonly sections = signal<Record<SectionKey, boolean>>(readStoredSections());
+
+  protected isOpen(key: SectionKey): boolean {
+    return this.sections()[key];
+  }
+
+  protected toggleSection(key: SectionKey): void {
+    this.setSection(key, !this.sections()[key]);
+  }
+
+  /** Opens a section without closing it if it was already open; used by the overview shortcuts. */
+  protected openSection(key: SectionKey): void {
+    if (!this.sections()[key]) {
+      this.setSection(key, true);
+    }
+  }
+
+  private setSection(key: SectionKey, open: boolean): void {
+    const next = { ...this.sections(), [key]: open };
+    this.sections.set(next);
+    try {
+      window.localStorage.setItem(SECTION_STATE_KEY, JSON.stringify(next));
+    } catch {
+      // The choice simply will not survive a restart when storage is unavailable.
+    }
+  }
 
   protected toggleQuotaScope(): void {
     this.showAllQuotas.update((showAll) => !showAll);

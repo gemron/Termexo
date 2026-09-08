@@ -316,22 +316,56 @@
                   </button>
                 }
                 @if (task.stage === 'executing') {
-                  @if (task.executionState === 'failed') {
-                    <button type="button" class="run-action" (click)="requestExecution(task)">
-                      <app-icon name="refresh" [size]="12" />
-                      {{ task.promptDeliveryState === 'failed' ? '重新发送' : '重试' }}
+                  @if (canResume(task)) {
+                    <button
+                      type="button"
+                      class="run-action"
+                      data-testid="task-resume-button"
+                      title="在原来的终端和会话里接着执行"
+                      [disabled]="busyTaskId() === task.id"
+                      (click)="resumeRequested.emit(task.id)"
+                    >
+                      <app-icon name="play" [size]="12" /> 继续执行
+                    </button>
+                    <button
+                      type="button"
+                      class="quiet-action"
+                      data-testid="task-backlog-button"
+                      title="放弃这一轮执行，任务回到待办"
+                      (click)="backlogRequested.emit(task.id)"
+                    >
+                      放回待办
+                    </button>
+                  } @else {
+                    @if (task.executionState === 'failed') {
+                      <button type="button" class="run-action" (click)="requestExecution(task)">
+                        <app-icon name="refresh" [size]="12" />
+                        {{ task.promptDeliveryState === 'failed' ? '重新发送' : '重试' }}
+                      </button>
+                    }
+                    @if (canAmend(task)) {
+                      <button
+                        type="button"
+                        class="quiet-action"
+                        data-testid="task-amend-button"
+                        title="给正在执行的 Agent 追加要求，任务不会重新开始"
+                        [disabled]="busyTaskId() === task.id"
+                        (click)="openAmendment(task)"
+                      >
+                        <app-icon name="message" [size]="12" /> 补充指令
+                      </button>
+                    }
+                    <button
+                      type="button"
+                      class="stop-action"
+                      data-testid="task-stop-button"
+                      title="中止执行，保留终端与会话，之后可以继续或放回待办"
+                      [disabled]="busyTaskId() === task.id"
+                      (click)="stopRequested.emit(task.id)"
+                    >
+                      <app-icon name="square" [size]="11" /> 中止
                     </button>
                   }
-                  <button
-                    type="button"
-                    class="stop-action"
-                    data-testid="task-stop-button"
-                    title="终止执行并把任务放回待办"
-                    [disabled]="busyTaskId() === task.id"
-                    (click)="stopRequested.emit(task.id)"
-                  >
-                    <app-icon name="square" [size]="11" /> 终止
-                  </button>
                   <button type="button" class="quiet-action" (click)="markCompleted(task)">
                     送交验收
                   </button>
@@ -801,8 +835,8 @@
     >
       <header>
         <div>
-          <h2>验收不通过</h2>
-          <p>{{ task.title }} 将回到执行中，并继续原来的 Agent 会话。</p>
+          <h2>{{ validationDialogCopy().heading }}</h2>
+          <p>{{ task.title }} · {{ validationDialogCopy().hint }}</p>
         </div>
         <button
           type="button"
@@ -814,13 +848,13 @@
         </button>
       </header>
       <label>
-        <span>需要修改的问题 *</span>
+        <span>{{ validationDialogCopy().feedbackLabel }}</span>
         <textarea
           rows="4"
           data-testid="validation-feedback-input"
           [ngModel]="validationFeedback()"
           (ngModelChange)="validationFeedback.set($event)"
-          placeholder="说明未通过的现象、复现方式和期望结果"
+          [placeholder]="validationDialogCopy().feedbackPlaceholder"
           autofocus
         ></textarea>
       </label>
@@ -852,7 +886,7 @@
           [disabled]="!validationFeedback().trim()"
           (click)="continueAfterFailure()"
         >
-          继续原会话修改
+          {{ validationDialogCopy().submit }}
         </button>
       </footer>
     </section>

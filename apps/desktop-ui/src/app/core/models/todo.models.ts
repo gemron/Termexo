@@ -8,8 +8,9 @@ import type { TerminalSession, TerminalStatus, Workspace } from './workspace.mod
 
 export type TodoStage = 'todo' | 'executing' | 'completed' | 'verified';
 export type TodoPriority = 'low' | 'medium' | 'high';
+/** `stopped` is a run the user halted: it keeps its terminal and session so it can go on. */
 export type TodoExecutionState =
-  'idle' | 'starting' | 'running' | 'waiting' | 'failed' | 'completed';
+  'idle' | 'starting' | 'running' | 'waiting' | 'failed' | 'completed' | 'stopped';
 export type TodoPromptDeliveryState = 'idle' | 'pending' | 'sending' | 'delivered' | 'failed';
 
 export interface TodoProject {
@@ -195,6 +196,23 @@ export function defaultTodoProject(workspace: Workspace, now = Date.now()): Todo
  */
 export function canRestartTodoTask(task: TodoTask): boolean {
   return task.recurring && (task.stage === 'completed' || task.stage === 'verified');
+}
+
+/**
+ * Whether a halted run can pick up where it left off.
+ *
+ * Stopping keeps the terminal binding, the session and the captured output, so continuing is a
+ * matter of talking to the same agent again rather than starting the task over.
+ */
+export function canResumeTodoTask(task: TodoTask): boolean {
+  return task.stage === 'executing' && task.executionState === 'stopped';
+}
+
+/** Whether new instructions can be handed to the agent that is working on this task right now. */
+export function canAmendTodoTask(task: TodoTask): boolean {
+  return (
+    task.stage === 'executing' && task.executionState !== 'stopped' && Boolean(task.terminalId)
+  );
 }
 
 /** Where the agent terminal is started: the task override wins over the project directory. */

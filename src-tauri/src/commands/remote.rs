@@ -29,7 +29,7 @@ pub async fn regenerate_remote_access_token(
 }
 
 /// Encodes an access URL as an SVG path so the panel can draw it without `innerHTML`.
-#[tauri::command]
+#[tauri::command(async)]
 pub fn render_remote_access_qr(url: String) -> Result<QrCodeImage, String> {
     qr::render(&url)
 }

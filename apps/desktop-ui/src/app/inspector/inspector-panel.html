@@ -17,232 +17,358 @@
   </header>
 
   <div class="inspector-body">
-    <section>
-      <header class="section-header">
-        <span>{{ 'inspector.activeAgents' | t }}</span>
-        <small>{{ workspace()?.terminals?.length ?? 0 }}</small>
-      </header>
-      <div class="agent-list">
-        @for (terminal of workspace()?.terminals ?? []; track terminal.id) {
-          <article
-            class="agent-row card"
-            [class.selected]="terminal.id === activeTerminal()?.id"
-            [attr.data-status]="terminal.status"
-          >
-            <span class="agent-avatar" [attr.data-agent]="terminal.agentType">
-              <app-icon [name]="agentIcon(terminal.agentType)" [size]="14" />
-            </span>
-            <span class="agent-copy">
-              <strong>{{ terminal.name }}</strong>
-              <small>{{ terminal.model }}</small>
-            </span>
-            <span class="state badge badge-sm" [attr.data-status]="terminal.status">
-              <i></i>{{ statusLabel(terminal.status) }}
-            </span>
-          </article>
-        } @empty {
-          <p class="inline-empty">{{ 'inspector.noActiveAgents' | t }}</p>
-        }
-      </div>
-    </section>
-
-    @if (activeTerminal(); as terminal) {
-      <section class="details">
-        <header class="section-header">
-          <span>{{ 'inspector.sessionDetails' | t }}</span>
-        </header>
-        <dl>
-          <div>
-            <dt>Agent</dt>
-            <dd>{{ agentLabels[terminal.agentType] }}</dd>
-          </div>
-          <div>
-            <dt>{{ 'inspector.model' | t }}</dt>
-            <dd>{{ terminal.model }}</dd>
-          </div>
-          @if (activeAccountName(); as account) {
-            <div>
-              <dt>{{ 'inspector.account' | t }}</dt>
-              <dd>{{ account }}</dd>
-            </div>
-          }
-          <div>
-            <dt>{{ 'inspector.branch' | t }}</dt>
-            <dd>{{ terminal.branch }}</dd>
-          </div>
-          <div>
-            <dt>{{ 'inspector.session' | t }}</dt>
-            <dd>{{ terminal.nativeSessionId ?? ('inspector.newSession' | t) }}</dd>
-          </div>
-        </dl>
-      </section>
-    }
-
-    @if (repository()?.available) {
-      <section class="git-session-panel">
-        <header class="section-header">
-          <span>{{ 'git.sidebarTitle' | t }}</span>
-          <small>{{ repository()?.changes?.length ?? 0 }}</small>
-        </header>
-        <button type="button" class="git-session-summary" (click)="gitRequested.emit()">
-          <span>
-            <app-icon name="git-branch" [size]="12" />
-            <strong>{{ repository()?.branch }}</strong>
+    <!-- Overview stays open: the one Agent in front of the user and the numbers worth a glance. -->
+    <section class="overview">
+      @if (activeTerminal(); as terminal) {
+        <div class="overview-agent" [attr.data-status]="terminal.status">
+          <span class="agent-avatar" [attr.data-agent]="terminal.agentType">
+            <app-icon [name]="agentIcon(terminal.agentType)" [size]="16" />
           </span>
-          <em>{{ 'git.openFull' | t }}</em>
-        </button>
-        <div class="git-session-files">
-          @for (change of recentCodeChanges(); track change.path) {
-            <button type="button" [title]="change.path" (click)="gitRequested.emit()">
-              <b [attr.data-status]="repositoryChangeStatus(change)">
-                {{ repositoryChangeStatus(change) }}
-              </b>
-              <span>{{ change.path }}</span>
-              @if (change.preExisting) {
-                <i>{{ 'git.preExisting' | t }}</i>
-              }
-            </button>
-          } @empty {
-            <p class="git-session-clean">
-              <app-icon name="check" [size]="13" />{{ 'git.clean' | t }}
-            </p>
-          }
-          @if ((repository()?.changes?.length ?? 0) > recentCodeChanges().length) {
-            <button type="button" class="git-session-more" (click)="gitRequested.emit()">
-              {{
-                'git.moreChanges'
-                  | t
-                    : {
-                        count: (repository()?.changes?.length ?? 0) - recentCodeChanges().length,
-                      }
-              }}
-            </button>
-          }
+          <span class="overview-id">
+            <strong>{{ terminal.name }}</strong>
+            <small>{{ terminal.model }}</small>
+          </span>
+          <span class="state badge" [attr.data-status]="terminal.status">
+            <i></i>{{ statusLabel(terminal.status) }}
+          </span>
         </div>
-      </section>
-    }
-
-    <section class="quota-panel">
-      <header class="section-header">
-        <span>{{ 'quota.title' | t }}</span>
-        <button
-          type="button"
-          class="quota-refresh"
-          [class.busy]="quotaLoading()"
-          [disabled]="quotaLoading()"
-          (click)="refreshQuotas.emit()"
-        >
-          <app-icon name="refresh" [size]="12" />
-          {{ (quotaLoading() ? 'quota.refreshing' : 'quota.refresh') | t }}
-        </button>
-      </header>
-      <button
-        type="button"
-        class="quota-scope-toggle"
-        [attr.aria-pressed]="showAllQuotas()"
-        (click)="toggleQuotaScope()"
-      >
-        {{ (showAllQuotas() ? 'quota.showCurrent' : 'quota.showAll') | t }}
-      </button>
-      @for (row of quotaRows(); track row.quota.profileId) {
-        <article class="quota-row">
-          <header>
-            <strong>{{ row.quota.profileName }}</strong>
-            @if (!row.quota.official) {
-              <span class="quota-unofficial">{{ 'quota.unofficial' | t }}</span>
-            }
-          </header>
-          @for (line of row.entries; track line.entry.label) {
-            <div class="quota-entry" [class.alerting]="line.alerting">
-              <div class="quota-entry-head">
-                <span class="quota-entry-label">{{ line.entry.label }}</span>
-                <span class="quota-entry-amount">
-                  <small>{{ 'quota.remaining' | t }}</small>
-                  <b>{{ formatAmount(line.entry, line.entry.remaining) }}</b>
-                </span>
-              </div>
-              @if (line.entry.percent !== undefined) {
-                <div
-                  class="quota-meter"
-                  role="progressbar"
-                  aria-valuemin="0"
-                  aria-valuemax="100"
-                  [attr.aria-label]="line.entry.label"
-                  [attr.aria-valuenow]="meterValue(line.entry.percent)"
-                >
-                  <span [style.width.%]="meterValue(line.entry.percent)"></span>
-                </div>
-              }
-              <div class="quota-entry-meta">
-                <small>
-                  @if (line.entry.percent !== undefined) {
-                    {{ usedLabel(line.entry.percent) }}
-                  }
-                  @if (line.entry.percent !== undefined && line.entry.total !== undefined) {
-                    ·
-                  }
-                  @if (line.entry.total !== undefined) {
-                    {{ 'quota.of' | t }} {{ formatAmount(line.entry, line.entry.total) }}
-                  }
-                </small>
-                @if (line.entry.resetsAt) {
-                  <small class="quota-reset" [title]="resetTooltip(line.entry.resetsAt)">
-                    <app-icon name="history" [size]="11" />
-                    {{ resetLabel(line.entry.resetsAt) }}
-                  </small>
-                }
-              </div>
-            </div>
-          }
-          @if (row.quota.diagnostic) {
-            <small class="quota-unavailable">{{ row.quota.diagnostic }}</small>
-          } @else {
-            <small class="quota-checked"
-              >{{ 'quota.checkedAt' | t }} {{ checkedLabel(row.quota.checkedAt) }}</small
-            >
-          }
-        </article>
-      } @empty {
-        <p class="quota-empty">
-          {{ (showAllQuotas() ? 'quota.none' : 'quota.currentNone') | t }}
-        </p>
+        <div class="overview-stats">
+          <button
+            type="button"
+            class="stat"
+            [class.alerting]="overviewQuota()?.alerting"
+            [title]="'quota.title' | t"
+            (click)="openSection('quota')"
+          >
+            <small>{{ 'inspector.statQuota' | t }}</small>
+            <b>{{ overviewQuota() ? overviewQuota()!.remaining + '%' : '—' }}</b>
+          </button>
+          <button
+            type="button"
+            class="stat"
+            [disabled]="!repository()?.available"
+            [title]="'git.openFull' | t"
+            (click)="gitRequested.emit()"
+          >
+            <small>{{ 'inspector.statChanges' | t }}</small>
+            <b>{{ changeCount() }}</b>
+          </button>
+          <div class="stat">
+            <small>{{ 'inspector.statBranch' | t }}</small>
+            <b class="stat-branch" [title]="overviewBranch()">{{ overviewBranch() || '—' }}</b>
+          </div>
+          <div class="stat">
+            <small>{{ 'inspector.statAgents' | t }}</small>
+            <b>{{ runningAgentCount() }}</b>
+          </div>
+        </div>
+      } @else {
+        <p class="inline-empty">{{ 'inspector.noActiveAgents' | t }}</p>
       }
     </section>
 
-    <section class="activity">
-      <header class="section-header">
-        <span>{{ 'inspector.recentActivity' | t }}</span>
-        <small>{{ recentEvents().length }}</small>
-      </header>
-      @for (event of recentEvents(); track event.eventKey) {
-        <div
-          class="event-row"
-          [class.attention]="
-            event.eventType === 'approval.required' ||
-            event.eventType === 'user.input.required' ||
-            event.eventType === 'agent.rate_limited'
-          "
-          [class.completed]="event.eventType === 'task.completed'"
-        >
-          <span
-            class="event-icon"
-            [class.success]="
-              event.eventType === 'tool.completed' || event.eventType === 'task.completed'
-            "
-          >
-            <app-icon
-              [name]="event.eventType === 'tool.completed' ? 'check' : 'radio'"
-              [size]="12"
-            />
-          </span>
-          <span>
-            <strong>{{ eventLabel(event) }}</strong>
-            <small>{{ eventDetail(event) }}</small>
-            <time [attr.datetime]="event.createdAt">{{ eventTime(event) }}</time>
-          </span>
+    <!-- 活动 Agent -->
+    <section class="collapsible">
+      <button
+        type="button"
+        class="section-toggle"
+        [attr.aria-expanded]="isOpen('agents')"
+        [attr.data-section]="'agents'"
+        (click)="toggleSection('agents')"
+      >
+        <app-icon name="chevron-down" [size]="14" class="chevron" [class.open]="isOpen('agents')" />
+        <span class="section-title">{{ 'inspector.activeAgents' | t }}</span>
+        <span class="section-count">{{ workspace()?.terminals?.length ?? 0 }}</span>
+      </button>
+      @if (isOpen('agents')) {
+        <div class="section-body">
+          <div class="agent-list">
+            @for (terminal of workspace()?.terminals ?? []; track terminal.id) {
+              <article
+                class="agent-row card"
+                [class.selected]="terminal.id === activeTerminal()?.id"
+                [attr.data-status]="terminal.status"
+              >
+                <span class="agent-avatar" [attr.data-agent]="terminal.agentType">
+                  <app-icon [name]="agentIcon(terminal.agentType)" [size]="14" />
+                </span>
+                <span class="agent-copy">
+                  <strong>{{ terminal.name }}</strong>
+                  <small>{{ terminal.model }}</small>
+                </span>
+                <span class="state badge badge-sm" [attr.data-status]="terminal.status">
+                  <i></i>{{ statusLabel(terminal.status) }}
+                </span>
+              </article>
+            } @empty {
+              <p class="inline-empty">{{ 'inspector.noActiveAgents' | t }}</p>
+            }
+          </div>
         </div>
-      } @empty {
-        <p class="inline-empty">{{ 'inspector.noEvents' | t }}</p>
+      }
+    </section>
+
+    <!-- 会话详情 -->
+    @if (activeTerminal(); as terminal) {
+      <section class="collapsible">
+        <button
+          type="button"
+          class="section-toggle"
+          [attr.aria-expanded]="isOpen('details')"
+          [attr.data-section]="'details'"
+          (click)="toggleSection('details')"
+        >
+          <app-icon
+            name="chevron-down"
+            [size]="14"
+            class="chevron"
+            [class.open]="isOpen('details')"
+          />
+          <span class="section-title">{{ 'inspector.sessionDetails' | t }}</span>
+        </button>
+        @if (isOpen('details')) {
+          <div class="section-body">
+            <dl>
+              <div>
+                <dt>Agent</dt>
+                <dd>{{ agentLabels[terminal.agentType] }}</dd>
+              </div>
+              <div>
+                <dt>{{ 'inspector.model' | t }}</dt>
+                <dd>{{ terminal.model }}</dd>
+              </div>
+              @if (activeAccountName(); as account) {
+                <div>
+                  <dt>{{ 'inspector.account' | t }}</dt>
+                  <dd>{{ account }}</dd>
+                </div>
+              }
+              <div>
+                <dt>{{ 'inspector.branch' | t }}</dt>
+                <dd>{{ terminal.branch }}</dd>
+              </div>
+              <div>
+                <dt>{{ 'inspector.session' | t }}</dt>
+                <dd>{{ terminal.nativeSessionId ?? ('inspector.newSession' | t) }}</dd>
+              </div>
+            </dl>
+          </div>
+        }
+      </section>
+    }
+
+    <!-- 代码变更 -->
+    @if (repository()?.available) {
+      <section class="collapsible">
+        <button
+          type="button"
+          class="section-toggle"
+          [attr.aria-expanded]="isOpen('changes')"
+          [attr.data-section]="'changes'"
+          (click)="toggleSection('changes')"
+        >
+          <app-icon
+            name="chevron-down"
+            [size]="14"
+            class="chevron"
+            [class.open]="isOpen('changes')"
+          />
+          <span class="section-title">{{ 'git.sidebarTitle' | t }}</span>
+          <span class="section-count">{{ changeCount() }}</span>
+        </button>
+        @if (isOpen('changes')) {
+          <div class="section-body git-session-panel">
+            <button type="button" class="git-session-summary" (click)="gitRequested.emit()">
+              <span>
+                <app-icon name="git-branch" [size]="12" />
+                <strong>{{ repository()?.branch }}</strong>
+              </span>
+              <em>{{ 'git.openFull' | t }}</em>
+            </button>
+            <div class="git-session-files">
+              @for (change of recentCodeChanges(); track change.path) {
+                <button type="button" [title]="change.path" (click)="gitRequested.emit()">
+                  <b [attr.data-status]="repositoryChangeStatus(change)">
+                    {{ repositoryChangeStatus(change) }}
+                  </b>
+                  <span>{{ change.path }}</span>
+                  @if (change.preExisting) {
+                    <i>{{ 'git.preExisting' | t }}</i>
+                  }
+                </button>
+              } @empty {
+                <p class="git-session-clean">
+                  <app-icon name="check" [size]="13" />{{ 'git.clean' | t }}
+                </p>
+              }
+              @if (changeCount() > recentCodeChanges().length) {
+                <button type="button" class="git-session-more" (click)="gitRequested.emit()">
+                  {{ 'git.moreChanges' | t: { count: changeCount() - recentCodeChanges().length } }}
+                </button>
+              }
+            </div>
+          </div>
+        }
+      </section>
+    }
+
+    <!-- 供应商余量 -->
+    <section class="collapsible">
+      <button
+        type="button"
+        class="section-toggle"
+        [attr.aria-expanded]="isOpen('quota')"
+        [attr.data-section]="'quota'"
+        (click)="toggleSection('quota')"
+      >
+        <app-icon name="chevron-down" [size]="14" class="chevron" [class.open]="isOpen('quota')" />
+        <span class="section-title">{{ 'quota.title' | t }}</span>
+        @if (overviewQuota(); as quota) {
+          <span class="section-count" [class.alerting]="quota.alerting"
+            >{{ quota.remaining }}%</span
+          >
+        }
+      </button>
+      @if (isOpen('quota')) {
+        <div class="section-body quota-panel">
+          <div class="quota-actions">
+            <button
+              type="button"
+              class="quota-scope-toggle"
+              [attr.aria-pressed]="showAllQuotas()"
+              (click)="toggleQuotaScope()"
+            >
+              {{ (showAllQuotas() ? 'quota.showCurrent' : 'quota.showAll') | t }}
+            </button>
+            <button
+              type="button"
+              class="quota-refresh"
+              [class.busy]="quotaLoading()"
+              [disabled]="quotaLoading()"
+              (click)="refreshQuotas.emit()"
+            >
+              <app-icon name="refresh" [size]="12" />
+              {{ (quotaLoading() ? 'quota.refreshing' : 'quota.refresh') | t }}
+            </button>
+          </div>
+          @for (row of quotaRows(); track row.quota.profileId) {
+            <article class="quota-row">
+              <header>
+                <strong>{{ row.quota.profileName }}</strong>
+                @if (!row.quota.official) {
+                  <span class="quota-unofficial">{{ 'quota.unofficial' | t }}</span>
+                }
+              </header>
+              @for (line of row.entries; track line.entry.label) {
+                <div class="quota-entry" [class.alerting]="line.alerting">
+                  <div class="quota-entry-head">
+                    <span class="quota-entry-label">{{ line.entry.label }}</span>
+                    <span class="quota-entry-amount">
+                      <small>{{ 'quota.remaining' | t }}</small>
+                      <b>{{ formatAmount(line.entry, line.entry.remaining) }}</b>
+                    </span>
+                  </div>
+                  @if (line.entry.percent !== undefined) {
+                    <div
+                      class="quota-meter"
+                      role="progressbar"
+                      aria-valuemin="0"
+                      aria-valuemax="100"
+                      [attr.aria-label]="line.entry.label"
+                      [attr.aria-valuenow]="meterValue(line.entry.percent)"
+                    >
+                      <span [style.width.%]="meterValue(line.entry.percent)"></span>
+                    </div>
+                  }
+                  <div class="quota-entry-meta">
+                    <small>
+                      @if (line.entry.percent !== undefined) {
+                        {{ usedLabel(line.entry.percent) }}
+                      }
+                      @if (line.entry.percent !== undefined && line.entry.total !== undefined) {
+                        ·
+                      }
+                      @if (line.entry.total !== undefined) {
+                        {{ 'quota.of' | t }} {{ formatAmount(line.entry, line.entry.total) }}
+                      }
+                    </small>
+                    @if (line.entry.resetsAt) {
+                      <small class="quota-reset" [title]="resetTooltip(line.entry.resetsAt)">
+                        <app-icon name="history" [size]="11" />
+                        {{ resetLabel(line.entry.resetsAt) }}
+                      </small>
+                    }
+                  </div>
+                </div>
+              }
+              @if (row.quota.diagnostic) {
+                <small class="quota-unavailable">{{ row.quota.diagnostic }}</small>
+              } @else {
+                <small class="quota-checked"
+                  >{{ 'quota.checkedAt' | t }} {{ checkedLabel(row.quota.checkedAt) }}</small
+                >
+              }
+            </article>
+          } @empty {
+            <p class="quota-empty">
+              {{ (showAllQuotas() ? 'quota.none' : 'quota.currentNone') | t }}
+            </p>
+          }
+        </div>
+      }
+    </section>
+
+    <!-- 最近活动 -->
+    <section class="collapsible">
+      <button
+        type="button"
+        class="section-toggle"
+        [attr.aria-expanded]="isOpen('activity')"
+        [attr.data-section]="'activity'"
+        (click)="toggleSection('activity')"
+      >
+        <app-icon
+          name="chevron-down"
+          [size]="14"
+          class="chevron"
+          [class.open]="isOpen('activity')"
+        />
+        <span class="section-title">{{ 'inspector.recentActivity' | t }}</span>
+        <span class="section-count">{{ recentEvents().length }}</span>
+      </button>
+      @if (isOpen('activity')) {
+        <div class="section-body">
+          @for (event of recentEvents(); track event.eventKey) {
+            <div
+              class="event-row"
+              [class.attention]="
+                event.eventType === 'approval.required' ||
+                event.eventType === 'user.input.required' ||
+                event.eventType === 'agent.rate_limited'
+              "
+              [class.completed]="event.eventType === 'task.completed'"
+            >
+              <span
+                class="event-icon"
+                [class.success]="
+                  event.eventType === 'tool.completed' || event.eventType === 'task.completed'
+                "
+              >
+                <app-icon
+                  [name]="event.eventType === 'tool.completed' ? 'check' : 'radio'"
+                  [size]="12"
+                />
+              </span>
+              <span>
+                <strong>{{ eventLabel(event) }}</strong>
+                <small>{{ eventDetail(event) }}</small>
+                <time [attr.datetime]="event.createdAt">{{ eventTime(event) }}</time>
+              </span>
+            </div>
+          } @empty {
+            <p class="inline-empty">{{ 'inspector.noEvents' | t }}</p>
+          }
+        </div>
       }
     </section>
   </div>

@@ -24,6 +24,8 @@ const OUTPUT_TAIL_LIMIT = 1_200;
 const TERMINAL_ENDED_ERROR = 'Agent 终端已结束，请检查终端输出后重试。';
 const TERMINAL_MISSING_ERROR = '关联终端不存在或已关闭，可重试以恢复原会话。';
 const PROMPT_INTERRUPTED_ERROR = '任务指令未送达终端，请重新发送。';
+/** Terminal states that end a run for good, which a stopped task still has to hear about. */
+const TERMINAL_GONE_STATUSES: readonly TerminalStatus[] = ['FAILED', 'STOPPED', 'DISCONNECTED'];
 
 function createTodoId(prefix: string): string {
   return `${prefix}-${createId()}`;
@@ -261,7 +263,34 @@ export class TodoService {
    * longer has. The native session is kept, so the next attempt resumes the same transcript.
    * Interrupting the agent itself belongs to whoever owns the terminal, not to the board.
    */
+  /**
+   * Halts a run without throwing away what it was bound to.
+   *
+   * The terminal, its session and the captured output all stay, so the user can pick the same run
+   * up again or hand it back to 待办 afterwards. Stopping used to be the same act as discarding the
+   * attempt, which left no way to interrupt an agent and then think about it.
+   */
   stopExecution(taskId: string): TodoTask | null {
+    const located = this.findTask(taskId);
+    if (!located || located.task.stage !== 'executing') return null;
+    const task: TodoTask = {
+      ...located.task,
+      executionState: 'stopped',
+      promptDeliveryState: 'idle',
+      lastError: undefined,
+      updatedAt: Date.now(),
+    };
+    this.replaceTask(located.snapshot, task);
+    return task;
+  }
+
+  /**
+   * Drops the current run and puts the task back in 待办.
+   *
+   * Everything describing the attempt goes with it — terminal, output, timings — because the next
+   * run starts the task from the beginning rather than continuing this one.
+   */
+  returnToBacklog(taskId: string): TodoTask | null {
     const located = this.findTask(taskId);
     if (!located || located.task.stage !== 'executing') return null;
     const task: TodoTask = {
@@ -276,6 +305,30 @@ export class TodoService {
       lastError: undefined,
       startedAt: undefined,
       completedAt: undefined,
+      updatedAt: Date.now(),
+    };
+    this.replaceTask(located.snapshot, task);
+    return task;
+  }
+
+  /**
+   * Records instructions added to a run that is already under way.
+   *
+   * Editing a task mid-run only ever changed the board: the agent had been told the old wording and
+   * never heard the new one. This keeps the task and the agent saying the same thing, and unlike a
+   * retry it is not a new attempt — the same run simply learns more.
+   */
+  amendExecution(request: TodoContinuationRequest): TodoTask | null {
+    const located = this.findTask(request.taskId);
+    const feedback = request.feedback.trim();
+    if (!located || located.task.stage !== 'executing' || !feedback) return null;
+    const task: TodoTask = {
+      ...located.task,
+      description: request.description.trim(),
+      acceptanceCriteria: request.acceptanceCriteria.trim(),
+      promptDeliveryState: 'pending',
+      promptDeliveredAt: undefined,
+      lastError: undefined,
       updatedAt: Date.now(),
     };
     this.replaceTask(located.snapshot, task);
@@ -392,6 +445,13 @@ export class TodoService {
   handleTerminalStatus(terminalId: string, status: TerminalStatus): void {
     const located = this.findTaskByTerminal(terminalId);
     if (!located || located.task.stage === 'completed' || located.task.stage === 'verified') return;
+    // A run the user stopped keeps that state. An interrupted agent usually prints a little more
+    // before it settles, and letting that traffic report "running" again would erase the stop the
+    // user just asked for. A terminal that actually went away still counts, because it decides
+    // whether the run can be resumed at all.
+    if (located.task.executionState === 'stopped' && !TERMINAL_GONE_STATUSES.includes(status)) {
+      return;
+    }
     this.replaceTask(
       located.snapshot,
       this.taskWithTerminalStatus(located.task, status, Date.now()),

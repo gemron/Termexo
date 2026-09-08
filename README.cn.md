@@ -11,7 +11,7 @@
 </p>
 
 <p align="center">
-  <img alt="Version 0.8.2" src="https://img.shields.io/badge/version-0.8.2-58c7a0">
+  <img alt="Version 0.8.3" src="https://img.shields.io/badge/version-0.8.3-58c7a0">
   <img alt="Windows" src="https://img.shields.io/badge/platform-Windows-0078D4?logo=windows">
   <img alt="Tauri 2" src="https://img.shields.io/badge/Tauri-2-24C8DB?logo=tauri&logoColor=white">
   <img alt="Angular 22" src="https://img.shields.io/badge/Angular-22-DD0031?logo=angular">
@@ -35,7 +35,7 @@ Agent 等着授权时，人在哪里都能回它一句。
 npx termexo@latest
 ```
 
-> 当前版本为 **V0.8.2**。
+> 当前版本为 **V0.8.3**。
 
 ![Termexo 多终端网格工作台](website/assets/termexo-workbench.png)
 
@@ -120,6 +120,22 @@ SQLite，密钥保存在 Windows Credential Manager，Claude/Codex 历史会话�
 
 界面支持简体中文、英语、西班牙语、法语、德语、日语和韩语。默认自动跟随 Windows
 系统语言，也可通过主工具栏手动切换并跨重启保留选择。
+
+## V0.8.3 新增
+
+- **Agent 忙时打字不再卡**：此前所有同步后端命令都跑在同一条 IPC 线程上，每 3 秒一次的 Git 轮询
+  （每次约半秒）和每秒一次的事件同步会排在按键前面，按键因此成批冒出来。这些命令现在改到线程池
+  执行，`write_terminal`（按键路径）独占 IPC 线程。实测按键延迟 p99 从 514 毫秒降到 19 毫秒。
+- **Git 状态改为监听，不再轮询**：侧栏显示的仓库现在监听文件变化，只在真正有改动时才重新读取，
+  不再每 3 秒读一次。空闲时 Git 开销归零，改动约 1 秒内出现。一条 `git status` 同时拿到 HEAD、
+  分支和工作树，取代原来的三个 git 进程。
+- **Hook 事件不再无限堆积**：事件 spool 和数据库表此前无上限增长，达到几百兆，每次启动都从头
+  重读。现在事件只保留 UI 用到的字段，读取位置跨重启保留，读空的 spool 会被截断，新增索引服务
+  最新优先的查询，超过 30 天的事件会被清理。启动时的事件读取从一秒多降到几毫秒。
+- **任务可中途中止与追加指令**：中止运行中的任务会保留其终端与会话，可继续执行或放回待办；运行
+  中的任务也能通过同一个 Agent 会话追加补充指令，不必等到验收不通过之后。
+- **Agent 状态面板重新归类**：顶部固定一张概览卡，显示当前 Agent 及其余量、变更数、分支、运行数；
+  下方的活动 Agent、会话详情、代码变更、供应商余量、最近活动改成可折叠区块，并记住展开状态。
 
 ## V0.8.2 新增
 

@@ -12,7 +12,7 @@ use crate::database::WorkspaceDatabase;
 use crate::network::{self, NetworkTestResult};
 use crate::system_proxy::{self, SystemProxyDiscovery};
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn list_model_profiles(
     database: State<'_, WorkspaceDatabase>,
     credentials: State<'_, CredentialStore>,
@@ -31,7 +31,7 @@ pub fn list_model_profiles(
     Ok(profiles)
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn save_model_profile(
     input: ModelProfileInput,
     database: State<'_, WorkspaceDatabase>,
@@ -133,7 +133,7 @@ fn trimmed_endpoint(value: Option<String>) -> Option<String> {
         .filter(|value| !value.is_empty())
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn delete_model_profile(
     profile_id: String,
     database: State<'_, WorkspaceDatabase>,
@@ -152,7 +152,7 @@ pub fn delete_model_profile(
         .map_err(|error| error.to_string())
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn list_mcp_profiles(
     database: State<'_, WorkspaceDatabase>,
 ) -> Result<Vec<McpProfile>, String> {
@@ -161,7 +161,7 @@ pub fn list_mcp_profiles(
         .map_err(|error| error.to_string())
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn save_mcp_profile(
     input: McpProfileInput,
     database: State<'_, WorkspaceDatabase>,
@@ -182,7 +182,7 @@ pub fn save_mcp_profile(
     Ok(profile)
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn delete_mcp_profile(
     profile_id: String,
     database: State<'_, WorkspaceDatabase>,
@@ -192,7 +192,7 @@ pub fn delete_mcp_profile(
         .map_err(|error| error.to_string())
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn list_network_profiles(
     database: State<'_, WorkspaceDatabase>,
 ) -> Result<Vec<NetworkProfile>, String> {
@@ -201,12 +201,12 @@ pub fn list_network_profiles(
         .map_err(|error| error.to_string())
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn discover_system_proxy() -> Result<SystemProxyDiscovery, String> {
     system_proxy::discover()
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn save_network_profile(
     input: NetworkProfileInput,
     database: State<'_, WorkspaceDatabase>,
@@ -269,7 +269,7 @@ pub fn save_network_profile(
     Ok(profile)
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn delete_network_profile(
     profile_id: String,
     database: State<'_, WorkspaceDatabase>,
@@ -288,7 +288,7 @@ pub fn delete_network_profile(
         .map_err(|error| error.to_string())
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn list_account_profiles(
     database: State<'_, WorkspaceDatabase>,
 ) -> Result<Vec<AccountProfile>, String> {
@@ -399,7 +399,7 @@ pub async fn copy_account_configuration(
         .map_err(|error| error.to_string())?
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn delete_account_profile(
     profile_id: String,
     database: State<'_, WorkspaceDatabase>,
@@ -451,7 +451,7 @@ pub struct ValidateClaudeProfileRequest {
     pub profile_id: String,
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn validate_claude_profile(
     request: ValidateClaudeProfileRequest,
     database: State<'_, WorkspaceDatabase>,

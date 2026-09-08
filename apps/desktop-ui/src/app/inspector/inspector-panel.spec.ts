@@ -95,11 +95,20 @@ const MODEL_PROFILES: ModelProfile[] = [
   },
 ];
 
+/** Opens a collapsible inspector section by its data hook, if it is not already open. */
+function openSection(root: HTMLElement, key: string): void {
+  const toggle = root.querySelector<HTMLButtonElement>(`[data-section="${key}"]`);
+  if (toggle && toggle.getAttribute('aria-expanded') !== 'true') {
+    toggle.click();
+  }
+}
+
 describe('InspectorPanelComponent provider allowances', () => {
   let fixture: ComponentFixture<InspectorPanelComponent>;
   let root: HTMLElement;
 
   beforeEach(async () => {
+    window.localStorage.clear();
     await TestBed.configureTestingModule({
       imports: [InspectorPanelComponent],
     }).compileComponents();
@@ -111,6 +120,8 @@ describe('InspectorPanelComponent provider allowances', () => {
     fixture.componentRef.setInput('modelProfiles', MODEL_PROFILES);
     fixture.detectChanges();
     await fixture.whenStable();
+    openSection(root, 'quota');
+    fixture.detectChanges();
   });
 
   it('uses the model profile allowance for a third-party model', () => {
@@ -175,6 +186,7 @@ describe('InspectorPanelComponent provider allowances', () => {
         },
       ],
       commits: [],
+      watched: false,
     };
     let requested = false;
     fixture.componentInstance.gitRequested.subscribe(() => (requested = true));
@@ -207,6 +219,8 @@ describe('InspectorPanelComponent provider allowances', () => {
     fixture.componentRef.setInput('events', [event]);
     fixture.detectChanges();
     await fixture.whenStable();
+    openSection(root, 'activity');
+    fixture.detectChanges();
 
     expect(root.querySelector('.event-row strong')?.textContent?.trim()).toBe('OpenCode 正在思考');
   });
@@ -237,9 +251,12 @@ describe('InspectorPanelComponent allowance reset countdown', () => {
     ] satisfies ProviderQuota[]);
     fixture.detectChanges();
     await fixture.whenStable();
+    openSection(root, 'quota');
+    fixture.detectChanges();
   }
 
   beforeEach(async () => {
+    window.localStorage.clear();
     await TestBed.configureTestingModule({
       imports: [InspectorPanelComponent],
     }).compileComponents();

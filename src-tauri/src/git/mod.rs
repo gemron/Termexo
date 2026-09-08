@@ -1,3 +1,5 @@
+pub mod watch;
+
 use std::collections::{HashMap, HashSet};
 use std::fs::{self, File};
 use std::hash::{DefaultHasher, Hash, Hasher};
@@ -64,6 +66,8 @@ pub struct RepositoryOverview {
     pub history_rewritten: bool,
     pub changes: Vec<RepositoryChange>,
     pub commits: Vec<RepositoryCommit>,
+    /// Whether the backend is watching this repository, so the UI can stop polling for it.
+    pub watched: bool,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -101,9 +105,28 @@ pub struct RepositoryDiff {
     pub truncated: bool,
 }
 
+/// What a session's overview derives from HEAD alone. The poll runs every few seconds while
+/// HEAD moves once per commit, so this is computed on a change of HEAD and reused until the next.
+#[derive(Clone)]
+struct HeadDerived {
+    history_rewritten: bool,
+    committed_changes: Vec<RepositoryChange>,
+    /// Kept at `MAX_COMMIT_LIMIT` so one entry serves whatever limit a caller asks for.
+    commits: Vec<RepositoryCommit>,
+}
+
+struct DerivedEntry {
+    head: Option<String>,
+    value: HeadDerived,
+}
+
 #[derive(Default)]
 pub struct RepositoryManager {
     baselines: Mutex<HashMap<SessionKey, Arc<SessionBaseline>>>,
+    /// Directory → repository root. Resolving it costs a `git rev-parse`, and on a machine where
+    /// starting git takes 150 ms that was a fifth of every poll for an answer that never changes.
+    roots: Mutex<HashMap<PathBuf, PathBuf>>,
+    derived: Mutex<HashMap<SessionKey, DerivedEntry>>,
 }
 
 impl RepositoryManager {
@@ -200,6 +223,85 @@ impl RepositoryManager {
         if let Ok(mut baselines) = self.baselines.lock() {
             baselines.retain(|key, _| key.terminal_id != terminal_id);
         }
+        if let Ok(mut derived) = self.derived.lock() {
+            derived.retain(|key, _| key.terminal_id != terminal_id);
+        }
+    }
+
+    /// The repository root for a directory, resolved through git once and remembered after.
+    fn cached_repository_root(&self, directory: &Path) -> Result<Option<PathBuf>, String> {
+        if let Ok(roots) = self.roots.lock() {
+            if let Some(root) = roots.get(directory) {
+                return Ok(Some(root.clone()));
+            }
+        }
+        let root = repository_root(directory)?;
+        if let (Some(root), Ok(mut roots)) = (root.as_ref(), self.roots.lock()) {
+            roots.insert(directory.to_path_buf(), root.clone());
+        }
+        Ok(root)
+    }
+
+    /// Drops a remembered root after git failed there, so the next poll resolves it afresh.
+    fn forget_repository_root(&self, directory: &Path) {
+        if let Ok(mut roots) = self.roots.lock() {
+            roots.remove(directory);
+        }
+    }
+
+    /// Everything the overview derives from HEAD, from the cache while HEAD has not moved.
+    ///
+    /// A miss costs up to four git processes (ancestry, session commits, committed changes, the
+    /// log); a hit costs nothing, and hits are the normal case between commits.
+    #[allow(clippy::too_many_arguments)]
+    fn head_derived(
+        &self,
+        key: SessionKey,
+        root: &Path,
+        baseline_head: Option<&str>,
+        head: Option<&str>,
+        has_baseline: bool,
+        pre_existing: &HashSet<String>,
+    ) -> Result<HeadDerived, String> {
+        if let Ok(derived) = self.derived.lock() {
+            if let Some(entry) = derived.get(&key) {
+                if entry.head.as_deref() == head {
+                    return Ok(entry.value.clone());
+                }
+            }
+        }
+        let history_rewritten = match (baseline_head, head) {
+            (Some(base), Some(current)) if base != current => !is_ancestor(root, base, current),
+            _ => false,
+        };
+        let session_oids = if history_rewritten || !has_baseline {
+            HashSet::new()
+        } else {
+            commits_since(root, baseline_head, head)?
+        };
+        let committed_changes = match (baseline_head, head) {
+            (Some(base), Some(current)) => committed_changes(root, base, current, pre_existing)?,
+            (None, Some(current)) if has_baseline => {
+                initial_commit_changes(root, current, pre_existing)?
+            }
+            _ => Vec::new(),
+        };
+        let commits = collect_commits(root, MAX_COMMIT_LIMIT, &session_oids)?;
+        let value = HeadDerived {
+            history_rewritten,
+            committed_changes,
+            commits,
+        };
+        if let Ok(mut derived) = self.derived.lock() {
+            derived.insert(
+                key,
+                DerivedEntry {
+                    head: head.map(str::to_owned),
+                    value: value.clone(),
+                },
+            );
+        }
+        Ok(value)
     }
 
     pub fn overview(
@@ -209,29 +311,42 @@ impl RepositoryManager {
         commit_limit: Option<usize>,
     ) -> Result<RepositoryOverview, String> {
         let (directory, baseline) = self.resolve_target(target, database)?;
-        let Some(root) = repository_root(&directory)? else {
+        let Some(root) = self.cached_repository_root(&directory)? else {
             return Ok(unavailable_overview("当前终端目录不是 Git 工作树。"));
         };
-        let head = current_head(&root)?;
         let baseline = baseline.filter(|item| {
             item.root == root || (item.repository_missing_at_start && root.starts_with(&item.root))
         });
-        let baseline_head = baseline.as_ref().and_then(|item| item.head.clone());
-        let current_head_value = head.as_deref();
-        let history_rewritten = match (baseline_head.as_deref(), current_head_value) {
-            (Some(base), Some(current)) if base != current => !is_ancestor(&root, base, current),
-            _ => false,
-        };
-        let session_oids = if history_rewritten || baseline.is_none() {
-            HashSet::new()
-        } else {
-            commits_since(&root, baseline_head.as_deref(), current_head_value)?
-        };
-        let pre_existing = baseline
+        let pre_existing: HashSet<String> = baseline
             .as_ref()
             .map(|item| item.dirty_files.keys().cloned().collect())
             .unwrap_or_default();
-        let mut changes = collect_worktree_changes(&root, &pre_existing)?;
+
+        // One process where there were three: HEAD, the branch and the working tree all come
+        // out of a single porcelain v2 status.
+        let status = match collect_status_snapshot(&root, &pre_existing) {
+            Ok(status) => status,
+            Err(error) => {
+                // The repository may have moved or gone; the next poll resolves it afresh.
+                self.forget_repository_root(&directory);
+                return Err(error);
+            }
+        };
+        let head = status.head;
+        let baseline_head = baseline.as_ref().and_then(|item| item.head.clone());
+        let derived = self.head_derived(
+            SessionKey {
+                terminal_id: target.terminal_id.clone(),
+                runtime_revision: target.runtime_revision,
+            },
+            &root,
+            baseline_head.as_deref(),
+            head.as_deref(),
+            baseline.is_some(),
+            &pre_existing,
+        )?;
+
+        let mut changes = status.changes;
         if let Some(baseline) = baseline.as_ref() {
             if baseline.snapshot_truncated {
                 changes.clear();
@@ -239,23 +354,13 @@ impl RepositoryManager {
                 retain_session_worktree_changes(&root, baseline, &mut changes);
             }
         }
-        match (baseline_head.as_deref(), current_head_value) {
-            (Some(base), Some(current)) => {
-                merge_committed_changes(&root, base, current, &pre_existing, &mut changes)?;
-            }
-            (None, Some(current)) if baseline.is_some() => {
-                merge_initial_commit_changes(&root, current, &pre_existing, &mut changes)?;
-            }
-            _ => {}
-        }
+        merge_change_sets(derived.committed_changes, &mut changes);
         changes.sort_by(|left, right| left.path.cmp(&right.path));
 
-        let (branch, detached) = current_branch(&root, current_head_value)?;
         let limit = commit_limit
             .unwrap_or(DEFAULT_COMMIT_LIMIT)
             .clamp(1, MAX_COMMIT_LIMIT);
-        let commits = collect_commits(&root, limit, &session_oids)?;
-        let mut diagnostic: String = if history_rewritten {
+        let mut diagnostic: String = if derived.history_rewritten {
             "当前 HEAD 已不再包含会话启动时的提交，变更列表仍按两个版本比较。".into()
         } else if baseline.is_some() {
             "显示当前终端会话启动以来的仓库差异。".into()
@@ -272,14 +377,15 @@ impl RepositoryManager {
             available: true,
             diagnostic,
             root: root.to_string_lossy().into_owned(),
-            branch,
-            detached,
+            branch: status.branch,
+            detached: status.detached,
             head,
             baseline_head,
             baseline_captured: baseline.is_some(),
-            history_rewritten,
+            history_rewritten: derived.history_rewritten,
             changes,
-            commits,
+            commits: derived.commits.into_iter().take(limit).collect(),
+            watched: false,
         })
     }
 
@@ -394,6 +500,7 @@ fn unavailable_overview(diagnostic: &str) -> RepositoryOverview {
         history_rewritten: false,
         changes: Vec::new(),
         commits: Vec::new(),
+        watched: false,
     }
 }
 
@@ -441,15 +548,135 @@ fn current_head(root: &Path) -> Result<Option<String>, String> {
     }
 }
 
-fn current_branch(root: &Path, head: Option<&str>) -> Result<(String, bool), String> {
-    match run_git(root, &["symbolic-ref", "--quiet", "--short", "HEAD"]) {
-        Ok(output) => Ok((clean_output(&output), false)),
-        Err(_) => Ok((
-            head.map(|value| format!("detached@{}", &value[..value.len().min(8)]))
+/// HEAD, branch and working tree as one `git status --porcelain=v2 --branch` reports them.
+struct StatusSnapshot {
+    head: Option<String>,
+    branch: String,
+    detached: bool,
+    changes: Vec<RepositoryChange>,
+}
+
+fn collect_status_snapshot(
+    root: &Path,
+    pre_existing: &HashSet<String>,
+) -> Result<StatusSnapshot, String> {
+    let output = run_git(
+        root,
+        &[
+            "status",
+            "--porcelain=v2",
+            "--branch",
+            "-z",
+            "--untracked-files=all",
+        ],
+    )?;
+    parse_porcelain_v2_status(&output, pre_existing)
+}
+
+const INVALID_STATUS_OUTPUT: &str = "Git 状态输出格式无效。";
+
+/// Parses porcelain v2 with `-z`: header lines carry HEAD and the branch, entries carry a fixed
+/// number of space-separated fields before a path that may itself contain spaces.
+fn parse_porcelain_v2_status(
+    output: &[u8],
+    pre_existing: &HashSet<String>,
+) -> Result<StatusSnapshot, String> {
+    let records: Vec<&[u8]> = output.split(|byte| *byte == 0).collect();
+    let mut head = None;
+    let mut branch_head: Option<String> = None;
+    let mut changes = Vec::new();
+    let mut index = 0;
+    while index < records.len() {
+        let record = records[index];
+        index += 1;
+        if record.is_empty() {
+            continue;
+        }
+        if let Some(value) = record.strip_prefix(b"# branch.oid ") {
+            let value = String::from_utf8_lossy(value).into_owned();
+            head = (value != "(initial)").then_some(value);
+            continue;
+        }
+        if let Some(value) = record.strip_prefix(b"# branch.head ") {
+            branch_head = Some(String::from_utf8_lossy(value).into_owned());
+            continue;
+        }
+        if record.starts_with(b"# ") {
+            continue;
+        }
+        let kind = record[0];
+        let (index_status, worktree_status, path, old_path) = match kind {
+            b'1' | b'2' | b'u' => {
+                if record.len() < 4 {
+                    return Err(INVALID_STATUS_OUTPUT.into());
+                }
+                let fields_before_path = match kind {
+                    b'1' => 8,
+                    b'2' => 9,
+                    _ => 10,
+                };
+                let path = field_rest(record, fields_before_path)?;
+                let old_path = if kind == b'2' {
+                    let value = records
+                        .get(index)
+                        .ok_or_else(|| "Git 重命名状态不完整。".to_owned())?;
+                    index += 1;
+                    Some(String::from_utf8_lossy(value).into_owned())
+                } else {
+                    None
+                };
+                (record[2] as char, record[3] as char, path, old_path)
+            }
+            b'?' => (
+                '?',
+                '?',
+                String::from_utf8_lossy(record.get(2..).unwrap_or_default()).into_owned(),
+                None,
+            ),
+            b'!' => continue,
+            _ => return Err(INVALID_STATUS_OUTPUT.into()),
+        };
+        let is_pre_existing = pre_existing.contains(&path)
+            || old_path
+                .as_ref()
+                .is_some_and(|old_path| pre_existing.contains(old_path));
+        changes.push(RepositoryChange {
+            path,
+            old_path,
+            index_status: normalized_status(index_status),
+            worktree_status: normalized_status(worktree_status),
+            untracked: index_status == '?' && worktree_status == '?',
+            committed: false,
+            pre_existing: is_pre_existing,
+        });
+    }
+    let (branch, detached) = match branch_head.as_deref() {
+        Some(name) if name != "(detached)" => (name.to_owned(), false),
+        _ => (
+            head.as_deref()
+                .map(|value| format!("detached@{}", &value[..value.len().min(8)]))
                 .unwrap_or_else(|| "未提交分支".into()),
             head.is_some(),
-        )),
+        ),
+    };
+    Ok(StatusSnapshot {
+        head,
+        branch,
+        detached,
+        changes,
+    })
+}
+
+/// The remainder of a record after `skip` space-separated fields.
+fn field_rest(record: &[u8], skip: usize) -> Result<String, String> {
+    let mut position = 0;
+    for _ in 0..skip {
+        match record[position..].iter().position(|byte| *byte == b' ') {
+            Some(offset) => position += offset + 1,
+            None => return Err(INVALID_STATUS_OUTPUT.into()),
+        }
     }
+    Ok(String::from_utf8_lossy(&record[position..]).into_owned())
 }
 
 fn collect_worktree_changes(
@@ -509,22 +736,22 @@ fn parse_porcelain_status(
 }
 
 fn normalized_status(value: char) -> String {
-    if value == ' ' || value == '?' {
+    // v1 marks "unchanged" with a space, v2 with a dot; neither is a status worth showing.
+    if value == ' ' || value == '?' || value == '.' {
         String::new()
     } else {
         value.to_string()
     }
 }
 
-fn merge_committed_changes(
+fn committed_changes(
     root: &Path,
     base: &str,
     current: &str,
     pre_existing: &HashSet<String>,
-    changes: &mut Vec<RepositoryChange>,
-) -> Result<(), String> {
+) -> Result<Vec<RepositoryChange>, String> {
     if base == current {
-        return Ok(());
+        return Ok(Vec::new());
     }
     let output = run_git(
         root,
@@ -538,18 +765,16 @@ fn merge_committed_changes(
             current,
         ],
     )?;
-    merge_change_sets(parse_name_status(&output, pre_existing)?, changes);
-    Ok(())
+    parse_name_status(&output, pre_existing)
 }
 
-fn merge_initial_commit_changes(
+fn initial_commit_changes(
     root: &Path,
     current: &str,
     pre_existing: &HashSet<String>,
-    changes: &mut Vec<RepositoryChange>,
-) -> Result<(), String> {
+) -> Result<Vec<RepositoryChange>, String> {
     let empty_tree = clean_output(&run_git(root, &["mktree"])?);
-    merge_committed_changes(root, &empty_tree, current, pre_existing, changes)
+    committed_changes(root, &empty_tree, current, pre_existing)
 }
 
 fn merge_change_sets(committed: Vec<RepositoryChange>, changes: &mut Vec<RepositoryChange>) {
@@ -879,6 +1104,65 @@ mod tests {
             "termexo-git-session-{}-{unique}",
             std::process::id()
         ))
+    }
+
+    #[test]
+    fn parses_porcelain_v2_with_branch_header_rename_and_untracked_file() {
+        let output = [
+            "# branch.oid 62cdf9dd62b128045ec8c692378d7726d2bf8e4c",
+            "# branch.head main",
+            "# branch.upstream origin/main",
+            "# branch.ab +0 -0",
+            "1 .M N... 100644 100644 100644 8a1f 8a1f apps/desktop-ui/src/app/app.html",
+            "1 M. N... 100644 100644 100644 8a1f 8a1f docs/with space.md",
+            "2 R. N... 100644 100644 100644 8a1f 8a1f R100 src/new.rs",
+            "src/old.rs",
+            "? scratch/notes.txt",
+        ]
+        .join("\0");
+        let snapshot =
+            parse_porcelain_v2_status(output.as_bytes(), &HashSet::from(["src/old.rs".into()]))
+                .unwrap();
+
+        assert_eq!(
+            snapshot.head.as_deref(),
+            Some("62cdf9dd62b128045ec8c692378d7726d2bf8e4c")
+        );
+        assert_eq!(snapshot.branch, "main");
+        assert!(!snapshot.detached);
+        assert_eq!(snapshot.changes.len(), 4);
+        let by_path = |path: &str| snapshot.changes.iter().find(|c| c.path == path).unwrap();
+        assert_eq!(
+            by_path("apps/desktop-ui/src/app/app.html").worktree_status,
+            "M"
+        );
+        assert_eq!(by_path("apps/desktop-ui/src/app/app.html").index_status, "");
+        assert_eq!(by_path("docs/with space.md").index_status, "M");
+        let renamed = by_path("src/new.rs");
+        assert_eq!(renamed.old_path.as_deref(), Some("src/old.rs"));
+        assert!(renamed.pre_existing);
+        assert!(by_path("scratch/notes.txt").untracked);
+    }
+
+    #[test]
+    fn parses_porcelain_v2_detached_and_initial_heads() {
+        let detached = parse_porcelain_v2_status(
+            "# branch.oid 62cdf9dd62b128045ec8c692378d7726d2bf8e4c\0# branch.head (detached)\0"
+                .as_bytes(),
+            &HashSet::new(),
+        )
+        .unwrap();
+        assert!(detached.detached);
+        assert_eq!(detached.branch, "detached@62cdf9dd");
+
+        let initial = parse_porcelain_v2_status(
+            "# branch.oid (initial)\0# branch.head main\0".as_bytes(),
+            &HashSet::new(),
+        )
+        .unwrap();
+        assert!(initial.head.is_none());
+        assert_eq!(initial.branch, "main");
+        assert!(!initial.detached);
     }
 
     #[test]

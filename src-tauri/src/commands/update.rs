@@ -9,7 +9,7 @@ pub async fn check_for_update(app: AppHandle) -> Result<UpdateCheck, String> {
 }
 
 /// Opens the release page in the default browser so the user can download the new version.
-#[tauri::command]
+#[tauri::command(async)]
 pub fn open_release_page(url: Option<String>) -> Result<(), String> {
     let target = url.unwrap_or_else(|| update::RELEASES_PAGE.to_owned());
     // Only the project's own release pages are ever opened, so a caller cannot turn this into
@@ -26,7 +26,7 @@ pub fn open_release_page(url: Option<String>) -> Result<(), String> {
 /// install would fail partway and could leave a broken copy. A detached helper waits for the
 /// process to exit first, which is why the app closes as part of this command.
 #[cfg(windows)]
-#[tauri::command]
+#[tauri::command(async)]
 pub fn update_via_npm(app: AppHandle) -> Result<(), String> {
     use std::os::windows::process::CommandExt;
     use std::process::{Command, Stdio};
@@ -73,7 +73,7 @@ pub fn update_via_npm(app: AppHandle) -> Result<(), String> {
 }
 
 #[cfg(not(windows))]
-#[tauri::command]
+#[tauri::command(async)]
 pub fn update_via_npm(_app: AppHandle) -> Result<(), String> {
     Err("当前平台不支持自动更新。".into())
 }

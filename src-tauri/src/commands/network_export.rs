@@ -81,7 +81,7 @@ impl From<&NetworkProfile> for ExportedNetworkProfile {
 ///
 /// Returns pretty JSON so the file stays reviewable — a user should be able to read exactly
 /// what is leaving their machine before sharing it.
-#[tauri::command]
+#[tauri::command(async)]
 pub fn export_network_profiles(
     profile_id: Option<String>,
     database: State<'_, WorkspaceDatabase>,
@@ -114,7 +114,7 @@ pub fn export_network_profiles(
 /// Writes the export to `path`.
 ///
 /// The frontend picks the path through the save dialog, so this only has to persist the bytes.
-#[tauri::command]
+#[tauri::command(async)]
 pub fn write_network_profile_export(path: String, contents: String) -> Result<(), String> {
     std::fs::write(&path, contents).map_err(|error| format!("写入导出文件失败：{error}"))
 }
@@ -163,7 +163,7 @@ pub struct ImportSummary {
 /// Imported profiles are always created as new records with fresh ids rather than overwriting
 /// by name: a file from a colleague must never silently replace a working local configuration.
 /// Nothing is marked default either, since that would change which proxy the agents use.
-#[tauri::command]
+#[tauri::command(async)]
 pub fn import_network_profiles(
     path: String,
     database: State<'_, WorkspaceDatabase>,

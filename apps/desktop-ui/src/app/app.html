@@ -522,7 +522,10 @@
               [awaitingTerminalIds]="agentStartup.awaitingTerminalIds()"
               (executionRequested)="executeTodoTask($event)"
               (stopRequested)="stopTodoTask($event)"
+              (resumeRequested)="resumeTodoTask($event)"
+              (backlogRequested)="returnTodoTaskToBacklog($event)"
               (continuationRequested)="continueTodoTask($event)"
+              (amendRequested)="amendTodoTask($event)"
               (terminalRequested)="openTodoTerminal($event)"
               (terminalCloseRequested)="closeTodoTerminal($event)"
             />

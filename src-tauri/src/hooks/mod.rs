@@ -2,6 +2,7 @@ use std::env;
 use std::fs::{self, File, OpenOptions};
 use std::io::{BufRead, BufReader, Read, Seek, SeekFrom, Write};
 use std::path::{Path, PathBuf};
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Mutex;
 use std::time::{SystemTime, UNIX_EPOCH};
 
@@ -79,20 +80,58 @@ struct StoredHookEvent {
     payload: Value,
 }
 
+/// Below this the spool is left alone: truncating a small file buys nothing.
+const SPOOL_COMPACT_THRESHOLD_BYTES: u64 = 4 * 1024 * 1024;
+
+/// Fields the UI reads out of an event's detail; everything else the hook sent is dropped.
+///
+/// A Claude hook payload carries the whole `tool_input` — the command being run, the file being
+/// written, the prompt — which averaged 6 KB per event and made the spool, the database and every
+/// IPC batch haul data that nothing displays. The inspector reads a handful of short fields, so an
+/// event keeps only those and stays well under a kilobyte.
+const DETAIL_FIELDS: [&str; 12] = [
+    "tool_name",
+    "notification_type",
+    "error_details",
+    "error",
+    "message",
+    "source",
+    "hook_event_name",
+    "type",
+    "event_type",
+    "model",
+    "session_title",
+    "stop_reason",
+];
+
+/// Longest string kept in a detail field; an error dump past this is cut rather than carried.
+const DETAIL_VALUE_LIMIT: usize = 512;
+
 pub struct HookEventStore {
     event_file: PathBuf,
+    /// Where the read position survives a restart, so the spool is never re-read from byte zero.
+    cursor_file: PathBuf,
     runtime_directory: PathBuf,
     cursor: Mutex<u64>,
+    /// Whether this process has had its one chance to truncate a fully-drained spool.
+    compacted: AtomicBool,
 }
 
 impl HookEventStore {
     pub fn new(app_data_directory: &Path) -> Result<Self, HookError> {
         let runtime_directory = app_data_directory.join("runtime");
         fs::create_dir_all(&runtime_directory)?;
+        let cursor_file = app_data_directory.join("claude-hook-events.cursor");
+        let cursor = fs::read_to_string(&cursor_file)
+            .ok()
+            .and_then(|value| value.trim().parse::<u64>().ok())
+            .unwrap_or(0);
         Ok(Self {
             event_file: app_data_directory.join("claude-hook-events.jsonl"),
+            cursor_file,
             runtime_directory,
-            cursor: Mutex::new(0),
+            cursor: Mutex::new(cursor),
+            compacted: AtomicBool::new(false),
         })
     }
 
@@ -250,6 +289,7 @@ impl HookEventStore {
         if *cursor > file_length {
             *cursor = 0;
         }
+        let started_at = *cursor;
 
         let mut reader = BufReader::new(file);
         reader.seek(SeekFrom::Start(*cursor))?;
@@ -272,7 +312,38 @@ impl HookEventStore {
             line.clear();
         }
 
+        if *cursor != started_at {
+            self.persist_cursor(*cursor)?;
+        }
         Ok(events)
+    }
+
+    /// Truncates a spool whose every event is already in the database, at most once per process.
+    ///
+    /// The spool is a transport between the hook CLI and this process, not a record: once its
+    /// events are saved it is dead weight, and it used to grow without bound — into hundreds of
+    /// megabytes that every restart parsed again from byte zero. Called after the batch is saved
+    /// and only when the cursor sits at the end of the file. At startup that is also the moment no
+    /// hook can be writing, because the terminals have not been restored yet.
+    pub fn compact_spool_once(&self) -> Result<(), HookError> {
+        if self.compacted.swap(true, Ordering::SeqCst) {
+            return Ok(());
+        }
+        let mut cursor = self.cursor.lock().map_err(|_| HookError::LockPoisoned)?;
+        let Ok(metadata) = fs::metadata(&self.event_file) else {
+            return Ok(());
+        };
+        if *cursor != metadata.len() || metadata.len() < SPOOL_COMPACT_THRESHOLD_BYTES {
+            return Ok(());
+        }
+        File::create(&self.event_file)?;
+        *cursor = 0;
+        self.persist_cursor(*cursor)
+    }
+
+    fn persist_cursor(&self, cursor: u64) -> Result<(), HookError> {
+        fs::write(&self.cursor_file, cursor.to_string())?;
+        Ok(())
     }
 }
 
@@ -386,9 +457,37 @@ fn map_hook_event(stored: StoredHookEvent) -> AgentEvent {
             .map(str::to_owned),
         terminal_id: stored.terminal_id,
         event_type: event_type.into(),
-        detail: stored.payload,
+        detail: compact_detail(&stored.payload),
         created_at: stored.received_at,
     }
+}
+
+/// Keeps only what the UI reads from a hook payload, with long strings cut short.
+fn compact_detail(payload: &Value) -> Value {
+    let Some(object) = payload.as_object() else {
+        return Value::Null;
+    };
+    let mut compact = serde_json::Map::new();
+    for key in DETAIL_FIELDS {
+        if let Some(value) = object.get(key) {
+            compact.insert(key.into(), truncate_detail_value(value));
+        }
+    }
+    Value::Object(compact)
+}
+
+fn truncate_detail_value(value: &Value) -> Value {
+    let Some(text) = value.as_str() else {
+        return value.clone();
+    };
+    if text.len() <= DETAIL_VALUE_LIMIT {
+        return value.clone();
+    }
+    let mut end = DETAIL_VALUE_LIMIT;
+    while !text.is_char_boundary(end) {
+        end -= 1;
+    }
+    Value::String(format!("{}…", &text[..end]))
 }
 
 fn map_opencode_event(stored: StoredHookEvent) -> AgentEvent {
@@ -407,11 +506,7 @@ fn map_opencode_event(stored: StoredHookEvent) -> AgentEvent {
             .and_then(Value::as_str)
             .unwrap_or("agent.notification")
             .into(),
-        detail: stored
-            .payload
-            .get("detail")
-            .cloned()
-            .unwrap_or_else(|| stored.payload.clone()),
+        detail: compact_detail(stored.payload.get("detail").unwrap_or(&stored.payload)),
         created_at: stored.received_at,
     }
 }
@@ -485,7 +580,7 @@ fn map_codex_event(stored: StoredHookEvent) -> AgentEvent {
             .map(str::to_owned),
         terminal_id: stored.terminal_id,
         event_type: event_type.into(),
-        detail: stored.payload,
+        detail: compact_detail(&stored.payload),
         created_at: stored.received_at,
     }
 }
@@ -817,6 +912,107 @@ mod tests {
         });
 
         assert_eq!(event.event_type, "tool.failed");
+    }
+
+    #[test]
+    fn keeps_only_the_fields_the_ui_reads_and_cuts_long_values() {
+        let long_error = "x".repeat(DETAIL_VALUE_LIMIT + 100);
+        let detail = compact_detail(&json!({
+            "hook_event_name": "PostToolUse",
+            "tool_name": "Bash",
+            "tool_input": { "command": "the whole command line" },
+            "tool_response": "megabytes of output",
+            "cwd": "C:/somewhere",
+            "error_details": long_error,
+        }));
+
+        assert_eq!(detail["tool_name"], "Bash");
+        assert_eq!(detail["hook_event_name"], "PostToolUse");
+        // The bulk of a hook payload is what the tool was given and what it produced; neither is
+        // ever displayed, and together they made an event 6 KB on average.
+        assert!(detail.get("tool_input").is_none());
+        assert!(detail.get("tool_response").is_none());
+        assert!(detail.get("cwd").is_none());
+        let cut = detail["error_details"].as_str().unwrap();
+        assert!(cut.ends_with('…'), "{cut}");
+        assert!(cut.len() < DETAIL_VALUE_LIMIT + '…'.len_utf8() + 1);
+    }
+
+    #[test]
+    fn remembers_the_read_position_across_restarts() {
+        let directory = test_directory("cursor-persist");
+        let store = HookEventStore::new(&directory).unwrap();
+        let event_file = store.event_file.to_string_lossy().into_owned();
+        append_stored_event(
+            &event_file,
+            "terminal-1".into(),
+            "claude",
+            json!({ "hook_event_name": "SessionStart" }),
+        )
+        .unwrap();
+        assert_eq!(store.read_new_events().unwrap().len(), 1);
+
+        // A fresh store is a restart: it carries on from where the last one stopped rather than
+        // parsing the whole spool again from byte zero.
+        let restarted = HookEventStore::new(&directory).unwrap();
+        assert!(restarted.read_new_events().unwrap().is_empty());
+        append_stored_event(
+            &event_file,
+            "terminal-1".into(),
+            "claude",
+            json!({ "hook_event_name": "Stop" }),
+        )
+        .unwrap();
+        let events = restarted.read_new_events().unwrap();
+        assert_eq!(events.len(), 1);
+        assert_eq!(events[0].event_type, "task.completed");
+    }
+
+    #[test]
+    fn compacts_a_drained_spool_once_and_leaves_a_small_one_alone() {
+        let directory = test_directory("spool-compact");
+        let store = HookEventStore::new(&directory).unwrap();
+        let event_file = store.event_file.to_string_lossy().into_owned();
+        append_stored_event(
+            &event_file,
+            "terminal-1".into(),
+            "claude",
+            json!({ "hook_event_name": "SessionStart" }),
+        )
+        .unwrap();
+        store.read_new_events().unwrap();
+
+        // Drained, but small: not worth touching.
+        store.compact_spool_once().unwrap();
+        assert!(fs::metadata(&store.event_file).unwrap().len() > 0);
+
+        // Drained and past the threshold: truncated, with the cursor back at the start so the
+        // next hook's event is the first thing read.
+        let store = HookEventStore::new(&directory).unwrap();
+        let padding = "p".repeat(SPOOL_COMPACT_THRESHOLD_BYTES as usize);
+        append_stored_event(
+            &event_file,
+            "terminal-1".into(),
+            "claude",
+            json!({ "hook_event_name": "Stop", "message": padding }),
+        )
+        .unwrap();
+        store.read_new_events().unwrap();
+        store.compact_spool_once().unwrap();
+        assert_eq!(fs::metadata(&store.event_file).unwrap().len(), 0);
+        assert_eq!(*store.cursor.lock().unwrap(), 0);
+
+        append_stored_event(
+            &event_file,
+            "terminal-1".into(),
+            "claude",
+            json!({ "hook_event_name": "SessionStart" }),
+        )
+        .unwrap();
+        assert_eq!(store.read_new_events().unwrap().len(), 1);
+        // The one chance per process is spent: a later drain never truncates again.
+        store.compact_spool_once().unwrap();
+        assert!(fs::metadata(&store.event_file).unwrap().len() > 0);
     }
 
     #[test]

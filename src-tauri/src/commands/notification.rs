@@ -6,7 +6,7 @@ use crate::notification;
 ///
 /// The frontend falls back to a system dialog on failure, which only works because this
 /// command propagates the delivery result instead of discarding it.
-#[tauri::command]
+#[tauri::command(async)]
 pub fn show_desktop_notification(
     title: String,
     body: String,
