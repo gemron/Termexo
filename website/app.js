@@ -7,17 +7,33 @@ const translations = {
     navPrinciples: "Privacy",
     navGuide: "User guide",
     github: "GitHub",
-    eyebrow: "Runs on your machine · Windows · No account needed",
-    heroLine1: "One window.",
-    heroLine2: "Every agent.",
+    eyebrow: "WINDOWS WORKBENCH / MOBILE REMOTE ACCESS",
+    heroLine1: "At your desk.",
+    heroLine2: "Or on your phone.",
     heroLead:
-      "Claude Code in one terminal, Codex in another, OpenCode in a third. Termexo puts them all on one screen — you can see which one is waiting on you, hand one a task straight off the board, pick up yesterday's conversation, and switch models without restarting anything. Turn on remote access and that same workbench opens on your phone, driving the very same live terminals.",
+      "Bring Claude Code, Codex, and OpenCode into one Windows workbench. Step away from your desk and open it in your phone’s browser to check output, respond to an approval, or send the next instruction. Same workspace. Same running terminals.",
+    heroRemoteNote: "Keep your PC running. Enable remote access, then connect with a token over a trusted LAN or VPN.",
+    heroRemoteGuide: "How to connect your phone ↗",
+    sceneHeading: "One workspace. Two ways in.",
+    sceneDesktop: "RUN ON YOUR PC",
+    sceneMobile: "CONTINUE ON YOUR PHONE",
+    sceneTask: "› Review the latest changes",
+    sceneResult: "Review complete. Ready for tests.",
+    sceneWaiting: "Waiting for your next instruction",
+    sceneHost: "Session runs on this PC",
+    sceneDesktopNote: "Your agents and project stay on the host. No session to move or restart.",
+    sceneConnection: "Remote · HTTPS",
+    sceneSameSession: "The same live terminal",
+    sceneInstruction: "› Run the tests and summarize any failures.",
+    sceneContinue: "↳ Continuing on your PC…",
+    sceneInput: "Send the next instruction",
+    sceneCaption: "PC runs it. Phone controls it. Illustrative workflow, not a live session.",
     runFromNpm: "Run it now",
     download: "Download installer",
     copyCommand: "Copy",
     copied: "Copied",
     viewSource: "View source",
-    metaLocal: "Nothing leaves your PC",
+    metaLocal: "Local-first · MIT open source",
     metaNpm: "One command to start",
 
     workbenchTitle: "Four agents. One screen.",
@@ -179,17 +195,33 @@ const translations = {
     navPrinciples: "隐私",
     navGuide: "使用说明",
     github: "GitHub",
-    eyebrow: "跑在你自己电脑上 · Windows · 不用注册",
-    heroLine1: "一个窗口，",
-    heroLine2: "装下所有 Agent。",
+    eyebrow: "WINDOWS 多 AGENT 工作台 / 手机远程访问",
+    heroLine1: "电脑上开工，",
+    heroLine2: "手机上接着用。",
     heroLead:
-      "一个终端跑 Claude Code，另一个跑 Codex，第三个跑 OpenCode。Termexo 把它们收进同一块屏幕——谁在等你回话一眼就能看到，一条任务可以直接从看板丢给某个 Agent，昨天聊到一半的会话点一下接着聊，换模型不用重开终端。打开远程访问，同一个工作台还能在手机浏览器里打开，驱动的是同一批正在运行的终端。",
+      "把 Claude Code、Codex 和 OpenCode 收进同一个 Windows 工作台。离开书桌，也能用手机浏览器查看输出、回应授权、发送下一步指令。打开的还是同一个工作空间，操作的还是电脑上正在运行的终端。",
+    heroRemoteNote: "电脑需保持运行。开启远程访问后，在可信局域网或 VPN 内使用令牌连接。",
+    heroRemoteGuide: "了解手机如何连接 ↗",
+    sceneHeading: "同一个工作台，电脑与手机接续操作。",
+    sceneDesktop: "电脑运行 AGENT",
+    sceneMobile: "手机远程接着操作",
+    sceneTask: "› 检查最新的代码变更",
+    sceneResult: "检查完成，可以开始测试。",
+    sceneWaiting: "等待你的下一步指令",
+    sceneHost: "会话在这台电脑上运行",
+    sceneDesktopNote: "Agent 和项目留在电脑上，无需搬运会话，也无需重新启动。",
+    sceneConnection: "远程访问 · HTTPS",
+    sceneSameSession: "同一个正在运行的终端",
+    sceneInstruction: "› 运行测试，并汇总失败项。",
+    sceneContinue: "↳ 正在电脑上继续执行…",
+    sceneInput: "发送下一步指令",
+    sceneCaption: "电脑负责运行，手机接着操作。场景示意，非实时会话。",
     runFromNpm: "立即运行",
     download: "下载安装包",
     copyCommand: "复制",
     copied: "已复制",
     viewSource: "查看源码",
-    metaLocal: "东西不出本机",
+    metaLocal: "本地优先 · MIT 开源",
     metaNpm: "一条命令启动",
 
     workbenchTitle: "四个 Agent，一块屏幕。",
@@ -344,14 +376,17 @@ function setLanguage(language) {
   document.documentElement.lang = language === "zh" ? "zh-CN" : "en";
   document.title =
     language === "zh"
-      ? "Termexo — 一个窗口装下所有编程 Agent"
-      : "Termexo — One window for every coding agent";
+      ? "Termexo — 电脑上开工，手机上接着用"
+      : "Termexo — Your agents, from desk to phone";
 
   translatedElements.forEach((element) => {
     const value = dictionary[element.dataset.i18n];
     if (value) element.textContent = value;
     if (element.dataset.i18n === "navGuide") {
       element.setAttribute("href", language === "zh" ? "guide.html" : "guide.en.html");
+    }
+    if (element.dataset.i18n === "heroRemoteGuide") {
+      element.setAttribute("href", language === "zh" ? "guide.html#remote" : "guide.en.html#remote");
     }
   });
 
