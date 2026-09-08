@@ -111,6 +111,7 @@ OSCHINA 或 CSDN 按平台格式稍作调整后发布。封面由 OpenAI 图像�
 - 微信公众号图文稿：`articles/24-wechat-v0.8.md`
 - V2EX 分享创造短帖：`articles/25-v2ex-v0.8.md`
 - 短帖合集（微博 / 朋友圈 / X / 掘金沸点 / 群公告）：`articles/26-short-posts-v0.8.md`
+- OSCHINA 软件更新资讯稿（第三人称新闻稿，走投递新闻入口）：`articles/27-oschina-news-v0.8.md`
 
 ### V0.8 配图
 
