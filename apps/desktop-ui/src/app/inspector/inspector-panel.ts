@@ -159,7 +159,9 @@ export class InspectorPanelComponent {
   }
 
   protected eventLabel(event: AgentEvent): string {
-    return this.i18n.t(EVENT_LABELS[event.eventType] ?? 'event.updated');
+    return this.i18n.t(EVENT_LABELS[event.eventType] ?? 'event.updated', {
+      name: AGENT_LABELS[event.agentType],
+    });
   }
 
   protected statusLabel(status: TerminalStatus): string {
