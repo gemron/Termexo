@@ -44,6 +44,9 @@ pub struct ClaudeLaunchOptions {
     pub session_id: Option<String>,
     pub name: Option<String>,
     pub model: Option<String>,
+    /// Reasoning depth for the session; empty or absent leaves the CLI's own default alone.
+    #[serde(default)]
+    pub effort: Option<String>,
     pub settings_path: Option<String>,
     pub mcp_config_path: Option<String>,
     #[serde(default)]

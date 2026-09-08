@@ -2,6 +2,7 @@ import { Component, computed, input, output } from '@angular/core';
 
 import { AccountProfile, terminalAccountName } from '../core/models/agent.models';
 import {
+  AgentType,
   DEFAULT_TERMINAL_GRID_DIMENSION,
   LayoutMode,
   normalizeTerminalGridDimension,
@@ -9,13 +10,14 @@ import {
   TerminalStatus,
 } from '../core/models/workspace.models';
 import { TranslatePipe } from '../core/i18n/translate.pipe';
+import { AgentLaunchOptionsComponent } from '../shared/agent-launch-options/agent-launch-options';
 import { IconComponent } from '../shared/icon/icon';
 import { DEFAULT_TERMINAL_FONT_NAME } from './terminal-font';
 import { TerminalPanelComponent } from './terminal-panel';
 
 @Component({
   selector: 'app-terminal-workbench',
-  imports: [IconComponent, TerminalPanelComponent, TranslatePipe],
+  imports: [AgentLaunchOptionsComponent, IconComponent, TerminalPanelComponent, TranslatePipe],
   templateUrl: './terminal-workbench.html',
   styleUrl: './terminal-workbench.scss',
 })
@@ -39,7 +41,8 @@ export class TerminalWorkbenchComponent {
   readonly terminalSelected = output<string>();
   readonly terminalClosed = output<string>();
   readonly terminalMaximizeRequested = output<string>();
-  readonly terminalRequested = output<void>();
+  /** Which of the empty state's launch options was picked; the host opens it. */
+  readonly launchRequested = output<AgentType>();
   readonly terminalStatusChanged = output<{ terminalId: string; status: TerminalStatus }>();
   readonly terminalRenamed = output<{ terminalId: string; name: string }>();
   readonly terminalModelSwitchRequested = output<string>();

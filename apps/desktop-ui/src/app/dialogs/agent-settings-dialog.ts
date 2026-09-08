@@ -20,6 +20,8 @@ import {
   CliOperationPlan,
   CliOperationRequest,
   CliOperationResult,
+  CLAUDE_EFFORT_LEVELS,
+  CODEX_REASONING_EFFORT_LEVELS,
   CUSTOM_PROVIDER,
   findProviderPreset,
   groupProfilesByProvider,
@@ -721,6 +723,24 @@ const DEFAULT_ALERT_THRESHOLD = 80;
                           [(ngModel)]="claudeBaseUrl"
                       /></label>
                     </div>
+                    <div class="two-columns">
+                      <label
+                        ><span>{{ 'settings.effortLevel' | t }}</span
+                        ><select [disabled]="!claudeEnabled" [(ngModel)]="claudeEffort">
+                          <option value="">{{ 'settings.effortDefault' | t }}</option>
+                          @for (level of claudeEffortLevels; track level) {
+                            <option [value]="level">{{ level }}</option>
+                          }
+                        </select>
+                      </label>
+                      <label class="checkbox-control" [title]="'settings.context1mHelp' | t"
+                        ><input
+                          type="checkbox"
+                          [disabled]="!claudeEnabled"
+                          [(ngModel)]="claudeContext1m"
+                        /><span>{{ 'settings.context1m' | t }}</span></label
+                      >
+                    </div>
                   </fieldset>
                   <fieldset class="agent-endpoint" [class.disabled]="!codexEnabled">
                     <label class="checkbox-control">
@@ -739,6 +759,17 @@ const DEFAULT_ALERT_THRESHOLD = 80;
                           [placeholder]="'settings.endpointPlaceholder' | t"
                           [(ngModel)]="codexBaseUrl"
                       /></label>
+                    </div>
+                    <div class="two-columns">
+                      <label
+                        ><span>{{ 'settings.effortLevel' | t }}</span
+                        ><select [disabled]="!codexEnabled" [(ngModel)]="codexReasoningEffort">
+                          <option value="">{{ 'settings.effortDefault' | t }}</option>
+                          @for (level of codexEffortLevels; track level) {
+                            <option [value]="level">{{ level }}</option>
+                          }
+                        </select>
+                      </label>
                     </div>
                   </fieldset>
                   <label>
@@ -1174,6 +1205,11 @@ export class AgentSettingsDialogComponent {
   protected codexEnabled = false;
   protected codexModel = '';
   protected codexBaseUrl = '';
+  protected claudeContext1m = false;
+  protected claudeEffort = '';
+  protected codexReasoningEffort = '';
+  protected readonly claudeEffortLevels = CLAUDE_EFFORT_LEVELS;
+  protected readonly codexEffortLevels = CODEX_REASONING_EFFORT_LEVELS;
   protected apiKey = '';
   protected isDefault = true;
   protected clearCredential = false;
@@ -1354,6 +1390,9 @@ export class AgentSettingsDialogComponent {
     this.codexEnabled = profile.codexEnabled;
     this.codexModel = profile.codexModel;
     this.codexBaseUrl = profile.codexBaseUrl ?? '';
+    this.claudeContext1m = profile.claudeContext1m ?? false;
+    this.claudeEffort = profile.claudeEffort ?? '';
+    this.codexReasoningEffort = profile.codexReasoningEffort ?? '';
     this.apiKey = '';
     this.isDefault = profile.isDefault;
     this.clearCredential = false;
@@ -1369,6 +1408,9 @@ export class AgentSettingsDialogComponent {
     this.clearCredential = false;
     this.hasCredential.set(false);
     this.modelPlanAlertThreshold = DEFAULT_ALERT_THRESHOLD;
+    this.claudeContext1m = false;
+    this.claudeEffort = '';
+    this.codexReasoningEffort = '';
   }
 
   protected saveModel(): void {
@@ -1389,6 +1431,9 @@ export class AgentSettingsDialogComponent {
       claudeBaseUrl: this.claudeBaseUrl.trim() || undefined,
       codexEnabled: this.codexEnabled,
       codexModel: this.codexModel.trim(),
+      claudeContext1m: this.claudeContext1m,
+      claudeEffort: this.claudeEffort,
+      codexReasoningEffort: this.codexReasoningEffort,
       codexBaseUrl: this.codexBaseUrl.trim() || undefined,
       planAlertThreshold: Math.min(
         100,

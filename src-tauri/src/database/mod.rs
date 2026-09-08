@@ -18,6 +18,7 @@ const API_PROTOCOL_MIGRATION: &str = include_str!("../../migrations/0005_api_pro
 const PROVIDER_PROFILE_MIGRATION: &str =
     include_str!("../../migrations/0006_provider_profiles.sql");
 const PROVIDER_PLAN_MIGRATION: &str = include_str!("../../migrations/0007_provider_plans.sql");
+const REASONING_EFFORT_MIGRATION: &str = include_str!("../../migrations/0010_reasoning_effort.sql");
 const V05_ASSETS_MIGRATION: &str = include_str!("../../migrations/0008_v05_assets.sql");
 const APP_SETTINGS_MIGRATION: &str = include_str!("../../migrations/0009_app_settings.sql");
 const LEGACY_MINIMAX_M3_MODEL: &str = "MiniMax-M3[1m]";
@@ -651,9 +652,12 @@ impl WorkspaceDatabase {
                  api_protocol, is_default, created_at, updated_at,
                  claude_enabled, claude_model, claude_base_url,
                  codex_enabled, codex_model, codex_base_url,
-                 plan_alert_threshold
+                 plan_alert_threshold, claude_context_1m, claude_effort, codex_reasoning_effort
              )
-             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16)
+             VALUES (
+                 ?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16,
+                 ?17, ?18, ?19
+             )
              ON CONFLICT(id) DO UPDATE SET
                  name = excluded.name,
                  provider = excluded.provider,
@@ -669,7 +673,10 @@ impl WorkspaceDatabase {
                  codex_enabled = excluded.codex_enabled,
                  codex_model = excluded.codex_model,
                  codex_base_url = excluded.codex_base_url,
-                 plan_alert_threshold = excluded.plan_alert_threshold",
+                 plan_alert_threshold = excluded.plan_alert_threshold,
+                 claude_context_1m = excluded.claude_context_1m,
+                 claude_effort = excluded.claude_effort,
+                 codex_reasoning_effort = excluded.codex_reasoning_effort",
             params![
                 profile.id,
                 profile.name,
@@ -687,6 +694,9 @@ impl WorkspaceDatabase {
                 profile.codex_model,
                 profile.codex_base_url,
                 profile.plan_alert_threshold,
+                profile.claude_context_1m,
+                profile.claude_effort,
+                profile.codex_reasoning_effort,
             ],
         )?;
         Ok(())
@@ -1054,7 +1064,7 @@ fn migrate_legacy_minimax_m3_model(connection: &Connection) -> Result<(), Databa
 /// Column order every model profile query selects, so the row mapper can index it positionally.
 const MODEL_PROFILE_COLUMNS: &str = "id, name, provider, credential_target, is_default, \
      claude_enabled, claude_model, claude_base_url, \
-     codex_enabled, codex_model, codex_base_url, plan_alert_threshold";
+     codex_enabled, codex_model, codex_base_url, plan_alert_threshold,      claude_context_1m, claude_effort, codex_reasoning_effort";
 
 fn model_profile_from_row(row: &rusqlite::Row<'_>) -> rusqlite::Result<ModelProfile> {
     let credential_target: Option<String> = row.get(3)?;
@@ -1072,6 +1082,9 @@ fn model_profile_from_row(row: &rusqlite::Row<'_>) -> rusqlite::Result<ModelProf
         codex_model: row.get(9)?,
         codex_base_url: row.get(10)?,
         plan_alert_threshold: row.get(11)?,
+        claude_context_1m: row.get(12)?,
+        claude_effort: row.get(13)?,
+        codex_reasoning_effort: row.get(14)?,
     })
 }
 
@@ -1141,7 +1154,11 @@ fn run_api_protocol_migration(connection: &Connection) -> Result<(), DatabaseErr
 /// would leave the remaining columns missing forever. Applying each `ALTER` on its own and
 /// swallowing only "duplicate column" lets a half-applied migration finish on the next startup.
 fn run_provider_profile_migration(connection: &Connection) -> Result<(), DatabaseError> {
-    for migration in [PROVIDER_PROFILE_MIGRATION, PROVIDER_PLAN_MIGRATION] {
+    for migration in [
+        PROVIDER_PROFILE_MIGRATION,
+        PROVIDER_PLAN_MIGRATION,
+        REASONING_EFFORT_MIGRATION,
+    ] {
         let sql: String = migration
             .lines()
             .filter(|line| !line.trim_start().starts_with("--"))
@@ -1505,6 +1522,9 @@ mod tests {
             codex_model: "gpt-5.6-sol".into(),
             codex_base_url: Some("https://gateway.example.com/v1".into()),
             plan_alert_threshold: 80,
+            claude_context_1m: true,
+            claude_effort: "high".into(),
+            codex_reasoning_effort: "xhigh".into(),
         };
         let mcp = McpProfile {
             id: "mcp-1".into(),
@@ -1518,6 +1538,9 @@ mod tests {
         let profiles = database.list_model_profiles().unwrap();
         assert_eq!(profiles.len(), 1);
         assert_eq!(profiles[0].plan_alert_threshold, 80);
+        assert!(profiles[0].claude_context_1m);
+        assert_eq!(profiles[0].claude_effort, "high");
+        assert_eq!(profiles[0].codex_reasoning_effort, "xhigh");
         assert_eq!(database.list_mcp_profiles().unwrap().len(), 1);
         assert!(
             database

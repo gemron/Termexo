@@ -445,42 +445,7 @@
           </button>
           @if (agentMenuOpen()) {
             <div class="agent-menu menu rounded-box bg-base-200 shadow-xl" role="menu">
-              <p class="menu-group">{{ 'terminal.groupAgent' | t }}</p>
-              <button type="button" role="menuitem" (click)="openClaudeLaunch()">
-                <span data-tone="green"><app-icon name="bot" [size]="14" /></span>
-                <div>
-                  <strong>Claude Code</strong>
-                  <small>{{ installationLabel(agents.installation()) }}</small>
-                </div>
-              </button>
-              <button type="button" role="menuitem" (click)="openCodexLaunch()">
-                <span data-tone="blue"><app-icon name="bot" [size]="14" /></span>
-                <div>
-                  <strong>Codex CLI</strong>
-                  <small>{{ installationLabel(agents.codexInstallation()) }}</small>
-                </div>
-              </button>
-              <button
-                type="button"
-                role="menuitem"
-                data-agent="opencode"
-                (click)="openOpenCodeLaunch()"
-              >
-                <span data-tone="amber"><app-icon name="terminal" [size]="14" /></span>
-                <div>
-                  <strong>OpenCode</strong>
-                  <small>{{ installationLabel(agents.openCodeInstallation()) }}</small>
-                </div>
-              </button>
-
-              <p class="menu-group">{{ 'terminal.groupTerminal' | t }}</p>
-              <button type="button" role="menuitem" (click)="createTerminal('shell')">
-                <span data-tone="slate"><app-icon name="terminal" [size]="14" /></span>
-                <div>
-                  <strong>Shell</strong>
-                  <small>{{ 'terminal.shellHint' | t }}</small>
-                </div>
-              </button>
+              <app-agent-launch-options (optionSelected)="launchAgent($event)" />
             </div>
           }
         </div>
@@ -600,7 +565,7 @@
             (terminalSelected)="selectTerminal($event)"
             (terminalClosed)="closeTerminal($event)"
             (terminalMaximizeRequested)="toggleTerminalMaximize($event)"
-            (terminalRequested)="createTerminal('shell')"
+            (launchRequested)="launchAgent($event)"
             (terminalStatusChanged)="handleTerminalStatus($event)"
             (terminalRenamed)="state.renameTerminal($event.terminalId, $event.name)"
             (terminalModelSwitchRequested)="openSingleModelSwitch($event)"

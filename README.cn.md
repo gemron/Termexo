@@ -11,7 +11,7 @@
 </p>
 
 <p align="center">
-  <img alt="Version 0.8.1" src="https://img.shields.io/badge/version-0.8.1-58c7a0">
+  <img alt="Version 0.8.2" src="https://img.shields.io/badge/version-0.8.2-58c7a0">
   <img alt="Windows" src="https://img.shields.io/badge/platform-Windows-0078D4?logo=windows">
   <img alt="Tauri 2" src="https://img.shields.io/badge/Tauri-2-24C8DB?logo=tauri&logoColor=white">
   <img alt="Angular 22" src="https://img.shields.io/badge/Angular-22-DD0031?logo=angular">
@@ -35,7 +35,7 @@ Agent 等着授权时，人在哪里都能回它一句。
 npx termexo@latest
 ```
 
-> 当前版本为 **V0.8.1**。
+> 当前版本为 **V0.8.2**。
 
 ![Termexo 多终端网格工作台](website/assets/termexo-workbench.png)
 
@@ -120,6 +120,18 @@ SQLite，密钥保存在 Windows Credential Manager，Claude/Codex 历史会话�
 
 界面支持简体中文、英语、西班牙语、法语、德语、日语和韩语。默认自动跟随 Windows
 系统语言，也可通过主工具栏手动切换并跨重启保留选择。
+
+## V0.8.2 新增
+
+- **Agent 输出时打字不再卡**：此前每个打开的终端各自订阅一次输出流，Agent 每产生一块输出都会唤醒
+  全部终端，并对整个工作台跑一遍变更检测；终端开得多时，按键就排在这些工作后面。现在改为一个共享
+  订阅按终端分发，界面每帧刷新一次，而不是每块输出刷一次。
+- **恢复终端不再卡住**：重连时回放的历史输出会被重新喂给任务、交接和启动检测，等于在启动时把每个
+  终端的全部历史再分析一遍。现在历史只负责重绘，不再被重复统计。
+- **1M 上下文与推理强度**：模型 Profile 可以为 Claude Code 开启 1M 上下文窗口，并分别为两个 Agent
+  设置推理强度；启动对话框还能只对当前这个终端临时覆盖。
+- **空工作空间提供同样的 Agent**：它的按钮以前只打开一个纯 Shell，启动 Agent 得靠一个用户还没发现
+  的菜单；现在直接列出 Claude Code、Codex CLI、OpenCode 和 Shell，与标签栏菜单是同一份列表。
 
 ## V0.8.1 新增
 

@@ -164,6 +164,10 @@ export interface ClaudeLaunchRequest {
   forkSession?: boolean;
   /** Reconnects to a session the CLI still has running instead of starting a new process. */
   attachShortId?: string;
+  /** Overrides the profile's 1M context window for this terminal only; omitted keeps it. */
+  context1m?: boolean;
+  /** Overrides the profile's reasoning depth for this terminal only; omitted keeps it. */
+  effort?: string;
 }
 
 /** What to do with a session the CLI is still running when its terminal wants it back. */
@@ -192,6 +196,8 @@ export interface CodexLaunchRequest {
   profileId?: string;
   accountProfileId?: string;
   autoConfirm?: boolean;
+  /** Overrides the profile's reasoning depth for this terminal only; omitted keeps it. */
+  reasoningEffort?: string;
 }
 
 export interface OpenCodeLaunchRequest {
@@ -251,6 +257,12 @@ export interface ModelProfile {
   codexBaseUrl?: string;
   /** Share of the provider-reported allowance at which the UI warns. */
   planAlertThreshold?: number;
+  /** Asks Claude Code for the model's 1M-token context window. */
+  claudeContext1m?: boolean;
+  /** One of {@link CLAUDE_EFFORT_LEVELS}; empty leaves the CLI's own default alone. */
+  claudeEffort?: string;
+  /** One of {@link CODEX_REASONING_EFFORT_LEVELS}; empty leaves the CLI's own default alone. */
+  codexReasoningEffort?: string;
 }
 
 export interface ModelProfileInput {
@@ -268,6 +280,9 @@ export interface ModelProfileInput {
   codexBaseUrl?: string;
   /** Share of the provider-reported allowance at which the UI warns. */
   planAlertThreshold?: number;
+  claudeContext1m?: boolean;
+  claudeEffort?: string;
+  codexReasoningEffort?: string;
 }
 
 /** What a provider's published API docs say each agent should be pointed at. */
@@ -466,6 +481,22 @@ export const CODEX_MODEL_SUGGESTIONS: readonly string[] = [
   'gpt-5.6-sol',
   'gpt-5.6-terra',
   'gpt-5.6-luna',
+];
+
+/**
+ * Reasoning depth each CLI accepts at launch, weakest first.
+ *
+ * The two agents publish different ladders — Claude Code has no `minimal` and Codex no `max` —
+ * so a level offered for one would fail the launch of the other.
+ */
+export const CLAUDE_EFFORT_LEVELS: readonly string[] = ['low', 'medium', 'high', 'xhigh', 'max'];
+
+export const CODEX_REASONING_EFFORT_LEVELS: readonly string[] = [
+  'minimal',
+  'low',
+  'medium',
+  'high',
+  'xhigh',
 ];
 
 /**

@@ -4,8 +4,9 @@ use tauri::{AppHandle, Manager, State};
 use crate::account;
 use crate::agent::{AgentAdapter, AgentLaunchSpec, ClaudeCodeAdapter, ClaudeLaunchOptions};
 use crate::config::{
-    AccountProfile, AccountProfileInput, CredentialStore, McpProfile, McpProfileInput,
-    ModelProfile, ModelProfileInput, NetworkProfile, NetworkProfileInput,
+    normalized_effort, AccountProfile, AccountProfileInput, CredentialStore, McpProfile,
+    McpProfileInput, ModelProfile, ModelProfileInput, NetworkProfile, NetworkProfileInput,
+    CLAUDE_EFFORT_LEVELS, CODEX_REASONING_EFFORT_LEVELS,
 };
 use crate::database::WorkspaceDatabase;
 use crate::network::{self, NetworkTestResult};
@@ -86,6 +87,12 @@ pub fn save_model_profile(
         codex_model: input.codex_model.trim().to_owned(),
         codex_base_url: trimmed_endpoint(input.codex_base_url),
         plan_alert_threshold: input.plan_alert_threshold.clamp(1, 100),
+        claude_context_1m: input.claude_context_1m,
+        claude_effort: normalized_effort(&input.claude_effort, &CLAUDE_EFFORT_LEVELS),
+        codex_reasoning_effort: normalized_effort(
+            &input.codex_reasoning_effort,
+            &CODEX_REASONING_EFFORT_LEVELS,
+        ),
     };
     if !profile.claude_enabled && !profile.codex_enabled {
         return Err(format!(
@@ -471,6 +478,7 @@ pub fn validate_claude_profile(
             session_id: None,
             name: None,
             model: Some(profile.claude_model),
+            effort: None,
             settings_path: None,
             mcp_config_path: None,
             auto_confirm: false,

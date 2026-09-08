@@ -46,6 +46,48 @@ pub struct ModelProfile {
     /// Percentage of the provider-reported allowance at which the UI warns. The allowance itself
     /// is never stored — it is read live from the provider.
     pub plan_alert_threshold: u8,
+    /// Asks Claude Code for the model's 1M-token context window.
+    #[serde(default, rename = "claudeContext1m")]
+    pub claude_context_1m: bool,
+    /// One of [`CLAUDE_EFFORT_LEVELS`]; empty leaves the CLI's own default alone.
+    #[serde(default)]
+    pub claude_effort: String,
+    /// One of [`CODEX_REASONING_EFFORT_LEVELS`]; empty leaves the CLI's own default alone.
+    #[serde(default)]
+    pub codex_reasoning_effort: String,
+}
+
+/// Effort levels `claude --effort` accepts, weakest first.
+pub const CLAUDE_EFFORT_LEVELS: [&str; 5] = ["low", "medium", "high", "xhigh", "max"];
+
+/// Levels Codex accepts for `model_reasoning_effort`, weakest first.
+pub const CODEX_REASONING_EFFORT_LEVELS: [&str; 5] = ["minimal", "low", "medium", "high", "xhigh"];
+
+/// Suffix that asks Claude Code for a model's 1M-token context window.
+const CLAUDE_1M_CONTEXT_SUFFIX: &str = "[1m]";
+
+/// Drops a level the CLI does not know, which it would otherwise refuse to start on.
+///
+/// The dialogs only offer the listed levels, so a value outside them means stored data from an
+/// older or hand-edited profile. Falling back to the CLI's own default beats failing the launch.
+pub fn normalized_effort(value: &str, levels: &[&str]) -> String {
+    let normalized = value.trim().to_ascii_lowercase();
+    if levels.contains(&normalized.as_str()) {
+        normalized
+    } else {
+        String::new()
+    }
+}
+
+/// The model id to launch Claude Code with, carrying the 1M context suffix when it was asked for.
+///
+/// A model the user already suffixed by hand is left as it is, so the flag cannot double it up.
+pub fn claude_launch_model(model: &str, context_1m: bool) -> String {
+    let model = model.trim();
+    if !context_1m || model.is_empty() || model.ends_with(CLAUDE_1M_CONTEXT_SUFFIX) {
+        return model.to_owned();
+    }
+    format!("{model}{CLAUDE_1M_CONTEXT_SUFFIX}")
 }
 
 impl ModelProfile {
@@ -95,6 +137,12 @@ pub struct ModelProfileInput {
     pub codex_base_url: Option<String>,
     #[serde(default = "default_plan_alert_threshold")]
     pub plan_alert_threshold: u8,
+    #[serde(default, rename = "claudeContext1m")]
+    pub claude_context_1m: bool,
+    #[serde(default)]
+    pub claude_effort: String,
+    #[serde(default)]
+    pub codex_reasoning_effort: String,
 }
 
 /// A new profile serves both agents unless the user says otherwise.
@@ -247,6 +295,27 @@ fn normalize_credential_result(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn appends_the_1m_suffix_only_when_it_is_asked_for_and_not_already_there() {
+        assert_eq!(claude_launch_model("opus", true), "opus[1m]");
+        assert_eq!(claude_launch_model("opus", false), "opus");
+        // A model the user suffixed by hand must not end up as `opus[1m][1m]`.
+        assert_eq!(claude_launch_model("opus[1m]", true), "opus[1m]");
+        assert_eq!(claude_launch_model("  sonnet  ", true), "sonnet[1m]");
+        assert_eq!(claude_launch_model("", true), "");
+    }
+
+    #[test]
+    fn keeps_only_effort_levels_the_cli_publishes() {
+        assert_eq!(normalized_effort("XHigh", &CLAUDE_EFFORT_LEVELS), "xhigh");
+        assert_eq!(normalized_effort(" max ", &CLAUDE_EFFORT_LEVELS), "max");
+        // Each CLI has its own ladder: `max` is Claude-only and `minimal` is Codex-only, so a
+        // level carried across would fail the launch rather than be ignored.
+        assert_eq!(normalized_effort("max", &CODEX_REASONING_EFFORT_LEVELS), "");
+        assert_eq!(normalized_effort("minimal", &CLAUDE_EFFORT_LEVELS), "");
+        assert_eq!(normalized_effort("", &CLAUDE_EFFORT_LEVELS), "");
+    }
 
     #[test]
     fn missing_secure_storage_entry_is_an_empty_optional_credential() {

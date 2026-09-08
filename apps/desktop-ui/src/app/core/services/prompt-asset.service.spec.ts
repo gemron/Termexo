@@ -26,6 +26,7 @@ const claude: TerminalSession = {
   branch: 'main',
 };
 const codex: TerminalSession = { ...claude, id: 'codex-1', name: 'Codex 1', agentType: 'codex' };
+const EMERGENCY_DRAFT_STORAGE_KEY = 'termexo.pendingPromptDrafts.v1';
 
 describe('PromptAssetService', () => {
   beforeEach(() => {
@@ -71,6 +72,20 @@ describe('PromptAssetService', () => {
     await restored.initialize();
 
     expect(restored.draftForTerminal(claude.id)?.content).toBe('不要丢失这个草稿');
+  });
+
+  it('keeps the emergency draft store off the keystroke path', async () => {
+    const service = TestBed.inject(PromptAssetService);
+    await service.initialize();
+
+    service.captureInput(workspace, claude, '草稿');
+
+    // Typing must not touch localStorage: the synchronous write is what made input stutter.
+    expect(window.localStorage.getItem(EMERGENCY_DRAFT_STORAGE_KEY)).toBeNull();
+
+    await vi.advanceTimersByTimeAsync(300);
+
+    expect(window.localStorage.getItem(EMERGENCY_DRAFT_STORAGE_KEY)).toContain('草稿');
   });
 
   it('never records shell input as a prompt asset', async () => {

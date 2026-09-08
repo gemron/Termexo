@@ -99,6 +99,24 @@ describe('CodexLaunchDialogComponent', () => {
     ]);
   });
 
+  it('leaves the reasoning effort to the profile until the launch overrides it', async () => {
+    const effort = root.querySelector<HTMLSelectElement>('.effort-field select')!;
+    expect(effort.value).toBe('');
+
+    const launches: CodexLaunchDialogValue[] = [];
+    component.launched.subscribe((value) => launches.push(value));
+    root.querySelector<HTMLButtonElement>('footer .primary')!.click();
+    expect(launches[0].reasoningEffort).toBeUndefined();
+
+    effort.value = 'xhigh';
+    effort.dispatchEvent(new Event('change'));
+    fixture.detectChanges();
+    await fixture.whenStable();
+    root.querySelector<HTMLButtonElement>('footer .primary')!.click();
+
+    expect(launches[1]).toEqual(expect.objectContaining({ reasoningEffort: 'xhigh' }));
+  });
+
   it('emits automatic confirmation only after the user enables it', async () => {
     const autoConfirm = root.querySelector<HTMLInputElement>('.auto-confirm-control input')!;
     expect(autoConfirm.checked).toBe(false);

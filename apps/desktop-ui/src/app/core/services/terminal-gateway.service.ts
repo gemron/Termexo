@@ -1,4 +1,4 @@
-import { inject, Injectable } from '@angular/core';
+import { DestroyRef, inject, Injectable, NgZone } from '@angular/core';
 
 import { TerminalPromptCapture } from '../models/prompt-assets';
 import { TerminalSession } from '../models/workspace.models';
@@ -88,7 +88,8 @@ interface TerminalStartRequest {
 interface TerminalConnection {
   id: string;
   runtimeRevision: number;
-  onOutput: (data: string) => void;
+  /** `replayed` marks history being redrawn, which must not be analysed a second time. */
+  onOutput: (data: string, replayed: boolean) => void;
   /** Live output that arrived while a replay was in flight, held back to keep the order right. */
   buffered: TerminalOutputEvent[];
   replaying: boolean;
@@ -98,14 +99,25 @@ interface TerminalConnection {
 @Injectable({ providedIn: 'root' })
 export class TerminalGatewayService {
   private readonly remoteConnection = inject(RemoteConnectionService);
+  private readonly zone = inject(NgZone);
   private readonly connections = new Map<string, TerminalConnection>();
   private readonly browserListeners = new Map<string, (data: string) => void>();
   private readonly browserInputs = new Map<string, TerminalPromptCapture>();
+  /** The one output subscription every terminal is dispatched from. */
+  private outputListener?: Promise<UnlistenFn>;
+  private uiSyncHandle?: number;
 
   constructor() {
     if (hasBackend()) {
       void this.watchReplaySignals();
     }
+    inject(DestroyRef).onDestroy(() => {
+      if (this.uiSyncHandle !== undefined) {
+        cancelAnimationFrame(this.uiSyncHandle);
+      }
+      // Nothing depends on the unsubscribe succeeding — the app is going away with it.
+      void this.outputListener?.then((unlisten) => unlisten()).catch(() => undefined);
+    });
   }
 
   /**
@@ -118,10 +130,10 @@ export class TerminalGatewayService {
   async connect(
     terminalId: string,
     runtimeRevision: number,
-    onOutput: (data: string) => void,
+    onOutput: (data: string, replayed: boolean) => void,
   ): Promise<UnlistenFn> {
     if (!hasBackend()) {
-      this.browserListeners.set(terminalId, onOutput);
+      this.browserListeners.set(terminalId, (data) => onOutput(data, false));
       return () => {
         this.browserListeners.delete(terminalId);
         this.browserInputs.delete(terminalId);
@@ -138,17 +150,54 @@ export class TerminalGatewayService {
     };
     this.connections.set(terminalId, connection);
 
-    const unlisten = await listen<TerminalOutputEvent>(TERMINAL_OUTPUT_EVENT, (event) =>
-      this.handleOutput(connection, event.payload),
-    );
+    await this.ensureOutputListener();
     await this.replay(connection, false);
 
     return () => {
-      unlisten();
       if (this.connections.get(terminalId) === connection) {
         this.connections.delete(terminalId);
       }
     };
+  }
+
+  /**
+   * Subscribes to the output stream once for the whole app, rather than once per terminal.
+   *
+   * The backend raises one event per PTY read for every terminal, so a listener per terminal made
+   * each event wake every open terminal and deserialise its payload again — quadratic in the number
+   * of terminals, and the reason typing stuttered while an agent was producing output. The single
+   * listener dispatches by id instead.
+   *
+   * It stays registered for the life of the app: terminals come and go through `connections`, and
+   * re-registering on the last disconnect would only trade this cost for a reconnect race.
+   */
+  private async ensureOutputListener(): Promise<void> {
+    // Outside Angular: an agent writing output would otherwise run change detection over the whole
+    // workbench for every chunk it produces. What the output does move on screen is flushed once a
+    // frame by `scheduleUiSync`.
+    this.outputListener ??= this.zone.runOutsideAngular(() =>
+      listen<TerminalOutputEvent>(TERMINAL_OUTPUT_EVENT, (event) =>
+        this.handleOutput(event.payload),
+      ),
+    );
+    await this.outputListener;
+  }
+
+  /**
+   * Runs one change detection per frame, however many output chunks arrived in it.
+   *
+   * Terminal state, task progress and the attention banner all follow the output stream, and they
+   * are read from signals written outside the zone. Coalescing per frame keeps them live without
+   * paying a full pass per chunk.
+   */
+  private scheduleUiSync(): void {
+    if (this.uiSyncHandle !== undefined) {
+      return;
+    }
+    this.uiSyncHandle = requestAnimationFrame(() => {
+      this.uiSyncHandle = undefined;
+      this.zone.run(() => undefined);
+    });
   }
 
   /**
@@ -277,8 +326,9 @@ export class TerminalGatewayService {
     await listen(RESYNC_EVENT, () => void this.replayAll());
   }
 
-  private handleOutput(connection: TerminalConnection, payload: TerminalOutputEvent): void {
-    if (!terminalEventMatchesSession(payload, connection)) {
+  private handleOutput(payload: TerminalOutputEvent): void {
+    const connection = this.connections.get(payload.terminalId);
+    if (!connection || !terminalEventMatchesSession(payload, connection)) {
       return;
     }
     if (connection.replaying) {
@@ -297,7 +347,8 @@ export class TerminalGatewayService {
       }
       connection.lastSequence = sequence;
     }
-    connection.onOutput(payload.data);
+    connection.onOutput(payload.data, false);
+    this.scheduleUiSync();
   }
 
   private async replay(connection: TerminalConnection, clearScreen: boolean): Promise<void> {
@@ -309,9 +360,9 @@ export class TerminalGatewayService {
       // A snapshot from a PTY this view has already replaced would draw someone else's output.
       if (scrollback.runtimeRevision === connection.runtimeRevision && scrollback.data) {
         if (clearScreen) {
-          connection.onOutput(CLEAR_SCREEN);
+          connection.onOutput(CLEAR_SCREEN, true);
         }
-        connection.onOutput(scrollback.data);
+        connection.onOutput(scrollback.data, true);
         connection.lastSequence = scrollback.sequence;
       }
     } catch (error) {
@@ -321,6 +372,7 @@ export class TerminalGatewayService {
       for (const payload of connection.buffered.splice(0)) {
         this.deliver(connection, payload);
       }
+      this.scheduleUiSync();
     }
   }
 

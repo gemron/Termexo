@@ -11,7 +11,7 @@
 </p>
 
 <p align="center">
-  <img alt="Version 0.8.1" src="https://img.shields.io/badge/version-0.8.1-58c7a0">
+  <img alt="Version 0.8.2" src="https://img.shields.io/badge/version-0.8.2-58c7a0">
   <img alt="Windows" src="https://img.shields.io/badge/platform-Windows-0078D4?logo=windows">
   <img alt="Tauri 2" src="https://img.shields.io/badge/Tauri-2-24C8DB?logo=tauri&logoColor=white">
   <img alt="Angular 22" src="https://img.shields.io/badge/Angular-22-DD0031?logo=angular">
@@ -36,7 +36,7 @@ Run the complete Windows app with one command—no Termexo account or server req
 npx termexo@latest
 ```
 
-> The current version is **V0.8.1**.
+> The current version is **V0.8.2**.
 
 ![Termexo multi-terminal grid workbench](website/assets/termexo-workbench.png)
 
@@ -131,6 +131,23 @@ you configure under their own terms and privacy policies.
 The interface is available in Simplified Chinese, English, Spanish, French, German, Japanese,
 and Korean. It follows the Windows language automatically, or you can choose a language from
 the main toolbar and keep that choice across restarts.
+
+## What's New in V0.8.2
+
+- **Typing keeps up with a working agent.** Every open terminal subscribed to the output stream
+  separately, so each chunk an agent produced woke all of them and ran change detection across the
+  whole workbench — with several terminals open, keystrokes queued behind that work. A single shared
+  subscription now dispatches by terminal, and the screen settles once a frame rather than once per
+  chunk.
+- **Restoring terminals no longer stalls.** Replayed scrollback was fed back through the task,
+  handoff and startup readers on every reconnect, which re-analysed each terminal's entire history
+  at startup. History is now redrawn without being counted a second time.
+- **1M context and reasoning effort.** A model profile can ask Claude Code for the 1M context window
+  and set the reasoning effort for either agent, and a launch can override both for that terminal
+  alone.
+- **The empty workspace offers the same agents.** Its button opened a plain Shell and left starting
+  an Agent to a menu that had not been found yet. It now lists Claude Code, Codex CLI, OpenCode and
+  Shell — the same list the tab strip's menu carries.
 
 ## What's New in V0.8.1
 

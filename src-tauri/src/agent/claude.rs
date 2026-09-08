@@ -273,6 +273,7 @@ impl AgentAdapter for ClaudeCodeAdapter {
 
         append_option(&mut command, "--name", options.name.as_deref());
         append_option(&mut command, "--model", options.model.as_deref());
+        append_option(&mut command, "--effort", options.effort.as_deref());
         append_option(&mut command, "--settings", options.settings_path.as_deref());
         append_option(
             &mut command,
@@ -720,6 +721,7 @@ mod tests {
             session_id: Some("04cd7760-d05a-4fb5".into()),
             name: Some("Auth refactor".into()),
             model: Some("opus".into()),
+            effort: None,
             settings_path: Some("C:\\runtime\\hooks.json".into()),
             mcp_config_path: None,
             auto_confirm: true,

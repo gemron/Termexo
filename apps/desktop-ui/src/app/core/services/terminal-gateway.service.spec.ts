@@ -39,6 +39,7 @@ describe('TerminalGatewayService attachment', () => {
   let commandHandler: (command: string, args: Record<string, unknown>) => Promise<unknown>;
   let eventHandlers: Map<string, (event: { event: string; payload: unknown }) => void>;
   let resolveScrollback: ((value: unknown) => void) | undefined;
+  let outputListenCount: number;
   let service: TerminalGatewayService;
 
   function emitOutput(data: string, sequence: number, runtimeRevision = 3): void {
@@ -57,6 +58,7 @@ describe('TerminalGatewayService attachment', () => {
   beforeEach(() => {
     eventHandlers = new Map();
     resolveScrollback = undefined;
+    outputListenCount = 0;
     commandHandler = (command) =>
       command === 'read_terminal_scrollback' ? pendingScrollback() : Promise.resolve(undefined);
 
@@ -72,6 +74,9 @@ describe('TerminalGatewayService attachment', () => {
       },
       invoke: (command: string, args: Record<string, unknown>) => {
         if (command === 'plugin:event|listen') {
+          if (args['event'] === 'terminal-output') {
+            outputListenCount += 1;
+          }
           const handler = callbacks.get(args['handler'] as number);
           if (handler) {
             eventHandlers.set(args['event'] as string, handler);
@@ -105,6 +110,35 @@ describe('TerminalGatewayService attachment', () => {
 
     // Everything up to sequence 8 is part of the snapshot; only newer output is written again.
     expect(output).toEqual(['scrollback', 'fresh']);
+  });
+
+  it('subscribes to the output stream once however many terminals attach', async () => {
+    // One subscription per terminal made every chunk wake every terminal and deserialise its
+    // payload again, which is what stalled typing while an agent was producing output.
+    commandHandler = () => Promise.resolve({ data: '', sequence: 0, runtimeRevision: 3 });
+
+    await service.connect('terminal-1', 3, () => undefined);
+    await service.connect('terminal-2', 3, () => undefined);
+    await service.connect('terminal-3', 3, () => undefined);
+
+    expect(outputListenCount).toBe(1);
+  });
+
+  it('marks replayed history so the output readers skip it', async () => {
+    const writes: Array<{ data: string; replayed: boolean }> = [];
+    const connecting = service.connect('terminal-1', 3, (data, replayed) =>
+      writes.push({ data, replayed }),
+    );
+    await vi.waitFor(() => expect(resolveScrollback).toBeDefined());
+
+    resolveScrollback?.({ data: 'history', sequence: 8, runtimeRevision: 3 });
+    await connecting;
+    emitOutput('live', 9);
+
+    expect(writes).toEqual([
+      { data: 'history', replayed: true },
+      { data: 'live', replayed: false },
+    ]);
   });
 
   it('ignores a snapshot belonging to a PTY this view has already replaced', async () => {

@@ -11,7 +11,10 @@ use crate::agent::{
     ClaudeCodeAdapter, ClaudeLaunchOptions, CodexCliAdapter, CodexLaunchOptions, OpenCodeAdapter,
     OpenCodeLaunchOptions,
 };
-use crate::config::{AgentProtocol, CredentialStore, LaunchEnvironmentStore, ModelProfile};
+use crate::config::{
+    claude_launch_model, normalized_effort, AgentProtocol, CredentialStore, LaunchEnvironmentStore,
+    ModelProfile, CLAUDE_EFFORT_LEVELS, CODEX_REASONING_EFFORT_LEVELS,
+};
 use crate::database::WorkspaceDatabase;
 use crate::hooks::{toml_literal, HookEventStore};
 use crate::network;
@@ -190,6 +193,12 @@ pub struct PrepareClaudeLaunchRequest {
     pub fork_session: bool,
     /// Reconnects to a session the CLI still has running instead of starting a new process.
     pub attach_short_id: Option<String>,
+    /// Overrides the profile's 1M context window for this terminal; absent keeps what it stores.
+    #[serde(default, rename = "context1m")]
+    pub context_1m: Option<bool>,
+    /// Overrides the profile's reasoning depth for this terminal; absent keeps what it stores.
+    #[serde(default)]
+    pub effort: Option<String>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -203,6 +212,9 @@ pub struct PrepareCodexLaunchRequest {
     pub account_profile_id: Option<String>,
     #[serde(default)]
     pub auto_confirm: bool,
+    /// Overrides the profile's reasoning depth for this terminal; absent keeps what it stores.
+    #[serde(default)]
+    pub reasoning_effort: Option<String>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -257,9 +269,32 @@ pub fn prepare_claude_launch(
         }
         None => None,
     };
+    // The launch dialog may override what the profile stores, for this one terminal. Both
+    // settings are fixed at launch: neither the context window nor the effort can be changed
+    // afterwards without restarting the CLI.
+    let context_1m = request.context_1m.unwrap_or_else(|| {
+        profile
+            .as_ref()
+            .is_some_and(|profile| profile.claude_context_1m)
+    });
+    let effort = normalized_effort(
+        request.effort.as_deref().unwrap_or_else(|| {
+            profile
+                .as_ref()
+                .map_or("", |profile| profile.claude_effort.as_str())
+        }),
+        &CLAUDE_EFFORT_LEVELS,
+    );
+    let model = claude_launch_model(
+        profile
+            .as_ref()
+            .map_or("", |profile| profile.claude_model.as_str()),
+        context_1m,
+    );
+
     let mut environment =
         account_profile_environment(&database, request.account_profile_id.as_deref(), "claude")?;
-    environment.extend(claude_profile_environment(profile.as_ref()));
+    environment.extend(claude_profile_environment(profile.as_ref(), context_1m));
     if let Some(profile) = profile.as_ref() {
         if let Some(target) = profile.credential_target.as_deref() {
             let token = credentials
@@ -292,7 +327,8 @@ pub fn prepare_claude_launch(
         .build_launch_command(&ClaudeLaunchOptions {
             session_id: request.session_id,
             name: request.name,
-            model: profile.map(|profile| profile.claude_model),
+            model: (!model.is_empty()).then_some(model),
+            effort: (!effort.is_empty()).then_some(effort),
             settings_path: Some(runtime.settings_path),
             mcp_config_path,
             auto_confirm: request.auto_confirm,
@@ -391,6 +427,20 @@ pub fn prepare_codex_launch(
             ));
             provider_configs.push(format!("model_context_window={}", metadata.context_window));
         }
+    }
+    let reasoning_effort = normalized_effort(
+        request.reasoning_effort.as_deref().unwrap_or_else(|| {
+            profile
+                .as_ref()
+                .map_or("", |profile| profile.codex_reasoning_effort.as_str())
+        }),
+        &CODEX_REASONING_EFFORT_LEVELS,
+    );
+    if !reasoning_effort.is_empty() {
+        provider_configs.push(format!(
+            "model_reasoning_effort={}",
+            toml_literal(&reasoning_effort).map_err(|error| error.to_string())?
+        ));
     }
     log_proxy_environment(&environment);
     launch_environment
@@ -640,7 +690,10 @@ pub(crate) fn relaunch_environment(
         // Codex takes its provider from `-c` overrides on the command line, which the terminal
         // already stores; only Claude reads the provider out of the environment.
         if agent_type == "claude" {
-            environment.extend(claude_profile_environment(Some(profile)));
+            environment.extend(claude_profile_environment(
+                Some(profile),
+                profile.claude_context_1m,
+            ));
         }
         if let Some(target) = profile.credential_target.as_deref() {
             // A missing key is not fatal here: the terminal is reconnecting, and refusing to
@@ -660,14 +713,19 @@ pub(crate) fn relaunch_environment(
 }
 
 /// Claude reads its provider from the environment, so the profile becomes env vars.
-fn claude_profile_environment(profile: Option<&ModelProfile>) -> HashMap<String, String> {
+/// A third-party endpoint reads its model — and the context window it implies — out of the
+/// environment, so it has to be handed the same suffixed id the command line carries.
+fn claude_profile_environment(
+    profile: Option<&ModelProfile>,
+    context_1m: bool,
+) -> HashMap<String, String> {
     let Some(profile) = profile else {
         return HashMap::new();
     };
     let Some((model, base_url)) = profile.endpoint(AgentProtocol::Anthropic) else {
         return HashMap::new();
     };
-    anthropic_profile_environment(profile, model, base_url)
+    anthropic_profile_environment(profile, &claude_launch_model(model, context_1m), base_url)
 }
 
 /// Codex provider id Termexo declares its overrides under.
@@ -885,6 +943,9 @@ mod tests {
             codex_model: String::new(),
             codex_base_url: None,
             plan_alert_threshold: 80,
+            claude_context_1m: false,
+            claude_effort: String::new(),
+            codex_reasoning_effort: String::new(),
         }
     }
 
@@ -896,7 +957,7 @@ mod tests {
             ..profile("deepseek", "DeepSeek")
         };
 
-        let environment = claude_profile_environment(Some(&profile));
+        let environment = claude_profile_environment(Some(&profile), false);
 
         assert_eq!(
             environment.get("ANTHROPIC_BASE_URL").map(String::as_str),
@@ -935,7 +996,7 @@ mod tests {
             ..profile("claude-default", "Anthropic")
         };
 
-        assert!(claude_profile_environment(Some(&profile)).is_empty());
+        assert!(claude_profile_environment(Some(&profile), false).is_empty());
     }
 
     #[test]
@@ -946,7 +1007,7 @@ mod tests {
             ..profile("minimax", "MiniMax")
         };
 
-        let environment = claude_profile_environment(Some(&profile));
+        let environment = claude_profile_environment(Some(&profile), false);
 
         assert_eq!(
             environment.get("ANTHROPIC_BASE_URL").map(String::as_str),
@@ -1165,7 +1226,7 @@ mod tests {
             ..profile("deepseek", "DeepSeek")
         };
 
-        let claude = claude_profile_environment(Some(&profile));
+        let claude = claude_profile_environment(Some(&profile), false);
         let codex = codex_provider_configs(Some(&profile)).unwrap();
 
         assert_eq!(
@@ -1199,7 +1260,7 @@ mod tests {
             codex_provider_configs(Some(&profile)).unwrap(),
             vec!["model_provider='''openai'''".to_owned()]
         );
-        assert!(!claude_profile_environment(Some(&profile)).is_empty());
+        assert!(!claude_profile_environment(Some(&profile), false).is_empty());
     }
 
     #[test]

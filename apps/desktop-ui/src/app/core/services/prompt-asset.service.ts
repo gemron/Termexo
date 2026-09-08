@@ -1,4 +1,4 @@
-import { Injectable, signal } from '@angular/core';
+import { DestroyRef, inject, Injectable, signal } from '@angular/core';
 
 import { createId } from '../models/identifiers';
 import {
@@ -13,6 +13,8 @@ import { hasBackend } from './tauri-runtime';
 const STORAGE_KEY = 'termexo.promptAssets.v1';
 const EMERGENCY_DRAFT_STORAGE_KEY = 'termexo.pendingPromptDrafts.v1';
 const DRAFT_SAVE_DELAY_MS = 250;
+/** Upper bound on how long a busy main thread may postpone the emergency draft write. */
+const EMERGENCY_DRAFT_FLUSH_TIMEOUT_MS = 200;
 const MAX_LOCAL_ASSETS = 1_000;
 
 @Injectable({ providedIn: 'root' })
@@ -22,10 +24,34 @@ export class PromptAssetService {
   private readonly captures = new Map<string, TerminalPromptCapture>();
   private readonly draftTimers = new Map<string, number>();
   private readonly draftQueues = new Map<string, Promise<unknown>>();
+  /** Mirror of the emergency store, so writing a draft never has to read and parse it back. */
+  private readonly emergencyDrafts = new Map<string, PromptAsset>();
+  /** Drafts waiting to be built and written, keyed by terminal; `null` removes one. */
+  private readonly pendingEmergencyDrafts = new Map<string, (() => PromptAsset) | null>();
+  private emergencyDraftsLoaded = false;
+  private cancelEmergencyFlush: (() => void) | undefined;
   private initialized = false;
 
   readonly assets = this.assetItems.asReadonly();
   readonly error = this.errorState.asReadonly();
+
+  constructor() {
+    // A window that is closing or going to the background may never reach the idle callback, and
+    // the draft still queued there is exactly the one a crash would lose.
+    const flush = (): void => this.flushEmergencyDrafts();
+    const flushWhenHidden = (): void => {
+      if (document.hidden) {
+        flush();
+      }
+    };
+    window.addEventListener('pagehide', flush);
+    document.addEventListener('visibilitychange', flushWhenHidden);
+    inject(DestroyRef).onDestroy(() => {
+      window.removeEventListener('pagehide', flush);
+      document.removeEventListener('visibilitychange', flushWhenHidden);
+      flush();
+    });
+  }
 
   async initialize(): Promise<void> {
     if (this.initialized) {
@@ -36,7 +62,7 @@ export class PromptAssetService {
       const assets = hasBackend()
         ? await invoke<PromptAsset[]>('list_prompt_assets', { workspaceId: null })
         : this.readLocalAssets();
-      this.assetItems.set(this.sort(this.mergeLatest(assets, this.readEmergencyDrafts())));
+      this.assetItems.set(this.sort(this.mergeLatest(assets, this.loadEmergencyDrafts())));
     } catch (error) {
       this.errorState.set(this.errorMessage(error));
     }
@@ -76,10 +102,14 @@ export class PromptAssetService {
       return;
     }
 
-    this.writeEmergencyDraft(
+    // Building the asset is deferred along with the write: redacting and serialising the whole
+    // draft on every keystroke is what made typing stutter, and this copy is only ever read back
+    // after a crash.
+    this.queueEmergencyDraft(
       terminal.id,
       result.draft
-        ? this.createAsset(workspace, terminal, 'draft', result.draft, this.draftId(terminal.id))
+        ? () =>
+            this.createAsset(workspace, terminal, 'draft', result.draft, this.draftId(terminal.id))
         : null,
     );
     this.scheduleDraftSave(workspace, terminal, result.draft);
@@ -254,29 +284,91 @@ export class PromptAssetService {
     }
   }
 
-  private readEmergencyDrafts(): PromptAsset[] {
-    try {
-      const value = window.localStorage.getItem(EMERGENCY_DRAFT_STORAGE_KEY);
-      const parsed: unknown = value ? JSON.parse(value) : {};
-      return parsed && typeof parsed === 'object'
-        ? Object.values(parsed as Record<string, PromptAsset>)
-        : [];
-    } catch {
-      return [];
+  /**
+   * Reads the emergency store into memory once, so a keystroke never parses it back out.
+   *
+   * Both `initialize` and the first queued write call this, because a draft typed before the asset
+   * list finished loading would otherwise persist an empty mirror over the recoverable ones.
+   */
+  private loadEmergencyDrafts(): PromptAsset[] {
+    if (!this.emergencyDraftsLoaded) {
+      this.emergencyDraftsLoaded = true;
+      try {
+        const value = window.localStorage.getItem(EMERGENCY_DRAFT_STORAGE_KEY);
+        const parsed: unknown = value ? JSON.parse(value) : {};
+        if (parsed && typeof parsed === 'object') {
+          for (const asset of Object.values(parsed as Record<string, PromptAsset>)) {
+            if (asset?.terminalId) {
+              this.emergencyDrafts.set(asset.terminalId, asset);
+            }
+          }
+        }
+      } catch {
+        // An unreadable store only means there is nothing to recover.
+      }
     }
+    return [...this.emergencyDrafts.values()];
   }
 
+  /** Queues an already-built draft; the write still coalesces with everything else pending. */
   private writeEmergencyDraft(terminalId: string, asset: PromptAsset | null): void {
-    try {
-      const drafts = Object.fromEntries(
-        this.readEmergencyDrafts()
-          .filter((candidate) => candidate.terminalId !== terminalId)
-          .map((candidate) => [candidate.terminalId!, candidate]),
-      );
-      if (asset) {
-        drafts[terminalId] = asset;
+    this.queueEmergencyDraft(terminalId, asset ? () => asset : null);
+  }
+
+  /**
+   * Queues one terminal's emergency draft, building the asset only when the write happens.
+   *
+   * Takes a closure rather than a finished asset because this runs on every keystroke: the
+   * redaction pass and the JSON serialisation are the parts a fast typist would feel.
+   */
+  private queueEmergencyDraft(terminalId: string, build: (() => PromptAsset) | null): void {
+    this.loadEmergencyDrafts();
+    this.pendingEmergencyDrafts.set(terminalId, build);
+    this.scheduleEmergencyFlush();
+  }
+
+  /**
+   * Defers the write to an idle moment, which is what keeps `localStorage` — synchronous, and
+   * occasionally stalling on disk — off the keystroke path.
+   */
+  private scheduleEmergencyFlush(): void {
+    if (this.cancelEmergencyFlush) {
+      return;
+    }
+    if (typeof window.requestIdleCallback === 'function') {
+      const handle = window.requestIdleCallback(() => this.flushEmergencyDrafts(), {
+        timeout: EMERGENCY_DRAFT_FLUSH_TIMEOUT_MS,
+      });
+      this.cancelEmergencyFlush = () => window.cancelIdleCallback(handle);
+      return;
+    }
+    const handle = window.setTimeout(
+      () => this.flushEmergencyDrafts(),
+      EMERGENCY_DRAFT_FLUSH_TIMEOUT_MS,
+    );
+    this.cancelEmergencyFlush = () => window.clearTimeout(handle);
+  }
+
+  /** Applies every queued draft and writes the store once. */
+  private flushEmergencyDrafts(): void {
+    this.cancelEmergencyFlush?.();
+    this.cancelEmergencyFlush = undefined;
+    if (this.pendingEmergencyDrafts.size === 0) {
+      return;
+    }
+    for (const [terminalId, build] of this.pendingEmergencyDrafts) {
+      if (build) {
+        this.emergencyDrafts.set(terminalId, build());
+      } else {
+        this.emergencyDrafts.delete(terminalId);
       }
-      window.localStorage.setItem(EMERGENCY_DRAFT_STORAGE_KEY, JSON.stringify(drafts));
+    }
+    this.pendingEmergencyDrafts.clear();
+    try {
+      window.localStorage.setItem(
+        EMERGENCY_DRAFT_STORAGE_KEY,
+        JSON.stringify(Object.fromEntries(this.emergencyDrafts)),
+      );
     } catch {
       // SQLite persistence remains available when localStorage is restricted.
     }

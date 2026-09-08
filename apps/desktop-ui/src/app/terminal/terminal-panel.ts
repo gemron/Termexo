@@ -7,6 +7,7 @@ import {
   effect,
   inject,
   input,
+  NgZone,
   output,
   signal,
   viewChild,
@@ -53,6 +54,7 @@ export class TerminalPanelComponent implements AfterViewInit {
   private readonly gateway = inject(TerminalGatewayService);
   private readonly i18n = inject(I18nService);
   private readonly destroyRef = inject(DestroyRef);
+  private readonly zone = inject(NgZone);
   private readonly container = viewChild.required<ElementRef<HTMLDivElement>>('terminal');
   private readonly terminal = new Terminal({
     cursorBlink: true,
@@ -197,8 +199,14 @@ export class TerminalPanelComponent implements AfterViewInit {
     this.terminal.attachCustomKeyEventHandler(this.handleCustomKey);
     this.terminal.loadAddon(this.fitAddon);
     const terminalContainer = this.container().nativeElement;
-    this.terminal.open(terminalContainer);
-    void this.enableGpuRenderer();
+    // Outside Angular on purpose: xterm registers its own keyboard, IME and animation-frame
+    // listeners here, and inside the zone every keystroke and every rendered frame would run
+    // change detection across the whole workbench. The callbacks that do move the UI come back in
+    // through `zone.run`.
+    this.zone.runOutsideAngular(() => {
+      this.terminal.open(terminalContainer);
+      void this.enableGpuRenderer();
+    });
     this.compositionAnchor = new TerminalCompositionAnchor(terminalContainer, () => {
       const buffer = this.terminal.buffer.active;
       return {
@@ -241,15 +249,18 @@ export class TerminalPanelComponent implements AfterViewInit {
     void this.initializeRuntime();
     const inputDisposable = this.terminal.onData((data) => {
       this.inputCaptured.emit({ terminalId: this.session().id, data });
-      this.claimTerminalSize();
       if (data.includes('\r')) {
         this.terminal.scrollToBottom();
-        this.runtimeIssue.set(null);
         this.lastRuntimeIssue = null;
         this.outputTail = '';
-        this.statusChanged.emit({
-          terminalId: this.session().id,
-          status: this.session().agentType === 'shell' ? 'RUNNING' : 'THINKING',
+        // Submitting a prompt clears the runtime notice and moves the terminal's status, both of
+        // which the workbench draws, so this part re-enters the zone.
+        this.zone.run(() => {
+          this.runtimeIssue.set(null);
+          this.statusChanged.emit({
+            terminalId: this.session().id,
+            status: this.session().agentType === 'shell' ? 'RUNNING' : 'THINKING',
+          });
         });
       }
       void this.gateway.write(this.session(), data);
@@ -362,8 +373,10 @@ export class TerminalPanelComponent implements AfterViewInit {
     let unlisten: (() => void) | undefined;
     try {
       const session = this.session();
-      unlisten = await this.gateway.connect(session.id, session.runtimeRevision ?? 0, (data) =>
-        this.handleOutput(data),
+      unlisten = await this.gateway.connect(
+        session.id,
+        session.runtimeRevision ?? 0,
+        (data, replayed) => this.handleOutput(data, replayed),
       );
       if (this.destroyRef.destroyed) {
         unlisten();
@@ -731,6 +744,10 @@ export class TerminalPanelComponent implements AfterViewInit {
    *
    * Sent only when this window would draw a different grid than the terminal currently uses, so
    * the common case — clicking around the view that already owns it — costs nothing.
+   *
+   * Typing does not call this: `proposeDimensions` measures the DOM, and forcing a synchronous
+   * layout on every keystroke is what made input stutter. Reaching the keyboard means the view was
+   * focused or clicked first, and both of those already claim the terminal.
    */
   private claimTerminalSize(): void {
     if (!this.runtimeReady) {
@@ -764,10 +781,16 @@ export class TerminalPanelComponent implements AfterViewInit {
     this.claimTerminalSize();
   }
 
-  private handleOutput(data: string): void {
-    this.outputCaptured.emit({ terminalId: this.session().id, data });
+  private handleOutput(data: string, replayed = false): void {
     this.terminal.write(data);
     this.outputTail = `${this.outputTail}${data}`.slice(-2_000);
+    // Replayed scrollback was already analysed when it first arrived. Feeding a whole terminal's
+    // history back through the task, handoff and startup readers on every reconnect is what made
+    // restoring terminals stall, and it would count the same output twice.
+    if (replayed) {
+      return;
+    }
+    this.outputCaptured.emit({ terminalId: this.session().id, data });
     const issue = detectTerminalRuntimeIssue(this.outputTail);
     if (!issue || issue === this.lastRuntimeIssue) {
       return;

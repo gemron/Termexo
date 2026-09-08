@@ -7,6 +7,7 @@ import {
   AccountProfile,
   AgentInstallation,
   CODEX_MODEL_SUGGESTIONS,
+  CODEX_REASONING_EFFORT_LEVELS,
   isNativeModel,
   profileModel,
   profileServes,
@@ -22,6 +23,8 @@ export interface CodexLaunchDialogValue {
   profileId?: string;
   accountProfileId?: string;
   autoConfirm?: boolean;
+  /** Overrides the profile's reasoning depth for this launch only; omitted keeps what it stores. */
+  reasoningEffort?: string;
 }
 
 @Component({
@@ -117,6 +120,19 @@ export interface CodexLaunchDialogValue {
           </datalist>
           <small>{{ 'launch.codexModelHelp' | t }}</small>
         </label>
+        <label class="effort-field">
+          <span>{{ 'settings.effortLevel' | t }}</span>
+          <select
+            class="select select-bordered select-sm"
+            [ngModel]="effort()"
+            (ngModelChange)="effort.set($event)"
+          >
+            <option value="">{{ 'launch.followProfile' | t }}</option>
+            @for (level of effortLevels; track level) {
+              <option [value]="level">{{ level }}</option>
+            }
+          </select>
+        </label>
         <label class="wide checkbox-control auto-confirm-control">
           <input
             type="checkbox"
@@ -150,6 +166,8 @@ export class CodexLaunchDialogComponent {
   protected readonly accountProfileId = signal('');
   protected readonly autoConfirm = signal(false);
   protected readonly modelSuggestions = CODEX_MODEL_SUGGESTIONS;
+  protected readonly effort = signal('');
+  protected readonly effortLevels = CODEX_REASONING_EFFORT_LEVELS;
   protected readonly codexAccounts = computed(() =>
     this.accountProfiles().filter((profile) => profile.agentType === 'codex'),
   );
@@ -226,6 +244,7 @@ export class CodexLaunchDialogComponent {
       profileId: this.resolvedProfileId() || undefined,
       accountProfileId: this.resolvedAccountProfileId() || undefined,
       autoConfirm: this.autoConfirm() || undefined,
+      reasoningEffort: this.effort() || undefined,
     });
   }
 }

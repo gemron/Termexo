@@ -13,7 +13,6 @@ import {
   AccountProfileInput,
   AgentProtocol,
   BackgroundSessionResolution,
-  type AgentInstallation,
   ClaudeBackgroundSession,
   CliOperationPlan,
   CliOperationRequest,
@@ -117,6 +116,7 @@ import { ResumeSessionValue, SessionCenterDialogComponent } from './dialogs/sess
 import { InspectorPanelComponent } from './inspector/inspector-panel';
 import { RemoteAccessGateComponent } from './remote/remote-access-gate';
 import { RemoteConnectionBadgeComponent } from './remote/remote-connection-badge';
+import { AgentLaunchOptionsComponent } from './shared/agent-launch-options/agent-launch-options';
 import { IconComponent } from './shared/icon/icon';
 import { LanguageSelectorComponent } from './shared/language-selector/language-selector';
 import { TopbarOverflowMenuComponent } from './shared/topbar-overflow-menu/topbar-overflow-menu';
@@ -218,6 +218,7 @@ function readStoredString(key: string, fallback: string): string {
 @Component({
   selector: 'app-root',
   imports: [
+    AgentLaunchOptionsComponent,
     AgentSettingsDialogComponent,
     ClaudeLaunchDialogComponent,
     CodexLaunchDialogComponent,
@@ -731,6 +732,27 @@ export class App {
     await this.agents.refreshProviderQuotas(this.state.activeWorkspace()?.id, force);
   }
 
+  /**
+   * Routes a pick from the shared launch list, so the tab strip's menu and the empty workspace
+   * open the same thing for the same option.
+   */
+  protected async launchAgent(agentType: AgentType): Promise<void> {
+    switch (agentType) {
+      case 'claude':
+        await this.openClaudeLaunch();
+        break;
+      case 'codex':
+        await this.openCodexLaunch();
+        break;
+      case 'opencode':
+        await this.openOpenCodeLaunch();
+        break;
+      case 'shell':
+        await this.createTerminal('shell');
+        break;
+    }
+  }
+
   protected async createTerminal(agentType: AgentType): Promise<void> {
     this.agentMenuOpen.set(false);
     const workingDirectory = await this.selectTerminalDirectory();
@@ -874,6 +896,7 @@ export class App {
         profileId: value.profileId,
         accountProfileId: value.accountProfileId,
         autoConfirm: value.autoConfirm,
+        reasoningEffort: value.reasoningEffort,
       });
       const terminal = this.state.createTerminal({
         id: terminalId,
@@ -932,6 +955,8 @@ export class App {
         mcpProfileId: value.mcpProfileId,
         accountProfileId: value.accountProfileId,
         autoConfirm: value.autoConfirm,
+        context1m: value.context1m,
+        effort: value.effort,
       });
       const terminal = this.state.createTerminal({
         id: terminalId,
@@ -2600,18 +2625,6 @@ export class App {
     } catch (error) {
       this.showToast(this.errorMessage(error));
     }
-  }
-
-  /**
-   * What the new-terminal menu shows under each Agent: its version when the CLI is usable, and
-   * otherwise why it is not. One reading for all three, so a missing CLI is visible before the
-   * user picks it rather than after the launch dialog opens.
-   */
-  protected installationLabel(installation: AgentInstallation | null): string {
-    if (!installation?.healthy) {
-      return this.i18n.t('common.notDetected');
-    }
-    return installation.version ?? this.i18n.t('common.connected');
   }
 
   protected async detectAgentInstallations(): Promise<void> {

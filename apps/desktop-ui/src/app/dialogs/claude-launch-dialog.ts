@@ -6,6 +6,7 @@ import { TranslatePipe } from '../core/i18n/translate.pipe';
 import {
   AccountProfile,
   AgentInstallation,
+  CLAUDE_EFFORT_LEVELS,
   isNativeModel,
   profileModel,
   profileServes,
@@ -22,7 +23,17 @@ export interface ClaudeLaunchDialogValue {
   mcpProfileId?: string;
   accountProfileId?: string;
   autoConfirm?: boolean;
+  /** Overrides the profile's settings for this launch only; omitted keeps what it stores. */
+  context1m?: boolean;
+  effort?: string;
 }
+
+/**
+ * The 1M window is a three-state choice, not a checkbox: a launch may follow the profile, or
+ * override it either way, and an unchecked box could not tell the first case from the last.
+ */
+const CONTEXT_1M_ON = 'on';
+const CONTEXT_1M_OFF = 'off';
 
 @Component({
   selector: 'app-claude-launch-dialog',
@@ -116,6 +127,31 @@ export interface ClaudeLaunchDialogValue {
             }
           </select>
         </label>
+        <label class="effort-field">
+          <span>{{ 'settings.effortLevel' | t }}</span>
+          <select
+            class="select select-bordered select-sm"
+            [ngModel]="effort()"
+            (ngModelChange)="effort.set($event)"
+          >
+            <option value="">{{ 'launch.followProfile' | t }}</option>
+            @for (level of effortLevels; track level) {
+              <option [value]="level">{{ level }}</option>
+            }
+          </select>
+        </label>
+        <label class="context-field">
+          <span>{{ 'settings.context1m' | t }}</span>
+          <select
+            class="select select-bordered select-sm"
+            [ngModel]="context1m()"
+            (ngModelChange)="context1m.set($event)"
+          >
+            <option value="">{{ 'launch.followProfile' | t }}</option>
+            <option [value]="contextOn">{{ 'launch.context1mOn' | t }}</option>
+            <option [value]="contextOff">{{ 'launch.context1mOff' | t }}</option>
+          </select>
+        </label>
         <label class="wide checkbox-control auto-confirm-control">
           <input
             type="checkbox"
@@ -149,6 +185,11 @@ export class ClaudeLaunchDialogComponent {
   protected readonly mcpProfileId = signal('');
   protected readonly accountProfileId = signal('');
   protected readonly autoConfirm = signal(false);
+  protected readonly effort = signal('');
+  protected readonly context1m = signal('');
+  protected readonly effortLevels = CLAUDE_EFFORT_LEVELS;
+  protected readonly contextOn = CONTEXT_1M_ON;
+  protected readonly contextOff = CONTEXT_1M_OFF;
   protected readonly claudeAccounts = computed(() =>
     this.accountProfiles().filter((profile) => profile.agentType === 'claude'),
   );
@@ -200,6 +241,14 @@ export class ClaudeLaunchDialogComponent {
       mcpProfileId: this.mcpProfileId() || undefined,
       accountProfileId: this.resolvedAccountProfileId() || undefined,
       autoConfirm: this.autoConfirm() || undefined,
+      context1m: this.selectedContext1m(),
+      effort: this.effort() || undefined,
     });
+  }
+
+  /** `undefined` leaves the profile's own setting in place, which is what an empty choice means. */
+  private selectedContext1m(): boolean | undefined {
+    const choice = this.context1m();
+    return choice ? choice === CONTEXT_1M_ON : undefined;
   }
 }

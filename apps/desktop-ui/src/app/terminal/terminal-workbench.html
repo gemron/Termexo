@@ -38,9 +38,10 @@
     <span class="empty-icon"><app-icon name="terminal" [size]="24" /></span>
     <h2>{{ 'terminal.emptyTitle' | t }}</h2>
     <p>{{ 'terminal.emptyDescription' | t }}</p>
-    <button type="button" (click)="terminalRequested.emit()">
-      <app-icon name="plus" [size]="15" />
-      {{ 'terminal.new' | t }}
-    </button>
+    <!--
+      The same list the tab strip's new-terminal menu shows: an empty workspace is exactly where
+      starting an Agent is most likely, and its button used to open a plain Shell instead.
+    -->
+    <app-agent-launch-options variant="panel" (optionSelected)="launchRequested.emit($event)" />
   </div>
 }
