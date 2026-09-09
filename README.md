@@ -11,7 +11,7 @@
 </p>
 
 <p align="center">
-  <img alt="Version 0.8.3" src="https://img.shields.io/badge/version-0.8.3-58c7a0">
+  <img alt="Version 0.8.4" src="https://img.shields.io/badge/version-0.8.4-58c7a0">
   <img alt="Windows" src="https://img.shields.io/badge/platform-Windows-0078D4?logo=windows">
   <img alt="Tauri 2" src="https://img.shields.io/badge/Tauri-2-24C8DB?logo=tauri&logoColor=white">
   <img alt="Angular 22" src="https://img.shields.io/badge/Angular-22-DD0031?logo=angular">
@@ -36,7 +36,7 @@ Run the complete Windows app with one command—no Termexo account or server req
 npx termexo@latest
 ```
 
-> The current version is **V0.8.3**.
+> The current version is **V0.8.4**.
 
 ![Termexo multi-terminal grid workbench](website/assets/termexo-workbench.png)
 
@@ -131,6 +131,17 @@ you configure under their own terms and privacy policies.
 The interface is available in Simplified Chinese, English, Spanish, French, German, Japanese,
 and Korean. It follows the Windows language automatically, or you can choose a language from
 the main toolbar and keep that choice across restarts.
+
+## What's New in V0.8.4
+
+- **Codex scrolls on a phone.** A finger drag reached xterm as a wheel event, which xterm damps as a
+  trackpad's below 50px and answers with a single arrow key on the alternate buffer however far the
+  wheel turned. Codex CLI runs full-screen without tracking the mouse, so those arrow keys were all
+  it saw: four rows of finger travel moved its transcript one line, which reads as not scrolling at
+  all. A drag now takes the route the program on the other end actually reads, and follows the
+  finger row for row.
+- **A wheel notch scrolls three lines in a full-screen agent**, the distance a native Windows
+  terminal moves, rather than the one line xterm sent.
 
 ## What's New in V0.8.3
 

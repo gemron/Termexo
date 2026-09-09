@@ -30,6 +30,13 @@ import { DEFAULT_TERMINAL_FONT_NAME, terminalFontFamily } from './terminal-font'
 import { terminalKeySequence, workbenchShortcut } from './terminal-key-sequences';
 import { TerminalResizeCoordinator } from './terminal-resize-coordinator';
 import { detectTerminalRuntimeIssue, TerminalRuntimeIssue } from './terminal-runtime-diagnostics';
+import {
+  cursorScrollSequence,
+  ScrollRowAccumulator,
+  TerminalScrollRoute,
+  terminalScrollRoute,
+  wheelScrollRows,
+} from './terminal-scroll-route';
 import { createTerminalTheme } from './terminal-theme';
 import { decayInertia, TerminalTouchScroller } from './terminal-touch-scroll';
 
@@ -93,6 +100,8 @@ export class TerminalPanelComponent implements AfterViewInit {
   private outputTail = '';
   private lastRuntimeIssue: TerminalRuntimeIssue = null;
   private readonly touchScroller = new TerminalTouchScroller(() => this.rowHeight());
+  /** Carries the fraction of a row a wheel event left over, so a trackpad still scrolls. */
+  private readonly wheelRows = new ScrollRowAccumulator();
   private inertiaFrame?: number;
   private inertiaVelocity = 0;
   private inertiaAt = 0;
@@ -197,6 +206,7 @@ export class TerminalPanelComponent implements AfterViewInit {
   ngAfterViewInit(): void {
     this.viewReady = true;
     this.terminal.attachCustomKeyEventHandler(this.handleCustomKey);
+    this.terminal.attachCustomWheelEventHandler(this.handleCustomWheel);
     this.terminal.loadAddon(this.fitAddon);
     const terminalContainer = this.container().nativeElement;
     // Outside Angular on purpose: xterm registers its own keyboard, IME and animation-frame
@@ -518,6 +528,26 @@ export class TerminalPanelComponent implements AfterViewInit {
   };
 
   /**
+   * Scrolls a full-screen agent by the wheel at the speed everything else scrolls at.
+   *
+   * On the alternate buffer xterm answers a wheel event with exactly one arrow key, however far
+   * the wheel turned, so Codex CLI crawled a line per notch where Windows Terminal moves three and
+   * xterm's own scrollback moves about the same. Taking the event here sends the whole distance.
+   * Every other case is left to xterm, which already scrolls it at the right speed.
+   */
+  private readonly handleCustomWheel = (event: WheelEvent): boolean => {
+    // Shift makes a wheel horizontal, which is not a scroll the buffer underneath can answer.
+    if (event.shiftKey || this.scrollRoute() !== 'cursorKeys') {
+      return true;
+    }
+    const rows = this.wheelRows.take(wheelScrollRows(event, this.terminal.rows));
+    if (rows !== 0) {
+      this.sendCursorScroll(rows);
+    }
+    return false;
+  };
+
+  /**
    * Scrolls with a finger, which xterm 6 does not do on its own.
    *
    * It renders to a canvas and moves its own scrollbar, so a drag reaches no scrollable element
@@ -593,15 +623,50 @@ export class TerminalPanelComponent implements AfterViewInit {
   }
 
   /**
-   * Scrolls by handing xterm a wheel event rather than calling `scrollLines`.
+   * Moves the terminal by the rows a drag covered, through whichever primitive reaches the agent.
    *
-   * A full-screen agent such as Claude Code or OpenCode runs on the alternate buffer, which has no
-   * scrollback for `scrollLines` to move through — the drag would do nothing there. xterm's own
-   * wheel handling covers every case: it scrolls the normal buffer, translates the wheel into
-   * arrow keys for the alternate buffer, and forwards a mouse event when the agent tracks the
-   * mouse. Reusing it makes a drag behave exactly like the wheel does on the desktop.
+   * Handing xterm a synthetic wheel event covers every case but not at the finger's speed: it
+   * damps pixel deltas under 50px to 30%, reading a row-sized step as a trackpad's, and answers
+   * the alternate buffer with a single arrow key however far the wheel turned. A finger had to
+   * travel four rows to move the buffer one, and Codex CLI — which runs full-screen without
+   * tracking the mouse, so it only ever sees those arrow keys — could not be scrolled on a phone
+   * at all. Routing each case explicitly keeps a drag tracking the finger row for row.
    */
   private scrollByRows(rows: number): void {
+    const route = this.scrollRoute();
+    if (route === 'mouseReport') {
+      this.reportWheel(rows);
+      return;
+    }
+    if (route === 'cursorKeys') {
+      this.sendCursorScroll(rows);
+      return;
+    }
+    this.terminal.scrollLines(rows);
+  }
+
+  private scrollRoute(): TerminalScrollRoute {
+    return terminalScrollRoute(
+      this.terminal.modes.mouseTrackingMode,
+      this.terminal.buffer.active.type,
+    );
+  }
+
+  /** Scrolls a full-screen agent, which reads a scroll as the arrow keys it binds to one. */
+  private sendCursorScroll(rows: number): void {
+    this.terminal.input(
+      cursorScrollSequence(rows, this.terminal.modes.applicationCursorKeysMode),
+      true,
+    );
+  }
+
+  /**
+   * Hands the drag to an agent that tracks the mouse, as the wheel it expects.
+   *
+   * xterm reports one wheel event per turn of the wheel and the agent scrolls by its own step, so
+   * the damping that holds the other routes back lands close to the finger's own speed here.
+   */
+  private reportWheel(rows: number): void {
     const target = this.terminal.element?.querySelector<HTMLElement>('.xterm-viewport');
     if (!target) {
       return;

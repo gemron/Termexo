@@ -2,6 +2,63 @@
 
 Release notes for every Termexo version, newest first. The current release is summarised in [README.md](README.md).
 
+## V0.8.4
+
+- Codex scrolls on a phone. A finger drag reached xterm as a synthetic wheel event, and xterm reads
+  a wheel two ways that a drag does not survive: it damps pixel deltas under 50px to 30%, taking a
+  row-sized step for a trackpad's, and it answers the alternate buffer with a single arrow key
+  however far the wheel turned. Codex CLI runs full-screen without tracking the mouse, so those
+  arrow keys are all it ever sees — a drag of four rows moved its transcript one line, which on a
+  phone reads as not scrolling at all. A drag now takes the route that matches the program on the
+  other end: the wheel report an agent that tracks the mouse expects, one arrow key per row for a
+  full-screen one, xterm's own scrollback for everything else. It follows the finger row for row.
+- A wheel notch over a full-screen agent scrolls three lines rather than one, the distance both a
+  native Windows terminal and xterm's own scrollback move, whichever unit the browser measures the
+  wheel in.
+
+## V0.8.3
+
+- Typing keeps up with a busy Agent. Every synchronous backend command ran on the single IPC thread,
+  so the Git overview poll — around half a second, every three — and the per-second event sync
+  queued ahead of each keystroke, and keys arrived in bursts. Every command except `write_terminal`
+  and `resize_terminal` now runs on the async thread pool, leaving the keystroke path the IPC thread
+  to itself: measured p99 keystroke latency fell from 514ms to 19ms.
+- Git status is watched rather than polled. A notify watcher per repository root, filtered to the
+  paths that change what the overview shows and debounced, raises a repository-changed event the UI
+  re-reads on, with a 60s safety poll behind it. One `git status --porcelain=v2 --branch` yields
+  HEAD, branch and worktree together, and repository roots and HEAD-derived data are cached, cutting
+  a poll from five to eight git processes down to one.
+- Hook events stop piling up. The spool and its table grew without bound, into hundreds of megabytes
+  that every launch re-read from the start. Events now carry only the fields the inspector reads,
+  the spool cursor is persisted and a drained spool truncated, an index serves the newest-first
+  read, and events older than 30 days are pruned on startup. The startup event read fell from around
+  1.1s to a few milliseconds.
+- Tasks can be interrupted and amended mid-run. Stopping a running task keeps its terminal and
+  session, so it can resume or return to 待办, and a running task takes further instructions through
+  the same Agent session instead of only after a failed verification.
+- The Agent status panel gains a pinned overview — current Agent, lowest allowance, change count,
+  branch, running count — above collapsible sections that remember what was left open.
+- Thinking events name the Agent that produced them rather than whichever one was active (#21).
+
+## V0.8.2
+
+- Typing keeps up with a working agent. Every open terminal subscribed to the output stream
+  separately, so each chunk an agent produced woke all of them and ran change detection across the
+  whole workbench, and keystrokes queued behind that work. Output now arrives through one shared
+  subscription dispatched by terminal id, registered outside the Angular zone, with change detection
+  coalesced to one pass per frame.
+- Restoring terminals no longer stalls. Replayed scrollback is marked as such so the task, handoff
+  and startup readers skip it, rather than re-analysing every terminal's whole history on every
+  reconnect.
+- Emergency prompt drafts are mirrored in memory and written from an idle callback instead of
+  parsing and rewriting the localStorage store on every keystroke, and typing no longer measures the
+  DOM through `proposeDimensions`.
+- Model profiles carry a 1M context switch and a reasoning effort level per agent — `claude
+  --effort` and `codex -c model_reasoning_effort` — and both launch dialogs can override them for a
+  single terminal.
+- The empty workspace lists the same agents as the tab strip menu. Its button opened a plain Shell
+  and left starting an Agent to a menu that had not been found yet.
+
 ## V0.8.1
 
 - Open a first run on a guide rather than on three invented workspaces. A new install seeded

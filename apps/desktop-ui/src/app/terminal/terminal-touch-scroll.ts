@@ -7,6 +7,8 @@
  * anything above the last screenful. This converts the drag into the row counts xterm understands.
  */
 
+import { ScrollRowAccumulator } from './terminal-scroll-route';
+
 /** Movement below this is a tap, not a scroll, so the terminal still takes focus normally. */
 const SCROLL_INTENT_THRESHOLD_PX = 6;
 /** Velocity samples older than this say nothing about the flick that just ended. */
@@ -34,7 +36,7 @@ interface VelocitySample {
 export class TerminalTouchScroller {
   private lastPosition = 0;
   private lastHorizontal = 0;
-  private carriedPixels = 0;
+  private readonly rows = new ScrollRowAccumulator();
   private travelledY = 0;
   private travelledX = 0;
   private scrolling = false;
@@ -51,7 +53,7 @@ export class TerminalTouchScroller {
   begin(position: number, at: number, horizontalPosition = 0): void {
     this.lastPosition = position;
     this.lastHorizontal = horizontalPosition;
-    this.carriedPixels = 0;
+    this.rows.reset();
     this.travelledY = 0;
     this.travelledX = 0;
     this.scrolling = false;
@@ -122,7 +124,7 @@ export class TerminalTouchScroller {
 
   cancel(): void {
     this.scrolling = false;
-    this.carriedPixels = 0;
+    this.rows.reset();
     this.samples = [];
   }
 
@@ -136,14 +138,10 @@ export class TerminalTouchScroller {
     if (!Number.isFinite(rowHeight) || rowHeight <= 0) {
       return 0;
     }
-    this.carriedPixels += pixels;
-    const rows = Math.trunc(this.carriedPixels / rowHeight);
-    if (rows === 0) {
-      return 0;
-    }
-    this.carriedPixels -= rows * rowHeight;
+    const rows = this.rows.take(pixels / rowHeight);
     // Dragging downwards should reveal older output, which xterm scrolls towards with negatives.
-    return -rows;
+    // Negating zero would report -0, which reads as a direction to anything comparing signs.
+    return rows === 0 ? 0 : -rows;
   }
 
   private recordSample(position: number, at: number): void {

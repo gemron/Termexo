@@ -11,7 +11,7 @@
 </p>
 
 <p align="center">
-  <img alt="Version 0.8.3" src="https://img.shields.io/badge/version-0.8.3-58c7a0">
+  <img alt="Version 0.8.4" src="https://img.shields.io/badge/version-0.8.4-58c7a0">
   <img alt="Windows" src="https://img.shields.io/badge/platform-Windows-0078D4?logo=windows">
   <img alt="Tauri 2" src="https://img.shields.io/badge/Tauri-2-24C8DB?logo=tauri&logoColor=white">
   <img alt="Angular 22" src="https://img.shields.io/badge/Angular-22-DD0031?logo=angular">
@@ -35,7 +35,7 @@ Agent 等着授权时，人在哪里都能回它一句。
 npx termexo@latest
 ```
 
-> 当前版本为 **V0.8.3**。
+> 当前版本为 **V0.8.4**。
 
 ![Termexo 多终端网格工作台](website/assets/termexo-workbench.png)
 
@@ -120,6 +120,14 @@ SQLite，密钥保存在 Windows Credential Manager，Claude/Codex 历史会话�
 
 界面支持简体中文、英语、西班牙语、法语、德语、日语和韩语。默认自动跟随 Windows
 系统语言，也可通过主工具栏手动切换并跨重启保留选择。
+
+## V0.8.4 新增
+
+- **手机上能滚动 Codex 了**：手指拖动此前是合成滚轮事件交给 xterm，而 xterm 会把小于 50px 的增量
+  当触控板阻尼掉，在备用屏上又不论转多远都只回一个方向键。Codex CLI 全屏运行且不上报鼠标，能收到
+  的只有这些方向键——划过四行才滚一行，看起来就是滚不动。现在拖动按对端程序实际读取的方式分发，
+  一行一行跟着手指走。
+- **滚轮滚全屏 Agent 一格走三行**，与原生 Windows 终端一致，不再是 xterm 只发一个方向键的一行。
 
 ## V0.8.3 新增
 
