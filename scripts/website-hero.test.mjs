@@ -106,5 +106,12 @@ test("static homepage links resolve and existing social artwork is preserved", (
     html,
     /property="og:image"\s+content="https:\/\/www.termexo.com\/assets\/termexo-phone.png"/,
   );
-  assert.match(html, /<small>0\.8\.2<\/small>/);
+  const { version } = JSON.parse(
+    readFileSync(new URL("../package.json", import.meta.url), "utf8"),
+  );
+  assert.ok(html.includes(`<small>${version}</small>`));
+  const metadata = JSON.parse(
+    html.match(/<script type="application\/ld\+json">([\s\S]*?)<\/script>/)[1],
+  );
+  assert.equal(metadata.softwareVersion, version);
 });

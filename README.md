@@ -4,7 +4,7 @@
 
 <h1 align="center">Termexo</h1>
 
-<p align="center"><strong>One window for every coding agent</strong></p>
+<p align="center"><strong>Your coding agents on Windows. Your next instruction from your phone.</strong></p>
 
 <p align="center">
   <strong>English</strong> · <a href="./README.cn.md">简体中文</a>
@@ -23,26 +23,52 @@
   <a href="https://www.npmjs.com/package/termexo">npm</a>
 </p>
 
-Termexo puts Claude Code, Codex, and the terminals around them into one recoverable Windows
-workspace. Keep several agents visible at once, see immediately when one needs input or
-approval, reopen yesterday's native session, and switch the Claude CLI between compatible
-model providers without rebuilding your setup. Turn on remote access and that same workbench
-opens in a browser on your phone or a second computer, driving the very same live terminals —
-so the agent waiting on an approval can be answered from wherever you are.
+Termexo runs Claude Code, Codex, and OpenCode in one Windows workbench.
+Keep your agents running on your PC, then use your phone to check output,
+answer an approval, or send the next instruction to the same live terminal.
 
-Run the complete Windows app with one command—no Termexo account or server required:
+![Termexo Windows workbench](website/assets/termexo-workbench.png)
+
+| See your agents together | Know who needs you | Continue from your phone |
+| --- | --- | --- |
+| Arrange real terminals side by side, grouped by project. | Spot an agent waiting for input or approval. | Open the same workbench in a browser over a trusted LAN or VPN. |
+
+## Try it on Windows
+
+**[Download the Windows installer](https://github.com/gemron/Termexo/releases/latest)** — choose the EXE or MSI asset. No Rust or build tools needed.
+
+Already have Node.js 18.18+? Run:
 
 ```powershell
 npx termexo@latest
 ```
 
-> The current version is **V0.8.5**.
+Requires Windows 10 build 17763+ and WebView2 Chromium 111+.
+Install and configure your chosen agent CLI and model access; Termexo does not include a model subscription.
+**MIT licensed. No Termexo account required.**
 
-![Termexo multi-terminal grid workbench](website/assets/termexo-workbench.png)
+## From your desk to your phone
 
-<p align="center">
-  <sub>Claude Code and Codex terminals side by side in a workspace that remembers its layout.</sub>
-</p>
+1. Open a project on your PC and start Claude Code, Codex, or OpenCode.
+2. Enable remote access in Termexo; keep your PC awake and connect your phone through a trusted LAN or VPN.
+3. Open the remote link in your phone's browser to read output, respond to approvals, and send instructions.
+
+[![Termexo mobile workbench](website/assets/termexo-phone.png)](https://www.termexo.com/guide.en.html#remote)
+
+The image shows the mobile interface. **[Read the phone connection guide](https://www.termexo.com/guide.en.html#remote)** for the complete setup.
+Remote access is off by default, uses an access token, and uses self-signed HTTPS by default.
+Keep the token private. Closing Termexo or stopping the PC ends the running processes.
+
+## Latest release
+
+**[v0.8.5](https://github.com/gemron/Termexo/releases/tag/v0.8.5)** bundles ConPTY to improve Shift+Tab and scrolling on older Windows, avoids repeated line reflow, and explains outdated or missing WebView2 runtimes.
+[Full changelog](CHANGELOG.md).
+
+If Termexo helps your workflow, a **Star on this repository** helps other developers discover it.
+Found a problem? [Open an issue](https://github.com/gemron/Termexo/issues) with your Windows version and reproduction steps.
+
+<details>
+<summary><strong>More features and screenshots</strong></summary>
 
 ## What Works Today
 
@@ -132,130 +158,7 @@ The interface is available in Simplified Chinese, English, Spanish, French, Germ
 and Korean. It follows the Windows language automatically, or you can choose a language from
 the main toolbar and keep that choice across restarts.
 
-## What's New in V0.8.5
-
-- **Terminals behave the same on every Windows.** The pseudo console they run on used to be
-  whichever one the machine's Windows build carried, and older ones lose input on the way to the
-  agent: Shift+Tab reached Claude Code as a plain Tab, and OpenCode received no scroll at all.
-  Termexo now ships its own and uses it everywhere.
-- **An outdated WebView2 runtime explains itself.** Below Chromium 111 the interface loses its
-  colours and parts of its layout, and nothing said why. It now names the version it found, the one
-  it needs, and both ways to install it — and a runtime missing entirely is reported instead of
-  failing silently at startup.
-
-## What's New in V0.8.4
-
-- **Codex scrolls on a phone.** A finger drag reached xterm as a wheel event, which xterm damps as a
-  trackpad's below 50px and answers with a single arrow key on the alternate buffer however far the
-  wheel turned. Codex CLI runs full-screen without tracking the mouse, so those arrow keys were all
-  it saw: four rows of finger travel moved its transcript one line, which reads as not scrolling at
-  all. A drag now takes the route the program on the other end actually reads, and follows the
-  finger row for row.
-- **A wheel notch scrolls three lines in a full-screen agent**, the distance a native Windows
-  terminal moves, rather than the one line xterm sent.
-
-## What's New in V0.8.3
-
-- **Typing keeps up with a busy Agent.** Every synchronous backend command ran on the one IPC
-  thread, so the 3-second Git poll (around half a second each) and the per-second event sync queued
-  ahead of each keystroke; keys arrived in bursts. Those commands now run on a thread pool, and
-  `write_terminal` — the keystroke path — has the IPC thread to itself. Measured p99 keystroke
-  latency fell from 514 ms to 19 ms.
-- **Git status is watched, not polled.** The repository shown in the sidebar is now watched for
-  file changes and re-read only when something actually changes, instead of every three seconds.
-  Idle Git work drops to zero, and an edit shows up in about a second. One `git status` reads HEAD,
-  branch and the working tree together where three separate git processes ran before.
-- **Hook events stop piling up.** The event spool and its database table grew without bound — into
-  hundreds of megabytes that every launch re-read from the start. Events now carry only the fields
-  the UI shows, the read position survives restarts, a drained spool is truncated, an index serves
-  the newest-first read, and events past 30 days are pruned. The startup event read fell from over
-  a second to a few milliseconds.
-- **Tasks can be interrupted and amended mid-run.** Stopping a running task now keeps its terminal
-  and session so it can be resumed or handed back to 待办, and a running task can be sent extra
-  instructions through the same Agent session instead of only after a failed verification.
-- **The Agent status panel is reorganised.** A pinned overview shows the current Agent with its
-  allowance, change count, branch and running count; the details below — active Agents, session
-  details, code changes, provider allowances, recent activity — are grouped into collapsible
-  sections that remember what you left open.
-
-## What's New in V0.8.2
-
-- **Typing keeps up with a working agent.** Every open terminal subscribed to the output stream
-  separately, so each chunk an agent produced woke all of them and ran change detection across the
-  whole workbench — with several terminals open, keystrokes queued behind that work. A single shared
-  subscription now dispatches by terminal, and the screen settles once a frame rather than once per
-  chunk.
-- **Restoring terminals no longer stalls.** Replayed scrollback was fed back through the task,
-  handoff and startup readers on every reconnect, which re-analysed each terminal's entire history
-  at startup. History is now redrawn without being counted a second time.
-- **1M context and reasoning effort.** A model profile can ask Claude Code for the 1M context window
-  and set the reasoning effort for either agent, and a launch can override both for that terminal
-  alone.
-- **The empty workspace offers the same agents.** Its button opened a plain Shell and left starting
-  an Agent to a menu that had not been found yet. It now lists Claude Code, Codex CLI, OpenCode and
-  Shell — the same list the tab strip's menu carries.
-
-## What's New in V0.8.1
-
-- **A first run opens on a guide.** A new install used to seed three sample workspaces pointed at a
-  path that exists on nobody's machine, whose Agent terminals resumed session ids that never
-  existed. It now starts empty and says what a workspace is and what the first three steps are.
-- **New terminal belongs to the tab strip.** It has moved off the window's own toolbar onto the
-  strip it adds to, taking the agent menu with it, and the button follows the last tab.
-- **What you create is what you see.** Starting a terminal from the task board or the Git view left
-  it behind that view; every path that opens one now returns to the terminal view and reveals it.
-- **Remote access settings, rearranged.** The listening address and port sit together instead of at
-  opposite edges of the dialog, the copy button sits on its link, and the master switch is set apart
-  from the option below it with the connected-device count beside it.
-
-## What's New in V0.8.0
-
-- **Remote access.** Turn it on in the settings and any phone, tablet, or second computer on the
-  same network or VPN opens the whole workbench in a browser: the same workspaces and terminals,
-  reading and writing the same live PTYs. Self-signed HTTPS by default, entered with an access
-  token the settings panel can reveal, turn into a QR code, or rotate.
-- **Terminals scroll by finger.** A drag synthesises a wheel event for xterm to dispatch, which
-  scrolls the normal buffer and reports the wheel to full-screen agents such as Claude Code and
-  OpenCode exactly as the desktop wheel does, with inertia after the finger lifts.
-- **Size follows the view in use.** Work on the desktop and the terminal uses the desktop's width,
-  pick up the phone and it becomes the phone's, come back and it returns. Every other client
-  renders that same grid, panning sideways when its window cannot hold it.
-- **A workbench that fits a phone.** Below 640px the split layouts fold to a single terminal, both
-  side panels float over the workspace instead of taking a column of it, controls grow to a
-  finger's size, and the tools at the right of the top bar collapse into one menu — which is what
-  stopped the toolbar from scrolling half its buttons out of reach.
-- **Pick a folder without a native dialog.** Starting a terminal from a browser used to open
-  `window.prompt`, which some mobile browsers suppress outright. It is an in-app dialog now,
-  prefilled with the workspace folder, so accepting it is a single tap.
-- **A Git view that stays put.** It no longer drops back to the terminals when the active terminal
-  changes or a read fails, keeps reading the repository while it is open, says why it could not
-  read one, and returns to the file and layout you left it on.
-
-## What's New in V0.7.0
-
-- **The window draws its own chrome.** No system title bar: the top bar spans the whole window
-  with the window controls at its right edge, and both side panels start beneath it. Dragging the
-  bar still moves the window, double-clicking still maximises.
-- **Terminals render on the GPU.** A long scrollback scrolls without the stutter the DOM renderer
-  produced. Machines without a usable GPU fall back to the previous renderer.
-- **A terminal keeps its account.** Reconnecting — including after the app restarts — rebuilds the
-  account directory, proxy settings, and provider key from what the terminal records, instead of
-  quietly falling back to the CLI's default home.
-- **Switch a terminal's account from its header.** The header names the account it runs on, and
-  picking another restarts that terminal on it with a new session, leaving the model, MCP profile,
-  and automatic confirmation alone.
-- **Copy configuration between accounts.** Settings, instructions, plugins, and skills move across;
-  credentials, account identity, and session history never do.
-- **Sign-in is noticed on its own.** A finished login refreshes the account without waiting for a
-  CLI that keeps running after the browser flow returns.
-
-[![Termexo task board](website/assets/termexo-task-board.png)](website/assets/termexo-task-board.png)
-
-<p align="center">
-  <sub>A task carries its acceptance criteria from todo through to verified, and runs as a real agent terminal.</sub>
-</p>
-
-Release notes for every earlier version live in [CHANGELOG.md](CHANGELOG.md).
+</details>
 
 ## Why Termexo
 
@@ -334,25 +237,9 @@ a local control plane that is observable, recoverable, and extensible.
 See [Termexo.md](./Termexo.md) for the complete product plan and
 [V0.2 architecture](./docs/architecture/v0.2.md) for current technical boundaries.
 
-## Quick Start
+## Build from source
 
-### Run directly from npm
-
-The npm package includes the Windows x64 desktop executable:
-
-```powershell
-npx termexo
-```
-
-Or install the command globally:
-
-```powershell
-npm install --global termexo
-termexo
-```
-
-This path requires Windows 10/11, the WebView2 runtime, and Node.js 18.18 or later. Building
-from source uses the newer toolchain listed below.
+These requirements are for contributors building Termexo, not for installing the release.
 
 ### Requirements
 
@@ -444,21 +331,17 @@ identifiers still use a legacy name. This does not affect the Termexo product na
 
 ## Roadmap
 
-| Version | Goal                                                                           | Status      |
-| ------- | ------------------------------------------------------------------------------ | ----------- |
-| V0.1    | Workspace, multi-terminal, PTY, and SQLite foundation                          | Complete    |
-| V0.2    | Claude detection, session resume, hooks, and profiles                          | Complete    |
-| V0.3    | Multi-agent foundation, interaction stabilization, and file-link openers        | Complete    |
-| V0.4    | Model switching, live token telemetry, and Plan quota/reset alerts              | Complete    |
-| V0.5    | Prompt assets, handoff documents, session summaries, and cross-agent migration  | Complete    |
-| V0.6    | OpenCode as a third agent, the task board, and automatic confirmation           | Current     |
-| V0.7    | Workspace sharing, remote computers, and mobile access                         | Planned     |
-| V1.0    | Stable release, security hardening, and complete recovery UX                   | Planned     |
+| Version | Delivered scope | Status |
+| --- | --- | --- |
+| V0.1–0.5 | Workspaces, real terminals, native session resume, model profiles, and handoff | Released |
+| V0.6 | OpenCode, task board, and agent confirmation options | Released |
+| V0.7 | Custom window chrome, GPU terminal rendering, and account workflows | Released |
+| V0.8.0–0.8.4 | Phone access, first-run guidance, input latency and mobile scrolling improvements | Released |
+| V0.8.5 | Bundled ConPTY and WebView2 startup diagnostics | Current |
+| V1.0 | Stability, security hardening, and recovery experience | Planned |
 
-Next up: notification channels ([#5](https://github.com/gemron/Termexo/issues/5)), then the
-V0.7 work on workspace sharing and reaching your machine from elsewhere. See
-[Termexo.md](Termexo.md) for dependencies and acceptance criteria, and
-[CHANGELOG.md](CHANGELOG.md) for what each released version actually shipped.
+See [open issues](https://github.com/gemron/Termexo/issues) for ongoing work and
+[CHANGELOG.md](CHANGELOG.md) for released changes. Planned work has no promised delivery date.
 
 ## Repository Layout
 

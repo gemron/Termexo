@@ -1,0 +1,28 @@
+1
+00:00:00,000 --> 00:00:05,000
+Your coding agent runs on your PC.
+
+2
+00:00:05,000 --> 00:00:10,000
+When it needs approval,
+you can respond from your phone.
+
+3
+00:00:10,000 --> 00:00:16,000
+Open the same terminal
+in your phone's browser.
+
+4
+00:00:16,000 --> 00:00:22,000
+Approve on your phone.
+The PC continues.
+
+5
+00:00:22,000 --> 00:00:27,000
+Same session.
+No transfer or restart.
+
+6
+00:00:27,000 --> 00:00:30,000
+Termexo · Windows · MIT open source
+github.com/gemron/Termexo
