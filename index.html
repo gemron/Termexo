@@ -7,7 +7,7 @@
       name="description"
       content="Run Claude Code, Codex, and OpenCode together on Windows. Step away and use the same live terminals from your phone over a trusted LAN or VPN. Local-first, MIT licensed."
     />
-    <meta name="theme-color" content="#0a0d0c" />
+    <meta name="theme-color" content="#edf4f8" />
     <meta property="og:type" content="website" />
     <meta
       property="og:title"
@@ -23,11 +23,23 @@
     />
     <meta property="og:url" content="https://www.termexo.com/" />
     <meta name="twitter:card" content="summary_large_image" />
-    <meta name="twitter:title" content="Termexo — Claude Code, Codex and OpenCode in one Windows workspace" />
-    <meta name="twitter:description" content="Manage real AI coding terminals, resume sessions, and reach the same workbench from your phone. Free, MIT licensed, Windows only." />
-    <meta name="twitter:image" content="https://www.termexo.com/assets/termexo-phone.png" />
+    <meta
+      name="twitter:title"
+      content="Termexo — Claude Code, Codex and OpenCode in one Windows workspace"
+    />
+    <meta
+      name="twitter:description"
+      content="Manage real AI coding terminals, resume sessions, and reach the same workbench from your phone. Free, MIT licensed, Windows only."
+    />
+    <meta
+      name="twitter:image"
+      content="https://www.termexo.com/assets/termexo-phone.png"
+    />
     <meta property="og:site_name" content="Termexo" />
-    <meta property="og:image:alt" content="Termexo desktop workbench and remote access from a phone" />
+    <meta
+      property="og:image:alt"
+      content="Termexo desktop workbench and remote access from a phone"
+    />
     <meta name="referrer" content="strict-origin-when-cross-origin" />
     <script type="application/ld+json">
       {
@@ -40,7 +52,10 @@
         "operatingSystem": "Windows 10, Windows 11",
         "license": "https://github.com/gemron/Termexo/blob/main/LICENSE",
         "downloadUrl": "https://github.com/gemron/Termexo/releases/latest",
-        "sameAs": ["https://github.com/gemron/Termexo", "https://www.npmjs.com/package/termexo"],
+        "sameAs": [
+          "https://github.com/gemron/Termexo",
+          "https://www.npmjs.com/package/termexo"
+        ],
         "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" },
         "screenshot": "https://www.termexo.com/assets/termexo-workbench.png"
       }
@@ -52,7 +67,7 @@
     <script src="app.js" defer></script>
     <script src="analytics.js" defer></script>
   </head>
-  <body>
+  <body class="home-page">
     <a class="skip-link" href="#main" data-i18n="skip">Skip to content</a>
 
     <header class="site-header" data-header>
@@ -113,6 +128,7 @@
 
     <main id="main">
       <section class="hero shell" id="top">
+        <div class="hero-wordmark" aria-hidden="true">termexo</div>
         <div class="hero-copy reveal">
           <div class="eyebrow">
             <span class="live-dot"></span>
@@ -125,12 +141,14 @@
             <em data-i18n="heroLine2">Or on your phone.</em>
           </h1>
           <p class="hero-lead" data-i18n="heroLead">
-            Bring Claude Code, Codex, and OpenCode into one Windows workbench.
-            Step away from your desk and open it in your phone’s browser to
-            check output, respond to an approval, or send the next instruction.
-            Same workspace. Same running terminals.
+            Claude Code, Codex, and OpenCode. One Windows workbench. Check
+            output and send the next instruction from your phone. Your agents
+            keep running on your PC.
           </p>
-          <p class="hero-remote-note" data-i18n="heroRemoteNote">Keep your PC running. Enable remote access, then connect with a token over a trusted LAN or VPN.</p>
+          <p class="hero-remote-note" data-i18n="heroRemoteNote">
+            Keep your PC running. Enable remote access, then connect with a
+            token over a trusted LAN or VPN.
+          </p>
           <div class="hero-actions">
             <a
               class="button primary"
@@ -159,71 +177,192 @@
             <span>PS</span>
             <code>npx termexo@latest</code>
             <button type="button" data-copy-command>
-              <span data-copy-label data-i18n="copyCommand">Copy</span>
+              <span data-copy-label data-i18n="copyCommand" aria-live="polite"
+                >Copy</span
+              >
             </button>
           </div>
-          <a class="hero-guide-link" href="guide.en.html#remote" data-i18n="heroRemoteGuide">How to connect your phone ↗</a>
           <a
-            class="product-hunt-badge"
-            href="https://www.producthunt.com/products/termexo?embed=true&amp;utm_source=badge-featured&amp;utm_medium=badge&amp;utm_campaign=badge-termexo"
-            target="_blank"
-            rel="noopener noreferrer"
+            class="hero-guide-link"
+            href="guide.en.html#remote"
+            data-i18n="heroRemoteGuide"
+            >How to connect your phone ↗</a
           >
-            <img
-              src="https://api.producthunt.com/widgets/embed-image/v1/featured.svg?post_id=1212781&amp;theme=light&amp;t=1785690737740"
-              alt="Termexo - A local Windows workbench for Claude Code and Codex | Product Hunt"
-              width="250"
-              height="54"
-              decoding="async"
-            />
-          </a>
-          <div class="hero-meta" aria-label="Product information">
-            <span
-              ><i></i><b data-i18n="metaLocal">Local-first · MIT open source</b></span
+          <div class="hero-proof">
+            <a
+              class="product-hunt-badge"
+              href="https://www.producthunt.com/products/termexo?embed=true&amp;utm_source=badge-featured&amp;utm_medium=badge&amp;utm_campaign=badge-termexo"
+              target="_blank"
+              rel="noopener noreferrer"
             >
-            <span><i></i><b>Windows 10 / 11</b></span>
-            <span><i></i><b data-i18n="metaNpm">One command to start</b></span>
+              <img
+                src="https://api.producthunt.com/widgets/embed-image/v1/featured.svg?post_id=1212781&amp;theme=light&amp;t=1785690737740"
+                alt="Termexo - A local Windows workbench for Claude Code and Codex | Product Hunt"
+                width="250"
+                height="54"
+                decoding="async"
+              />
+            </a>
+            <div class="hero-meta" aria-label="Product information">
+              <span
+                ><i></i
+                ><b data-i18n="metaLocal"
+                  >Local-first · MIT open source</b
+                ></span
+              >
+              <span><i></i><b>Windows 10 / 11</b></span>
+              <span
+                ><i></i><b data-i18n="metaNpm">One command to start</b></span
+              >
+            </div>
           </div>
         </div>
 
-        <figure class="hero-scene reveal" data-delay="1" aria-labelledby="scene-caption">
+        <figure
+          class="hero-scene reveal"
+          data-delay="1"
+          aria-labelledby="scene-caption"
+        >
+          <div class="scene-atmosphere" aria-hidden="true">
+            <div class="scene-halo"></div>
+            <span class="glass-orbit orbit-one"></span>
+            <span class="glass-orbit orbit-two"></span>
+            <span class="glass-sphere sphere-one"></span>
+            <span class="glass-sphere sphere-two"></span>
+            <span class="floating-agent agent-codex">⌘ <b>Codex</b></span>
+            <span class="floating-agent agent-opencode"
+              >&gt;_ <b>OpenCode</b></span
+            >
+          </div>
           <div class="scene-heading">
             <span class="scene-dot" aria-hidden="true"></span>
             <span data-i18n="sceneHeading">One workspace. Two ways in.</span>
             <span class="scene-protocol">LAN / VPN</span>
           </div>
           <div class="device-scenes">
+            <div class="device-connection" aria-hidden="true">
+              <svg
+                class="connection-lines"
+                viewBox="0 0 600 600"
+                preserveAspectRatio="none"
+                fill="none"
+              >
+                <path
+                  class="connection-rail"
+                  d="M 130 338 C 130 430 128 556 215 556 L 355 556 C 405 556 423 480 446 430"
+                  pathLength="100"
+                />
+                <path
+                  class="connection-flow flow-out"
+                  d="M 130 338 C 130 430 128 556 215 556 L 355 556 C 405 556 423 480 446 430"
+                  pathLength="100"
+                />
+                <path
+                  class="connection-flow flow-in"
+                  d="M 130 338 C 130 430 128 556 215 556 L 355 556 C 405 556 423 480 446 430"
+                  pathLength="100"
+                />
+                <circle class="connection-node" cx="130" cy="338" r="5" />
+                <circle class="connection-node" cx="446" cy="430" r="5" />
+              </svg>
+              <span class="connection-badge"
+                ><i></i><span data-i18n="sceneSync">Two-way connection</span
+                ><b>↔</b></span
+              >
+            </div>
+
             <div class="desktop-scene">
-              <div class="device-label"><span>01</span><b data-i18n="sceneDesktop">RUN ON YOUR PC</b></div>
-              <div class="desktop-window">
-                <div class="scene-topbar"><img src="assets/termexo-mark.svg" alt="" width="18" height="18" /><b>Termexo</b><span>Windows</span></div>
-                <div class="scene-workspace"><span>Termexo</span><code>main</code></div>
-                <div class="scene-tabs"><span class="selected">Claude Code</span><span>Codex</span><span>OpenCode</span></div>
-                <div class="scene-terminal">
-                  <p class="terminal-muted">~/projects/termexo</p>
-                  <p class="terminal-request" data-i18n="sceneTask">› Review the latest changes</p>
-                  <p><span class="terminal-success">✓</span> <span data-i18n="sceneResult">Review complete. Ready for tests.</span></p>
-                  <p class="terminal-waiting"><span aria-hidden="true">◐</span> <span data-i18n="sceneWaiting">Waiting for your next instruction</span></p>
-                  <div class="terminal-prompt"><span aria-hidden="true">›</span><span class="scene-cursor" aria-hidden="true"></span></div>
-                </div>
-                <div class="scene-footer"><i aria-hidden="true"></i><span data-i18n="sceneHost">Session runs on this PC</span></div>
+              <div class="device-label">
+                <span>01</span><b data-i18n="sceneDesktop">RUN ON YOUR PC</b>
               </div>
-              <p class="scene-desktop-note" data-i18n="sceneDesktopNote">Your agents and project stay on the host. No session to move or restart.</p>
+              <div class="desktop-window">
+                <div class="monitor-bezel">
+                  <i class="monitor-camera" aria-hidden="true"></i>
+                  <img
+                    class="monitor-screen"
+                    src="assets/termexo-workbench.png"
+                    width="1800"
+                    height="1125"
+                    alt="Termexo desktop workbench with project sidebar and two agent terminals"
+                    fetchpriority="high"
+                  />
+                </div>
+                <div class="monitor-chin" aria-hidden="true">
+                  <span>termexo</span><i></i>
+                </div>
+              </div>
+              <div class="monitor-stand" aria-hidden="true">
+                <div class="monitor-neck"></div>
+                <div class="monitor-foot"></div>
+              </div>
+              <p class="scene-desktop-note" data-i18n="sceneDesktopNote">
+                Your agents and project stay on the host. No session to move or
+                restart.
+              </p>
             </div>
             <div class="mobile-scene">
-              <div class="device-label"><span>02</span><b data-i18n="sceneMobile">CONTINUE ON YOUR PHONE</b></div>
-              <div class="mobile-window">
-                <div class="mobile-browser"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 10V7a5 5 0 0 1 10 0v3M5 10h14v11H5z" /></svg><span data-i18n="sceneConnection">Remote · HTTPS</span></div>
-                <div class="mobile-workspace"><img src="assets/termexo-mark.svg" alt="" width="22" height="22" /><b>Termexo</b><span aria-hidden="true">⌄</span></div>
-                <div class="mobile-agent"><i aria-hidden="true"></i><span>Claude Code</span></div>
-                <div class="mobile-output"><p class="terminal-muted" data-i18n="sceneSameSession">The same live terminal</p><p><span class="terminal-success">✓</span> <span data-i18n="sceneResult">Review complete. Ready for tests.</span></p><p class="mobile-instruction" data-i18n="sceneInstruction">› Run the tests and summarize any failures.</p><p class="terminal-success" data-i18n="sceneContinue">↳ Continuing on your PC…</p></div>
-                <div class="mobile-input"><span data-i18n="sceneInput">Send the next instruction</span><span aria-hidden="true">↵</span></div>
-                <div class="mobile-shortcuts" aria-hidden="true"><span>Esc</span><span>Tab</span><span>Ctrl</span><span>↑</span><span>↓</span></div>
+              <div class="device-label">
+                <span>02</span
+                ><b data-i18n="sceneMobile">CONTINUE ON YOUR PHONE</b>
+              </div>
+              <div class="phone-body">
+                <span class="phone-key key-mute" aria-hidden="true"></span>
+                <span class="phone-key key-volume" aria-hidden="true"></span>
+                <span class="phone-key key-power" aria-hidden="true"></span>
+                <div class="mobile-window">
+                  <div class="phone-hardware" aria-hidden="true">
+                    <span>9:41</span><i class="phone-camera"></i>
+                    <svg viewBox="0 0 28 12">
+                      <path d="M1 10V8m4 2V5m4 5V2" />
+                      <rect x="14" y="2" width="10" height="8" rx="2" />
+                      <path d="M27 4v4" />
+                    </svg>
+                  </div>
+                  <div class="mobile-browser">
+                    <svg viewBox="0 0 24 24" aria-hidden="true">
+                      <path d="M7 10V7a5 5 0 0 1 10 0v3M5 10h14v11H5z" /></svg
+                    ><span data-i18n="sceneConnection">Remote · HTTPS</span>
+                  </div>
+                  <svg
+                    class="phone-screen"
+                    viewBox="2065 250 697 1500"
+                    role="img"
+                    aria-label="Termexo mobile remote access showing repository changes"
+                  >
+                    <image
+                      href="assets/termexo-phone.png"
+                      width="2880"
+                      height="1800"
+                    />
+                  </svg>
+                  <div class="phone-home" aria-hidden="true"><i></i></div>
+                </div>
               </div>
             </div>
           </div>
-          <figcaption id="scene-caption"><span class="scene-link-line" aria-hidden="true">↔</span><span data-i18n="sceneCaption">PC runs it. Phone controls it. Illustrative workflow, not a live session.</span></figcaption>
+          <figcaption id="scene-caption">
+            <span class="scene-link-line" aria-hidden="true">↔</span
+            ><span data-i18n="sceneCaption"
+              >Actual Termexo screenshots. Illustrative devices and connection,
+              not a live session.</span
+            >
+          </figcaption>
         </figure>
+        <div class="hero-bottom">
+          <a class="scroll-cue" href="#workbench"
+            ><span class="scroll-arrow" aria-hidden="true">↓</span
+            ><span data-i18n="exploreWorkbench">Explore the workbench</span></a
+          >
+          <button
+            class="motion-toggle"
+            type="button"
+            data-motion-toggle
+            aria-pressed="false"
+          >
+            <span data-motion-label>Pause motion</span
+            ><span class="motion-icon" aria-hidden="true">Ⅱ</span>
+          </button>
+        </div>
       </section>
 
       <section class="signal-strip" aria-label="Supported tools">
@@ -239,7 +378,9 @@
       <section class="section shell" id="workbench">
         <div class="section-heading reveal">
           <div>
-            <span class="section-index" data-i18n="indexWorkbench">01 / WORKBENCH</span>
+            <span class="section-index" data-i18n="indexWorkbench"
+              >01 / WORKBENCH</span
+            >
             <h2 data-i18n="workbenchTitle">Four agents. One screen.</h2>
           </div>
           <p data-i18n="workbenchLead">
@@ -304,7 +445,9 @@
 
       <section class="section model-section shell">
         <div class="model-copy reveal">
-          <span class="section-index" data-i18n="indexAttention">02 / NEVER MISS ONE</span>
+          <span class="section-index" data-i18n="indexAttention"
+            >02 / NEVER MISS ONE</span
+          >
           <h2 data-i18n="attentionTitle">
             It tells you when an agent is stuck.
           </h2>
@@ -367,7 +510,9 @@
           </figcaption>
         </figure>
         <div class="model-copy reveal" data-delay="1">
-          <span class="section-index" data-i18n="indexSession">03 / NOTHING IS LOST</span>
+          <span class="section-index" data-i18n="indexSession"
+            >03 / NOTHING IS LOST</span
+          >
           <h2 data-i18n="sessionTitle">Pick up yesterday's conversation.</h2>
           <p data-i18n="sessionLead">
             Claude Code and Codex already save your sessions on disk. Termexo
@@ -392,7 +537,9 @@
 
       <section class="section model-section shell">
         <div class="model-copy reveal">
-          <span class="section-index" data-i18n="indexModel">04 / MODEL ROUTING</span>
+          <span class="section-index" data-i18n="indexModel"
+            >04 / MODEL ROUTING</span
+          >
           <h2 data-i18n="modelTitle">Same CLI. Different model.</h2>
           <p data-i18n="modelLead">
             Keep using Claude Code, but point it at DeepSeek, MiniMax, GLM, or
@@ -453,7 +600,9 @@
           </figcaption>
         </figure>
         <div class="model-copy reveal" data-delay="1">
-          <span class="section-index" data-i18n="indexTask">05 / TASK BOARD</span>
+          <span class="section-index" data-i18n="indexTask"
+            >05 / TASK BOARD</span
+          >
           <h2 data-i18n="taskTitle">Hand the work to an agent.</h2>
           <p data-i18n="taskLead">
             Write down what needs doing and what counts as done, pick the agent
@@ -477,7 +626,9 @@
 
       <section class="section model-section shell">
         <div class="model-copy reveal">
-          <span class="section-index" data-i18n="indexRemote">06 / ANY DEVICE</span>
+          <span class="section-index" data-i18n="indexRemote"
+            >06 / ANY DEVICE</span
+          >
           <h2 data-i18n="remoteTitle">The same workbench, in your hand.</h2>
           <p data-i18n="remoteLead">
             Turn on remote access and a phone, a tablet, or the laptop in the
@@ -525,7 +676,9 @@
         <div class="shell">
           <div class="section-heading reveal">
             <div>
-              <span class="section-index" data-i18n="indexCapabilities">07 / FEATURES</span>
+              <span class="section-index" data-i18n="indexCapabilities"
+                >07 / FEATURES</span
+              >
               <h2 data-i18n="capabilitiesTitle">
                 The things you keep doing by hand.
               </h2>
@@ -567,8 +720,8 @@
               <div class="card-icon orange" aria-hidden="true">↻</div>
               <h3 data-i18n="featureSessionTitle">Nothing you close is lost</h3>
               <p data-i18n="featureSessionBody">
-                Find any past Claude Code, Codex, or OpenCode session across your
-                projects and reopen it with its full history intact.
+                Find any past Claude Code, Codex, or OpenCode session across
+                your projects and reopen it with its full history intact.
               </p>
               <code>claude --resume · codex resume · opencode --session</code>
             </article>
@@ -696,7 +849,9 @@
         <div class="shell">
           <div class="section-heading reveal">
             <div>
-              <span class="section-index" data-i18n="indexRoadmap">08 / ROADMAP</span>
+              <span class="section-index" data-i18n="indexRoadmap"
+                >08 / ROADMAP</span
+              >
               <h2 data-i18n="roadmapTitle">What comes next.</h2>
             </div>
             <p data-i18n="roadmapLead">
@@ -708,9 +863,7 @@
 
           <div class="roadmap-list">
             <article class="roadmap-item shipped reveal">
-              <div>
-                <span>V0.3</span><b data-i18n="shipped">SHIPPED</b>
-              </div>
+              <div><span>V0.3</span><b data-i18n="shipped">SHIPPED</b></div>
               <h3 data-i18n="roadmap02Title">
                 Run several agents side by side
               </h3>
@@ -758,8 +911,10 @@
 
       <section class="section principles-section shell" id="principles">
         <div class="principles-copy reveal">
-          <span class="section-index" data-i18n="indexPrivacy">09 / PRIVACY</span>
-          <h2 data-i18n="principlesTitle">It all stays on your computer.</h2>
+          <span class="section-index" data-i18n="indexPrivacy"
+            >09 / PRIVACY</span
+          >
+          <h2 data-i18n="principlesTitle">Your work. On your computer.</h2>
           <p data-i18n="principlesLead">
             Termexo has no account, no server, and nothing to sync. Remote
             access is the one link out, and it is the kind you switch on
@@ -814,7 +969,11 @@
             The npm package ships the whole Windows app. Run it, and if you do
             not like it, delete it — nothing was created anywhere else.
           </p>
-          <p data-i18n="supportProject">Built in the open, under the MIT license. If Termexo helps your workflow, a GitHub Star helps others discover it. Bug reports and contributions are welcome too.</p>
+          <p data-i18n="supportProject">
+            Built in the open, under the MIT license. If Termexo helps your
+            workflow, a GitHub Star helps others discover it. Bug reports and
+            contributions are welcome too.
+          </p>
         </div>
         <div class="cta-actions">
           <a
@@ -833,7 +992,14 @@
             data-i18n="getRelease"
             >Download installer</a
           >
-          <a class="button secondary" href="https://github.com/gemron/Termexo" target="_blank" rel="noopener" data-i18n="starGithub">Star on GitHub</a>
+          <a
+            class="button secondary"
+            href="https://github.com/gemron/Termexo"
+            target="_blank"
+            rel="noopener"
+            data-i18n="starGithub"
+            >Star on GitHub</a
+          >
         </div>
       </section>
     </main>
@@ -879,8 +1045,13 @@
         <small>© <span data-year></span> Termexo</small>
       </div>
       <div class="shell site-counter">
-        <p><span data-i18n="siteVisits">Website visits (PV)</span>: <span id="busuanzi_value_site_pv" class="site-counter-value">—</span></p>
-        <p data-i18n="counterNotice">Third-party website statistics only; “—” means unavailable.</p>
+        <p>
+          <span data-i18n="siteVisits">Website visits (PV)</span>:
+          <span id="busuanzi_value_site_pv" class="site-counter-value">—</span>
+        </p>
+        <p data-i18n="counterNotice">
+          Third-party website statistics only; “—” means unavailable.
+        </p>
       </div>
     </footer>
   </body>

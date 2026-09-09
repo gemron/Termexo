@@ -1,5 +1,5 @@
 .guide-page { background: var(--bg); }
-.guide-header { position: sticky; top: 0; z-index: 100; background: rgba(10, 13, 12, .96); border-bottom: 1px solid var(--line); }
+.guide-header { position: sticky; top: 0; z-index: 100; background: rgba(248, 250, 251, .96); border-bottom: 1px solid var(--line); }
 .guide-header > .shell { display: flex; align-items: center; justify-content: space-between; gap: 16px; min-height: 76px; }
 .guide-header nav { display: flex; align-items: center; gap: 24px; margin-left: auto; font-size: .875rem; }
 .guide-header .language-switch { font-size: .875rem; }
