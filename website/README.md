@@ -59,10 +59,21 @@ node --test scripts/website-guide.test.mjs
 
 ## 校验与发布命令
 
+首页采用浅色冰蓝主题，动效由原生 CSS 与 `app.js` 驱动，无动画库或视频依赖。
+设计参考 CBDC 的玻璃材质与悬浮构图：
+https://dribbble.com/shots/24093396-CBDC-Web-Design-for-Digital-Currency-Website
+参考页视频受访问验证限制，本实现是基于封面构图重新设计的动效，不是逐帧复刻。
+
+- 鼠标视差只在精确指针设备启用；滚动使用浏览器原生行为。
+- 首屏可暂停动效；系统开启减少动态效果时自动关闭动画。
+- 首屏设备使用真实桌面截图与手机截图的 SVG 视口裁切，显示器和手机外壳由 CSS 绘制；双向连接光点仅作场景示意，随全局动效控制暂停。
+- 离开视口或切到后台时暂停相关循环动画；JavaScript 不可用时保持静态内容可读。
+- `styles.css` 同时供中英文指南使用，调整主题时需检查指南的页头和正文对比度。
+
 ```powershell
 node --check website/app.js
 node --check website/analytics.js
-node --test scripts/website-analytics.test.mjs
+node --test scripts/website-hero.test.mjs scripts/website-guide.test.mjs scripts/website-analytics.test.mjs
 ```
 
 在本地验证布局与未加载第三方脚本；使用模拟响应验证中英文切换不会改动数字。

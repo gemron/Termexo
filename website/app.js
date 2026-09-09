@@ -1,6 +1,11 @@
 const translations = {
   en: {
     skip: "Skip to content",
+    exploreWorkbench: "Explore the workbench",
+    pauseMotion: "Pause motion",
+    resumeMotion: "Enable motion",
+    reducedMotion: "Motion reduced",
+    copyFailed: "Select command to copy",
     navWorkbench: "Workbench",
     navCapabilities: "Features",
     navRoadmap: "Roadmap",
@@ -11,8 +16,9 @@ const translations = {
     heroLine1: "At your desk.",
     heroLine2: "Or on your phone.",
     heroLead:
-      "Bring Claude Code, Codex, and OpenCode into one Windows workbench. Step away from your desk and open it in your phone’s browser to check output, respond to an approval, or send the next instruction. Same workspace. Same running terminals.",
-    heroRemoteNote: "Keep your PC running. Enable remote access, then connect with a token over a trusted LAN or VPN.",
+      "Claude Code, Codex, and OpenCode. One Windows workbench. Check output and send the next instruction from your phone. Your agents keep running on your PC.",
+    heroRemoteNote:
+      "Keep your PC running. Enable remote access, then connect with a token over a trusted LAN or VPN.",
     heroRemoteGuide: "How to connect your phone ↗",
     sceneHeading: "One workspace. Two ways in.",
     sceneDesktop: "RUN ON YOUR PC",
@@ -21,13 +27,16 @@ const translations = {
     sceneResult: "Review complete. Ready for tests.",
     sceneWaiting: "Waiting for your next instruction",
     sceneHost: "Session runs on this PC",
-    sceneDesktopNote: "Your agents and project stay on the host. No session to move or restart.",
+    sceneDesktopNote:
+      "Your agents and project stay on the host. No session to move or restart.",
     sceneConnection: "Remote · HTTPS",
+    sceneSync: "Two-way connection",
     sceneSameSession: "The same live terminal",
     sceneInstruction: "› Run the tests and summarize any failures.",
     sceneContinue: "↳ Continuing on your PC…",
     sceneInput: "Send the next instruction",
-    sceneCaption: "PC runs it. Phone controls it. Illustrative workflow, not a live session.",
+    sceneCaption:
+      "Actual Termexo screenshots. Illustrative devices and connection, not a live session.",
     runFromNpm: "Run it now",
     download: "Download installer",
     copyCommand: "Copy",
@@ -87,10 +96,13 @@ const translations = {
     taskTitle: "Hand the work to an agent.",
     taskLead:
       "Write down what needs doing and what counts as done, pick the agent and the project, and the task opens as a real terminal. It reports its own progress back to the board, so you can see what is running without reading four terminals at once.",
-    taskPoint1: "Todo, executing, completed, verified — the terminal moves the card",
+    taskPoint1:
+      "Todo, executing, completed, verified — the terminal moves the card",
     taskPoint2: "Send a task to Claude Code, Codex, or OpenCode",
-    taskPoint3: "Reject a result with a note and it goes back for another round",
-    taskCaption: "A task carries its acceptance criteria from todo through to verified",
+    taskPoint3:
+      "Reject a result with a note and it goes back for another round",
+    taskCaption:
+      "A task carries its acceptance criteria from todo through to verified",
     capabilitiesTitle: "The things you keep doing by hand.",
     capabilitiesLead:
       "Most of the friction with coding agents is not the model. It is remembering which terminal was doing what, and setting it all up again tomorrow.",
@@ -152,7 +164,7 @@ const translations = {
     roadmap07Body:
       "The workbench opens on a phone or a second computer over an encrypted link to your own machine, driving the same live terminals. Paired devices, roles, and an audit trail come next.",
 
-    principlesTitle: "It all stays on your computer.",
+    principlesTitle: "Your work.\nOn your computer.",
     principlesLead:
       "Termexo has no account, no server, and nothing to sync. Remote access is the one link out, and it is the kind you switch on yourself, hand a token to, and switch off just as fast.",
     principle1Title: "Local by default",
@@ -170,7 +182,8 @@ const translations = {
       "The npm package ships the whole Windows app. Run it, and if you do not like it, delete it — nothing was created anywhere else.",
     getRelease: "Download installer",
     starGithub: "Star on GitHub",
-    supportProject: "Built in the open, under the MIT license. If Termexo helps your workflow, a GitHub Star helps others discover it. Bug reports and contributions are welcome too.",
+    supportProject:
+      "Built in the open, under the MIT license. If Termexo helps your workflow, a GitHub Star helps others discover it. Bug reports and contributions are welcome too.",
     indexWorkbench: "01 / WORKBENCH",
     indexAttention: "02 / NEVER MISS ONE",
     indexSession: "03 / NOTHING IS LOST",
@@ -185,10 +198,16 @@ const translations = {
     footerIssues: "Issues",
     footerTagline: "One window for every coding agent",
     siteVisits: "Website visits (PV)",
-    counterNotice: "Third-party website statistics only; “—” means unavailable.",
+    counterNotice:
+      "Third-party website statistics only; “—” means unavailable.",
   },
   zh: {
     skip: "跳到主要内容",
+    exploreWorkbench: "探索工作台",
+    pauseMotion: "暂停动效",
+    resumeMotion: "开启动效",
+    reducedMotion: "已跟随系统减少动效",
+    copyFailed: "请选择命令复制",
     navWorkbench: "工作台",
     navCapabilities: "功能",
     navRoadmap: "开发计划",
@@ -199,8 +218,9 @@ const translations = {
     heroLine1: "电脑上开工，",
     heroLine2: "手机上接着用。",
     heroLead:
-      "把 Claude Code、Codex 和 OpenCode 收进同一个 Windows 工作台。离开书桌，也能用手机浏览器查看输出、回应授权、发送下一步指令。打开的还是同一个工作空间，操作的还是电脑上正在运行的终端。",
-    heroRemoteNote: "电脑需保持运行。开启远程访问后，在可信局域网或 VPN 内使用令牌连接。",
+      "Claude Code、Codex、OpenCode，一个 Windows 工作台。离开书桌，用手机查看输出、发送下一步指令。Agent 继续在电脑上运行。",
+    heroRemoteNote:
+      "电脑需保持运行。开启远程访问后，在可信局域网或 VPN 内使用令牌连接。",
     heroRemoteGuide: "了解手机如何连接 ↗",
     sceneHeading: "同一个工作台，电脑与手机接续操作。",
     sceneDesktop: "电脑运行 AGENT",
@@ -211,11 +231,12 @@ const translations = {
     sceneHost: "会话在这台电脑上运行",
     sceneDesktopNote: "Agent 和项目留在电脑上，无需搬运会话，也无需重新启动。",
     sceneConnection: "远程访问 · HTTPS",
+    sceneSync: "双向连接",
     sceneSameSession: "同一个正在运行的终端",
     sceneInstruction: "› 运行测试，并汇总失败项。",
     sceneContinue: "↳ 正在电脑上继续执行…",
     sceneInput: "发送下一步指令",
-    sceneCaption: "电脑负责运行，手机接着操作。场景示意，非实时会话。",
+    sceneCaption: "真实 Termexo 界面截图，设备与连接为场景示意，非实时会话。",
     runFromNpm: "立即运行",
     download: "下载安装包",
     copyCommand: "复制",
@@ -301,7 +322,8 @@ const translations = {
     remoteTitle: "同一个工作台，装进手里。",
     remoteLead:
       "打开远程访问，手机、平板或另一个房间的笔记本用浏览器就能打开完整工作台。不是只读的镜像，而是同一批工作空间、同一批正在运行的终端——人不在工位上，卡在授权那一步的 Agent 也能等到回答。",
-    remotePoint1: "连接加密到你自己的电脑，凭令牌进入，令牌可扫码，也可以随时更换",
+    remotePoint1:
+      "连接加密到你自己的电脑，凭令牌进入，令牌可扫码，也可以随时更换",
     remotePoint2: "终端支持手指拖拽滚动，尺寸跟随正在使用的那块屏幕",
     remotePoint3: "不经过 Termexo 的任何服务器，连接只在你自己的设备之间",
     remoteCaption: "屏幕上是同一个终端，桌面端正在跑的那个。",
@@ -324,7 +346,7 @@ const translations = {
     roadmap07Body:
       "工作台已经能在手机或另一台电脑上打开，走一条到自己电脑的加密连接，驱动同一批终端。设备配对、权限角色和操作日志是接下来的部分。",
 
-    principlesTitle: "一切都留在你自己的电脑上。",
+    principlesTitle: "你的工作，\n留在你的电脑。",
     principlesLead:
       "Termexo 没有账号、没有服务器，也没有要同步的东西。远程访问是唯一一条对外的连接，也是你自己打开、自己发令牌、随时能关掉的那种。",
     principle1Title: "默认就在本地",
@@ -342,7 +364,8 @@ const translations = {
       "npm 包里带着完整的 Windows 应用。跑起来看看，不喜欢直接删掉——它不会在别处留下任何东西。",
     getRelease: "下载安装包",
     starGithub: "在 GitHub 上 Star",
-    supportProject: "MIT 开源。如果 Termexo 帮到了你的工作，欢迎在 GitHub 点个 Star，让更多开发者发现它；也欢迎反馈问题和参与贡献。",
+    supportProject:
+      "MIT 开源。如果 Termexo 帮到了你的工作，欢迎在 GitHub 点个 Star，让更多开发者发现它；也欢迎反馈问题和参与贡献。",
     indexWorkbench: "01 / 工作台",
     indexAttention: "02 / 一个都不漏",
     indexSession: "03 / 什么都没丢",
@@ -383,10 +406,16 @@ function setLanguage(language) {
     const value = dictionary[element.dataset.i18n];
     if (value) element.textContent = value;
     if (element.dataset.i18n === "navGuide") {
-      element.setAttribute("href", language === "zh" ? "guide.html" : "guide.en.html");
+      element.setAttribute(
+        "href",
+        language === "zh" ? "guide.html" : "guide.en.html",
+      );
     }
     if (element.dataset.i18n === "heroRemoteGuide") {
-      element.setAttribute("href", language === "zh" ? "guide.html#remote" : "guide.en.html#remote");
+      element.setAttribute(
+        "href",
+        language === "zh" ? "guide.html#remote" : "guide.en.html#remote",
+      );
     }
   });
 
@@ -398,7 +427,12 @@ function setLanguage(language) {
     );
   });
 
-  localStorage.setItem("termexo.website.language", language);
+  try {
+    localStorage.setItem("termexo.website.language", activeLanguage);
+  } catch {
+    /* Preferences are optional. */
+  }
+  document.dispatchEvent?.(new Event("languagechange"));
 }
 
 languageButtons.forEach((button) => {
@@ -406,7 +440,17 @@ languageButtons.forEach((button) => {
 });
 
 copyCommandButton.addEventListener("click", async () => {
-  await navigator.clipboard.writeText("npx termexo@latest");
+  try {
+    await navigator.clipboard.writeText("npx termexo@latest");
+  } catch {
+    const range = document.createRange();
+    range.selectNodeContents(document.querySelector(".install-command code"));
+    const selection = window.getSelection();
+    selection.removeAllRanges();
+    selection.addRange(range);
+    copyCommandLabel.textContent = translations[activeLanguage].copyFailed;
+    return;
+  }
   copyCommandLabel.textContent = translations[activeLanguage].copied;
   copyCommandButton.classList.add("copied");
   window.setTimeout(() => {
@@ -427,21 +471,40 @@ nav.querySelectorAll("a").forEach((link) => {
   });
 });
 
-const revealObserver = new IntersectionObserver(
-  (entries, observer) => {
-    entries.forEach((entry) => {
-      if (entry.isIntersecting) {
-        entry.target.classList.add("visible");
-        observer.unobserve(entry.target);
-      }
-    });
-  },
-  { rootMargin: "0px 0px -8% 0px", threshold: 0.08 },
-);
+document.addEventListener("keydown", (event) => {
+  if (event.key === "Escape" && nav.classList.contains("open")) {
+    nav.classList.remove("open");
+    menuToggle.setAttribute("aria-expanded", "false");
+    menuToggle.focus();
+  }
+});
+document.addEventListener("pointerdown", (event) => {
+  if (!nav.contains(event.target) && !menuToggle.contains(event.target)) {
+    nav.classList.remove("open");
+    menuToggle.setAttribute("aria-expanded", "false");
+  }
+});
 
-document
-  .querySelectorAll(".reveal")
-  .forEach((element) => revealObserver.observe(element));
+const revealObserver =
+  "IntersectionObserver" in window
+    ? new IntersectionObserver(
+        (entries, observer) => {
+          entries.forEach((entry) => {
+            if (entry.isIntersecting) {
+              entry.target.classList.add("visible");
+              observer.unobserve(entry.target);
+            }
+          });
+        },
+        { rootMargin: "0px 0px -8% 0px", threshold: 0.08 },
+      )
+    : null;
+
+document.querySelectorAll(".reveal").forEach((element) => {
+  if (revealObserver) revealObserver.observe(element);
+  else element.classList.add("visible");
+});
+document.documentElement.classList.add("motion-ready");
 
 window.addEventListener(
   "scroll",
@@ -451,5 +514,156 @@ window.addEventListener(
 
 document.querySelector("[data-year]").textContent = new Date().getFullYear();
 
-const storedLanguage = localStorage.getItem("termexo.website.language");
+let storedLanguage;
+try {
+  storedLanguage = localStorage.getItem("termexo.website.language");
+} catch {
+  /* Use the default language. */
+}
 setLanguage(storedLanguage || "en");
+
+// Native scrolling drives the scene; there is no scroll interception or perpetual render loop.
+const motionPreference = window.matchMedia("(prefers-reduced-motion: reduce)");
+const precisePointer = window.matchMedia("(hover: hover) and (pointer: fine)");
+const motionToggle = document.querySelector("[data-motion-toggle]");
+const motionLabel = document.querySelector("[data-motion-label]");
+const hero = document.querySelector(".hero");
+const scene = document.querySelector(".hero-scene");
+const workbench = document.querySelector("#workbench .product-frame");
+let motionPaused = motionPreference.matches;
+let motionFrame = 0;
+let pointerX = 0;
+let pointerY = 0;
+
+function renderMotion() {
+  motionFrame = 0;
+  if (motionPaused || document.hidden) return;
+  const heroBounds = hero.getBoundingClientRect();
+  if (heroBounds.bottom > 0 && heroBounds.top < window.innerHeight) {
+    const progress = Math.min(
+      1,
+      Math.max(0, -heroBounds.top / heroBounds.height),
+    );
+    scene.style.setProperty("--scene-scroll", progress.toFixed(3));
+    scene.style.setProperty("--pointer-x", `${pointerX.toFixed(2)}deg`);
+    scene.style.setProperty("--pointer-y", `${pointerY.toFixed(2)}deg`);
+  }
+  const frameBounds = workbench.getBoundingClientRect();
+  if (frameBounds.bottom > 0 && frameBounds.top < window.innerHeight) {
+    const progress = Math.min(
+      1,
+      Math.max(
+        0,
+        (window.innerHeight - frameBounds.top) / (window.innerHeight * 0.8),
+      ),
+    );
+    workbench.style.setProperty(
+      "--frame-scale",
+      (0.9 + progress * 0.1).toFixed(4),
+    );
+    workbench.style.setProperty(
+      "--frame-tilt",
+      `${((1 - progress) * 7).toFixed(2)}deg`,
+    );
+  }
+}
+
+function scheduleMotion() {
+  if (!motionPaused && !document.hidden && !motionFrame)
+    motionFrame = requestAnimationFrame(renderMotion);
+}
+
+function updateMotionControl() {
+  document.documentElement.classList.toggle("motion-paused", motionPaused);
+  motionToggle.setAttribute("aria-pressed", String(motionPaused));
+  motionToggle.disabled = motionPreference.matches;
+  motionLabel.textContent =
+    translations[activeLanguage][
+      motionPreference.matches
+        ? "reducedMotion"
+        : motionPaused
+          ? "resumeMotion"
+          : "pauseMotion"
+    ];
+  motionToggle.querySelector(".motion-icon").textContent = motionPaused
+    ? "▷"
+    : "Ⅱ";
+  if (motionPaused) {
+    cancelAnimationFrame(motionFrame);
+    motionFrame = 0;
+    scene.style.removeProperty("--scene-scroll");
+    scene.style.removeProperty("--pointer-x");
+    scene.style.removeProperty("--pointer-y");
+    workbench.style.removeProperty("--frame-scale");
+    workbench.style.removeProperty("--frame-tilt");
+  } else scheduleMotion();
+}
+
+motionToggle.addEventListener("click", () => {
+  motionPaused = !motionPaused;
+  updateMotionControl();
+});
+motionPreference.addEventListener("change", () => {
+  motionPaused = motionPreference.matches;
+  updateMotionControl();
+});
+document.addEventListener("languagechange", updateMotionControl);
+hero.addEventListener(
+  "pointermove",
+  (event) => {
+    if (motionPaused || !precisePointer.matches) return;
+    const bounds = hero.getBoundingClientRect();
+    pointerX = ((event.clientX - bounds.left) / bounds.width - 0.5) * 6;
+    pointerY = ((event.clientY - bounds.top) / bounds.height - 0.5) * -5;
+    scheduleMotion();
+  },
+  { passive: true },
+);
+hero.addEventListener("pointerleave", () => {
+  pointerX = 0;
+  pointerY = 0;
+  scheduleMotion();
+});
+window.addEventListener("scroll", scheduleMotion, { passive: true });
+window.addEventListener("resize", scheduleMotion, { passive: true });
+document.addEventListener("visibilitychange", () => {
+  document.documentElement.classList.toggle("page-hidden", document.hidden);
+  scheduleMotion();
+});
+
+// A second, non-semantic copy makes the ticker loop without a visible jump.
+const signalTrack = document.querySelector(".signal-track");
+const signalCopy = signalTrack.cloneNode(true);
+signalCopy.setAttribute("aria-hidden", "true");
+signalTrack.parentElement.append(signalCopy);
+
+// Suspend CSS loops after their surface leaves the viewport.
+if ("IntersectionObserver" in window) {
+  const activityObserver = new IntersectionObserver((entries) => {
+    entries.forEach((entry) =>
+      entry.target.classList.toggle("motion-offscreen", !entry.isIntersecting),
+    );
+  });
+  activityObserver.observe(scene);
+  activityObserver.observe(signalTrack.parentElement);
+
+  const sectionLinks = [...nav.querySelectorAll('a[href^="#"]')];
+  const navigationObserver = new IntersectionObserver(
+    (entries) => {
+      const entering = entries.find((entry) => entry.isIntersecting);
+      if (!entering) return;
+      sectionLinks.forEach((link) => {
+        if (link.hash === `#${entering.target.id}`)
+          link.setAttribute("aria-current", "location");
+        else link.removeAttribute("aria-current");
+      });
+    },
+    { rootMargin: "-15% 0px -65% 0px" },
+  );
+  sectionLinks.forEach((link) => {
+    const section = document.querySelector(link.hash);
+    if (section) navigationObserver.observe(section);
+  });
+  navigationObserver.observe(hero);
+}
+updateMotionControl();
