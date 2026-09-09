@@ -15,6 +15,7 @@ mod quota;
 mod remote;
 mod system_proxy;
 mod update;
+mod webview;
 
 use std::fs;
 use std::sync::Arc;
@@ -53,6 +54,14 @@ pub fn run() {
                 .unwrap_or_else(|_| "termexo=info,termexo_lib=info".into()),
         )
         .init();
+
+    // Nothing below can report this: without a runtime Tauri cannot build the webview, and the
+    // process dies behind a panic message no user sees. An install from npm never ran an
+    // installer that could deploy WebView2, so this is the only notice such a user ever gets.
+    if tauri::webview_version().is_err() {
+        webview::warn_runtime_missing();
+        return;
+    }
 
     // Installing the provider before anything can reach for one keeps a future dependency that
     // pulls in `ring` from making the first TLS user panic on an ambiguous default.
@@ -163,6 +172,9 @@ pub fn run() {
             commands::workspace::list_workspaces,
             commands::workspace::save_workspace,
             commands::workspace::delete_workspace,
+            commands::terminal::get_pty_backend,
+            commands::webview::get_webview_status,
+            commands::webview::open_webview_download,
             commands::terminal::create_terminal,
             commands::terminal::write_terminal,
             commands::terminal::resize_terminal,

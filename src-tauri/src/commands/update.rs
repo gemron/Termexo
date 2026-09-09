@@ -79,7 +79,7 @@ pub fn update_via_npm(_app: AppHandle) -> Result<(), String> {
 }
 
 #[cfg(windows)]
-fn open_url(url: &str) -> Result<(), String> {
+pub(crate) fn open_url(url: &str) -> Result<(), String> {
     use std::process::Command;
     // `rundll32 url.dll,FileProtocolHandler` hands the URL to the default browser without
     // going through a shell, so the URL is never parsed as a command line.
@@ -91,6 +91,6 @@ fn open_url(url: &str) -> Result<(), String> {
 }
 
 #[cfg(not(windows))]
-fn open_url(_url: &str) -> Result<(), String> {
+pub(crate) fn open_url(_url: &str) -> Result<(), String> {
     Err("当前平台不支持打开发布页面。".into())
 }

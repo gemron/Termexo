@@ -2,6 +2,28 @@
 
 Release notes for every Termexo version, newest first. The current release is summarised in [README.md](README.md).
 
+## V0.8.5
+
+- Termexo ships its own ConPTY. Every terminal runs through the pseudo console
+  `CreatePseudoConsole` opens, and which one that was had been left to whatever the user's Windows
+  build carries. ConPTY re-synthesises terminal input as Win32 key records before the program reads
+  it back as VT, and older builds lose sequences in that round trip: `CSI Z` arrives as a plain Tab,
+  so Claude Code never sees Shift+Tab, and mouse reports are dropped outright, so OpenCode cannot be
+  scrolled. The same builds reflow wrapped lines themselves, which xterm then reflows a second time.
+  `conpty.dll` and `OpenConsole.exe` — Microsoft.Windows.Console.ConPTY 1.24.260710001, MIT — now
+  sit beside `termexo.exe` in both installers and in the npm package, which `portable-pty` prefers
+  over the one in `kernel32.dll`, so every install behaves the same whatever Windows it runs on.
+- The terminal is told which pseudo console it is attached to. On an old system ConPTY it stops
+  reflowing wrapped lines on top of the reflow ConPTY has already done, rather than assuming the
+  reflow is its own to perform.
+- A WebView2 runtime too old to draw the interface now says so. Below Chromium 111 the stylesheets'
+  `color-mix()` and `oklch()` colours are dropped and parts of the layout break, with nothing on
+  screen connecting that to a runtime version; the notice names the version, the one it needs, the
+  download page and the `winget` line, and keeps the address readable for when the browser cannot be
+  launched from here. A runtime missing altogether — which an install from npm never had an
+  installer to deploy — is reported before startup rather than failing behind a panic message no
+  one sees.
+
 ## V0.8.4
 
 - Codex scrolls on a phone. A finger drag reached xterm as a synthetic wheel event, and xterm reads

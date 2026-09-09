@@ -11,7 +11,7 @@
 </p>
 
 <p align="center">
-  <img alt="Version 0.8.4" src="https://img.shields.io/badge/version-0.8.4-58c7a0">
+  <img alt="Version 0.8.5" src="https://img.shields.io/badge/version-0.8.5-58c7a0">
   <img alt="Windows" src="https://img.shields.io/badge/platform-Windows-0078D4?logo=windows">
   <img alt="Tauri 2" src="https://img.shields.io/badge/Tauri-2-24C8DB?logo=tauri&logoColor=white">
   <img alt="Angular 22" src="https://img.shields.io/badge/Angular-22-DD0031?logo=angular">
@@ -35,7 +35,7 @@ Agent 等着授权时，人在哪里都能回它一句。
 npx termexo@latest
 ```
 
-> 当前版本为 **V0.8.4**。
+> 当前版本为 **V0.8.5**。
 
 ![Termexo 多终端网格工作台](website/assets/termexo-workbench.png)
 
@@ -120,6 +120,15 @@ SQLite，密钥保存在 Windows Credential Manager，Claude/Codex 历史会话�
 
 界面支持简体中文、英语、西班牙语、法语、德语、日语和韩语。默认自动跟随 Windows
 系统语言，也可通过主工具栏手动切换并跨重启保留选择。
+
+## V0.8.5 新增
+
+- **终端在任何 Windows 上表现一致**：终端所用的伪控制台此前取决于这台机器的 Windows 版本，旧版本
+  会在把输入送给 Agent 的途中丢东西——Shift+Tab 到 Claude Code 时变成普通 Tab，OpenCode 则完全收不
+  到滚动。现在 Termexo 自带一份，所有环境统一使用。
+- **WebView2 过旧时会说明原因**：低于 Chromium 111 时界面会失去配色、部分布局错位，而此前没有任何
+  提示。现在会写明检测到的版本、所需版本和两种安装方式；运行时完全缺失时也会给出提示，不再在启动
+  时无声失败。
 
 ## V0.8.4 新增
 
@@ -291,14 +300,17 @@ npm install --global termexo
 termexo
 ```
 
-此方式需要 Windows 10/11、WebView2 和 Node.js 18.18 或更高版本。从源码构建
+此方式需要 Windows 10/11、WebView2 运行时和 Node.js 18.18 或更高版本。从源码构建
 则使用下方列出的新版开发工具链。
 
 ### 环境要求
 
-- Windows 10/11；
+- Windows 10 build 17763（2018 年 10 月）或更高——终端所依赖的伪控制台从这个版本开始才有；
+- WebView2 运行时需 Chromium 111 或更高——界面的配色用 `color-mix()` 和 `oklch()` 表达，更旧的
+  运行时会直接丢弃这些声明。遇到旧版本时 Termexo 会提示并提供下载入口；Windows 11 自带，安装包
+  也会补装；
 - Node.js `^22.22.3`、`^24.15.0` 或 `>=26.0.0`；
-- 桌面模式需要 Rust stable、Visual Studio C++ Build Tools 和 WebView2；
+- 桌面模式需要 Rust stable 和 Visual Studio C++ Build Tools；
 - 本机已安装 Claude Code 和/或 Codex CLI（也可由 Termexo 管理安装与升级）。
 
 ### 1. 获取代码与安装前端依赖

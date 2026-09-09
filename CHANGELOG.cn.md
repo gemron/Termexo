@@ -2,6 +2,23 @@
 
 按版本倒序记录每个版本的变更。当前版本的要点见 [README.cn.md](README.cn.md)。
 
+## V0.8.5
+
+- Termexo 自带 ConPTY。每个终端都跑在 `CreatePseudoConsole` 打开的伪控制台上，而用的是哪一份此前
+  完全取决于用户的 Windows 版本。ConPTY 会先把终端输入重建成 Win32 按键记录，程序再从中读回 VT，
+  这一来一回是有损的：旧版本里 `CSI Z` 会退化成普通 Tab，Claude Code 因此收不到 Shift+Tab；鼠标
+  上报则被整个丢弃，OpenCode 完全没法滚动。同样这些版本还会自己重排换行，xterm 再重排一次就乱了。
+  现在 `conpty.dll` 和 `OpenConsole.exe`（Microsoft.Windows.Console.ConPTY 1.24.260710001，MIT
+  许可）随两种安装包和 npm 包一起放在 `termexo.exe` 旁边，`portable-pty` 会优先用它而不是
+  `kernel32.dll` 里的那份，于是所有安装在任何 Windows 上表现一致。
+- 终端会被告知自己连的是哪一份伪控制台。在使用旧版系统 ConPTY 时，它不再在 ConPTY 已经重排过的
+  基础上重排第二遍，而不是一律当作重排该由自己负责。
+- WebView2 运行时过旧时会明确提示。低于 Chromium 111 时样式里的 `color-mix()` 和 `oklch()` 颜色
+  会被整条丢弃、部分布局会错位，而界面上没有任何东西能把这个现象和运行时版本联系起来。现在提示会
+  写明当前版本、所需版本、下载页和 `winget` 命令，并把地址保留为可读文本，供浏览器打不开时使用。
+  运行时完全缺失时——通过 npm 安装的用户从来没有安装程序帮他们装上——会在启动前给出提示，而不是
+  带着一条没人看得见的 panic 消息失败。
+
 ## V0.8.4
 
 - 手机上能滚动 Codex 了。手指拖动此前是合成一个 wheel 事件交给 xterm，而 xterm 对滚轮的两种处理

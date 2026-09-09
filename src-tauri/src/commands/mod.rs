@@ -11,4 +11,5 @@ pub mod quota;
 pub mod remote;
 pub mod terminal;
 pub mod update;
+pub mod webview;
 pub mod workspace;

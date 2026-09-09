@@ -1,7 +1,7 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
   "productName": "Termexo",
-  "version": "0.8.4",
+  "version": "0.8.5",
   "identifier": "dev.agentdock.desktop",
   "build": {
     "beforeDevCommand": "npm --prefix apps/desktop-ui start -- --host 127.0.0.1 --port 4200",
@@ -41,6 +41,10 @@
       "icons/icon.icns",
       "icons/icon.ico"
     ],
-    "resources": ["icons/128x128.png"]
+    "resources": {
+      "icons/128x128.png": "icons/128x128.png",
+      "vendor/conpty/conpty.dll": "conpty.dll",
+      "vendor/conpty/OpenConsole.exe": "OpenConsole.exe"
+    }
   }
 }

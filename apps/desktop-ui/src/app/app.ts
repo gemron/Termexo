@@ -79,6 +79,7 @@ import {
   runtimeMode,
 } from './core/services/tauri-runtime';
 import { UpdateCheck, UpdateService } from './core/services/update.service';
+import { WebviewStatusService } from './core/services/webview-status.service';
 import { WindowControlsService } from './core/services/window-controls.service';
 import {
   TerminalExitEvent,
@@ -97,6 +98,7 @@ import {
 } from './dialogs/opencode-launch-dialog';
 import { CreateWorkspaceDialogComponent } from './dialogs/create-workspace-dialog';
 import { DirectoryPromptDialogComponent } from './dialogs/directory-prompt-dialog';
+import { WebviewUpgradeDialogComponent } from './dialogs/webview-upgrade-dialog';
 import { BackgroundSessionDialogComponent } from './dialogs/background-session-dialog';
 import { DeleteWorkspaceDialogComponent } from './dialogs/delete-workspace-dialog';
 import {
@@ -251,6 +253,7 @@ function readStoredString(key: string, fallback: string): string {
     TerminalWorkbenchComponent,
     TodoBoardComponent,
     TranslatePipe,
+    WebviewUpgradeDialogComponent,
     WorkspaceSidebarComponent,
   ],
   templateUrl: './app.html',
@@ -282,6 +285,7 @@ export class App {
   /** True only in the browser client served by the desktop app's remote access server. */
   protected readonly remoteMode = this.remoteConnection.mode === 'remote';
   protected readonly directoryPicker = inject(DirectoryPickerService);
+  protected readonly webviewStatus = inject(WebviewStatusService);
   private readonly desktopNotifications = inject(DesktopNotificationService);
   private readonly terminalGateway = inject(TerminalGatewayService);
   protected readonly promptAssets = inject(PromptAssetService);

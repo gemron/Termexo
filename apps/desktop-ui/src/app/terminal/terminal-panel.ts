@@ -23,6 +23,7 @@ import {
   TerminalSession,
   TerminalStatus,
 } from '../core/models/workspace.models';
+import { PtyBackendService } from '../core/services/pty-backend.service';
 import { TerminalGatewayService } from '../core/services/terminal-gateway.service';
 import { IconComponent } from '../shared/icon/icon';
 import { TerminalCompositionAnchor } from './terminal-composition-anchor';
@@ -59,6 +60,7 @@ const TERMINAL_LINE_HEIGHT = 1;
 })
 export class TerminalPanelComponent implements AfterViewInit {
   private readonly gateway = inject(TerminalGatewayService);
+  private readonly ptyBackend = inject(PtyBackendService);
   private readonly i18n = inject(I18nService);
   private readonly destroyRef = inject(DestroyRef);
   private readonly zone = inject(NgZone);
@@ -181,6 +183,18 @@ export class TerminalPanelComponent implements AfterViewInit {
       this.terminal.options.fontFamily = terminalFontFamily(this.fontName());
       if (this.viewReady && this.visible()) {
         this.scheduleFit();
+      }
+    });
+    effect(() => {
+      const backend = this.ptyBackend.backend();
+      if (backend) {
+        // Without this xterm assumes it owns reflow. An old system ConPTY rewrites wrapped lines
+        // itself, and a second reflow on top of that corrupts them; xterm suppresses its own once
+        // it knows the build it is talking to.
+        this.terminal.options.windowsPty = {
+          backend: backend.backend,
+          buildNumber: backend.buildNumber,
+        };
       }
     });
     effect(() => {

@@ -1,6 +1,6 @@
 {
   "name": "termexo",
-  "version": "0.8.4",
+  "version": "0.8.5",
   "description": "Run the Termexo AI development workspace directly from npm on Windows",
   "type": "module",
   "bin": {
@@ -10,6 +10,8 @@
     "bin/",
     "lib/",
     "vendor/win32-x64/termexo.exe",
+    "vendor/win32-x64/conpty.dll",
+    "vendor/win32-x64/OpenConsole.exe",
     "README.md"
   ],
   "os": [

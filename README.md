@@ -11,7 +11,7 @@
 </p>
 
 <p align="center">
-  <img alt="Version 0.8.4" src="https://img.shields.io/badge/version-0.8.4-58c7a0">
+  <img alt="Version 0.8.5" src="https://img.shields.io/badge/version-0.8.5-58c7a0">
   <img alt="Windows" src="https://img.shields.io/badge/platform-Windows-0078D4?logo=windows">
   <img alt="Tauri 2" src="https://img.shields.io/badge/Tauri-2-24C8DB?logo=tauri&logoColor=white">
   <img alt="Angular 22" src="https://img.shields.io/badge/Angular-22-DD0031?logo=angular">
@@ -36,7 +36,7 @@ Run the complete Windows app with one command—no Termexo account or server req
 npx termexo@latest
 ```
 
-> The current version is **V0.8.4**.
+> The current version is **V0.8.5**.
 
 ![Termexo multi-terminal grid workbench](website/assets/termexo-workbench.png)
 
@@ -131,6 +131,17 @@ you configure under their own terms and privacy policies.
 The interface is available in Simplified Chinese, English, Spanish, French, German, Japanese,
 and Korean. It follows the Windows language automatically, or you can choose a language from
 the main toolbar and keep that choice across restarts.
+
+## What's New in V0.8.5
+
+- **Terminals behave the same on every Windows.** The pseudo console they run on used to be
+  whichever one the machine's Windows build carried, and older ones lose input on the way to the
+  agent: Shift+Tab reached Claude Code as a plain Tab, and OpenCode received no scroll at all.
+  Termexo now ships its own and uses it everywhere.
+- **An outdated WebView2 runtime explains itself.** Below Chromium 111 the interface loses its
+  colours and parts of its layout, and nothing said why. It now names the version it found, the one
+  it needs, and both ways to install it — and a runtime missing entirely is reported instead of
+  failing silently at startup.
 
 ## What's New in V0.8.4
 
@@ -340,14 +351,18 @@ npm install --global termexo
 termexo
 ```
 
-This path requires Windows 10/11, WebView2, and Node.js 18.18 or later. Building
+This path requires Windows 10/11, the WebView2 runtime, and Node.js 18.18 or later. Building
 from source uses the newer toolchain listed below.
 
 ### Requirements
 
-- Windows 10/11;
+- Windows 10 build 17763 (October 2018) or newer, the first to carry the pseudo console the
+  terminals run on;
+- the WebView2 runtime at Chromium 111 or newer — the interface states its colours through
+  `color-mix()` and `oklch()`, which older runtimes drop. Termexo says so and offers the download
+  when it finds an older one, and Windows 11 and the installers both provide a current runtime;
 - Node.js `^22.22.3`, `^24.15.0`, or `>=26.0.0`;
-- Rust stable, Visual Studio C++ Build Tools, and WebView2 for the desktop runtime;
+- Rust stable and Visual Studio C++ Build Tools for the desktop runtime;
 - a local Claude Code and/or Codex CLI installation (Termexo can also manage installation and upgrades).
 
 ### 1. Clone and install frontend dependencies

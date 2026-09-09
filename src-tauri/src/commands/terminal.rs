@@ -5,6 +5,7 @@ use crate::config::{CredentialStore, LaunchEnvironmentStore};
 use crate::database::WorkspaceDatabase;
 use crate::git::watch::RepositoryWatcher;
 use crate::git::RepositoryManager;
+use crate::pty::backend::{self, PtyBackendInfo};
 use crate::pty::{PtyManager, TerminalScrollback};
 
 #[derive(Debug, Deserialize)]
@@ -138,6 +139,13 @@ pub fn read_terminal_scrollback(
     manager
         .read_scrollback(&terminal_id)
         .map_err(|error| error.to_string())
+}
+
+/// Reports the pseudo console terminals run on, which decides what the frontend may leave to
+/// xterm. An old system ConPTY reflows wrapped lines itself, so xterm has to stop doing it too.
+#[tauri::command]
+pub fn get_pty_backend() -> PtyBackendInfo {
+    backend::describe()
 }
 
 #[tauri::command]

@@ -635,6 +635,17 @@
   Stands in for the native directory dialog outside the Tauri window; on a phone it is what makes
   starting a terminal possible at all.
 -->
+<!--
+  A WebView2 older than the interface needs still draws a window, just one with its colours
+  dropped and parts of its layout wrong. Nothing else on screen connects that to a runtime
+  version, so this says it outright and carries both ways of installing a newer one.
+-->
+@defer (when webviewStatus.upgradeNeeded()) {
+  @if (webviewStatus.upgradeNeeded()) {
+    <app-webview-upgrade-dialog />
+  }
+}
+
 @defer (when directoryPicker.prompt() !== null) {
   @if (directoryPicker.prompt(); as request) {
     <app-directory-prompt-dialog

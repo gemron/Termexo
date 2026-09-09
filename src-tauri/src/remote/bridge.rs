@@ -103,6 +103,7 @@ pub const REMOTE_ALLOWED: &[&str] = &[
     "list_workspaces",
     "save_workspace",
     "delete_workspace",
+    "get_pty_backend",
     "create_terminal",
     "write_terminal",
     "resize_terminal",
