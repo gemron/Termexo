@@ -9,6 +9,7 @@
     "build": "npm --prefix apps/desktop-ui run build",
     "capture:readme": "npm --prefix apps/desktop-ui run capture:readme",
     "capture:demo": "npm --prefix apps/desktop-ui run capture:demo --",
+    "growth:collect": "node scripts/collect-growth-metrics.mjs",
     "test": "npm --prefix apps/desktop-ui test -- --watch=false",
     "npm:pack": "npm pack ./packages/termexo --dry-run",
     "npm:publish": "npm publish ./packages/termexo --access public",

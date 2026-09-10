@@ -65,6 +65,8 @@ npx termexo@latest
 如果 Termexo 帮到了你，欢迎 **给仓库点一个 Star**，帮助更多开发者发现它。
 遇到问题请 [提交 Issue](https://github.com/gemron/Termexo/issues)，附上 Windows 版本和复现步骤。
 
+第一次试用？欢迎 [告诉我们是否顺利、卡在了哪一步](https://github.com/gemron/Termexo/issues/new?template=first-use.yml)，简单描述即可。
+
 <details>
 <summary><strong>更多功能与截图</strong></summary>
 

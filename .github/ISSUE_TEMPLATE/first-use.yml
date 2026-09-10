@@ -1,0 +1,56 @@
+name: First-use feedback / 首次试用反馈
+description: Tell us what worked and where you got stuck. 告诉我们首次使用是否顺利。
+title: "[First use] "
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for trying Termexo. A short report is enough; Chinese and English are both welcome.
+        感谢试用，简单描述即可，中英文均可。不需要先 Star 才能反馈。
+
+        This is a public issue. Remove access tokens, QR codes, API keys, private project content, and personal details before posting.
+        此处内容公开，请勿提交访问令牌、连接二维码、API Key、私人项目内容或个人资料。
+  - type: dropdown
+    id: outcome
+    attributes:
+      label: How far did you get? / 使用到了哪一步？
+      options:
+        - Could not install or open / 无法安装或打开
+        - Opened, but could not start an agent / 已打开，但无法启动 Agent
+        - Ran an agent on the PC / 已在电脑运行 Agent
+        - Connected a phone, but could not operate / 手机已连接，但操作有问题
+        - Operated the same terminal from a phone / 已在手机操作同一终端
+    validations:
+      required: true
+  - type: textarea
+    id: experience
+    attributes:
+      label: What worked or blocked you? / 顺利的地方或卡住的问题
+      description: What were you trying to do, what happened, and what did you expect? 描述目标、实际结果和预期即可。
+    validations:
+      required: true
+  - type: input
+    id: versions
+    attributes:
+      label: Versions, if known / 版本信息（知道多少填多少）
+      placeholder: "Termexo version; Windows version/build; agent CLI and version"
+  - type: dropdown
+    id: install
+    attributes:
+      label: Install method / 安装方式
+      options:
+        - EXE installer / EXE 安装包
+        - MSI installer / MSI 安装包
+        - npx / npm
+        - Built from source / 源码构建
+        - Not installed yet / 尚未安装
+  - type: input
+    id: source
+    attributes:
+      label: Where did you find Termexo? / 从哪里了解到 Termexo？
+      description: Optional. A site name is enough. 选填，写平台名称即可。
+  - type: textarea
+    id: next-improvement
+    attributes:
+      label: One thing to improve / 最希望改善的一件事
+      description: Optional. What would make this useful in your daily work? 选填，什么改进能让你愿意日常使用？

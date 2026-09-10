@@ -67,6 +67,8 @@ Keep the token private. Closing Termexo or stopping the PC ends the running proc
 If Termexo helps your workflow, a **Star on this repository** helps other developers discover it.
 Found a problem? [Open an issue](https://github.com/gemron/Termexo/issues) with your Windows version and reproduction steps.
 
+Trying it for the first time? [Tell us what worked or where you got stuck](https://github.com/gemron/Termexo/issues/new?template=first-use.yml). A short report is enough.
+
 <details>
 <summary><strong>More features and screenshots</strong></summary>
 

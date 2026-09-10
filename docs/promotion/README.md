@@ -6,14 +6,20 @@
 
 - 项目：Termexo
 - 定位：Windows 上的 Claude Code / Codex 本地多 Agent 工作台
-- 当前版本：V0.8.1
+- 当前版本：以 [最新 Release](https://github.com/gemron/Termexo/releases/latest) 为准
 - 许可证：MIT
 - GitHub：https://github.com/gemron/Termexo
-- Release：https://github.com/gemron/Termexo/releases/tag/v0.8.1
+- Release：https://github.com/gemron/Termexo/releases/latest
 - 官网：https://www.termexo.com
 - npm：https://www.npmjs.com/package/termexo
 - 快速体验：`npx termexo@latest`
-- 环境：Windows 10/11 x64、WebView2、Node.js 18.18+
+- 环境：Windows 10 build 17763+ x64、WebView2 Chromium 111+；npm 启动方式另需 Node.js 18.18+
+
+## 试用反馈与效果跟踪
+
+- [首次试用反馈](https://github.com/gemron/Termexo/issues/new?template=first-use.yml)：收集首次安装、Agent 启动与手机连接体验。
+- [增长记录流程](growth-workflow.md)：运行 `npm run growth:collect` 保存内部快照，区分流量、Star 与安装包下载。
+- [手机实录分镜](phone-demo-storyboard.md)：真实双端视频尚待录制，已有中英文字幕模板。
 
 ## 素材清单
 
