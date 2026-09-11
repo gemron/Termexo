@@ -2,6 +2,7 @@ import { TestBed } from '@angular/core/testing';
 
 import { Workspace } from '../models/workspace.models';
 import { AppStateService } from './app-state.service';
+import { TerminalGatewayService } from './terminal-gateway.service';
 import { WorkspaceRepository } from './workspace.repository';
 
 describe('AppStateService', () => {
@@ -12,6 +13,10 @@ describe('AppStateService', () => {
     saveAll: vi.fn().mockResolvedValue(undefined),
     delete: vi.fn().mockResolvedValue(undefined),
     watchChanges: vi.fn().mockResolvedValue(() => undefined),
+  };
+  /** Stands in for the backend's answer about which terminals still have a process. */
+  const gateway = {
+    liveTerminals: vi.fn().mockResolvedValue(new Map<string, number>()),
   };
 
   function externalWorkspace(id: string, sortOrder: number): Workspace {
@@ -40,8 +45,13 @@ describe('AppStateService', () => {
     vi.clearAllMocks();
     repository.list.mockResolvedValue([]);
     repository.watchChanges.mockResolvedValue(() => undefined);
+    gateway.liveTerminals.mockResolvedValue(new Map<string, number>());
     TestBed.configureTestingModule({
-      providers: [AppStateService, { provide: WorkspaceRepository, useValue: repository }],
+      providers: [
+        AppStateService,
+        { provide: WorkspaceRepository, useValue: repository },
+        { provide: TerminalGatewayService, useValue: gateway },
+      ],
     });
     service = TestBed.inject(AppStateService);
   });
@@ -128,6 +138,74 @@ describe('AppStateService', () => {
         ],
       }),
     ]);
+  });
+
+  it('adopts a terminal the backend is still running rather than relaunching it', async () => {
+    // A reloaded window and a second client both load into a backend whose terminals are still
+    // working. Bumping the revision here is what `create_terminal` reads as a relaunch, and it
+    // answers by killing the agent that was mid-task.
+    repository.list.mockResolvedValueOnce([
+      {
+        id: 'workspace-1',
+        name: 'Persisted workspace',
+        projectPath: 'D:\dev\persisted',
+        projectType: 'Local project',
+        activeBranch: 'main',
+        favorite: false,
+        lastOpenedAt: Date.now(),
+        layout: 'single',
+        terminals: [
+          {
+            id: 'terminal-running',
+            name: 'Working agent',
+            workingDirectory: 'D:\dev\persisted',
+            shell: 'powershell.exe',
+            agentType: 'claude',
+            status: 'THINKING',
+            model: 'Claude Sonnet',
+            branch: 'main',
+            command: "claude --resume 'session-123'",
+            runtimeRevision: 3,
+          },
+          {
+            id: 'terminal-stopped',
+            name: 'Closed terminal',
+            workingDirectory: 'D:\dev\persisted',
+            shell: 'powershell.exe',
+            agentType: 'shell',
+            status: 'STOPPED',
+            model: 'Local',
+            branch: 'main',
+            command: 'echo restored',
+            runtimeRevision: 1,
+          },
+        ],
+      },
+    ]);
+    gateway.liveTerminals.mockResolvedValue(new Map([['terminal-running', 3]]));
+
+    await service.initialize();
+
+    expect(repository.saveAll).toHaveBeenCalledWith([
+      expect.objectContaining({
+        terminals: [
+          // Left at the launch that is running, and at the status it was left in.
+          expect.objectContaining({
+            id: 'terminal-running',
+            status: 'THINKING',
+            runtimeRevision: 3,
+          }),
+          // Nothing is running for this one, so it still restarts.
+          expect.objectContaining({
+            id: 'terminal-stopped',
+            status: 'STARTING',
+            runtimeRevision: 2,
+          }),
+        ],
+      }),
+    ]);
+    expect(service.isAdoptedTerminal('terminal-running')).toBe(true);
+    expect(service.isAdoptedTerminal('terminal-stopped')).toBe(false);
   });
 
   it('adds a terminal to the active workspace', async () => {

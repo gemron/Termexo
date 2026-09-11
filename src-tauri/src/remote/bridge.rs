@@ -104,6 +104,7 @@ pub const REMOTE_ALLOWED: &[&str] = &[
     "save_workspace",
     "delete_workspace",
     "get_pty_backend",
+    "list_live_terminals",
     "create_terminal",
     "write_terminal",
     "resize_terminal",
@@ -123,7 +124,13 @@ pub const REMOTE_DENIED: &[&str] = &[
     // Native shell side effects that would land on the desktop, not on the remote device.
     "show_desktop_notification",
     "open_release_page",
+    "open_webview_download",
+    "open_terminal_url",
+    "open_terminal_path",
     "update_via_npm",
+    // Describes the desktop window's own WebView2, which says nothing about the browser a
+    // remote client is being drawn in and would have it offer an install for another machine.
+    "get_webview_status",
     // A remote client may read the remote access state but never change it or rotate the token.
     "update_remote_access_settings",
     "regenerate_remote_access_token",

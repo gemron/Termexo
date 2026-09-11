@@ -39,6 +39,14 @@ export interface TerminalStartResult {
 
 /** The output a terminal has produced so far, plus the point that snapshot reaches. */
 interface TerminalScrollback {
+  /**
+   * A redraw of the terminal's screen, not the output that drew it.
+   *
+   * The backend parses the PTY's output into a screen of its own and describes that screen here,
+   * so what arrives stands on its own: it starts from no assumed cursor, attributes or mode, and
+   * it is laid out for the grid the PTY is running at. Which is why the caller has to settle the
+   * emulator's grid before asking for it.
+   */
   data: string;
   sequence: number;
   runtimeRevision: number;
@@ -46,14 +54,26 @@ interface TerminalScrollback {
 
 /** Clears the current line and parks the cursor at its start, ready for a redraw. */
 const ERASE_LINE = '\x1b[2K\r';
-/** Wipes the screen and homes the cursor, so a replay does not stack on top of stale output. */
-const CLEAR_SCREEN = '\x1b[2J\x1b[H';
+/**
+ * Wipes the screen and the scrollback above it, so a replay does not stack on what it replaces.
+ *
+ * A snapshot carries the lines that scrolled off as well as the visible grid, so clearing only
+ * what is on screen would leave the previous replay's copy of that history standing above the
+ * new one, and every resync would add another.
+ */
+const CLEAR_SCREEN = '\x1b[H\x1b[2J\x1b[3J';
 
 const TERMINAL_OUTPUT_EVENT = 'terminal-output';
 const TERMINAL_EXIT_EVENT = 'terminal-exit';
 const TERMINAL_RESIZED_EVENT = 'terminal-resized';
 /** Raised by the remote bridge when the server had to drop frames for this connection. */
 const RESYNC_EVENT = 'resync';
+
+/** A terminal the backend still has a process for. */
+interface LiveTerminal {
+  terminalId: string;
+  runtimeRevision: number;
+}
 
 type TerminalRuntimeEvent = Pick<TerminalExitEvent, 'terminalId' | 'runtimeRevision'>;
 
@@ -94,6 +114,8 @@ interface TerminalConnection {
   buffered: TerminalOutputEvent[];
   replaying: boolean;
   lastSequence: number;
+  /** The redraw this terminal is already doing, so a second signal joins it rather than repeating it. */
+  replayInFlight?: Promise<void>;
 }
 
 @Injectable({ providedIn: 'root' })
@@ -105,6 +127,9 @@ export class TerminalGatewayService {
   private readonly browserInputs = new Map<string, TerminalPromptCapture>();
   /** The one output subscription every terminal is dispatched from. */
   private outputListener?: Promise<UnlistenFn>;
+  /** The redraw pass currently running, and whether a signal arrived while it ran. */
+  private replayAllInFlight?: Promise<void>;
+  private replayAllPending = false;
   private uiSyncHandle?: number;
 
   constructor() {
@@ -121,11 +146,14 @@ export class TerminalGatewayService {
   }
 
   /**
-   * Attaches a terminal view to a PTY that may already be running.
+   * Subscribes a terminal view to a PTY that may already be running.
    *
    * The subscription is installed before the scrollback is read so nothing produced in between is
-   * lost; those events wait in a buffer and are released once the replay has been written, with
-   * anything the snapshot already contained dropped by sequence number.
+   * lost: output that arrives from here on waits in a buffer until {@link replayInitial} has
+   * written the history, and whatever the snapshot already covered is then dropped by sequence
+   * number. The history is deliberately not written yet — the emulator is still at the size this
+   * client guessed for itself, and parsing an agent's frames at the wrong width wraps them where
+   * the agent never did. The caller settles the grid first and then asks for the replay.
    */
   async connect(
     terminalId: string,
@@ -151,13 +179,42 @@ export class TerminalGatewayService {
     this.connections.set(terminalId, connection);
 
     await this.ensureOutputListener();
-    await this.replay(connection, false);
 
     return () => {
       if (this.connections.get(terminalId) === connection) {
         this.connections.delete(terminalId);
       }
     };
+  }
+
+  /**
+   * Writes the history a terminal missed, once its grid matches the PTY's.
+   *
+   * Must be called for every {@link connect}, including when the launch it was waiting on failed:
+   * the buffer that {@link connect} started filling is only released here, and output held in it
+   * would otherwise never reach the screen.
+   */
+  async replayInitial(terminalId: string): Promise<void> {
+    const connection = this.connections.get(terminalId);
+    if (connection) {
+      await this.replay(connection, false);
+    }
+  }
+
+  /**
+   * Draws one terminal again from the backend's screen, replacing what it is showing.
+   *
+   * A grid change is not something an emulator can absorb on its own. What is on screen was drawn
+   * for the old width by a program that positions itself in columns, and rewrapping those frames
+   * produces something the program never drew — the agent then redraws its live region over the
+   * misplaced remains. The backend re-lays its own screen out whenever the PTY's grid moves, so
+   * asking it again is the only thing that puts the two back in step.
+   */
+  async redraw(terminalId: string): Promise<void> {
+    const connection = this.connections.get(terminalId);
+    if (connection) {
+      await this.replay(connection, true);
+    }
   }
 
   /**
@@ -304,6 +361,43 @@ export class TerminalGatewayService {
     }
   }
 
+  /**
+   * The terminals whose process is still running, mapped to the launch that is running.
+   *
+   * Loading is not the same as starting: a reloaded window and a second client both arrive at a
+   * backend whose terminals are still working, and relaunching those would kill the agents in
+   * them. Empty without a backend, where nothing is running to begin with.
+   */
+  async liveTerminals(): Promise<Map<string, number>> {
+    if (!hasBackend()) {
+      return new Map();
+    }
+    try {
+      const live = await invoke<LiveTerminal[]>('list_live_terminals');
+      return new Map(live.map((terminal) => [terminal.terminalId, terminal.runtimeRevision]));
+    } catch (error) {
+      // Treated as nothing running, which restores terminals the way every release before this
+      // one did rather than leaving the workbench with terminals it refuses to start.
+      console.warn('Unable to read the running terminals.', error);
+      return new Map();
+    }
+  }
+
+  /** Opens an address a terminal printed, in the default browser on the machine running the PTY. */
+  async openUrl(url: string): Promise<void> {
+    await invoke('open_terminal_url', { url });
+  }
+
+  /**
+   * Opens a file or folder a terminal printed.
+   *
+   * The working directory travels with it because most of what an agent prints is relative to
+   * where it was standing, and only the backend knows whether the result is really there.
+   */
+  async openPath(path: string, workingDirectory?: string): Promise<void> {
+    await invoke('open_terminal_path', { path, workingDirectory });
+  }
+
   async close(terminalId: string, preserveRepositoryBaseline = false): Promise<void> {
     if (hasBackend()) {
       await invoke('close_terminal', { terminalId, preserveRepositoryBaseline });
@@ -313,11 +407,37 @@ export class TerminalGatewayService {
     this.browserInputs.delete(terminalId);
   }
 
-  /** Redraws every attached terminal from the backend's replay buffer. */
+  /**
+   * Redraws every attached terminal, coalescing the signals that arrive while one redraw runs.
+   *
+   * Resyncs come in bursts: the server raises one per gap it had to leave, and a client that is
+   * still settling after a reload leaves several. Letting each one start its own pass asked the
+   * backend for the same snapshot repeatedly and wrote every answer to the same terminal, which
+   * drew the screen twice over and released the buffered live output alongside each copy.
+   *
+   * The compounding part is worse than the duplication. Every extra copy is work the UI thread
+   * must finish before it can read the socket again, and falling behind the socket is exactly what
+   * raises the next resync — the signal and its own remedy feed each other until the window stops
+   * responding. One pass at a time, with a later signal folded into a single follow-up, is what
+   * breaks that loop.
+   */
   async replayAll(): Promise<void> {
-    await Promise.all(
+    if (this.replayAllInFlight) {
+      this.replayAllPending = true;
+      return this.replayAllInFlight;
+    }
+    this.replayAllInFlight = Promise.all(
       [...this.connections.values()].map((connection) => this.replay(connection, true)),
-    );
+    ).then(() => undefined);
+    try {
+      await this.replayAllInFlight;
+    } finally {
+      this.replayAllInFlight = undefined;
+    }
+    if (this.replayAllPending) {
+      this.replayAllPending = false;
+      await this.replayAll();
+    }
   }
 
   /** Replays after the output stream was interrupted, whichever way it was interrupted. */
@@ -351,7 +471,23 @@ export class TerminalGatewayService {
     this.scheduleUiSync();
   }
 
-  private async replay(connection: TerminalConnection, clearScreen: boolean): Promise<void> {
+  /**
+   * Redraws one terminal, joining the redraw already running rather than starting a second.
+   *
+   * `replayInitial` and a resync can reach the same terminal at once, and two passes over one
+   * connection corrupt it rather than merely repeating work: each releases `buffered` when it
+   * finishes, so live output held for the first pass is delivered in the middle of the second
+   * one's history, and each writes its own `lastSequence`, which decides what is dropped as
+   * already-seen.
+   */
+  private replay(connection: TerminalConnection, clearScreen: boolean): Promise<void> {
+    connection.replayInFlight ??= this.replayOnce(connection, clearScreen).finally(() => {
+      connection.replayInFlight = undefined;
+    });
+    return connection.replayInFlight;
+  }
+
+  private async replayOnce(connection: TerminalConnection, clearScreen: boolean): Promise<void> {
     connection.replaying = true;
     try {
       const scrollback = await invoke<TerminalScrollback>('read_terminal_scrollback', {

@@ -14,6 +14,7 @@ import {
 } from '@angular/core';
 import { FitAddon } from '@xterm/addon-fit';
 import type { WebglAddon } from '@xterm/addon-webgl';
+import type { ILink } from '@xterm/xterm';
 import { Terminal } from '@xterm/xterm';
 
 import { I18nService } from '../core/i18n/i18n.service';
@@ -29,6 +30,15 @@ import { IconComponent } from '../shared/icon/icon';
 import { TerminalCompositionAnchor } from './terminal-composition-anchor';
 import { DEFAULT_TERMINAL_FONT_NAME, terminalFontFamily } from './terminal-font';
 import { terminalKeySequence, workbenchShortcut } from './terminal-key-sequences';
+import {
+  detectTerminalLinks,
+  readLogicalLine,
+  TerminalCell,
+  TerminalLineText,
+  TerminalLink,
+  TerminalRow,
+} from './terminal-links';
+import { TerminalReplayGate } from './terminal-replay-gate';
 import { TerminalResizeCoordinator } from './terminal-resize-coordinator';
 import { detectTerminalRuntimeIssue, TerminalRuntimeIssue } from './terminal-runtime-diagnostics';
 import {
@@ -99,8 +109,19 @@ export class TerminalPanelComponent implements AfterViewInit {
   private compositionAnchor?: TerminalCompositionAnchor;
   private runtimeReady = false;
   private viewReady = false;
+  /** Set when output reaches this view while it is off screen and cannot draw it properly. */
+  private wroteWhileHidden = false;
   private outputTail = '';
   private lastRuntimeIssue: TerminalRuntimeIssue = null;
+  private readonly replayGate = new TerminalReplayGate();
+  /**
+   * Whether Ctrl is down, which is the whole gate on link detection.
+   *
+   * Underlining every path an agent mentions would make ordinary output look clickable and put a
+   * link under every stray click. Offering them only while the modifier is held is what a code
+   * editor does, and it leaves plain clicking to selection.
+   */
+  private ctrlHeld = false;
   private readonly touchScroller = new TerminalTouchScroller(() => this.rowHeight());
   /** Carries the fraction of a row a wheel event left over, so a trackpad still scrolls. */
   private readonly wheelRows = new ScrollRowAccumulator();
@@ -137,6 +158,8 @@ export class TerminalPanelComponent implements AfterViewInit {
   readonly accountSwitchRequested = output<string>();
   readonly inputCaptured = output<{ terminalId: string; data: string }>();
   readonly outputCaptured = output<{ terminalId: string; data: string }>();
+  /** A link that could not be opened, which the shell reports without touching the buffer. */
+  readonly openFailed = output<string>();
 
   protected readonly renaming = signal(false);
 
@@ -210,6 +233,14 @@ export class TerminalPanelComponent implements AfterViewInit {
       }
     });
     effect(() => {
+      // Switching to a panel that received output while it was hidden: it is showing a screen laid
+      // out for a grid it never had, so it takes its own grid and is drawn again from the backend.
+      if (this.viewReady && this.visible() && this.wroteWhileHidden) {
+        this.wroteWhileHidden = false;
+        void this.redrawForOwnGrid();
+      }
+    });
+    effect(() => {
       this.layoutRevision();
       if (this.viewReady && this.visible()) {
         this.scheduleFit();
@@ -220,6 +251,10 @@ export class TerminalPanelComponent implements AfterViewInit {
   ngAfterViewInit(): void {
     this.viewReady = true;
     this.terminal.attachCustomKeyEventHandler(this.handleCustomKey);
+    this.terminal.registerLinkProvider({
+      provideLinks: (bufferLineNumber, callback) =>
+        callback(this.ctrlHeld ? this.linksOnLine(bufferLineNumber) : undefined),
+    });
     this.terminal.attachCustomWheelEventHandler(this.handleCustomWheel);
     this.terminal.loadAddon(this.fitAddon);
     const terminalContainer = this.container().nativeElement;
@@ -252,6 +287,9 @@ export class TerminalPanelComponent implements AfterViewInit {
     terminalContainer.addEventListener('touchmove', this.handleTouchMove, { passive: false });
     terminalContainer.addEventListener('touchend', this.handleTouchEnd, { passive: true });
     terminalContainer.addEventListener('touchcancel', this.handleTouchCancel, { passive: true });
+    window.addEventListener('keydown', this.trackModifier);
+    window.addEventListener('keyup', this.trackModifier);
+    window.addEventListener('blur', this.releaseModifier);
     terminalContainer.addEventListener('mousedown', this.suppressRightButtonReport, true);
     terminalContainer.addEventListener('contextmenu', this.handleContextMenu);
     terminalContainer.addEventListener('compositionstart', this.prepareComposition, true);
@@ -272,6 +310,11 @@ export class TerminalPanelComponent implements AfterViewInit {
 
     void this.initializeRuntime();
     const inputDisposable = this.terminal.onData((data) => {
+      // History being redrawn, not the user typing: xterm is answering a query the replayed
+      // scrollback still carried, and sending that answer would type it into the program.
+      if (this.replayGate.replaying) {
+        return;
+      }
       this.inputCaptured.emit({ terminalId: this.session().id, data });
       if (data.includes('\r')) {
         this.terminal.scrollToBottom();
@@ -302,6 +345,9 @@ export class TerminalPanelComponent implements AfterViewInit {
       renderDisposable.dispose();
       this.resizeObserver?.disconnect();
       terminalContainer.removeEventListener('mousedown', this.suppressRightButtonReport, true);
+      window.removeEventListener('keydown', this.trackModifier);
+      window.removeEventListener('keyup', this.trackModifier);
+      window.removeEventListener('blur', this.releaseModifier);
       terminalContainer.removeEventListener('contextmenu', this.handleContextMenu);
       terminalContainer.removeEventListener('compositionstart', this.prepareComposition, true);
       terminalContainer.removeEventListener('compositionstart', this.beginComposition);
@@ -416,8 +462,14 @@ export class TerminalPanelComponent implements AfterViewInit {
       // follows that rather than its own fit, or it would keep drawing columns the agent has
       // stopped refreshing.
       const stopResizeUpdates = await this.gateway.onResized((event) => {
-        if (event.terminalId === this.session().id) {
-          this.applyDimensions(event.cols, event.rows);
+        if (event.terminalId !== this.session().id) {
+          return;
+        }
+        // Only the backend re-lays its screen out for the new grid; xterm would rewrap the frames
+        // it holds into something the agent never drew. Once the grid has moved, what is on screen
+        // is stale by definition, so it is drawn again from the side that knows the new layout.
+        if (this.applyDimensions(event.cols, event.rows) && this.runtimeReady) {
+          void this.gateway.redraw(this.session().id);
         }
       });
       if (this.destroyRef.destroyed) {
@@ -442,6 +494,18 @@ export class TerminalPanelComponent implements AfterViewInit {
       // a phone, or the desktop joining a terminal a phone started — has to draw that grid rather
       // than its own, or the agent's redraws would land on the wrong columns.
       this.applyDimensions(cols, rows);
+      // A view the user is working in takes the grid the moment it is focused, and focusing a
+      // window it has just opened is the ordinary case. Letting that happen after the history is
+      // written resizes the emulator underneath a screen an agent drew for the grid before it,
+      // and what xterm makes of that — a frame rewrapped or clipped, with the agent's next redraw
+      // painted over the remains — is precisely the mangled terminal a focused browser came back
+      // to, while one left in the background stayed clean. Taking the grid first leaves nothing
+      // written for a grid this view is about to leave behind.
+      if (this.active() && this.visible()) {
+        await this.claimTerminalSize();
+      }
+      // Only now, with the grid settled, is history worth writing.
+      await this.gateway.replayInitial(this.session().id);
       // Attaching to a PTY that was already running must not discard the state hook events have
       // derived for it; only a fresh launch, or one still marked as starting, becomes RUNNING.
       if (!attached || this.session().status === 'STARTING') {
@@ -449,6 +513,9 @@ export class TerminalPanelComponent implements AfterViewInit {
       }
       this.fitTerminal();
     } catch (error) {
+      // The subscription holds output back until the history is written, so a launch that failed
+      // still has to release it or anything the PTY produced afterwards is stranded in the buffer.
+      await this.gateway.replayInitial(this.session().id).catch(() => undefined);
       unlisten?.();
       unlisten = undefined;
       this.statusChanged.emit({ terminalId: this.session().id, status: 'FAILED' });
@@ -489,18 +556,25 @@ export class TerminalPanelComponent implements AfterViewInit {
     }
   }
 
-  /** Matches the emulator to a size, redrawing so the change is visible immediately. */
-  private applyDimensions(cols: number, rows: number): void {
+  /**
+   * Matches the emulator to a size, redrawing so the change is visible immediately.
+   *
+   * Reports whether the grid actually moved, because what is already on screen was drawn for the
+   * grid this replaces and does not survive being rewrapped into the new one.
+   */
+  private applyDimensions(cols: number, rows: number): boolean {
     const safeCols = Math.max(Math.trunc(cols), 1);
     const safeRows = Math.max(Math.trunc(rows), 1);
     if (this.terminal.cols === safeCols && this.terminal.rows === safeRows) {
-      return;
+      return false;
     }
     try {
       this.terminal.resize(safeCols, safeRows);
       this.terminal.refresh(0, Math.max(0, this.terminal.rows - 1));
+      return true;
     } catch {
       // A terminal being torn down rejects the resize; the next fit will settle it.
+      return false;
     }
   }
 
@@ -769,6 +843,106 @@ export class TerminalPanelComponent implements AfterViewInit {
     this.activateTerminal();
   };
 
+  private readonly trackModifier = (event: KeyboardEvent): void => {
+    this.ctrlHeld = event.ctrlKey;
+  };
+
+  /** A window that loses focus never reports the key going up, so the modifier is cleared here. */
+  private readonly releaseModifier = (): void => {
+    this.ctrlHeld = false;
+  };
+
+  /**
+   * The links on the logical line the buffer row belongs to.
+   *
+   * Rows are joined back into the line the agent wrote, because a path or address long enough to
+   * matter is exactly the one the terminal wrapped: matching per row would find its halves and
+   * open neither.
+   */
+  private linksOnLine(bufferLineNumber: number): ILink[] | undefined {
+    const buffer = this.terminal.buffer.active;
+    // A buffer position is numbered from one while the buffer itself is indexed from zero, and
+    // reading a row by its position lands on the row below it.
+    const lineAt = (row: number) => buffer.getLine(row - 1);
+
+    let firstRow = bufferLineNumber;
+    while (firstRow > 1 && lineAt(firstRow)?.isWrapped) {
+      firstRow -= 1;
+    }
+
+    const rows: TerminalRow[] = [];
+    for (let row = firstRow; row <= buffer.length; row += 1) {
+      const line = lineAt(row);
+      if (!line || (row > firstRow && !line.isWrapped)) {
+        break;
+      }
+      // Read cell by cell rather than as a string: a full-width character is one character in two
+      // columns, and only the cells say which column each one starts at.
+      const cells: TerminalCell[] = [];
+      for (let column = 0; column < line.length; column += 1) {
+        const cell = line.getCell(column);
+        cells.push({ chars: cell?.getChars() ?? '', width: cell?.getWidth() ?? 1 });
+      }
+      rows.push({ row, cells });
+    }
+
+    const { text, positions } = readLogicalLine(rows);
+    if (!text.trim()) {
+      return undefined;
+    }
+
+    const links = detectTerminalLinks(text)
+      .map((link) => this.toTerminalLink(link, positions))
+      .filter(
+        (link) => link.range.start.y <= bufferLineNumber && link.range.end.y >= bufferLineNumber,
+      );
+    return links.length > 0 ? links : undefined;
+  }
+
+  private toTerminalLink(link: TerminalLink, positions: TerminalLineText['positions']): ILink {
+    const last = Math.min(link.end, positions.length) - 1;
+    return {
+      range: {
+        start: positions[link.start],
+        // A range ends on the last cell it covers rather than the one after it.
+        end: positions[Math.max(link.start, last)],
+      },
+      text: link.text,
+      activate: (event: MouseEvent, text: string) => {
+        // The modifier is checked again at the click: the link was offered while it was held, but
+        // nothing stops it being released before the button goes down.
+        if (event.ctrlKey) {
+          void this.openLink(link.kind, text);
+        }
+      },
+    };
+  }
+
+  /**
+   * Hands the target to the backend, which is the only side that can reach the machine.
+   *
+   * A failure is reported to the shell rather than written here. Anything written into the
+   * emulator lands in the middle of whatever the agent is drawing — its composer above all — and
+   * an agent redraws relative to its own cursor, so a line it never produced pushes its frame out
+   * of place. The user still needs to know why nothing opened, so the shell raises a toast.
+   */
+  private async openLink(kind: TerminalLink['kind'], text: string): Promise<void> {
+    try {
+      await (kind === 'url'
+        ? this.gateway.openUrl(text)
+        : this.gateway.openPath(text, this.session().workingDirectory));
+    } catch (error) {
+      this.zone.run(() =>
+        this.openFailed.emit(
+          this.i18n.t('terminal.openFailed', {
+            target: text,
+            error: this.errorMessage(error),
+          }),
+        ),
+      );
+    }
+  }
+
   /**
    * Handles right-click as copy-or-paste, the convention terminals on Windows follow.
    *
@@ -828,7 +1002,7 @@ export class TerminalPanelComponent implements AfterViewInit {
    * layout on every keystroke is what made input stutter. Reaching the keyboard means the view was
    * focused or clicked first, and both of those already claim the terminal.
    */
-  private claimTerminalSize(): void {
+  private async claimTerminalSize(): Promise<void> {
     if (!this.runtimeReady) {
       return;
     }
@@ -841,13 +1015,30 @@ export class TerminalPanelComponent implements AfterViewInit {
     if (cols === this.terminal.cols && rows === this.terminal.rows) {
       return;
     }
-    void this.gateway
-      .resize(this.session().id, cols, rows, true)
-      .catch((error) => console.warn('Terminal claim failed', this.errorMessage(error)));
+    try {
+      await this.gateway.resize(this.session().id, cols, rows, true);
+    } catch (error) {
+      console.warn('Terminal claim failed', this.errorMessage(error));
+    }
   }
 
   /** Any sign the user started working in this view hands it the terminal's size. */
-  private readonly claimOnFocus = (): void => this.claimTerminalSize();
+  private readonly claimOnFocus = (): void => void this.claimTerminalSize();
+
+  /**
+   * Draws this view again now that it is on screen with a grid of its own.
+   *
+   * The grid is taken first: claiming it after the screen was written would resize the emulator
+   * underneath frames drawn for the grid before it, which is the same rewrap this redraw exists to
+   * undo. A view that is visible without being the active one does not claim — the terminal
+   * belongs to whoever the user is working in — and redraws at the grid the PTY already has.
+   */
+  private async redrawForOwnGrid(): Promise<void> {
+    if (this.active()) {
+      await this.claimTerminalSize();
+    }
+    await this.gateway.redraw(this.session().id);
+  }
 
   private activateTerminal(): void {
     if (this.destroyRef.destroyed || !this.visible()) {
@@ -857,11 +1048,25 @@ export class TerminalPanelComponent implements AfterViewInit {
       this.selected.emit(this.session().id);
     }
     this.terminal.focus();
-    this.claimTerminalSize();
+    void this.claimTerminalSize();
   }
 
   private handleOutput(data: string, replayed = false): void {
-    this.terminal.write(data);
+    if (!this.visible()) {
+      // A hidden panel is `display: none`: it has no size to fit to, it never claims the terminal,
+      // and its renderer has no box to paint onto. Whatever lands here was laid out for whichever
+      // grid the PTY happened to have and drawn by a renderer that could not draw, so it has to be
+      // drawn again once the view is on screen with a grid of its own.
+      this.wroteWhileHidden = true;
+    }
+    if (replayed) {
+      // The callback runs once xterm has parsed this chunk, which is the whole window in which
+      // the history could make it answer something.
+      this.replayGate.begin();
+      this.terminal.write(data, () => this.replayGate.end());
+    } else {
+      this.terminal.write(data);
+    }
     this.outputTail = `${this.outputTail}${data}`.slice(-2_000);
     // Replayed scrollback was already analysed when it first arrived. Feeding a whole terminal's
     // history back through the task, handoff and startup readers on every reconnect is what made

@@ -18,6 +18,7 @@ import {
 } from '../models/workspace.models';
 import { UnlistenFn } from './backend-bridge';
 import { RemoteConnectionService } from './remote-connection.service';
+import { TerminalGatewayService } from './terminal-gateway.service';
 import { hasBackend, runtimeMode } from './tauri-runtime';
 import { WorkspaceRepository } from './workspace.repository';
 
@@ -50,6 +51,19 @@ async function loadPreviewWorkspaces(): Promise<Workspace[]> {
 export class AppStateService {
   private readonly repository = inject(WorkspaceRepository);
   private readonly remoteConnection = inject(RemoteConnectionService);
+  private readonly gateway = inject(TerminalGatewayService);
+  /**
+   * Terminals that were already running when this client loaded.
+   *
+   * Populated once by {@link initialize} and read by the startup launch refreshes, which must not
+   * regenerate a launch — or ask the user to reclaim a session — for an agent still working.
+   */
+  private readonly adoptedTerminals = signal<ReadonlySet<string>>(new Set());
+
+  /** Whether the terminal was already running when this client loaded, and so was adopted. */
+  isAdoptedTerminal(terminalId: string): boolean {
+    return this.adoptedTerminals().has(terminalId);
+  }
   private readonly workspaceItems = signal<Workspace[]>([]);
   private readonly activeWorkspaceId = signal<string | null>(null);
   private readonly activeTerminalId = signal<string | null>(null);
@@ -107,11 +121,15 @@ export class AppStateService {
    */
   async initialize(): Promise<void> {
     const attaching = this.isAttachedRuntime();
-    const storedWorkspaces = await this.repository.list();
+    const [storedWorkspaces, live] = await Promise.all([
+      this.repository.list(),
+      this.gateway.liveTerminals(),
+    ]);
+    this.adoptedTerminals.set(new Set(live.keys()));
     const initialWorkspaces = attaching
       ? storedWorkspaces
       : storedWorkspaces.length > 0
-        ? this.restartRestoredTerminals(storedWorkspaces)
+        ? this.restartRestoredTerminals(storedWorkspaces, live)
         : // A real first run opens on the guide instead: the sample workspaces pointed at folders
           // that do not exist on this machine, and their Agent terminals resumed session ids that
           // never did either. The browser preview keeps them — a simulated terminal with nothing
@@ -700,17 +718,35 @@ export class AppStateService {
     }));
   }
 
-  private restartRestoredTerminals(workspaces: Workspace[]): Workspace[] {
+  /**
+   * Restarts the terminals this client is taking ownership of, and adopts the ones already running.
+   *
+   * Loading is not the same as starting. The backend outlives a reloaded window, so a reload — or
+   * a right-click on a menu that still offered Reload — used to arrive here and bump every
+   * revision, which `create_terminal` reads as a relaunch and answers by killing the process that
+   * was running. A user with a dozen agents mid-task lost all of them to one click. A terminal the
+   * backend is still running is therefore left at the launch it is running, so mounting it
+   * re-attaches instead.
+   */
+  private restartRestoredTerminals(
+    workspaces: Workspace[],
+    live: ReadonlyMap<string, number>,
+  ): Workspace[] {
     return workspaces.map((workspace) => ({
       ...workspace,
       terminals: workspace.terminals
         .filter((terminal) => (terminal.agentType as string) !== 'gemini')
-        .map((terminal) => ({
-          ...terminal,
-          status: 'STARTING',
-          command: terminal.command ?? this.restoredCommand(terminal),
-          runtimeRevision: (terminal.runtimeRevision ?? 0) + 1,
-        })),
+        .map((terminal) => {
+          const runningRevision = live.get(terminal.id);
+          return runningRevision === undefined
+            ? {
+                ...terminal,
+                status: 'STARTING' as const,
+                command: terminal.command ?? this.restoredCommand(terminal),
+                runtimeRevision: (terminal.runtimeRevision ?? 0) + 1,
+              }
+            : { ...terminal, runtimeRevision: runningRevision };
+        }),
     }));
   }
 

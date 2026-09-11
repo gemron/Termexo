@@ -11,7 +11,7 @@
 </p>
 
 <p align="center">
-  <img alt="Version 0.8.5" src="https://img.shields.io/badge/version-0.8.5-58c7a0">
+  <img alt="Version 0.8.6" src="https://img.shields.io/badge/version-0.8.6-58c7a0">
   <img alt="Windows" src="https://img.shields.io/badge/platform-Windows-0078D4?logo=windows">
   <img alt="Tauri 2" src="https://img.shields.io/badge/Tauri-2-24C8DB?logo=tauri&logoColor=white">
   <img alt="Angular 22" src="https://img.shields.io/badge/Angular-22-DD0031?logo=angular">
@@ -61,7 +61,7 @@ Keep the token private. Closing Termexo or stopping the PC ends the running proc
 
 ## Latest release
 
-**[v0.8.5](https://github.com/gemron/Termexo/releases/tag/v0.8.5)** bundles ConPTY to improve Shift+Tab and scrolling on older Windows, avoids repeated line reflow, and explains outdated or missing WebView2 runtimes.
+**[v0.8.6](https://github.com/gemron/Termexo/releases/tag/v0.8.6)** rebuilds terminal replay around a parsed screen, so reconnecting or reloading shows what the terminal actually holds, and stops a burst of resync signals from redrawing the same terminal repeatedly.
 [Full changelog](CHANGELOG.md).
 
 If Termexo helps your workflow, a **Star on this repository** helps other developers discover it.
@@ -339,7 +339,8 @@ identifiers still use a legacy name. This does not affect the Termexo product na
 | V0.6 | OpenCode, task board, and agent confirmation options | Released |
 | V0.7 | Custom window chrome, GPU terminal rendering, and account workflows | Released |
 | V0.8.0–0.8.4 | Phone access, first-run guidance, input latency and mobile scrolling improvements | Released |
-| V0.8.5 | Bundled ConPTY and WebView2 startup diagnostics | Current |
+| V0.8.5 | Bundled ConPTY and WebView2 startup diagnostics | Released |
+| V0.8.6 | Screen-accurate terminal replay and reconnect stability | Current |
 | V1.0 | Stability, security hardening, and recovery experience | Planned |
 
 See [open issues](https://github.com/gemron/Termexo/issues) for ongoing work and

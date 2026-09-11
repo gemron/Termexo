@@ -2723,6 +2723,11 @@ export class App {
     }
   }
 
+  /** Reports a terminal link that would not open, where it cannot disturb what an agent draws. */
+  protected reportLinkOpenFailure(message: string): void {
+    this.showToast(message, 'attention');
+  }
+
   private showToast(message: string, tone: 'success' | 'attention' = 'success'): void {
     this.toastTone.set(tone);
     this.toastMessage.set(message);
@@ -3223,13 +3228,15 @@ export class App {
   private async refreshRestoredClaudeLaunches(): Promise<void> {
     const profiles = this.agents.modelProfiles();
     const defaultProfile = profiles.find((profile) => profile.isDefault) ?? profiles[0];
-    const restoredClaudeTerminals = this.state
-      .workspaces()
-      .flatMap((workspace) =>
-        workspace.terminals
-          .filter((terminal) => terminal.agentType === 'claude')
-          .map((terminal) => ({ workspaceId: workspace.id, terminal })),
-      );
+    const restoredClaudeTerminals = this.state.workspaces().flatMap((workspace) =>
+      workspace.terminals
+        .filter((terminal) => terminal.agentType === 'claude')
+        // A terminal still running was adopted rather than restarted, and its launch is the
+        // one already in flight. Regenerating it would ask the CLI to hand over a session its
+        // own live process is holding, which is what raised the reclaim prompt on every reload.
+        .filter((terminal) => !this.state.isAdoptedTerminal(terminal.id))
+        .map((terminal) => ({ workspaceId: workspace.id, terminal })),
+    );
     if (restoredClaudeTerminals.length === 0) {
       return;
     }
@@ -3399,13 +3406,15 @@ export class App {
   }
 
   private async refreshRestoredCodexLaunches(): Promise<void> {
-    const restoredCodexTerminals = this.state
-      .workspaces()
-      .flatMap((workspace) =>
-        workspace.terminals
-          .filter((terminal) => terminal.agentType === 'codex')
-          .map((terminal) => ({ workspaceId: workspace.id, terminal })),
-      );
+    const restoredCodexTerminals = this.state.workspaces().flatMap((workspace) =>
+      workspace.terminals
+        .filter((terminal) => terminal.agentType === 'codex')
+        // A terminal still running was adopted rather than restarted, and its launch is the
+        // one already in flight. Regenerating it would ask the CLI to hand over a session its
+        // own live process is holding, which is what raised the reclaim prompt on every reload.
+        .filter((terminal) => !this.state.isAdoptedTerminal(terminal.id))
+        .map((terminal) => ({ workspaceId: workspace.id, terminal })),
+    );
     if (restoredCodexTerminals.length === 0) {
       return;
     }
@@ -3463,13 +3472,15 @@ export class App {
   }
 
   private async refreshRestoredOpenCodeLaunches(): Promise<void> {
-    const restored = this.state
-      .workspaces()
-      .flatMap((workspace) =>
-        workspace.terminals
-          .filter((terminal) => terminal.agentType === 'opencode')
-          .map((terminal) => ({ workspaceId: workspace.id, terminal })),
-      );
+    const restored = this.state.workspaces().flatMap((workspace) =>
+      workspace.terminals
+        .filter((terminal) => terminal.agentType === 'opencode')
+        // A terminal still running was adopted rather than restarted, and its launch is the
+        // one already in flight. Regenerating it would ask the CLI to hand over a session its
+        // own live process is holding, which is what raised the reclaim prompt on every reload.
+        .filter((terminal) => !this.state.isAdoptedTerminal(terminal.id))
+        .map((terminal) => ({ workspaceId: workspace.id, terminal })),
+    );
     if (restored.length === 0) {
       return;
     }

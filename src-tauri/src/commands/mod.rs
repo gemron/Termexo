@@ -6,6 +6,7 @@ pub mod fonts;
 pub mod git;
 pub mod hooks;
 pub mod network_export;
+pub mod open;
 pub mod notification;
 pub mod quota;
 pub mod remote;

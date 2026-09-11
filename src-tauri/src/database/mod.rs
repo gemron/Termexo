@@ -3,7 +3,7 @@ use std::sync::Mutex;
 
 use rusqlite::{params, Connection};
 use serde::{Deserialize, Serialize};
-use serde_json::Value;
+use serde_json::{Map, Value};
 use thiserror::Error;
 
 use crate::agent::AgentSession;
@@ -27,6 +27,36 @@ const AGENT_EVENT_INDEX_MIGRATION: &str =
 /// How long an agent event is kept. Nothing reads further back: the inspector shows the latest
 /// batch and a task only matches a session through its recent events.
 const AGENT_EVENT_RETENTION_MS: i64 = 30 * 24 * 60 * 60 * 1000;
+
+/// How many events survive, whatever their age.
+///
+/// Age alone does not bound a table whose rows have no size limit: one database reached 22 000
+/// events and 208 MB well inside the 30-day window. The inspector lists the newest 250.
+const MAX_RETAINED_AGENT_EVENTS: i64 = 5_000;
+
+/// Largest event detail stored whole.
+///
+/// A tool's result arrives here in full — the file it read, every line a search matched, up to
+/// 2 MB in one row — while the only thing read back out of it is a handful of short fields. The
+/// poll re-reads the newest 250 events every second, so whatever is kept here is parsed,
+/// re-serialised and sent across the IPC boundary once a second, for as long as the app is open.
+const MAX_EVENT_DETAIL_BYTES: usize = 4 * 1024;
+
+/// Longest single string kept inside a detail that had to be cut down.
+const MAX_EVENT_DETAIL_FIELD_CHARS: usize = 500;
+
+/// The detail fields the UI actually reads — see `eventDetail` in the inspector panel.
+const RETAINED_EVENT_DETAIL_FIELDS: [&str; 6] = [
+    "tool_name",
+    "notification_type",
+    "error_details",
+    "error",
+    "message",
+    "source",
+];
+
+/// Marks a detail that was cut down, so a reader can tell it is not the whole payload.
+const TRUNCATED_DETAIL_FIELD: &str = "termexoTruncated";
 const LEGACY_MINIMAX_M3_MODEL: &str = "MiniMax-M3[1m]";
 const MINIMAX_M3_MODEL: &str = "MiniMax-M3";
 
@@ -178,6 +208,12 @@ impl WorkspaceDatabase {
         ensure_default_profile(&connection)?;
         connection.execute_batch(AGENT_EVENT_INDEX_MIGRATION)?;
         prune_stale_agent_events(&connection)?;
+        // Pruning frees rows but leaves the pages behind, and compacting rewrites the ones that
+        // stayed. Reclaiming the file is worth its one-off cost only when either found something,
+        // which on an already-compacted database is never.
+        if compact_stored_agent_events(&connection)? > 0 {
+            connection.execute_batch("VACUUM")?;
+        }
         Ok(Self {
             connection: Mutex::new(connection),
         })
@@ -553,11 +589,15 @@ impl WorkspaceDatabase {
                     event.native_session_id,
                     event.terminal_id,
                     event.event_type,
-                    serde_json::to_string(&event.detail)?,
+                    compact_event_detail(&event.detail),
                     event.created_at,
                 ])?;
             }
         }
+
+        // Trimming here rather than only at startup is what keeps a long-running session bounded;
+        // it is an indexed lookup that usually deletes nothing, and only runs when events arrived.
+        prune_excess_agent_events(&transaction)?;
 
         transaction.commit()?;
         Ok(())
@@ -1200,7 +1240,91 @@ fn run_provider_profile_migration(connection: &Connection) -> Result<(), Databas
 fn prune_stale_agent_events(connection: &Connection) -> Result<(), DatabaseError> {
     let cutoff = unix_timestamp_millis() - AGENT_EVENT_RETENTION_MS;
     connection.execute("DELETE FROM agent_events WHERE created_at < ?1", [cutoff])?;
+    prune_excess_agent_events(connection)?;
     Ok(())
+}
+
+/// Drops the events past the retained count, oldest first.
+///
+/// The cutoff is the timestamp of the oldest event that should survive, so events sharing that
+/// timestamp survive alongside it — keeping one row too many is the safe side of that boundary.
+fn prune_excess_agent_events(connection: &Connection) -> Result<(), DatabaseError> {
+    connection.execute(
+        "DELETE FROM agent_events
+         WHERE created_at < (
+             SELECT created_at FROM agent_events
+             ORDER BY created_at DESC
+             LIMIT 1 OFFSET ?1
+         )",
+        params![MAX_RETAINED_AGENT_EVENTS - 1],
+    )?;
+    Ok(())
+}
+
+/// Encodes an event's detail, keeping only what is read back once the payload grows large.
+///
+/// Re-encoding bounds what a single event can cost the poll that reads it every second, which
+/// pruning by age or by count cannot do on its own — neither of them limits the size of a row.
+fn compact_event_detail(detail: &Value) -> String {
+    let encoded = serde_json::to_string(detail).unwrap_or_else(|_| "null".to_owned());
+    if encoded.len() <= MAX_EVENT_DETAIL_BYTES {
+        return encoded;
+    }
+    let mut kept = Map::new();
+    if let Some(fields) = detail.as_object() {
+        for name in RETAINED_EVENT_DETAIL_FIELDS {
+            if let Some(value) = fields.get(name) {
+                kept.insert((*name).to_owned(), shorten_detail_value(value));
+            }
+        }
+    }
+    kept.insert(TRUNCATED_DETAIL_FIELD.to_owned(), Value::Bool(true));
+    serde_json::to_string(&Value::Object(kept)).unwrap_or_else(|_| "null".to_owned())
+}
+
+/// Cuts a long string down to what the UI can show, leaving every other kind of value alone.
+fn shorten_detail_value(value: &Value) -> Value {
+    match value {
+        Value::String(text) if text.chars().count() > MAX_EVENT_DETAIL_FIELD_CHARS => {
+            Value::String(text.chars().take(MAX_EVENT_DETAIL_FIELD_CHARS).collect())
+        }
+        other => other.clone(),
+    }
+}
+
+/// Brings stored events under the same limit new ones are written with.
+///
+/// Databases written before the limit existed hold details of up to 2 MB each, and the poll reads
+/// the newest 250 of them back every second. Rows already within the limit are not touched, which
+/// is what makes this safe to re-run: after the first pass it matches nothing.
+///
+/// The oversized rows are loaded one at a time on purpose — the whole set is what made the file
+/// large in the first place, and reading it into memory to shrink it would defeat the point.
+fn compact_stored_agent_events(connection: &Connection) -> Result<usize, DatabaseError> {
+    let keys: Vec<String> = {
+        let mut statement = connection
+            .prepare("SELECT event_key FROM agent_events WHERE length(detail_json) > ?1")?;
+        let rows = statement.query_map(params![MAX_EVENT_DETAIL_BYTES as i64], |row| row.get(0))?;
+        rows.collect::<Result<Vec<_>, _>>()?
+    };
+    if keys.is_empty() {
+        return Ok(0);
+    }
+
+    let transaction = connection.unchecked_transaction()?;
+    {
+        let mut read =
+            transaction.prepare("SELECT detail_json FROM agent_events WHERE event_key = ?1")?;
+        let mut write =
+            transaction.prepare("UPDATE agent_events SET detail_json = ?2 WHERE event_key = ?1")?;
+        for key in &keys {
+            let stored: String = read.query_row(params![key], |row| row.get(0))?;
+            let detail = serde_json::from_str(&stored).unwrap_or(Value::Null);
+            write.execute(params![key, compact_event_detail(&detail)])?;
+        }
+    }
+    transaction.commit()?;
+    Ok(keys.len())
 }
 
 /// Moves a pre-split profile onto the side its protocol served.
@@ -1312,6 +1436,143 @@ mod tests {
 
         database.delete_handoff_package(&record.id).unwrap();
         assert!(database.list_handoff_packages(None).unwrap().is_empty());
+    }
+
+    fn event_database() -> WorkspaceDatabase {
+        let database = WorkspaceDatabase {
+            connection: Mutex::new(Connection::open_in_memory().unwrap()),
+        };
+        {
+            let connection = database.connection.lock().unwrap();
+            connection.execute_batch(AGENT_MIGRATION).unwrap();
+            connection
+                .execute_batch(AGENT_EVENT_INDEX_MIGRATION)
+                .unwrap();
+        }
+        database
+    }
+
+    fn tool_event(key: &str, created_at: i64, result: &str) -> AgentEvent {
+        AgentEvent {
+            event_key: key.into(),
+            agent_type: "claude".into(),
+            native_session_id: None,
+            terminal_id: "terminal-1".into(),
+            event_type: "tool.completed".into(),
+            detail: serde_json::json!({ "tool_name": "Read", "tool_result": result }),
+            created_at,
+        }
+    }
+
+    fn stored_detail(database: &WorkspaceDatabase, key: &str) -> Value {
+        let connection = database.connection.lock().unwrap();
+        let stored: String = connection
+            .query_row(
+                "SELECT detail_json FROM agent_events WHERE event_key = ?1",
+                params![key],
+                |row| row.get(0),
+            )
+            .unwrap();
+        serde_json::from_str(&stored).unwrap()
+    }
+
+    /// A tool's result arrives in full and the UI reads a couple of short fields out of it. The
+    /// poll re-reads the newest events every second, so an unbounded detail is paid for every
+    /// second the app is open.
+    #[test]
+    fn an_oversized_event_detail_keeps_only_what_is_read_back() {
+        let database = event_database();
+        let huge = "x".repeat(MAX_EVENT_DETAIL_BYTES * 2);
+
+        database
+            .save_agent_events(&[tool_event("event-1", 10, &huge)])
+            .unwrap();
+
+        let detail = stored_detail(&database, "event-1");
+        assert_eq!(detail["tool_name"], "Read");
+        assert_eq!(detail[TRUNCATED_DETAIL_FIELD], Value::Bool(true));
+        // The payload the UI never reads is gone rather than merely shortened.
+        assert!(detail.get("tool_result").is_none());
+    }
+
+    #[test]
+    fn an_event_detail_within_the_limit_is_stored_unchanged() {
+        let database = event_database();
+
+        database
+            .save_agent_events(&[tool_event("event-1", 10, "three lines of output")])
+            .unwrap();
+
+        let detail = stored_detail(&database, "event-1");
+        assert_eq!(detail["tool_result"], "three lines of output");
+        assert!(detail.get(TRUNCATED_DETAIL_FIELD).is_none());
+    }
+
+    /// A long string among the retained fields is cut to what the UI can show, rather than being
+    /// kept whole and reintroducing the cost the cap exists to remove.
+    #[test]
+    fn a_retained_field_that_is_itself_huge_is_shortened() {
+        let database = event_database();
+        let mut event = tool_event("event-1", 10, &"x".repeat(MAX_EVENT_DETAIL_BYTES * 2));
+        event.detail["message"] = Value::String("m".repeat(MAX_EVENT_DETAIL_FIELD_CHARS * 4));
+
+        database.save_agent_events(&[event]).unwrap();
+
+        let detail = stored_detail(&database, "event-1");
+        let message = detail["message"].as_str().unwrap();
+        assert_eq!(message.chars().count(), MAX_EVENT_DETAIL_FIELD_CHARS);
+    }
+
+    /// Age does not bound a table whose rows have no size limit, so a count limit backs it up.
+    #[test]
+    fn events_past_the_retained_count_are_dropped_as_new_ones_arrive() {
+        let database = event_database();
+        let overflow = MAX_RETAINED_AGENT_EVENTS + 50;
+        let events: Vec<AgentEvent> = (0..overflow)
+            .map(|index| tool_event(&format!("event-{index}"), index, "ok"))
+            .collect();
+
+        database.save_agent_events(&events).unwrap();
+
+        let connection = database.connection.lock().unwrap();
+        let kept: i64 = connection
+            .query_row("SELECT count(*) FROM agent_events", [], |row| row.get(0))
+            .unwrap();
+        assert_eq!(kept, MAX_RETAINED_AGENT_EVENTS);
+        // The newest survive: the oldest 50 are the ones that went.
+        let oldest: i64 = connection
+            .query_row("SELECT min(created_at) FROM agent_events", [], |row| {
+                row.get(0)
+            })
+            .unwrap();
+        assert_eq!(oldest, 50);
+    }
+
+    /// Databases written before the cap existed hold details of up to 2 MB each.
+    #[test]
+    fn stored_events_from_before_the_cap_are_compacted_once() {
+        let database = event_database();
+        let huge = serde_json::json!({ "tool_name": "Read", "tool_result": "x".repeat(MAX_EVENT_DETAIL_BYTES * 2) });
+        {
+            let connection = database.connection.lock().unwrap();
+            connection
+                .execute(
+                    "INSERT INTO agent_events (
+                         event_key, agent_type, native_session_id, terminal_id,
+                         event_type, detail_json, created_at
+                     ) VALUES (?1, 'claude', NULL, 'terminal-1', 'tool.completed', ?2, 10)",
+                    params!["legacy-1", serde_json::to_string(&huge).unwrap()],
+                )
+                .unwrap();
+
+            assert_eq!(compact_stored_agent_events(&connection).unwrap(), 1);
+            // Re-running matches nothing, which is what makes it safe on every startup.
+            assert_eq!(compact_stored_agent_events(&connection).unwrap(), 0);
+        }
+
+        let detail = stored_detail(&database, "legacy-1");
+        assert_eq!(detail["tool_name"], "Read");
+        assert!(detail.get("tool_result").is_none());
     }
 
     #[test]

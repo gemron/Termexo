@@ -571,6 +571,7 @@
             (launchRequested)="launchAgent($event)"
             (terminalStatusChanged)="handleTerminalStatus($event)"
             (terminalRenamed)="state.renameTerminal($event.terminalId, $event.name)"
+            (linkOpenFailed)="reportLinkOpenFailure($event)"
             (terminalModelSwitchRequested)="openSingleModelSwitch($event)"
             (terminalAccountSwitchRequested)="openAccountSwitch($event)"
             (terminalInput)="handleTerminalInput($event)"

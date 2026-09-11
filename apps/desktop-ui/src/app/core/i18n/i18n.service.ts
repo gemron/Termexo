@@ -270,6 +270,7 @@ const EN: TranslationTable = {
   'terminal.closeNotice': 'Dismiss notice',
   'terminal.codexStarting': 'Termexo · Starting Codex CLI (hooks allowed automatically)',
   'terminal.startFailed': 'Terminal failed to start: {error}',
+  'terminal.openFailed': 'Could not open {target}: {error}',
   'terminal.rateLimited':
     'The provider returned HTTP 429. Claude CLI may retry automatically; wait for the status to update before submitting again.',
   'terminal.timeout':
@@ -959,6 +960,7 @@ const ZH_CN: TranslationTable = {
   'terminal.closeNotice': '关闭提示',
   'terminal.codexStarting': 'Termexo · 正在启动 Codex CLI（hooks 已自动允许）',
   'terminal.startFailed': '终端启动失败：{error}',
+  'terminal.openFailed': '无法打开 {target}：{error}',
   'terminal.rateLimited':
     '供应商返回 429 限流。Claude CLI 可能自动重试，请先等待状态更新，避免重复提交。',
   'terminal.timeout': 'Claude 请求超时。可等待 CLI 重试，或检查代理与供应商状态。',

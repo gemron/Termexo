@@ -544,7 +544,12 @@ const OPENCODE_PLUGIN_TEMPLATE: &str = include_str!("opencode-plugin.mjs");
 
 fn map_codex_event(stored: StoredHookEvent) -> AgentEvent {
     let event_type = match stored.payload.get("type").and_then(Value::as_str) {
-        Some("agent-turn-complete") => "task.completed",
+        // Reported for whichever thread just finished, which is not always the task the user is
+        // watching: the CLI runs its own catch-up recap on a thread of its own, and a side
+        // conversation gets one too. Neither raises the `Stop` hook, which fires only when the
+        // main turn ends — so completion is taken from that, and this only records the notice.
+        // Treating it as a completion announced "done" while the agent was still working.
+        Some("agent-turn-complete") => "agent.notification",
         _ => match stored
             .payload
             .get("hook_event_name")
@@ -572,11 +577,16 @@ fn map_codex_event(stored: StoredHookEvent) -> AgentEvent {
     AgentEvent {
         event_key: stored.event_key,
         agent_type: "codex".into(),
+        // `session_id` only, which every hook event carries and which names the rollout the CLI
+        // can resume. The `notify` payload carries `thread-id` instead, and that is the thread of
+        // the turn that just ended — usually the session, but a side conversation gets its own,
+        // and no rollout is written for one. Taking it first meant the last turn before a restart
+        // could leave the terminal resuming an id that does not exist, which the CLI answers with
+        // "No saved session found" and a terminal stuck at its shell prompt.
         native_session_id: stored
             .payload
-            .get("thread-id")
+            .get("session_id")
             .and_then(Value::as_str)
-            .or_else(|| stored.payload.get("session_id").and_then(Value::as_str))
             .map(str::to_owned),
         terminal_id: stored.terminal_id,
         event_type: event_type.into(),
@@ -844,7 +854,7 @@ mod tests {
     }
 
     #[test]
-    fn maps_codex_turn_completion_to_a_completed_agent_event() {
+    fn records_a_codex_thread_completion_without_completing_the_task() {
         let stored = StoredHookEvent {
             event_key: "event-codex-complete".into(),
             agent_type: Some("codex".into()),
@@ -860,8 +870,50 @@ mod tests {
         let event = map_hook_event(stored);
 
         assert_eq!(event.agent_type, "codex");
+        // A finished thread is not a finished task: the CLI reports one for its own catch-up
+        // recap and for side conversations, neither of which the user is waiting on.
+        assert_eq!(event.event_type, "agent.notification");
+        // Nor is that thread a session the CLI can be resumed into.
+        assert_eq!(event.native_session_id, None);
+    }
+
+    #[test]
+    fn maps_the_codex_stop_hook_to_a_completed_agent_event() {
+        let stored = StoredHookEvent {
+            event_key: "event-codex-stop-status".into(),
+            agent_type: Some("codex".into()),
+            terminal_id: "terminal-codex".into(),
+            received_at: 12,
+            payload: json!({
+                "hook_event_name": "Stop",
+                "session_id": "01a08a3d-48f6-7b02-b701-b99a1b89e5dc"
+            }),
+        };
+
+        let event = map_hook_event(stored);
+
         assert_eq!(event.event_type, "task.completed");
-        assert_eq!(event.native_session_id.as_deref(), Some("thread-1"));
+    }
+
+    #[test]
+    fn takes_the_codex_session_from_a_hook_event_rather_than_the_thread_of_a_turn() {
+        let stored = StoredHookEvent {
+            event_key: "event-codex-stop".into(),
+            agent_type: Some("codex".into()),
+            terminal_id: "terminal-codex".into(),
+            received_at: 11,
+            payload: json!({
+                "hook_event_name": "Stop",
+                "session_id": "01a08a3d-48f6-7b02-b701-b99a1b89e5dc"
+            }),
+        };
+
+        let event = map_hook_event(stored);
+
+        assert_eq!(
+            event.native_session_id.as_deref(),
+            Some("01a08a3d-48f6-7b02-b701-b99a1b89e5dc")
+        );
     }
 
     #[test]

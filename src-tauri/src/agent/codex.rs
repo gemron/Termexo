@@ -174,6 +174,34 @@ impl CodexCliAdapter {
         sessions.sort_by_key(|session| Reverse(session.last_used_at));
         Ok(sessions)
     }
+
+    /// Whether a rollout for this session is still on disk, and so can be resumed into.
+    ///
+    /// The CLI answers a resume it cannot satisfy by exiting with "No saved session found",
+    /// which leaves the terminal sitting at its shell prompt with the agent never started.
+    /// A rollout carries its session in its own file name, so this costs a directory walk
+    /// rather than a parse of every session on the machine.
+    pub fn session_exists(&self, session_id: &str) -> bool {
+        let session_id = session_id.trim();
+        if session_id.is_empty() {
+            return false;
+        }
+        let directory = self.codex_home().join("sessions");
+        if !directory.exists() {
+            return false;
+        }
+        let mut rollouts = Vec::new();
+        if collect_rollouts(&directory, &mut rollouts).is_err() {
+            // An unreadable sessions directory says nothing about the session; refusing the
+            // resume over it would be worse than letting the CLI answer for itself.
+            return true;
+        }
+        rollouts.iter().any(|path| {
+            path.file_stem()
+                .and_then(|stem| stem.to_str())
+                .is_some_and(|stem| stem.ends_with(session_id))
+        })
+    }
 }
 
 impl AgentAdapter for CodexCliAdapter {
@@ -578,6 +606,28 @@ mod tests {
         assert_eq!(fs::read_to_string(&transcript).unwrap(), original);
 
         fs::remove_dir_all(directory).unwrap();
+    }
+
+    #[test]
+    fn reports_whether_a_rollout_is_still_on_disk() {
+        let directory = test_directory("session-exists");
+        let sessions = directory.join("sessions").join("2026").join("09").join("10");
+        fs::create_dir_all(&sessions).unwrap();
+        let id = "01a08a3d-48f6-7b02-b701-b99a1b89e5dc";
+        fs::write(
+            sessions.join(format!("rollout-2026-09-10T15-34-27-{id}.jsonl")),
+            "{}
+",
+        )
+        .unwrap();
+        let adapter = CodexCliAdapter::with_home(directory.clone());
+
+        assert!(adapter.session_exists(id));
+        // The thread of a finished turn, which never had a rollout of its own.
+        assert!(!adapter.session_exists("01a08a4f-c1f5-7e90-8290-bc91d1ddf881"));
+        assert!(!adapter.session_exists("   "));
+
+        fs::remove_dir_all(&directory).ok();
     }
 
     #[test]

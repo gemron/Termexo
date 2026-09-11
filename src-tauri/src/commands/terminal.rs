@@ -6,7 +6,7 @@ use crate::database::WorkspaceDatabase;
 use crate::git::watch::RepositoryWatcher;
 use crate::git::RepositoryManager;
 use crate::pty::backend::{self, PtyBackendInfo};
-use crate::pty::{PtyManager, TerminalScrollback};
+use crate::pty::{LiveTerminal, PtyManager, TerminalScrollback};
 
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -139,6 +139,16 @@ pub fn read_terminal_scrollback(
     manager
         .read_scrollback(&terminal_id)
         .map_err(|error| error.to_string())
+}
+
+/// Reports which terminals still have a process running, and which launch of each.
+///
+/// A client cannot tell from its own startup whether the backend started with it: a reloaded
+/// window and a second client both load into a backend whose terminals are still running, and
+/// relaunching those would kill the agents working in them.
+#[tauri::command]
+pub fn list_live_terminals(manager: State<'_, PtyManager>) -> Result<Vec<LiveTerminal>, String> {
+    manager.live_terminals().map_err(|error| error.to_string())
 }
 
 /// Reports the pseudo console terminals run on, which decides what the frontend may leave to

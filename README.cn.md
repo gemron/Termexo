@@ -11,7 +11,7 @@
 </p>
 
 <p align="center">
-  <img alt="Version 0.8.5" src="https://img.shields.io/badge/version-0.8.5-58c7a0">
+  <img alt="Version 0.8.6" src="https://img.shields.io/badge/version-0.8.6-58c7a0">
   <img alt="Windows" src="https://img.shields.io/badge/platform-Windows-0078D4?logo=windows">
   <img alt="Tauri 2" src="https://img.shields.io/badge/Tauri-2-24C8DB?logo=tauri&logoColor=white">
   <img alt="Angular 22" src="https://img.shields.io/badge/Angular-22-DD0031?logo=angular">
@@ -59,7 +59,7 @@ npx termexo@latest
 
 ## 最新版本
 
-**[v0.8.5](https://github.com/gemron/Termexo/releases/tag/v0.8.5)** 自带 ConPTY，改善旧版 Windows 的 Shift+Tab 与滚动兼容性，避免重复换行重排，并提示 WebView2 过旧或缺失的处理方法。
+**[v0.8.6](https://github.com/gemron/Termexo/releases/tag/v0.8.6)** 把终端重放改为重放解析后的屏幕，重连或刷新后看到的就是终端真实的内容；并且不再让一连串重同步信号把同一个终端反复重画。
 [完整更新记录](CHANGELOG.cn.md)。
 
 如果 Termexo 帮到了你，欢迎 **给仓库点一个 Star**，帮助更多开发者发现它。
@@ -315,7 +315,8 @@ flowchart LR
 | V0.6 | OpenCode、任务看板与 Agent 确认选项 | 已发布 |
 | V0.7 | 自绘窗口、GPU 终端渲染与账号流程改进 | 已发布 |
 | V0.8.0–0.8.4 | 手机访问、首次使用引导、输入延迟和手机滚动改进 | 已发布 |
-| V0.8.5 | 自带 ConPTY 与 WebView2 启动诊断 | 当前版本 |
+| V0.8.5 | 自带 ConPTY 与 WebView2 启动诊断 | 已发布 |
+| V0.8.6 | 屏幕级准确的终端重放与重连稳定性 | 当前版本 |
 | V1.0 | 稳定性、安全加固与恢复体验 | 规划中 |
 
 进行中的工作见 [Issues](https://github.com/gemron/Termexo/issues)，实际交付内容见

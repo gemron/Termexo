@@ -2,6 +2,69 @@
 
 Release notes for every Termexo version, newest first. The current release is summarised in [README.md](README.md).
 
+## V0.8.6
+
+- Reloading a window no longer kills the agents running in it. The backend outlives a reloaded
+  window, but loading was treated as starting: a reload — or a right-click on a menu that still
+  offered Reload — bumped every terminal's revision, which `create_terminal` reads as a relaunch
+  and answers by killing the process that was running. A dozen agents mid-task were lost to one
+  click. A terminal the backend is still running is now left at the launch it is running, so
+  mounting it re-attaches instead, and its launch is no longer regenerated either — asking the CLI
+  to hand over a session its own live process still holds is what raised the reclaim prompt on
+  every reload.
+- The desktop window no longer carries the browser behaviours it has no use for. It is a WebView2,
+  so it arrived with Back, Reload, Save as and Print in its own menu and accelerators, where reload
+  is worse than useless — it throws the workbench away and rebuilds it while the terminals keep
+  running. Text fields keep their editing commands. Remote clients and the browser preview are
+  untouched: those are real browsers, where the same menu carries the long-press selection a phone
+  has no other way to reach, and reload is how a page recovers.
+- Terminal replay now sends a screen rather than the output that drew it. The backend kept the raw
+  PTY stream and replayed the tail of it, but that buffer has to be bounded, and a cut anywhere
+  lands in the middle of a frame: the cursor position, character attributes, scroll region and
+  screen mode that everything after the cut was written against are all in the part that was
+  dropped. The emulator ran those instructions against whatever it happened to hold, which is why a
+  reloaded page came back with duplicated frames, a misplaced cursor and rewrapped lines. The PTY's
+  output is now parsed into a terminal of its own, and a client is sent a redraw of that screen —
+  history, visible grid, cursor and input modes — which stands on its own. Mouse reporting is part
+  of what is restored, so a phone can still scroll an agent's viewer after a reload.
+- A resize no longer costs a terminal its history. The old buffer was discarded whenever the grid
+  moved, because output drawn for one width cannot be replayed into another. The parsed screen is
+  re-laid out at the new grid instead, the way the terminal in front of the user is.
+- A burst of resync signals no longer redraws the same terminal several times over. The server
+  raises one per gap it has to leave, and a client still settling after a reload leaves several, so
+  passes ran concurrently over one connection: each released the buffered live output when it
+  finished, so output held for the first was written into the middle of the second one's history,
+  and each wrote its own idea of how far the stream had been consumed. The compounding part was
+  worse — every extra redraw is work the interface must finish before it can read the socket again,
+  and falling behind the socket is what raises the next resync. Redrawing one pass at a time, with
+  later signals folded into a single follow-up, is what stops that feeding itself.
+- Switching to a terminal that was off screen shows what it actually holds. A hidden panel is
+  `display: none`: it has no size to fit to and never claims the terminal, so its history was
+  written for whichever grid the PTY happened to have, into a renderer with nothing to paint onto.
+  Switching to it then resized the emulator underneath frames drawn for the previous grid. Such a
+  view now takes its own grid first and is drawn again from the backend's screen, and any change of
+  grid — a window dragged wider, another client claiming the terminal — redraws from the same
+  place, rather than leaving the emulator to rewrap frames an agent never drew that way.
+- Addresses and file paths in terminal output can be opened with Ctrl and a click. An agent spends
+  most of its output naming things the user then wants to look at: a file it changed, a test that
+  failed at a line, a page it is quoting. Detection never touches the disk, so a word that merely
+  looks like a path costs nothing, and the backend decides whether it exists. Paths naming an
+  extension Windows runs rather than displays are revealed in the file manager instead of opened.
+- Resuming a Codex session checks the rollout is still on disk first. The CLI answers a resume it
+  cannot satisfy by exiting with "No saved session found", which left the terminal sitting at its
+  shell prompt with the agent never started.
+- A Codex turn ending on a side thread no longer reports the task as done. The CLI runs its
+  catch-up recap on a thread of its own and a side conversation gets one too, neither of which is
+  the task the user is watching; completion is now taken from the `Stop` hook, which fires only
+  when the main turn ends. The session a terminal resumes into is taken from `session_id`, which
+  names a rollout that exists, rather than from the thread id of whichever turn just finished.
+- Agent events no longer grow without bound. A tool's result was stored whole, up to 2 MB in a
+  single row, while the interface only ever reads a few short fields out of it — and it re-reads the
+  newest 250 events every second, so all of it was parsed, re-serialised and sent across the IPC
+  boundary once a second, for as long as the app was open. Details are now capped when written, a
+  count limit backs up the 30-day window, and a database written before the cap is compacted and
+  reclaimed on first launch.
+
 ## V0.8.5
 
 - Termexo ships its own ConPTY. Every terminal runs through the pseudo console

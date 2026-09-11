@@ -443,12 +443,32 @@ pub fn prepare_codex_launch(
         ));
     }
     log_proxy_environment(&environment);
+    // The account decides which home the CLI reads its sessions from, so the same one has to
+    // answer whether the session being resumed is still there.
+    let adapter = match environment.get("CODEX_HOME") {
+        Some(home) => CodexCliAdapter::with_home(home.into()),
+        None => CodexCliAdapter::new(),
+    };
     launch_environment
         .put(request.terminal_id.clone(), environment)
         .map_err(|error| error.to_string())?;
-    CodexCliAdapter::new()
+    // A resume the CLI cannot satisfy is not a recoverable state: it prints "No saved session
+    // found" and exits, leaving the terminal at a shell prompt with no agent in it. Starting a
+    // fresh session is the outcome the user can still work in.
+    let session_id = request.session_id.filter(|session_id| {
+        let exists = adapter.session_exists(session_id);
+        if !exists {
+            tracing::warn!(
+                target: "termexo::agent",
+                terminal_id = %request.terminal_id,
+                "Codex 会话 {session_id} 已不存在，改为开始新会话"
+            );
+        }
+        exists
+    });
+    adapter
         .build_launch_command(&CodexLaunchOptions {
-            session_id: request.session_id,
+            session_id,
             model: effective_model,
             notify_config: Some(notify_config),
             hook_configs,
