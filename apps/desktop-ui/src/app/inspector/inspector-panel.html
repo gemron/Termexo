@@ -230,7 +230,7 @@
         }
       </button>
       @if (isOpen('quota')) {
-        <div class="section-body quota-panel">
+        <div class="section-body quota-panel" [attr.aria-busy]="quotaLoading()">
           <div class="quota-actions">
             <button
               type="button"
@@ -252,12 +252,17 @@
             </button>
           </div>
           @for (row of quotaRows(); track row.quota.profileId) {
-            <article class="quota-row">
+            <article class="quota-row" [class.unavailable]="row.quota.diagnostic">
               <header>
-                <strong>{{ row.quota.profileName }}</strong>
-                @if (!row.quota.official) {
-                  <span class="quota-unofficial">{{ 'quota.unofficial' | t }}</span>
-                }
+                <span class="quota-provider-mark" aria-hidden="true">
+                  {{ row.quota.provider.slice(0, 2) }}
+                </span>
+                <div class="quota-provider-copy">
+                  <strong [title]="row.quota.profileName">{{ row.quota.profileName }}</strong>
+                  @if (row.quota.provider !== row.quota.profileName) {
+                    <small>{{ row.quota.provider }}</small>
+                  }
+                </div>
               </header>
               @for (line of row.entries; track line.entry.label) {
                 <div class="quota-entry" [class.alerting]="line.alerting">
@@ -276,6 +281,7 @@
                       aria-valuemax="100"
                       [attr.aria-label]="line.entry.label"
                       [attr.aria-valuenow]="meterValue(line.entry.percent)"
+                      [attr.aria-valuetext]="usedLabel(line.entry.percent)"
                     >
                       <span [style.width.%]="meterValue(line.entry.percent)"></span>
                     </div>
@@ -302,16 +308,27 @@
                 </div>
               }
               @if (row.quota.diagnostic) {
-                <small class="quota-unavailable">{{ row.quota.diagnostic }}</small>
+                <div class="quota-unavailable">
+                  <app-icon name="triangle-alert" [size]="13" />
+                  <span>{{ row.quota.diagnostic }}</span>
+                </div>
               } @else {
-                <small class="quota-checked"
-                  >{{ 'quota.checkedAt' | t }} {{ checkedLabel(row.quota.checkedAt) }}</small
-                >
+                <small class="quota-checked">
+                  <app-icon name="history" [size]="11" />
+                  {{ 'quota.checkedAt' | t }} {{ checkedLabel(row.quota.checkedAt) }}
+                </small>
               }
             </article>
           } @empty {
-            <p class="quota-empty">
-              {{ (showAllQuotas() ? 'quota.none' : 'quota.currentNone') | t }}
+            <p class="quota-empty" role="status">
+              {{
+                (quotaLoading()
+                  ? 'quota.refreshing'
+                  : showAllQuotas()
+                    ? 'quota.none'
+                    : 'quota.currentNone'
+                ) | t
+              }}
             </p>
           }
         </div>

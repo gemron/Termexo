@@ -269,17 +269,6 @@ button.stat {
   padding: 0 12px 12px;
 }
 
-.quota-actions {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-
-  .quota-scope-toggle {
-    width: auto;
-    flex: 1;
-  }
-}
-
 .agent-list {
   display: grid;
   gap: 4px;
@@ -604,11 +593,20 @@ button.stat {
 
 .quota-panel {
   display: grid;
+  gap: 10px;
+}
+
+.quota-actions {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
   gap: 6px;
 }
 
 .quota-refresh,
 .quota-scope-toggle {
+  min-width: 0;
+  min-height: 30px;
   border: 1px solid transparent;
   border-radius: var(--radius-field);
   color: var(--text-muted);
@@ -619,12 +617,15 @@ button.stat {
     border-color 140ms ease,
     background-color 140ms ease;
 
-  &:hover:not(:disabled),
-  &:focus-visible:not(:disabled) {
+  &:hover:not(:disabled) {
     border-color: var(--border);
     color: var(--text);
     background: var(--surface-2);
-    outline: 0;
+  }
+
+  &:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
   }
 }
 
@@ -659,6 +660,8 @@ button.stat {
   border-color: var(--border);
   padding: 5px 8px;
   font-size: 11px;
+  line-height: 1.4;
+  text-wrap: balance;
 
   &[aria-pressed='true'] {
     border-color: color-mix(in oklab, var(--color-primary) 34%, var(--border));
@@ -668,23 +671,27 @@ button.stat {
 }
 
 .quota-row {
-  padding: 8px;
+  min-width: 0;
+  overflow: hidden;
   border: 1px solid var(--border);
-  border-radius: var(--radius-field);
+  border-radius: 10px;
   background: var(--surface-raised);
 
   > header {
     display: flex;
     align-items: center;
-    justify-content: space-between;
-    gap: 6px;
+    gap: 9px;
+    padding: 11px 12px;
+    border-bottom: 1px solid var(--border);
+    background: color-mix(in srgb, var(--accent) 4%, var(--surface-raised));
   }
 
   strong {
+    display: block;
     overflow: hidden;
     color: var(--text);
     font-size: 12px;
-    font-weight: 620;
+    font-weight: 650;
     text-overflow: ellipsis;
     white-space: nowrap;
   }
@@ -695,14 +702,43 @@ button.stat {
     font-size: 11px;
     line-height: 1.4;
   }
+
+  &.unavailable > header {
+    background: transparent;
+  }
+}
+
+.quota-provider-mark {
+  display: grid;
+  width: 30px;
+  height: 30px;
+  flex: none;
+  place-items: center;
+  border: 1px solid color-mix(in srgb, var(--accent) 20%, var(--border));
+  border-radius: 8px;
+  color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 9%, var(--surface-raised));
+  font: 650 11px/1 var(--mono);
+}
+
+.quota-provider-copy {
+  min-width: 0;
+
+  small {
+    margin-top: 2px;
+    overflow-wrap: anywhere;
+  }
 }
 
 .quota-entry {
-  margin-top: 8px;
-  padding-top: 8px;
-  border-top: 1px solid var(--border);
+  margin: 0 12px;
+  padding: 12px 0;
 
-  /* Warns without recolouring the reading itself, which still reads as consumption. */
+  + .quota-entry {
+    border-top: 1px solid var(--border);
+  }
+
+  /* The remaining amount and consumed meter share the same low-allowance warning. */
   &.alerting {
     .quota-entry-amount b {
       color: var(--color-warning);
@@ -715,26 +751,27 @@ button.stat {
 }
 
 .quota-entry-head {
-  display: flex;
+  display: grid;
   min-width: 0;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: 8px;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.2fr);
+  align-items: center;
+  gap: 10px;
 }
 
 .quota-entry-label {
-  overflow: hidden;
+  min-width: 0;
   color: var(--text-secondary);
   font-size: 12px;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
 }
 
 .quota-entry-amount {
-  display: flex;
-  flex: none;
-  align-items: baseline;
-  gap: 5px;
+  display: grid;
+  min-width: 0;
+  justify-items: end;
+  gap: 2px;
+  text-align: right;
 
   small {
     display: inline;
@@ -743,18 +780,21 @@ button.stat {
   }
 
   b {
-    color: var(--text);
-    font-size: 14px;
-    font-weight: 680;
+    max-width: 100%;
+    color: var(--accent);
+    font-size: 22px;
+    font-weight: 650;
+    line-height: 1.2;
     font-variant-numeric: tabular-nums;
-    letter-spacing: -0.01em;
+    letter-spacing: -0.035em;
+    overflow-wrap: anywhere;
   }
 }
 
 .quota-meter {
   overflow: hidden;
-  height: 6px;
-  margin: 6px 0 5px;
+  height: 5px;
+  margin: 10px 0 8px;
   border-radius: 999px;
   background: var(--surface-inset);
 
@@ -772,13 +812,19 @@ button.stat {
   flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
-  gap: 4px 8px;
+  gap: 6px 8px;
+  margin-top: 8px;
+  overflow-wrap: anywhere;
+
+  > small:empty {
+    display: none;
+  }
 }
 
 /* Scoped through the meta row so it outranks the block display shared by the row's captions. */
 .quota-entry-meta .quota-reset {
   display: inline-flex;
-  flex: none;
+  max-width: 100%;
   align-items: center;
   gap: 4px;
   padding: 2px 7px;
@@ -786,37 +832,59 @@ button.stat {
   color: var(--text-secondary);
   background: var(--surface-2);
   font-variant-numeric: tabular-nums;
-}
 
-.quota-unofficial {
-  flex: none;
-  padding: 2px 6px;
-  border: 1px solid color-mix(in srgb, var(--color-warning) 45%, var(--border));
-  border-radius: var(--radius-field);
-  color: var(--color-warning);
-  font-size: 10px;
-  line-height: 1.4;
+  app-icon {
+    flex: none;
+  }
 }
 
 .quota-unavailable,
 .quota-checked {
-  margin-top: 8px;
-  padding-top: 8px;
-  border-top: 1px solid var(--border);
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  margin: 0;
+  padding: 10px 12px;
+  font-size: 11px;
+  line-height: 1.6;
+  overflow-wrap: anywhere;
+
+  app-icon {
+    flex: none;
+    margin-top: 2px;
+  }
 }
 
 .quota-unavailable {
-  color: var(--color-warning);
+  color: var(--text-muted);
+}
+
+.quota-row .quota-checked {
+  display: flex;
+  border-top: 1px solid var(--border);
+  background: var(--surface-0);
+  font-variant-numeric: tabular-nums;
 }
 
 .quota-empty {
-  padding: 8px;
+  margin: 0;
+  padding: 18px 12px;
   border: 1px dashed var(--border);
-  border-radius: var(--radius-field);
+  border-radius: 10px;
   color: var(--text-muted);
   font-size: 11px;
-  line-height: 1.4;
+  line-height: 1.6;
   text-align: center;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .quota-refresh.busy app-icon {
+    animation: none;
+  }
+
+  .quota-meter span {
+    transition: none;
+  }
 }
 
 .event-row {
