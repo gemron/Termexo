@@ -2,6 +2,36 @@
 
 Release notes for every Termexo version, newest first. The current release is summarised in [README.md](README.md).
 
+## V0.8.7
+
+- A terminal can no longer be left permanently stuck. The screen kept for replay was parsed by a
+  library that asserts its own invariants rather than repairing them, and a resize can break one:
+  a wide character left where the narrower grid has no room for its second half was enough. The
+  unwind poisoned the mutex the screen lives behind, and a poisoned mutex never recovers — every
+  later read failed, so the terminal showed an empty screen marked "stopped" while its agent kept
+  running with nothing able to reach it. Switching to an agent in one client and then activating
+  it in another was a reliable way to reach it, because both the wide characters and the resize
+  were there.
+- The screen parser is now avt, the terminal model asciinema uses for its recorder, player and
+  server. Fed the same 30 000 sessions of realistic agent output — mixed scripts, colours, cursor
+  moves, scroll regions, the alternate screen and resizes — the previous parser failed 1 169 times
+  and this one never did.
+- A fault inside the parser now costs a terminal its scrollback rather than the terminal. The
+  screen is rebuilt at the same grid and the terminal carries on, and a lock a panic had already
+  poisoned is recovered instead of refused, so one fault can no longer disable everything behind
+  it for the life of the process.
+- A redraw that never answers no longer holds a terminal silent. Everything a terminal produces
+  while one is in flight waits to be written until it ends, so a backend that never replied did
+  not merely fail to redraw — it stopped the terminal showing anything at all. Falling behind is
+  recoverable on the agent's next frame; silence is not.
+- Reading a terminal's screen no longer blocks every other terminal. The snapshot was taken while
+  holding the lock that each terminal's input, output, resize and launch passes through, so one
+  terminal's redraw stalled all of them; it now runs outside that lock, as does encoding and
+  publishing each chunk of output.
+- Mouse reporting, bracketed paste and the keypad mode survive a reload. The new parser models the
+  screen but not how input is reported, so those are read from the output stream and restored
+  alongside it — losing the mouse ones is what stops a phone scrolling an agent's viewer.
+
 ## V0.8.6
 
 - Reloading a window no longer kills the agents running in it. The backend outlives a reloaded

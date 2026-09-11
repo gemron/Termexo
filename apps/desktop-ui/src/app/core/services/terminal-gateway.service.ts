@@ -69,6 +69,15 @@ const TERMINAL_RESIZED_EVENT = 'terminal-resized';
 /** Raised by the remote bridge when the server had to drop frames for this connection. */
 const RESYNC_EVENT = 'resync';
 
+/**
+ * How long a redraw may be waited on before the terminal is released instead of held silent.
+ *
+ * Generous, because a redraw competes with the output the terminal is producing: reading a screen
+ * out of the backend takes the same lock the reader takes for every chunk that arrives, and a busy
+ * agent holds it often. This bounds the wait; it is not a deadline a healthy redraw approaches.
+ */
+const REPLAY_TIMEOUT_MS = 5_000;
+
 /** A terminal the backend still has a process for. */
 interface LiveTerminal {
   terminalId: string;
@@ -490,9 +499,11 @@ export class TerminalGatewayService {
   private async replayOnce(connection: TerminalConnection, clearScreen: boolean): Promise<void> {
     connection.replaying = true;
     try {
-      const scrollback = await invoke<TerminalScrollback>('read_terminal_scrollback', {
-        terminalId: connection.id,
-      });
+      const scrollback = await this.withReplayTimeout(
+        invoke<TerminalScrollback>('read_terminal_scrollback', {
+          terminalId: connection.id,
+        }),
+      );
       // A snapshot from a PTY this view has already replaced would draw someone else's output.
       if (scrollback.runtimeRevision === connection.runtimeRevision && scrollback.data) {
         if (clearScreen) {
@@ -509,6 +520,34 @@ export class TerminalGatewayService {
         this.deliver(connection, payload);
       }
       this.scheduleUiSync();
+    }
+  }
+
+  /**
+   * Fails a redraw that never comes back, rather than letting it hold the terminal silent.
+   *
+   * Everything a terminal produces while a redraw is in flight waits in `buffered`, and only the
+   * end of that redraw releases it. A backend that never answers therefore does not merely fail to
+   * redraw: it stops the terminal showing anything at all, for as long as the app stays open. The
+   * screen that arrives after a timeout may be behind, but a live terminal recovers from that on
+   * the agent's next frame, where a silent one recovers from nothing.
+   */
+  private async withReplayTimeout<T>(pending: Promise<T>): Promise<T> {
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    try {
+      return await Promise.race([
+        pending,
+        new Promise<never>((_, reject) => {
+          timer = setTimeout(
+            () => reject(new Error('read_terminal_scrollback timed out')),
+            REPLAY_TIMEOUT_MS,
+          );
+        }),
+      ]);
+    } finally {
+      if (timer !== undefined) {
+        clearTimeout(timer);
+      }
     }
   }
 

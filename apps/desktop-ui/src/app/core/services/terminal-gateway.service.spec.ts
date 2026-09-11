@@ -179,6 +179,30 @@ describe('TerminalGatewayService attachment', () => {
     expect(output).toEqual([CLEAR_SCREEN, 'redrawn']);
   });
 
+  it('releases the terminal when a redraw never comes back', async () => {
+    // Everything the terminal produces waits in the buffer until a redraw ends, so a backend that
+    // never answers does not merely fail to redraw — it stops the terminal showing anything at
+    // all. Being behind is recoverable on the agent's next frame; being silent is not.
+    vi.useFakeTimers();
+    try {
+      const writes: string[] = [];
+      await service.connect('terminal-1', 3, (data) => writes.push(data));
+      // Never resolved: the backend is holding the lock the screen is read under.
+      commandHandler = () => new Promise(() => undefined);
+
+      const replaying = service.replayInitial('terminal-1');
+      emitOutput('produced while waiting', 9);
+      expect(writes).toEqual([]);
+
+      await vi.advanceTimersByTimeAsync(5_000);
+      await replaying;
+
+      expect(writes).toEqual(['produced while waiting']);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it('redraws a terminal from the backend screen when its grid moves', async () => {
     // A grid change makes what is on screen stale: it was drawn for the old width, and rewrapping
     // it produces something the agent never drew. Only the backend re-lays its screen out.

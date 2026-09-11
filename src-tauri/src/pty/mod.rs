@@ -31,7 +31,23 @@ const END_OF_LINE: &str = "\x1b[m\r\n";
 const RESET_ATTRIBUTES: &str = "\x1b[m";
 const ENTER_ALTERNATE_SCREEN: &str = "\x1b[?1049h";
 const HIDE_CURSOR: &str = "\x1b[?25l";
-const SHOW_CURSOR: &str = "\x1b[?25h";
+
+/// The private modes a reloading client has to be put back into.
+///
+/// The screen model tracks what was drawn, not how the terminal reports input, so these are read
+/// off the stream instead. They are the ones that change what a keypress or a click becomes:
+/// mouse reporting in each encoding an agent might ask for, focus reporting, and bracketed paste.
+/// Losing the mouse ones is what stops a phone scrolling an agent's viewer after a reload.
+const TRACKED_PRIVATE_MODES: &[u16] = &[1000, 1002, 1003, 1004, 1005, 1006, 1015, 1016, 2004];
+
+/// Longest unfinished escape sequence held back for the read that completes it.
+///
+/// A mode sequence is a dozen bytes at most; anything longer is not one being split across reads,
+/// so holding it would only grow without bound on output that never completes a sequence.
+const MAX_PENDING_SEQUENCE: usize = 64;
+
+/// Puts the keypad back into application mode, which the screen model does not restore either.
+const APPLICATION_KEYPAD: &str = "\x1b=";
 
 /// Grid a terminal falls back to when no viewer has claimed a size, matching the VT default.
 const DEFAULT_COLS: u16 = 80;
@@ -49,8 +65,6 @@ pub struct LiveTerminal {
 pub enum PtyError {
     #[error("terminal {0} was not found")]
     NotFound(String),
-    #[error("terminal manager lock is poisoned")]
-    LockPoisoned,
     #[error("failed to create PTY: {0}")]
     Open(String),
     #[error("failed to start shell: {0}")]
@@ -104,6 +118,181 @@ impl TerminalScrollback {
     }
 }
 
+/// The input modes a reloading client has to be put back into.
+///
+/// The screen model describes what was drawn; it does not describe how the terminal reports a
+/// click, a paste or a keypad key. Those are read off the output stream here, because a client
+/// that comes back without them looks fine and behaves wrongly — a phone silently loses the
+/// ability to scroll an agent's viewer.
+#[derive(Default)]
+struct InputModes {
+    enabled: std::collections::BTreeSet<u16>,
+    keypad_application: bool,
+    /// Whether a program has taken the alternate screen, which decides whether history is shown
+    /// behind it. The screen model does not report this either.
+    alternate_screen: bool,
+    /// A sequence cut in half by the end of a read, kept for the read that finishes it.
+    carry: Vec<u8>,
+}
+
+impl InputModes {
+    /// Reads the mode changes out of one chunk of terminal output.
+    fn observe(&mut self, chunk: &[u8]) {
+        let mut data = std::mem::take(&mut self.carry);
+        data.extend_from_slice(chunk);
+        let mut index = 0;
+        while let Some(offset) = data[index..].iter().position(|byte| *byte == 0x1b) {
+            let start = index + offset;
+            match self.read_sequence(&data[start..]) {
+                Some(used) => index = start + used,
+                None => {
+                    if data.len() - start <= MAX_PENDING_SEQUENCE {
+                        self.carry = data[start..].to_vec();
+                    }
+                    return;
+                }
+            }
+        }
+    }
+
+    /// Applies one sequence and reports its length, or `None` when the read ended inside it.
+    fn read_sequence(&mut self, data: &[u8]) -> Option<usize> {
+        match data.get(1)? {
+            b'=' => {
+                self.keypad_application = true;
+                Some(2)
+            }
+            b'>' => {
+                self.keypad_application = false;
+                Some(2)
+            }
+            b'[' => self.read_csi(data),
+            // Every other sequence is one this does not track. Stepping over the escape byte is
+            // enough, because the scan only ever looks for the next one.
+            _ => Some(1),
+        }
+    }
+
+    fn read_csi(&mut self, data: &[u8]) -> Option<usize> {
+        let private = data.get(2)? == &b'?';
+        let params_start = if private { 3 } else { 2 };
+        let mut index = params_start;
+        loop {
+            let byte = *data.get(index)?;
+            if byte.is_ascii_digit() || byte == b';' {
+                index += 1;
+                continue;
+            }
+            if private && (byte == b'h' || byte == b'l') {
+                let enable = byte == b'h';
+                for part in data[params_start..index].split(|byte| *byte == b';') {
+                    if let Some(mode) = std::str::from_utf8(part).ok().and_then(|t| t.parse().ok())
+                    {
+                        self.set(mode, enable);
+                    }
+                }
+            }
+            return Some(index + 1);
+        }
+    }
+
+    fn set(&mut self, mode: u16, enable: bool) {
+        // Both spellings of the alternate screen are tracked on their own, because entering it is
+        // written once, ahead of the grid, rather than restored alongside the input modes.
+        if matches!(mode, 1047 | 1049) {
+            self.alternate_screen = enable;
+            return;
+        }
+        if !TRACKED_PRIVATE_MODES.contains(&mode) {
+            return;
+        }
+        if enable {
+            self.enabled.insert(mode);
+        } else {
+            self.enabled.remove(&mode);
+        }
+    }
+
+    /// The sequences that put a terminal that has seen nothing into these modes.
+    fn formatted(&self) -> String {
+        let mut out = String::new();
+        if self.keypad_application {
+            out.push_str(APPLICATION_KEYPAD);
+        }
+        for mode in &self.enabled {
+            out.push_str(&format!("\x1b[?{mode}h"));
+        }
+        out
+    }
+}
+
+/// The SGR parameters that select one colour, as a foreground or a background.
+fn colour_parameters(colour: avt::Color, background: bool) -> String {
+    let base: u16 = if background { 40 } else { 30 };
+    match colour {
+        avt::Color::Indexed(index) if index < 8 => format!("{}", base + u16::from(index)),
+        avt::Color::Indexed(index) if index < 16 => format!("{}", base + 60 + u16::from(index - 8)),
+        avt::Color::Indexed(index) => format!("{};5;{index}", base + 8),
+        avt::Color::RGB(rgb) => format!("{};2;{};{};{}", base + 8, rgb.r, rgb.g, rgb.b),
+    }
+}
+
+/// The sequence that selects a pen, written from a known-reset state so it never inherits.
+fn pen_sequence(pen: &avt::Pen) -> String {
+    if pen.is_default() {
+        return RESET_ATTRIBUTES.to_owned();
+    }
+    let mut parts = vec![String::from("0")];
+    for (active, code) in [
+        (pen.is_bold(), "1"),
+        (pen.is_faint(), "2"),
+        (pen.is_italic(), "3"),
+        (pen.is_underline(), "4"),
+        (pen.is_blink(), "5"),
+        (pen.is_inverse(), "7"),
+        (pen.is_strikethrough(), "9"),
+    ] {
+        if active {
+            parts.push(code.to_owned());
+        }
+    }
+    if let Some(colour) = pen.foreground() {
+        parts.push(colour_parameters(colour, false));
+    }
+    if let Some(colour) = pen.background() {
+        parts.push(colour_parameters(colour, true));
+    }
+    format!("\x1b[{}m", parts.join(";"))
+}
+
+/// One line of history, with the attributes it was drawn in, clipped to the grid's width.
+///
+/// A line kept from before a resize stays as wide as the grid it was written for, so writing it
+/// out in full would wrap onto a second line in a narrower terminal — and every wrapped line
+/// pushes what follows down, including the visible grid the redraw has to land exactly on.
+fn line_sequence(line: &avt::Line, cols: u16) -> String {
+    let mut out = String::new();
+    let mut current: Option<avt::Pen> = None;
+    let mut width = 0usize;
+    for cell in line.cells() {
+        // A wide character owns two cells and the second holds no character of its own; writing
+        // it would put a stray space after every wide glyph.
+        if cell.width() == 0 {
+            continue;
+        }
+        width += usize::from(cell.width());
+        if width > usize::from(cols) {
+            break;
+        }
+        if current.as_ref() != Some(cell.pen()) {
+            out.push_str(&pen_sequence(cell.pen()));
+            current = Some(cell.pen().clone());
+        }
+        out.push(cell.char());
+    }
+    out
+}
+
 /// The screen a terminal is showing, kept so a client can be handed the picture rather than the
 /// instructions that painted it.
 ///
@@ -114,117 +303,193 @@ impl TerminalScrollback {
 /// happens to have instead, which is what put duplicated frames, misplaced cursors and rewrapped
 /// lines on a reloaded page.
 ///
-/// Parsing the stream here keeps one screen that is always whole, and [`OutputHistory::snapshot`] describes
-/// it as a redraw that stands on its own. A resize costs nothing either: the screen is re-laid out
-/// at the new grid the way the terminal in front of the user is, rather than being thrown away for
-/// having been drawn at the old one.
+/// Parsing the stream here keeps one screen that is always whole, and [`OutputHistory::snapshot`]
+/// describes it as a redraw that stands on its own. A resize costs nothing either: the screen is
+/// re-laid out at the new grid the way the terminal in front of the user is, rather than being
+/// thrown away for having been drawn at the old one.
 struct OutputHistory {
-    screen: vt100::Parser,
+    screen: avt::Vt,
+    /// Tracked separately because the screen model does not describe how input is reported.
+    modes: InputModes,
+    /// Rejoins a character split across two reads, because the screen is fed text, not bytes.
+    text: Utf8Reassembler,
     last_sequence: u64,
+    /// The grid the screen is kept at, so it can be rebuilt without asking a parser that panicked.
+    rows: u16,
+    cols: u16,
 }
 
 impl OutputHistory {
     fn new(cols: u16, rows: u16) -> Self {
+        let (rows, cols) = (rows.max(1), cols.max(1));
         Self {
-            screen: vt100::Parser::new(rows.max(1), cols.max(1), MAX_SCROLLBACK_ROWS),
+            screen: Self::build_screen(rows, cols),
+            modes: InputModes::default(),
+            text: Utf8Reassembler::default(),
             last_sequence: 0,
+            rows,
+            cols,
+        }
+    }
+
+    fn build_screen(rows: u16, cols: u16) -> avt::Vt {
+        avt::Vt::builder()
+            .size(usize::from(cols), usize::from(rows))
+            .scrollback_limit(MAX_SCROLLBACK_ROWS)
+            .build()
+    }
+
+    /// Runs an operation against the parsed screen, rebuilding the screen if the parser panics.
+    ///
+    /// A terminal model is a large state machine with invariants a resize can break, and one that
+    /// asserts them rather than repairing them takes the whole terminal down with it: an unwind
+    /// poisons the mutex the screen lives behind, and a poisoned mutex is permanent — every later
+    /// read fails, so the terminal never redraws again while its PTY keeps running with nothing
+    /// able to reach it. That is how a terminal ended up showing an empty screen marked "stopped"
+    /// with its agent still alive.
+    ///
+    /// Discarding one terminal's scrollback is the cheaper failure by a wide margin, so the screen
+    /// is started again at the same grid and the terminal carries on.
+    fn guard<T>(&mut self, during: &str, operation: impl FnOnce(&mut avt::Vt) -> T) -> Option<T> {
+        let screen = &mut self.screen;
+        match std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| operation(screen))) {
+            Ok(value) => Some(value),
+            Err(_) => {
+                tracing::warn!(
+                    during,
+                    rows = self.rows,
+                    cols = self.cols,
+                    "terminal screen parser panicked; its scrollback was discarded"
+                );
+                self.screen = Self::build_screen(self.rows, self.cols);
+                None
+            }
         }
     }
 
     /// Draws a chunk onto the screen and returns the sequence assigned to it.
+    ///
+    /// The sequence advances even when the draw failed, because the chunk was still published to
+    /// every client; a client that reads the screen afterwards must not be told it is older.
     fn push(&mut self, chunk: &[u8]) -> u64 {
-        self.screen.process(chunk);
+        self.modes.observe(chunk);
+        // The screen is fed text rather than bytes, so the half of a character that arrived in
+        // this read waits for the read that finishes it. Decoding each half on its own would turn
+        // both into replacement characters and lose the character from the screen entirely — and a
+        // full-width one occupies two columns where its replacement occupies one, so everything
+        // after it on the line would shift as well.
+        let complete = self.text.accept(chunk);
+        let text = String::from_utf8_lossy(&complete).into_owned();
+        if self
+            .guard("drawing output", |screen| {
+                screen.feed_str(&text);
+            })
+            .is_none()
+        {
+            // The rebuilt screen has never seen this chunk, and it is the newest thing the
+            // terminal drew, so it is worth starting the fresh screen from.
+            self.guard("redrawing output after a reset", |screen| {
+                screen.feed_str(&text);
+            });
+        }
         self.last_sequence += 1;
         self.last_sequence
     }
 
     /// Follows the PTY's grid, so a replay is always drawn for the size the client will show it at.
     fn resize(&mut self, cols: u16, rows: u16) {
-        self.screen.screen_mut().set_size(rows.max(1), cols.max(1));
+        self.rows = rows.max(1);
+        self.cols = cols.max(1);
+        let (rows, cols) = (self.rows, self.cols);
+        self.guard("resizing the screen", |screen| {
+            screen.resize(usize::from(cols), usize::from(rows));
+        });
     }
 
     /// Describes the screen as output that reproduces it on a terminal that has seen nothing.
     ///
     /// The lines are written in the order the terminal produced them — what has scrolled off
     /// first, then the visible grid — so the client's own scrollback ends up holding the history
-    /// exactly as this one does. The last visible line deliberately ends without a newline: that
-    /// leaves the client's viewport sitting on the visible grid rather than scrolled a line past
-    /// it. Cursor position and input modes are restored last, because writing the lines moves the
-    /// cursor and the modes decide how the client's keyboard and mouse report from here on.
+    /// exactly as this one does. The visible grid, the cursor and the alternate screen come from
+    /// the parser's own dump; the input modes are appended because it does not track them.
     fn snapshot(&mut self, runtime_revision: u64) -> TerminalScrollback {
-        let (_, cols) = self.screen.screen().size();
-        // A program drawing on the alternate screen — an editor, or an agent's own viewer — owns
-        // the whole grid, and a real terminal shows no scrollback behind it either.
-        let alternate = self.screen.screen().alternate_screen();
-        let scrolled_off = if alternate {
-            Vec::new()
-        } else {
-            self.scrolled_off_lines(cols)
-        };
-
-        // A terminal that has drawn nothing replays as nothing. A view that is starting a terminal
-        // rather than joining one would otherwise be sent a screenful of blank lines, pushing the
-        // notice it had already written for itself out of sight.
-        if scrolled_off.is_empty() && self.screen.screen().contents().is_empty() {
-            return TerminalScrollback {
-                data: String::new(),
-                sequence: self.last_sequence,
-                runtime_revision,
-            };
-        }
-
-        let mut data = String::new();
-        if alternate {
-            data.push_str(ENTER_ALTERNATE_SCREEN);
-        }
-        for line in scrolled_off {
-            data.push_str(&line);
-            data.push_str(END_OF_LINE);
-        }
-
-        let screen = self.screen.screen();
-        for (index, row) in screen.rows_formatted(0, cols).enumerate() {
-            if index > 0 {
-                data.push_str(END_OF_LINE);
-            }
-            data.push_str(&String::from_utf8_lossy(&row));
-        }
-
-        let (cursor_row, cursor_col) = screen.cursor_position();
-        data.push_str(RESET_ATTRIBUTES);
-        data.push_str(&format!("\x1b[{};{}H", cursor_row + 1, cursor_col + 1));
-        data.push_str(if screen.hide_cursor() {
-            HIDE_CURSOR
-        } else {
-            SHOW_CURSOR
-        });
-        data.push_str(&String::from_utf8_lossy(&screen.input_mode_formatted()));
-
+        let modes = self.modes.formatted();
+        let alternate = self.modes.alternate_screen;
+        // Reading the screen walks it the same way drawing does, so it is guarded the same way:
+        // a redraw that cannot be produced costs this client its history, not the terminal.
+        let data = self
+            .guard("reading the screen", |screen| {
+                Self::encode(screen, &modes, alternate)
+            })
+            .flatten();
         TerminalScrollback {
-            data,
+            data: data.unwrap_or_default(),
             sequence: self.last_sequence,
             runtime_revision,
         }
     }
 
-    /// The lines that have scrolled off the top of the screen, oldest first.
+    /// Encodes the screen, or `None` when the terminal has drawn nothing worth replaying.
     ///
-    /// A line above the screen is only reachable by moving the viewport over it, so the viewport
-    /// walks down the history one line at a time and its top line is read off at each step. Asking
-    /// to scroll back further than there is history settles on however much there is, which is
-    /// also how the depth is found.
-    fn scrolled_off_lines(&mut self, cols: u16) -> Vec<String> {
-        self.screen.screen_mut().set_scrollback(usize::MAX);
-        let depth = self.screen.screen().scrollback();
-        let mut lines = Vec::with_capacity(depth);
-        for offset in (1..=depth).rev() {
-            self.screen.screen_mut().set_scrollback(offset);
-            if let Some(row) = self.screen.screen().rows_formatted(0, cols).next() {
-                lines.push(String::from_utf8_lossy(&row).into_owned());
+    /// Every row of the grid is written, including the blank ones, so the cursor lands on the row
+    /// it belongs to. The parser's own dump is not used: it writes from wherever the cursor is and
+    /// leaves trailing blank rows out, which only reproduces a screen when nothing precedes it —
+    /// and replayed history always does.
+    fn encode(screen: &avt::Vt, modes: &str, alternate: bool) -> Option<String> {
+        let (cols, _) = screen.size();
+        let cols = cols as u16;
+        let total = screen.lines().count();
+        let visible = screen.view().count();
+        let scrolled_off = total.saturating_sub(visible);
+
+        // A terminal that has drawn nothing replays as nothing. A view that is starting a terminal
+        // rather than joining one would otherwise be sent a screenful of blank lines, pushing the
+        // notice it had already written for itself out of sight.
+        if scrolled_off == 0 && screen.lines().all(|line| line.text().trim().is_empty()) {
+            return None;
+        }
+
+        let mut data = String::new();
+        // A program drawing on the alternate screen owns the whole grid, and a real terminal shows
+        // no scrollback behind it either.
+        if alternate {
+            data.push_str(ENTER_ALTERNATE_SCREEN);
+        } else {
+            for line in screen.lines().take(scrolled_off) {
+                data.push_str(&line_sequence(line, cols));
+                data.push_str(END_OF_LINE);
             }
         }
-        self.screen.screen_mut().set_scrollback(0);
-        lines
+
+        // The last visible row deliberately ends without a newline: that leaves the client's
+        // viewport sitting on the grid rather than scrolled one row past it.
+        for (index, line) in screen.view().enumerate() {
+            if index > 0 {
+                data.push_str(END_OF_LINE);
+            }
+            data.push_str(&line_sequence(line, cols));
+        }
+
+        let cursor = screen.cursor();
+        data.push_str(RESET_ATTRIBUTES);
+        data.push_str(&format!("\x1b[{};{}H", cursor.row + 1, cursor.col + 1));
+        if !cursor.visible {
+            data.push_str(HIDE_CURSOR);
+        }
+        data.push_str(modes);
+        Some(data)
+    }
+}
+
+fn lock_recovering<T>(lock: &Mutex<T>) -> std::sync::MutexGuard<'_, T> {
+    match lock.lock() {
+        Ok(guard) => guard,
+        Err(poisoned) => {
+            tracing::warn!(
+                "terminal manager lock had been poisoned by an earlier panic; recovered"
+            );
+            poisoned.into_inner()
+        }
     }
 }
 
@@ -289,7 +554,7 @@ impl PtyManager {
 
     /// Which launch of a terminal is currently running, or `None` when it is not.
     pub fn runtime_revision(&self, terminal_id: &str) -> Result<Option<u64>, PtyError> {
-        let sessions = self.sessions.lock().map_err(|_| PtyError::LockPoisoned)?;
+        let sessions = lock_recovering(&self.sessions);
         Ok(sessions
             .get(terminal_id)
             .map(|session| session.runtime_revision))
@@ -301,7 +566,7 @@ impl PtyManager {
     /// running and every terminal has to be launched — from a window that merely reloaded, or a
     /// second client joining, where relaunching would kill the agents mid-task.
     pub fn live_terminals(&self) -> Result<Vec<LiveTerminal>, PtyError> {
-        let sessions = self.sessions.lock().map_err(|_| PtyError::LockPoisoned)?;
+        let sessions = lock_recovering(&self.sessions);
         Ok(sessions
             .iter()
             .map(|(terminal_id, session)| LiveTerminal {
@@ -316,7 +581,7 @@ impl PtyManager {
     /// A client joining a terminal has to draw what the agent is already drawing for, which its own
     /// window may not match.
     pub fn size(&self, terminal_id: &str) -> Result<Option<(u16, u16)>, PtyError> {
-        let sessions = self.sessions.lock().map_err(|_| PtyError::LockPoisoned)?;
+        let sessions = lock_recovering(&self.sessions);
         Ok(sessions.get(terminal_id).map(|session| {
             session
                 .active_viewport
@@ -326,13 +591,24 @@ impl PtyManager {
         }))
     }
 
+    /// Describes one terminal's screen, without holding the session map while doing it.
+    ///
+    /// Taking the snapshot is the only real work here — walking the scrolled-off lines and
+    /// encoding a redraw — and the session map is what every terminal's input, output, resize and
+    /// launch has to pass through. Holding it for the duration put all of them behind one
+    /// terminal's redraw, so two clients each redrawing what the other's resize announced was
+    /// enough to keep the map busy continuously and stall both ends. The history is reached
+    /// through its own handle, so the map is released before any of that begins.
     pub fn read_scrollback(&self, terminal_id: &str) -> Result<TerminalScrollback, PtyError> {
-        let sessions = self.sessions.lock().map_err(|_| PtyError::LockPoisoned)?;
-        let Some(session) = sessions.get(terminal_id) else {
-            return Ok(TerminalScrollback::empty());
+        let (history, runtime_revision) = {
+            let sessions = lock_recovering(&self.sessions);
+            let Some(session) = sessions.get(terminal_id) else {
+                return Ok(TerminalScrollback::empty());
+            };
+            (session.history.clone(), session.runtime_revision)
         };
-        let mut history = session.history.lock().map_err(|_| PtyError::LockPoisoned)?;
-        Ok(history.snapshot(session.runtime_revision))
+        let mut history = lock_recovering(&history);
+        Ok(history.snapshot(runtime_revision))
     }
 
     /// Starts the terminal's process, or reports `false` when one is already running under this id.
@@ -342,7 +618,7 @@ impl PtyManager {
         app: AppHandle,
         environment: HashMap<String, String>,
     ) -> Result<bool, PtyError> {
-        let mut sessions = self.sessions.lock().map_err(|_| PtyError::LockPoisoned)?;
+        let mut sessions = lock_recovering(&self.sessions);
         if sessions.contains_key(&request.terminal_id) {
             return Ok(false);
         }
@@ -439,7 +715,7 @@ impl PtyManager {
     }
 
     pub fn write(&self, terminal_id: &str, data: &[u8]) -> Result<(), PtyError> {
-        let mut sessions = self.sessions.lock().map_err(|_| PtyError::LockPoisoned)?;
+        let mut sessions = lock_recovering(&self.sessions);
         let session = sessions
             .get_mut(terminal_id)
             .ok_or_else(|| PtyError::NotFound(terminal_id.into()))?;
@@ -462,7 +738,7 @@ impl PtyManager {
         claim: bool,
         app: &AppHandle,
     ) -> Result<(), PtyError> {
-        let mut sessions = self.sessions.lock().map_err(|_| PtyError::LockPoisoned)?;
+        let mut sessions = lock_recovering(&self.sessions);
         let session = sessions
             .get_mut(terminal_id)
             .ok_or_else(|| PtyError::NotFound(terminal_id.into()))?;
@@ -547,7 +823,7 @@ impl PtyManager {
     }
 
     pub fn close(&self, terminal_id: &str) -> Result<(), PtyError> {
-        let mut sessions = self.sessions.lock().map_err(|_| PtyError::LockPoisoned)?;
+        let mut sessions = lock_recovering(&self.sessions);
         let mut session = sessions
             .remove(terminal_id)
             .ok_or_else(|| PtyError::NotFound(terminal_id.into()))?;
@@ -672,22 +948,28 @@ fn spawn_reader(
                         continue;
                     }
                     let chunk = chunk.as_slice();
-                    // Sequencing, buffering and publishing share one critical section so a replay
-                    // and the live stream can never interleave out of order.
-                    let event = {
+                    // Only drawing the chunk onto the screen needs the lock. Encoding and
+                    // publishing used to sit inside it as well, to keep a replay and the live
+                    // stream from interleaving, but the sequence number already settles that: a
+                    // client drops anything the snapshot it just applied already covered, however
+                    // the two arrive. Holding the lock for the rest starved the reads that take it
+                    // — a screen is read out under the same lock — and a terminal producing output
+                    // steadily could keep a redraw waiting indefinitely, which left that terminal
+                    // buffering everything it produced and showing none of it.
+                    let sequence = {
                         let mut history = match history.lock() {
                             Ok(history) => history,
                             Err(poisoned) => poisoned.into_inner(),
                         };
-                        let event = TerminalOutputEvent {
-                            terminal_id: terminal_id.clone(),
-                            runtime_revision,
-                            sequence: history.push(chunk),
-                            data: String::from_utf8_lossy(chunk).into_owned(),
-                        };
-                        hub.publish(EVENT_TERMINAL_OUTPUT, &event);
-                        event
+                        history.push(chunk)
                     };
+                    let event = TerminalOutputEvent {
+                        terminal_id: terminal_id.clone(),
+                        runtime_revision,
+                        sequence,
+                        data: String::from_utf8_lossy(chunk).into_owned(),
+                    };
+                    hub.publish(EVENT_TERMINAL_OUTPUT, &event);
                     let _ = app.emit(EVENT_TERMINAL_OUTPUT, &event);
                 }
                 Err(error) => {
@@ -832,10 +1114,31 @@ mod tests {
     }
 
     /// Feeds a snapshot to a terminal that has seen nothing, the way a reloading client does.
-    fn replay_into(snapshot: &str, cols: u16, rows: u16) -> vt100::Parser {
-        let mut client = vt100::Parser::new(rows, cols, MAX_SCROLLBACK_ROWS);
-        client.process(snapshot.as_bytes());
+    fn replay_into(snapshot: &str, cols: u16, rows: u16) -> avt::Vt {
+        let mut client = OutputHistory::build_screen(rows, cols);
+        client.feed_str(snapshot);
         client
+    }
+
+    /// The grid a terminal is showing right now, which is what a redraw has to reproduce exactly.
+    fn visible_grid(screen: &avt::Vt) -> Vec<String> {
+        screen
+            .view()
+            .map(|line| line.text().trim_end().to_owned())
+            .collect()
+    }
+
+    /// What a terminal is showing, with the trailing blank lines a comparison does not care about.
+    fn shown(screen: &avt::Vt) -> Vec<String> {
+        let mut lines: Vec<String> = screen
+            .text()
+            .into_iter()
+            .map(|line| line.trim_end().to_owned())
+            .collect();
+        while lines.last().is_some_and(|line| line.is_empty()) {
+            lines.pop();
+        }
+        lines
     }
 
     #[test]
@@ -846,6 +1149,130 @@ mod tests {
         assert_eq!(history.push(b"b"), 2);
         assert_eq!(history.snapshot(3).sequence, 2);
         assert_eq!(history.snapshot(3).runtime_revision, 3);
+    }
+
+    /// Replaying a screen has to survive whatever an agent draws, not just the cases someone
+    /// thought to write down — a terminal that redraws, resizes and writes wide characters is
+    /// exactly where the previous parser asserted its way out of a usable terminal.
+    #[test]
+    fn a_snapshot_reproduces_the_screen_across_many_random_sessions() {
+        // xorshift, so a failure is reproducible from the round number alone.
+        let mut state = 0x2026_09_11_u64;
+        let mut next = move || {
+            state ^= state << 13;
+            state ^= state >> 7;
+            state ^= state << 17;
+            state
+        };
+
+        for round in 0..300 {
+            let mut history = OutputHistory::new(80, 24);
+            for _ in 0..30 {
+                match next() % 7 {
+                    0 => history.push(
+                        format!("\x1b[3{}m混合 output 中文\x1b[0m\r\n", next() % 8).as_bytes(),
+                    ),
+                    1 => history.push(format!("\x1b[{}A\x1b[K", 1 + next() % 20).as_bytes()),
+                    2 => history
+                        .push(format!("\x1b[{};{}H", 1 + next() % 24, 1 + next() % 80).as_bytes()),
+                    3 => history.push(b"\x1b[?1049h"),
+                    4 => history.push(b"\x1b[?1049l"),
+                    5 => {
+                        history.resize(40 + (next() % 200) as u16, 10 + (next() % 40) as u16);
+                        0
+                    }
+                    _ => history
+                        .push(format!("{}\r\n", "x".repeat((next() % 100) as usize)).as_bytes()),
+                };
+            }
+
+            let snapshot = history.snapshot(1);
+            let (rows, cols) = (history.rows, history.cols);
+            let client = replay_into(&snapshot.data, cols, rows);
+            // The visible grid is compared, not the scrollback: a line kept from before a resize
+            // stays at the width it was written at, so replaying it wraps where the stored line
+            // does not. Every client wraps it the same way, so what they show still agrees — it is
+            // only the backend's own copy that holds the longer line.
+            assert_eq!(
+                visible_grid(&client),
+                visible_grid(&history.screen),
+                "round {round} did not reproduce the screen"
+            );
+        }
+    }
+
+    /// A mode sequence can be cut in half by a read boundary the same way a character can, and
+    /// losing one is silent: the terminal looks right and stops reporting the mouse.
+    #[test]
+    fn a_mode_sequence_split_across_reads_is_still_seen() {
+        let mut history = OutputHistory::new(20, 4);
+
+        history.push(b"\x1b[?1000h\x1b[?10");
+        history.push(b"06h\x1b[?2004hprompt");
+
+        let restored = history.modes.formatted();
+        assert!(restored.contains("\x1b[?1000h"));
+        assert!(restored.contains("\x1b[?1006h"));
+        assert!(restored.contains("\x1b[?2004h"));
+    }
+
+    #[test]
+    fn a_mode_the_program_turned_off_is_not_restored() {
+        let mut history = OutputHistory::new(20, 4);
+
+        history.push(b"\x1b[?1000h\x1b[?1006h");
+        history.push(b"\x1b[?1000l");
+
+        let restored = history.modes.formatted();
+        assert!(!restored.contains("\x1b[?1000h"));
+        assert!(restored.contains("\x1b[?1006h"));
+    }
+
+    /// Runs something that panics without the default hook printing a backtrace for it.
+    fn quietly<T>(body: impl FnOnce() -> T) -> std::thread::Result<T> {
+        let hook = std::panic::take_hook();
+        std::panic::set_hook(Box::new(|_| {}));
+        let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(body));
+        std::panic::set_hook(hook);
+        result
+    }
+
+    /// The parser asserts invariants a resize can break, and an unwind out of one would poison the
+    /// mutex the screen lives behind — permanently, for the life of the process. That is what left
+    /// a terminal showing an empty screen marked "stopped" while its agent kept running.
+    #[test]
+    fn a_panicking_screen_operation_costs_the_scrollback_not_the_terminal() {
+        let mut history = OutputHistory::new(20, 4);
+        history.push(b"drawn before the parser gave up");
+
+        let result = quietly(|| {
+            let mut history = OutputHistory::new(20, 4);
+            history.push(b"first");
+            let outcome = history.guard("a parser that panics", |_| panic!("parser gave up"));
+            assert!(outcome.is_none());
+            // The screen was rebuilt at the same grid, so the terminal keeps working.
+            assert_eq!(history.push(b"drawn after"), 2);
+            history.snapshot(1).data
+        });
+
+        let replayed = result.expect("the panic must not escape the guard");
+        assert!(replayed.contains("drawn after"));
+        // The sequence keeps counting, so a client can still tell what it has already seen.
+        assert_eq!(history.push(b"and the original history is unaffected"), 2);
+    }
+
+    /// A poisoned lock stays poisoned, so refusing it would disable every terminal for good.
+    #[test]
+    fn a_poisoned_lock_is_recovered_rather_than_refused() {
+        let lock = Mutex::new(String::from("still here"));
+
+        let _ = quietly(|| {
+            let _guard = lock.lock().expect("first lock succeeds");
+            panic!("a holder panicked");
+        });
+
+        assert!(lock.lock().is_err(), "the lock should now be poisoned");
+        assert_eq!(*lock_recovering(&lock), "still here");
     }
 
     #[test]
@@ -869,14 +1296,8 @@ mod tests {
         let snapshot = history.snapshot(1);
 
         let client = replay_into(&snapshot.data, 20, 4);
-        assert_eq!(
-            client.screen().contents(),
-            history.screen.screen().contents()
-        );
-        assert_eq!(
-            client.screen().cursor_position(),
-            history.screen.screen().cursor_position()
-        );
+        assert_eq!(shown(&client), shown(&history.screen));
+        assert_eq!(client.cursor(), history.screen.cursor());
     }
 
     /// A cut in the middle of a frame is exactly what replaying a raw stream could not survive.
@@ -888,11 +1309,8 @@ mod tests {
 
         let client = replay_into(&history.snapshot(1).data, 20, 4);
 
-        assert_eq!(
-            client.screen().contents(),
-            history.screen.screen().contents()
-        );
-        assert!(client.screen().contents().contains("second li"));
+        assert_eq!(shown(&client), shown(&history.screen));
+        assert!(shown(&client).iter().any(|line| line.contains("second li")));
     }
 
     #[test]
@@ -903,10 +1321,13 @@ mod tests {
         let snapshot = history.snapshot(1);
 
         // The visible grid holds the last three lines; the first two are only in the scrollback.
-        let mut client = replay_into(&snapshot.data, 20, 3);
-        assert_eq!(client.screen().contents(), "three\nfour\nfive");
-        client.screen_mut().set_scrollback(2);
-        assert!(client.screen().contents().contains("one"));
+        let client = replay_into(&snapshot.data, 20, 3);
+        let history_and_screen: Vec<String> = client
+            .lines()
+            .map(|line| line.text().trim_end().to_owned())
+            .collect();
+        assert_eq!(history_and_screen, ["one", "two", "three", "four", "five"]);
+        assert_eq!(client.view().count(), 3);
     }
 
     /// Input modes decide how the client's keyboard and mouse report, so a reload has to restore
@@ -916,18 +1337,17 @@ mod tests {
         let mut history = OutputHistory::new(20, 4);
         history.push(b"\x1b[?2004h\x1b[?1000h\x1b[?1006h\x1b[?25lprompt");
 
-        let client = replay_into(&history.snapshot(1).data, 20, 4);
+        // avt models the screen, not how input is reported, so the modes are read back from the
+        // snapshot the way a client's own tracker would see them.
+        let mut restored = InputModes::default();
+        restored.observe(history.snapshot(1).data.as_bytes());
 
-        assert!(client.screen().bracketed_paste());
-        assert!(client.screen().hide_cursor());
-        assert_eq!(
-            client.screen().mouse_protocol_mode(),
-            history.screen.screen().mouse_protocol_mode()
-        );
-        assert_eq!(
-            client.screen().mouse_protocol_encoding(),
-            history.screen.screen().mouse_protocol_encoding()
-        );
+        assert_eq!(restored.formatted(), history.modes.formatted());
+        for mode in ["\u{1b}[?1000h", "\u{1b}[?1006h", "\u{1b}[?2004h"] {
+            assert!(restored.formatted().contains(mode), "missing {mode:?}");
+        }
+        let client = replay_into(&history.snapshot(1).data, 20, 4);
+        assert!(!client.cursor().visible);
     }
 
     /// A program on the alternate screen owns the whole grid, and nothing sits behind it.
@@ -939,9 +1359,15 @@ mod tests {
 
         let client = replay_into(&history.snapshot(1).data, 20, 3);
 
-        assert!(client.screen().alternate_screen());
-        assert!(client.screen().contents().contains("editor"));
-        assert!(!client.screen().contents().contains("shell"));
+        // The alternate screen owns the whole grid. avt keeps the normal screen underneath it, so
+        // the alternate grid is what `lines()` describes while `text()` still describes the one
+        // beneath — which is also why no scrollback is replayed behind it.
+        let alternate: Vec<String> = client
+            .lines()
+            .map(|line| line.text().trim_end().to_owned())
+            .collect();
+        assert!(alternate.iter().any(|line| line.contains("editor")));
+        assert!(!alternate.iter().any(|line| line.contains("shell")));
     }
 
     #[test]
