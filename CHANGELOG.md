@@ -2,6 +2,29 @@
 
 Release notes for every Termexo version, newest first. The current release is summarised in [README.md](README.md).
 
+## V0.8.8
+
+- Settings has a Storage panel. It names the data directory, lists what is in it with the size of
+  each file, and gives the executable's own path and version. The database is the thing worth
+  watching: one had reached 208 MB of agent events with nothing in the interface that could have
+  said so.
+- The data directory can be moved to another drive. Termexo's default sits on the system drive,
+  which is the one that runs out. Choosing an empty directory copies everything there and records
+  it for the next start.
+- Nothing is deleted by the move. The previous copy stays exactly where it was and the panel names
+  it, so a move that turns out to be wrong is undone by pointing the setting back — and the space
+  is reclaimed by the user, once they are satisfied. The database makes its own copy rather than
+  being copied as a file, because a file copy of an open database can be torn: SQLite's write-ahead
+  log holds pages the file does not.
+- A data directory that cannot be reached no longer stops Termexo starting. A drive that is not
+  currently attached falls back to the default, and the panel reports which directory is actually
+  in use — the setting is only reachable from inside the application, so being unable to start
+  would leave no way to correct it.
+- The provider allowance panel was reworked. Each row leads with a two-letter provider mark and
+  carries the profile name above the provider it belongs to; a provider that could not be reached
+  marks its row unavailable rather than showing a blank allowance, and the panel reports loading
+  through aria-busy.
+
 ## V0.8.7
 
 - A terminal can no longer be left permanently stuck. The screen kept for replay was parsed by a

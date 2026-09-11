@@ -40,16 +40,23 @@ import { createId } from '../core/models/identifiers';
 import { UpdateCheck } from '../core/services/update.service';
 import { IconComponent } from '../shared/icon/icon';
 import { RemoteAccessPanelComponent } from './remote-access-panel';
+import { StoragePanelComponent } from './storage-panel';
 
 export type SettingsTab =
-  'diagnostics' | 'cli' | 'accounts' | 'models' | 'mcp' | 'network' | 'remote';
+  'diagnostics' | 'cli' | 'accounts' | 'models' | 'mcp' | 'network' | 'remote' | 'storage';
 
 /** Matches the backend default for a profile that has never had a threshold set. */
 const DEFAULT_ALERT_THRESHOLD = 80;
 
 @Component({
   selector: 'app-agent-settings-dialog',
-  imports: [FormsModule, IconComponent, RemoteAccessPanelComponent, TranslatePipe],
+  imports: [
+    FormsModule,
+    IconComponent,
+    RemoteAccessPanelComponent,
+    StoragePanelComponent,
+    TranslatePipe,
+  ],
   template: `
     <div class="backdrop modal modal-open" (mousedown)="cancelled.emit()">
       <section
@@ -134,6 +141,14 @@ const DEFAULT_ALERT_THRESHOLD = 80;
             (click)="selectTab('remote')"
           >
             {{ 'settings.tabRemote' | t }}
+          </button>
+          <button
+            type="button"
+            class="tab"
+            [class.active]="tab() === 'storage'"
+            (click)="selectTab('storage')"
+          >
+            {{ 'settings.tabStorage' | t }}
           </button>
         </nav>
 
@@ -1106,6 +1121,13 @@ const DEFAULT_ALERT_THRESHOLD = 80;
                   </div>
                 </div>
               </div>
+            }
+            @case ('storage') {
+              @defer (on immediate) {
+                <app-storage-panel />
+              } @placeholder {
+                <section class="profile-editor"></section>
+              }
             }
             @case ('remote') {
               @defer (on immediate) {

@@ -10,6 +10,7 @@ pub mod open;
 pub mod notification;
 pub mod quota;
 pub mod remote;
+pub mod storage;
 pub mod terminal;
 pub mod update;
 pub mod webview;

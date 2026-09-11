@@ -593,7 +593,7 @@ button.stat {
 
 .quota-panel {
   display: grid;
-  gap: 10px;
+  gap: 6px;
 }
 
 .quota-actions {
@@ -606,7 +606,7 @@ button.stat {
 .quota-refresh,
 .quota-scope-toggle {
   min-width: 0;
-  min-height: 30px;
+  min-height: 26px;
   border: 1px solid transparent;
   border-radius: var(--radius-field);
   color: var(--text-muted);
@@ -658,7 +658,7 @@ button.stat {
 .quota-scope-toggle {
   width: 100%;
   border-color: var(--border);
-  padding: 5px 8px;
+  padding: 3px 8px;
   font-size: 11px;
   line-height: 1.4;
   text-wrap: balance;
@@ -674,14 +674,14 @@ button.stat {
   min-width: 0;
   overflow: hidden;
   border: 1px solid var(--border);
-  border-radius: 10px;
+  border-radius: 8px;
   background: var(--surface-raised);
 
   > header {
     display: flex;
     align-items: center;
-    gap: 9px;
-    padding: 11px 12px;
+    gap: 7px;
+    padding: 7px 9px;
     border-bottom: 1px solid var(--border);
     background: color-mix(in srgb, var(--accent) 4%, var(--surface-raised));
   }
@@ -710,29 +710,38 @@ button.stat {
 
 .quota-provider-mark {
   display: grid;
-  width: 30px;
-  height: 30px;
+  width: 24px;
+  height: 24px;
   flex: none;
   place-items: center;
   border: 1px solid color-mix(in srgb, var(--accent) 20%, var(--border));
-  border-radius: 8px;
+  border-radius: 6px;
   color: var(--accent);
   background: color-mix(in srgb, var(--accent) 9%, var(--surface-raised));
   font: 650 11px/1 var(--mono);
 }
 
 .quota-provider-copy {
+  display: flex;
   min-width: 0;
+  flex: 1;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 2px 6px;
+
+  strong {
+    min-width: 0;
+    max-width: 100%;
+  }
 
   small {
-    margin-top: 2px;
     overflow-wrap: anywhere;
   }
 }
 
 .quota-entry {
-  margin: 0 12px;
-  padding: 12px 0;
+  margin: 0 9px;
+  padding: 7px 0;
 
   + .quota-entry {
     border-top: 1px solid var(--border);
@@ -755,7 +764,7 @@ button.stat {
   min-width: 0;
   grid-template-columns: minmax(0, 1fr) minmax(0, 1.2fr);
   align-items: center;
-  gap: 10px;
+  gap: 6px;
 }
 
 .quota-entry-label {
@@ -767,10 +776,12 @@ button.stat {
 }
 
 .quota-entry-amount {
-  display: grid;
+  display: flex;
   min-width: 0;
-  justify-items: end;
-  gap: 2px;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: flex-end;
+  gap: 2px 4px;
   text-align: right;
 
   small {
@@ -782,7 +793,7 @@ button.stat {
   b {
     max-width: 100%;
     color: var(--accent);
-    font-size: 22px;
+    font-size: 17px;
     font-weight: 650;
     line-height: 1.2;
     font-variant-numeric: tabular-nums;
@@ -793,8 +804,8 @@ button.stat {
 
 .quota-meter {
   overflow: hidden;
-  height: 5px;
-  margin: 10px 0 8px;
+  height: 4px;
+  margin: 6px 0 4px;
   border-radius: 999px;
   background: var(--surface-inset);
 
@@ -812,8 +823,8 @@ button.stat {
   flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
-  gap: 6px 8px;
-  margin-top: 8px;
+  gap: 3px 6px;
+  margin-top: 4px;
   overflow-wrap: anywhere;
 
   > small:empty {
@@ -827,7 +838,7 @@ button.stat {
   max-width: 100%;
   align-items: center;
   gap: 4px;
-  padding: 2px 7px;
+  padding: 1px 5px;
   border-radius: 999px;
   color: var(--text-secondary);
   background: var(--surface-2);
@@ -844,7 +855,7 @@ button.stat {
   align-items: flex-start;
   gap: 6px;
   margin: 0;
-  padding: 10px 12px;
+  padding: 5px 9px;
   font-size: 11px;
   line-height: 1.6;
   overflow-wrap: anywhere;
@@ -868,9 +879,9 @@ button.stat {
 
 .quota-empty {
   margin: 0;
-  padding: 18px 12px;
+  padding: 10px 9px;
   border: 1px dashed var(--border);
-  border-radius: 10px;
+  border-radius: 8px;
   color: var(--text-muted);
   font-size: 11px;
   line-height: 1.6;

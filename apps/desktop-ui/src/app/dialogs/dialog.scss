@@ -252,3 +252,117 @@
     font-size: 10px;
   }
 }
+
+.storage-panel {
+  display: grid;
+  gap: 14px;
+}
+
+.storage-location {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+
+  strong {
+    display: block;
+    font-size: 12px;
+  }
+
+  code {
+    display: block;
+    margin-top: 4px;
+    overflow-wrap: anywhere;
+    font: 11px/1.5 var(--mono);
+    color: var(--text-muted);
+  }
+
+  small {
+    display: block;
+    margin-top: 4px;
+    font-size: 10px;
+    color: var(--text-muted);
+  }
+}
+
+.storage-location-actions {
+  display: flex;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.storage-entries {
+  display: grid;
+  gap: 2px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+
+  li {
+    display: grid;
+    grid-template-columns: 1fr auto auto;
+    align-items: center;
+    gap: 10px;
+    padding: 6px 8px;
+    border-radius: 6px;
+    background: color-mix(in srgb, var(--surface) 60%, transparent);
+  }
+
+  // A file that was never written is listed so its absence is visible, not hidden.
+  li.missing {
+    opacity: 0.55;
+  }
+
+  li.storage-total {
+    background: none;
+    border-top: 1px solid var(--border);
+    border-radius: 0;
+    font-weight: 600;
+  }
+}
+
+.storage-entry-name {
+  overflow-wrap: anywhere;
+  font: 11px/1.4 var(--mono);
+}
+
+.storage-entry-size {
+  font: 11px/1.4 var(--mono);
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+
+.storage-actions {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.storage-executable {
+  min-width: 0;
+
+  small {
+    display: block;
+    font-size: 10px;
+    color: var(--text-muted);
+  }
+
+  code {
+    display: block;
+    margin: 2px 0;
+    overflow-wrap: anywhere;
+    font: 11px/1.4 var(--mono);
+  }
+}
+
+.storage-notice {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin: 0;
+  font-size: 11px;
+  line-height: 1.6;
+}

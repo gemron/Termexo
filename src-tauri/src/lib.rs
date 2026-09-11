@@ -13,6 +13,7 @@ mod process;
 mod pty;
 mod quota;
 mod remote;
+mod storage;
 mod system_proxy;
 mod update;
 mod webview;
@@ -71,8 +72,18 @@ pub fn run() {
         .plugin(tauri_plugin_notification::init())
         .plugin(tauri_plugin_dialog::init())
         .setup(|app| {
-            let app_data_dir = app.path().app_data_dir()?;
+            // Windows hands out a directory on the system drive, and the database is the
+            // largest thing Termexo writes, so the data can be moved elsewhere. The pointer that
+            // records where stays behind in the default directory — something has to be findable
+            // without configuration.
+            let default_data_dir = app.path().app_data_dir()?;
+            fs::create_dir_all(&default_data_dir)?;
+            let app_data_dir = storage::resolve_data_directory(&default_data_dir);
             fs::create_dir_all(&app_data_dir)?;
+            app.manage(storage::DataDirectories {
+                active: app_data_dir.clone(),
+                default: default_data_dir,
+            });
 
             // Without a registered AppUserModelID Windows silently drops every toast, which is
             // what happens when Termexo runs from the npm package instead of an installer.
@@ -174,6 +185,9 @@ pub fn run() {
             commands::workspace::delete_workspace,
             commands::open::open_terminal_url,
             commands::open::open_terminal_path,
+            commands::storage::read_storage_overview,
+            commands::storage::relocate_application_data,
+            commands::storage::reset_application_data_location,
             commands::terminal::get_pty_backend,
             commands::terminal::list_live_terminals,
             commands::webview::get_webview_status,

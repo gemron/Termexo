@@ -1,4 +1,4 @@
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::sync::Mutex;
 
 use rusqlite::{params, Connection};
@@ -192,6 +192,21 @@ pub struct WorkspaceDatabase {
     connection: Mutex<Connection>,
 }
 
+/// Takes the database lock, recovering it when a previous holder panicked.
+///
+/// A poisoned mutex stays poisoned for the life of the process, so refusing it would turn one
+/// panic into a database nothing can reach again — the same failure that left a terminal stranded
+/// before its own lock was made recoverable.
+fn lock_recovering_database(lock: &Mutex<Connection>) -> std::sync::MutexGuard<'_, Connection> {
+    match lock.lock() {
+        Ok(guard) => guard,
+        Err(poisoned) => {
+            tracing::warn!("database lock had been poisoned by an earlier panic; recovered");
+            poisoned.into_inner()
+        }
+    }
+}
+
 impl WorkspaceDatabase {
     pub fn open(path: PathBuf) -> Result<Self, DatabaseError> {
         let connection = Connection::open(path)?;
@@ -217,6 +232,17 @@ impl WorkspaceDatabase {
         Ok(Self {
             connection: Mutex::new(connection),
         })
+    }
+
+    /// Writes a consistent copy of the database to another path, compacting it on the way.
+    ///
+    /// A file copy of an open database promises nothing: the write-ahead log holds pages the file
+    /// does not, so the copy can be torn. `VACUUM INTO` takes its own consistent read and writes a
+    /// database with no log to replay, which is what makes it safe to do while the app is running.
+    pub fn copy_to(&self, target: &Path) -> Result<(), DatabaseError> {
+        let connection = lock_recovering_database(&self.connection);
+        connection.execute("VACUUM INTO ?1", params![target.to_string_lossy().as_ref()])?;
+        Ok(())
     }
 
     /// Reads one application-wide setting document, or `None` when it was never written.

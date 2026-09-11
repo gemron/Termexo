@@ -11,7 +11,7 @@
 </p>
 
 <p align="center">
-  <img alt="Version 0.8.7" src="https://img.shields.io/badge/version-0.8.7-58c7a0">
+  <img alt="Version 0.8.8" src="https://img.shields.io/badge/version-0.8.8-58c7a0">
   <img alt="Windows" src="https://img.shields.io/badge/platform-Windows-0078D4?logo=windows">
   <img alt="Tauri 2" src="https://img.shields.io/badge/Tauri-2-24C8DB?logo=tauri&logoColor=white">
   <img alt="Angular 22" src="https://img.shields.io/badge/Angular-22-DD0031?logo=angular">
@@ -61,7 +61,7 @@ Keep the token private. Closing Termexo or stopping the PC ends the running proc
 
 ## Latest release
 
-**[v0.8.7](https://github.com/gemron/Termexo/releases/tag/v0.8.7)** replaces the screen parser, whose assertions could leave a terminal permanently stuck showing nothing while its agent kept running, and makes a fault inside one cost that terminal's scrollback rather than the terminal.
+**[v0.8.8](https://github.com/gemron/Termexo/releases/tag/v0.8.8)** adds a storage panel: where the data directory is, how large the database has grown, and a way to move it all to another drive without losing anything.
 [Full changelog](CHANGELOG.md).
 
 If Termexo helps your workflow, a **Star on this repository** helps other developers discover it.
@@ -341,7 +341,8 @@ identifiers still use a legacy name. This does not affect the Termexo product na
 | V0.8.0–0.8.4 | Phone access, first-run guidance, input latency and mobile scrolling improvements | Released |
 | V0.8.5 | Bundled ConPTY and WebView2 startup diagnostics | Released |
 | V0.8.6 | Screen-accurate terminal replay and reconnect stability | Released |
-| V0.8.7 | A screen parser that cannot strand a terminal | Current |
+| V0.8.7 | A screen parser that cannot strand a terminal | Released |
+| V0.8.8 | A storage panel, and data that can be moved | Current |
 | V1.0 | Stability, security hardening, and recovery experience | Planned |
 
 See [open issues](https://github.com/gemron/Termexo/issues) for ongoing work and

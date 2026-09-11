@@ -112,10 +112,18 @@ pub const REMOTE_ALLOWED: &[&str] = &[
     "read_terminal_scrollback",
     "get_remote_access_status",
     "render_remote_access_qr",
+    // Reading where the data lives and how large it has grown is diagnosis a phone has as
+    // much reason to do as the desktop; it changes nothing.
+    "read_storage_overview",
 ];
 
 /// Commands a remote client must never reach, with the reason each one is held back.
 pub const REMOTE_DENIED: &[&str] = &[
+    // Moves the desktop machine's data and changes what its next start opens. A remote client
+    // cannot see that machine's drives to choose a sound destination, and getting it wrong is
+    // answered by a restart the person holding the phone is not there to perform.
+    "relocate_application_data",
+    "reset_application_data_location",
     // Reads and writes an arbitrary path on the host, chosen by a native file dialog.
     "write_handoff_document",
     "read_handoff_document",
