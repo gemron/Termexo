@@ -14,6 +14,9 @@ packages/termexo/vendor/
 *.db-shm
 *.db-wal
 
+# Promotion kits, which only bundle files that are already in docs/promotion
+docs/promotion/*-promotion-kit.zip
+
 # Editors and operating systems
 .codegraph/
 .playwright-mcp/
