@@ -28,6 +28,7 @@ use tokio_tungstenite::{
     connect_async_tls_with_config, Connector, MaybeTlsStream, WebSocketStream,
 };
 
+use super::connect_failure::describe as describe_connect_failure;
 use super::endpoint::RelayEndpoint;
 use super::{mux, LinkStatus};
 
@@ -157,7 +158,7 @@ fn connect_failure(error: TungsteniteError) -> SessionEnd {
                 response.status().as_u16()
             ))
         }
-        _ => SessionEnd::Interrupted(format!("无法连接中继：{error}")),
+        _ => SessionEnd::Interrupted(describe_connect_failure(&error)),
     }
 }
 

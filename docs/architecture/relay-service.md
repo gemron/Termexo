@@ -440,8 +440,11 @@ termexo-relay serve --data-dir /var/lib/termexo-relay --listen 0.0.0.0:8443 \
 * 每个参数都有 `TERMEXO_RELAY_*` 环境变量等价物，便于容器；仓库提供 `apps/relay/Dockerfile`。
 * 首次启动数据库里没有用户时，生成管理员 `admin` 与一次性密码，打印到日志一次；
   `termexo-relay admin reset-password` 可重置。
-* `self-signed` 模式下桌面端首次接入时把证书指纹随 url 存进 `app_settings`（TOFU），之后指纹不符即
-  拒连——面向没有域名的内网中继。
+* `self-signed` 模式下，桌面端接入表单在地址为 `https://` 时要求填中继启动日志打印的 SHA-256 指纹，
+  随 url 存进 `app_settings`，之后接入请求与隧道都只认这张证书，指纹不符即拒连——面向没有域名的中继。
+  指纹由运维从日志抄过来而不是首次连接时自动记下（不做 TOFU），因为首次连接恰恰是最容易被中间人
+  顶替的一次。握手失败时桌面端沿错误链（含 `io::Error` 包裹的 `rustls::Error`）区分证书不受信任、
+  指纹不符、地址写了 https 但中继未启用 TLS 三种情况，分别给出可操作的提示。
 * ACME（Let's Encrypt）自动证书**不内置**：签发需要一个公网可达的域名才能完成验证，无法在本机
   验证，而未经验证的取证代码比没有更糟。公网部署放在 Caddy 后面以 `--tls off` 运行，由它申请与
   续期（含子域名模式的泛域名 DNS-01）；内网用 `--tls self-signed` 加指纹固定。

@@ -198,6 +198,17 @@
   grid-template-columns: 340px 200px;
 }
 
+/* As wide as the two fields above it together, which fits a colon-separated SHA-256 on one line. */
+.remote-relay-fingerprint {
+  max-width: 556px;
+  margin-top: 12px;
+
+  input {
+    font-family: var(--mono);
+    font-variant-ligatures: none;
+  }
+}
+
 .remote-relay-method {
   display: flex;
   flex-wrap: wrap;

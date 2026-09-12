@@ -11,6 +11,10 @@ import { RemoteAccessService } from '../core/services/remote-access.service';
 import { RemoteAccessPanelComponent } from './remote-access-panel';
 
 const TOKEN = 'token-value';
+/** How a relay's startup log prints its certificate: uppercase and grouped by byte. */
+const PRINTED_FINGERPRINT =
+  '45:7C:B9:97:54:02:57:D5:3E:CA:EA:01:6F:89:78:D8:9A:3F:8F:EC:27:DB:4F:D1:91:9C:92:4C:28:2B:3C:12';
+const STORED_FINGERPRINT = '457cb997540257d53ecaea016f8978d89a3f8fec27db4fd1919c924c282b3c12';
 
 function relayStatus(overrides: Partial<RelayStatus> = {}): RelayStatus {
   return {
@@ -95,6 +99,8 @@ describe('RemoteAccessPanelComponent', () => {
   const methodButtons = () =>
     Array.from(root.querySelectorAll<HTMLButtonElement>('.remote-relay-method button'));
   const joinButton = () => root.querySelector<HTMLButtonElement>('.remote-relay-actions .primary')!;
+  const fingerprintField = () =>
+    root.querySelector<HTMLInputElement>('.remote-relay-fingerprint input');
 
   function type(field: HTMLInputElement, value: string): void {
     field.value = value;
@@ -164,9 +170,67 @@ describe('RemoteAccessPanelComponent', () => {
         url: 'https://relay.example.com',
         method: { method: 'code', code: 'ABCD-EFGH', name: 'Desk PC' },
         name: 'Desk PC',
+        certificateFingerprint: null,
       },
     ]);
     expect(relayFields()[2].value).toBe('');
+  });
+
+  it('asks for a certificate fingerprint only when the relay is reached over https', async () => {
+    await mount();
+    const [url] = relayFields();
+
+    type(url, 'http://192.168.1.20:8443');
+    expect(fingerprintField()).toBeNull();
+
+    type(url, 'https://8.141.0.175:8443');
+    expect(fingerprintField()).not.toBeNull();
+  });
+
+  it('pins the fingerprint exactly as the relay log prints it, in the form the desktop stores', async () => {
+    await mount();
+    const [url, name] = relayFields();
+    type(url, 'https://8.141.0.175:8443');
+    type(name, 'Desk PC');
+    type(relayFields()[2], 'ABCD-EFGH');
+    type(fingerprintField()!, ` ${PRINTED_FINGERPRINT} `);
+
+    joinButton().click();
+    await fixture.whenStable();
+
+    expect(service.enrolled[0].certificateFingerprint).toBe(STORED_FINGERPRINT);
+  });
+
+  it('holds the join back while the fingerprint is not a SHA-256 digest', async () => {
+    await mount();
+    const [url, name] = relayFields();
+    type(url, 'https://8.141.0.175:8443');
+    type(name, 'Desk PC');
+    type(relayFields()[2], 'ABCD-EFGH');
+
+    type(fingerprintField()!, PRINTED_FINGERPRINT.slice(0, -3));
+    expect(root.querySelector('.remote-relay-fingerprint .field-error')).not.toBeNull();
+    expect(joinButton().disabled).toBe(true);
+
+    type(fingerprintField()!, PRINTED_FINGERPRINT);
+    expect(root.querySelector('.remote-relay-fingerprint .field-error')).toBeNull();
+    expect(joinButton().disabled).toBe(false);
+  });
+
+  it('does not pin a fingerprint left over from an https address once it is switched to http', async () => {
+    await mount();
+    const [url, name] = relayFields();
+    type(url, 'https://relay.example.com');
+    type(name, 'Desk PC');
+    type(relayFields()[2], 'ABCD-EFGH');
+    type(fingerprintField()!, 'not-a-fingerprint');
+
+    type(url, 'http://relay.example.com');
+    expect(joinButton().disabled).toBe(false);
+    joinButton().click();
+    await fixture.whenStable();
+
+    expect(service.enrolled[0].certificateFingerprint).toBeNull();
   });
 
   it('joins with a relay account when that method is picked', async () => {

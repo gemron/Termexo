@@ -21,7 +21,8 @@ const SECURE_WEBSOCKET_SCHEME: &str = "wss";
 const PLAIN_WEBSOCKET_SCHEME: &str = "ws";
 const SCHEME_SEPARATOR: &str = "://";
 
-const FINGERPRINT_MISMATCH: &str = "中继证书指纹与已保存的不一致。";
+/// Also how [`super::connect_failure`] recognizes this verifier's refusal inside a wrapped error.
+pub(super) const FINGERPRINT_MISMATCH: &str = "中继证书指纹与已保存的不一致。";
 
 /// One relay's address together with the trust decision that goes with it.
 #[derive(Debug, Clone, PartialEq, Eq)]

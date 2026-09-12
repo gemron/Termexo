@@ -38,6 +38,12 @@ export interface RelayEnrollRequest {
   url: string;
   method: RelayEnrollMethod;
   name: string;
+  /**
+   * A self-signed relay's SHA-256 certificate fingerprint, lowercase hex without separators.
+   * Without it the desktop trusts only the platform's root store, which a self-signed certificate
+   * never passes.
+   */
+  certificateFingerprint: string | null;
 }
 
 /** Settings the user controls from the remote-access panel. */

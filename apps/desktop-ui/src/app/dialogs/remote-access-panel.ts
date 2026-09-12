@@ -32,6 +32,11 @@ const MASK_LENGTH = 28;
 
 /** Accepts anything that looks like an origin; the backend is the one that really validates it. */
 const RELAY_URL_PATTERN = /^https?:\/\/\S+$/i;
+const RELAY_HTTPS_PATTERN = /^https:\/\//i;
+/** A SHA-256 fingerprint once the separators an operator may paste with it are removed. */
+const CERTIFICATE_FINGERPRINT_PATTERN = /^[0-9a-f]{64}$/;
+/** Colons and spaces are how fingerprints get printed and copied; neither is part of the value. */
+const FINGERPRINT_SEPARATORS = /[:\s]/g;
 /** Stands in for a field the relay has not filled in yet. */
 const UNKNOWN_VALUE = '—';
 
@@ -230,6 +235,30 @@ interface AddressOption {
                   />
                 </label>
               </div>
+
+              <!-- Only an https relay has a certificate to pin; over http the field would be noise. -->
+              @if (relayUsesHttps()) {
+                <label class="remote-relay-fingerprint">
+                  <span>{{ 'remote.relayFingerprint' | t }}</span>
+                  <input
+                    type="text"
+                    spellcheck="false"
+                    autocomplete="off"
+                    [placeholder]="'remote.relayFingerprintPlaceholder' | t"
+                    [disabled]="busy()"
+                    [attr.aria-invalid]="relayFingerprintInvalid() ? 'true' : null"
+                    [ngModel]="relayFingerprint()"
+                    (ngModelChange)="relayFingerprint.set($event)"
+                  />
+                  @if (relayFingerprintInvalid()) {
+                    <small class="field-error" role="alert">{{
+                      'remote.relayFingerprintInvalid' | t
+                    }}</small>
+                  } @else {
+                    <small class="field-hint">{{ 'remote.relayFingerprintHint' | t }}</small>
+                  }
+                </label>
+              }
 
               <!-- Two ways in, one at a time: a segmented pick shows both without a second field. -->
               <div class="remote-relay-method">
@@ -573,6 +602,7 @@ export class RemoteAccessPanelComponent implements OnDestroy {
   protected readonly relayUsername = signal('');
   protected readonly relayPassword = signal('');
   protected readonly relayDeviceName = signal('');
+  protected readonly relayFingerprint = signal('');
   protected readonly relayError = signal('');
   protected readonly confirmingDisconnect = signal(false);
 
@@ -699,9 +729,27 @@ export class RemoteAccessPanelComponent implements OnDestroy {
     return value.length > 0 && !RELAY_URL_PATTERN.test(value);
   });
 
+  protected readonly relayUsesHttps = computed(() =>
+    RELAY_HTTPS_PATTERN.test(this.relayUrl().trim()),
+  );
+
+  /** The fingerprint as the desktop expects it, or empty when none was given or it does not apply. */
+  private readonly normalizedFingerprint = computed(() =>
+    this.relayUsesHttps()
+      ? this.relayFingerprint().replace(FINGERPRINT_SEPARATORS, '').toLowerCase()
+      : '',
+  );
+
+  protected readonly relayFingerprintInvalid = computed(() => {
+    const value = this.normalizedFingerprint();
+    // Empty is valid: a relay with a trusted certificate needs no pin.
+    return value.length > 0 && !CERTIFICATE_FINGERPRINT_PATTERN.test(value);
+  });
+
   protected readonly canEnrollRelay = computed(() => {
     if (this.readOnly || this.busy()) return false;
     if (!this.relayUrl().trim() || this.relayUrlInvalid()) return false;
+    if (this.relayFingerprintInvalid()) return false;
     if (!this.relayDeviceName().trim()) return false;
     return this.relayMethod() === 'code'
       ? this.relayCode().trim().length > 0
@@ -791,6 +839,7 @@ export class RemoteAccessPanelComponent implements OnDestroy {
           url: this.relayUrl().trim(),
           method: this.buildEnrollMethod(name),
           name,
+          certificateFingerprint: this.normalizedFingerprint() || null,
         }),
       );
       // Both are single-use secrets: keeping them in the form would only leave them on screen.
@@ -881,6 +930,9 @@ export class RemoteAccessPanelComponent implements OnDestroy {
     }
     if (!this.relayDeviceName()) {
       this.relayDeviceName.set(status.relay.deviceName ?? '');
+    }
+    if (!this.relayFingerprint()) {
+      this.relayFingerprint.set(status.settings.relay.certificateFingerprint ?? '');
     }
     const reachable = this.linkOptions();
     if (!reachable.some((option) => option.value === this.linkAddress())) {

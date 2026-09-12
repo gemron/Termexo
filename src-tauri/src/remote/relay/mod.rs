@@ -6,6 +6,7 @@
 //! that through a callback and leaves the durable consequences to the manager that owns them.
 
 mod client;
+mod connect_failure;
 mod endpoint;
 mod enroll;
 mod mux;

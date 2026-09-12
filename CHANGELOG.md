@@ -21,6 +21,15 @@ Release notes for every Termexo version, newest first. The current release is su
   one goes through.
 - A device can require a relay sign-in before anyone reaches it — a gate on the relay's side, quite
   separate from the desktop's own access token.
+- A relay with a self-signed certificate can be joined. When the relay address starts with
+  `https://`, the join form asks for a certificate fingerprint: paste the SHA-256 the relay prints
+  at startup, colons or not, and the desktop trusts that one certificate and no other, for the
+  tunnel as well. A join that cannot connect now says why — an untrusted certificate, a certificate
+  that does not match the fingerprint, or an `https` address for a relay that is not serving HTTPS —
+  instead of only `error sending request for url`.
+- When the desktop requires the sealed handshake and the page was opened over plain HTTP, the
+  browser now sends no part of the token and tells you to open it over HTTPS. It used to send the
+  token in the clear under the old handshake first, and only then be refused.
 - OpenCode terminals now show the ChatGPT Codex and OpenCode Go subscriptions connected through
   OpenCode in the provider allowance panel, including their five-hour, weekly and monthly windows
   and reset times. An unresolved default model shows both connected subscriptions; every figure is

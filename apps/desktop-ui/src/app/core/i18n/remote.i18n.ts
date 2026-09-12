@@ -77,6 +77,12 @@ export const REMOTE_TRANSLATIONS: TranslationBundle = {
     'remote.relayUrl': 'Relay address',
     'remote.relayUrlPlaceholder': 'https://relay.example.com',
     'remote.relayUrlInvalid': 'The relay address has to start with http:// or https://.',
+    'remote.relayFingerprint': 'Certificate fingerprint (SHA-256)',
+    'remote.relayFingerprintPlaceholder': 'For example 45:7C:B9:97:…',
+    'remote.relayFingerprintHint':
+      "Required when the relay uses a self-signed certificate: paste the SHA-256 fingerprint its startup log prints, with or without colons. Leave it empty when the relay's certificate is trusted, such as one issued through Caddy.",
+    'remote.relayFingerprintInvalid':
+      'A certificate fingerprint is 64 hexadecimal characters, optionally separated by colons.',
     'remote.relayMethod': 'How to join',
     'remote.relayMethodCode': 'Enrolment code',
     'remote.relayMethodPassword': 'Relay account',
@@ -190,6 +196,11 @@ export const REMOTE_TRANSLATIONS: TranslationBundle = {
     'remote.relayUrl': '中继地址',
     'remote.relayUrlPlaceholder': 'https://relay.example.com',
     'remote.relayUrlInvalid': '中继地址需以 http:// 或 https:// 开头。',
+    'remote.relayFingerprint': '证书指纹（SHA-256）',
+    'remote.relayFingerprintPlaceholder': '例如 45:7C:B9:97:…',
+    'remote.relayFingerprintHint':
+      '中继使用自签名证书时必填：填中继启动日志里打印的 SHA-256 指纹，带不带冒号都可以。中继证书受信任（例如经 Caddy 签发）时留空。',
+    'remote.relayFingerprintInvalid': '证书指纹应为 64 位十六进制字符，可以用冒号分隔。',
     'remote.relayMethod': '接入方式',
     'remote.relayMethodCode': '接入码',
     'remote.relayMethodPassword': '账号密码',
@@ -311,6 +322,12 @@ export const REMOTE_TRANSLATIONS: TranslationBundle = {
     'remote.relayUrl': 'Dirección del relé',
     'remote.relayUrlPlaceholder': 'https://relay.example.com',
     'remote.relayUrlInvalid': 'La dirección del relé debe empezar por http:// o https://.',
+    'remote.relayFingerprint': 'Huella del certificado (SHA-256)',
+    'remote.relayFingerprintPlaceholder': 'Por ejemplo 45:7C:B9:97:…',
+    'remote.relayFingerprintHint':
+      'Obligatoria si el relé usa un certificado autofirmado: pega la huella SHA-256 que imprime su registro al arrancar, con o sin dos puntos. Déjala vacía si el certificado del relé es de confianza, como uno emitido mediante Caddy.',
+    'remote.relayFingerprintInvalid':
+      'La huella del certificado tiene 64 caracteres hexadecimales, opcionalmente separados por dos puntos.',
     'remote.relayMethod': 'Cómo unirse',
     'remote.relayMethodCode': 'Código de acceso',
     'remote.relayMethodPassword': 'Cuenta del relé',
@@ -439,6 +456,12 @@ export const REMOTE_TRANSLATIONS: TranslationBundle = {
     'remote.relayUrl': 'Adresse du relais',
     'remote.relayUrlPlaceholder': 'https://relay.example.com',
     'remote.relayUrlInvalid': 'L’adresse du relais doit commencer par http:// ou https://.',
+    'remote.relayFingerprint': 'Empreinte du certificat (SHA-256)',
+    'remote.relayFingerprintPlaceholder': 'Par exemple 45:7C:B9:97:…',
+    'remote.relayFingerprintHint':
+      'Obligatoire si le relais utilise un certificat autosigné : collez l’empreinte SHA-256 que son journal de démarrage affiche, avec ou sans deux-points. Laissez vide si le certificat du relais est reconnu, par exemple émis via Caddy.',
+    'remote.relayFingerprintInvalid':
+      'Une empreinte de certificat compte 64 caractères hexadécimaux, éventuellement séparés par des deux-points.',
     'remote.relayMethod': 'Mode de rattachement',
     'remote.relayMethodCode': 'Code d’accès',
     'remote.relayMethodPassword': 'Compte du relais',
@@ -566,6 +589,12 @@ export const REMOTE_TRANSLATIONS: TranslationBundle = {
     'remote.relayUrl': 'Relay-Adresse',
     'remote.relayUrlPlaceholder': 'https://relay.example.com',
     'remote.relayUrlInvalid': 'Die Relay-Adresse muss mit http:// oder https:// beginnen.',
+    'remote.relayFingerprint': 'Zertifikat-Fingerabdruck (SHA-256)',
+    'remote.relayFingerprintPlaceholder': 'Zum Beispiel 45:7C:B9:97:…',
+    'remote.relayFingerprintHint':
+      'Pflicht, wenn das Relay ein selbstsigniertes Zertifikat verwendet: Den SHA-256-Fingerabdruck aus seinem Startprotokoll einfügen, mit oder ohne Doppelpunkte. Leer lassen, wenn das Zertifikat des Relays vertrauenswürdig ist, etwa über Caddy ausgestellt.',
+    'remote.relayFingerprintInvalid':
+      'Ein Zertifikat-Fingerabdruck besteht aus 64 Hexadezimalzeichen, optional durch Doppelpunkte getrennt.',
     'remote.relayMethod': 'Art der Anmeldung',
     'remote.relayMethodCode': 'Zugangscode',
     'remote.relayMethodPassword': 'Relay-Konto',
@@ -691,6 +720,12 @@ export const REMOTE_TRANSLATIONS: TranslationBundle = {
     'remote.relayUrl': '中継のアドレス',
     'remote.relayUrlPlaceholder': 'https://relay.example.com',
     'remote.relayUrlInvalid': '中継のアドレスは http:// または https:// で始めてください。',
+    'remote.relayFingerprint': '証明書のフィンガープリント（SHA-256）',
+    'remote.relayFingerprintPlaceholder': '例：45:7C:B9:97:…',
+    'remote.relayFingerprintHint':
+      '中継が自己署名証明書を使う場合は必須です。中継の起動ログに表示される SHA-256 フィンガープリントを貼り付けてください（コロンの有無は問いません）。Caddy などで発行された信頼済みの証明書なら空欄のままにします。',
+    'remote.relayFingerprintInvalid':
+      '証明書のフィンガープリントは 16 進数 64 文字です（コロン区切りも可）。',
     'remote.relayMethod': '接続方法',
     'remote.relayMethodCode': '接続コード',
     'remote.relayMethodPassword': '中継のアカウント',
@@ -811,6 +846,11 @@ export const REMOTE_TRANSLATIONS: TranslationBundle = {
     'remote.relayUrl': '중계 주소',
     'remote.relayUrlPlaceholder': 'https://relay.example.com',
     'remote.relayUrlInvalid': '중계 주소는 http:// 또는 https://로 시작해야 합니다.',
+    'remote.relayFingerprint': '인증서 지문(SHA-256)',
+    'remote.relayFingerprintPlaceholder': '예: 45:7C:B9:97:…',
+    'remote.relayFingerprintHint':
+      '중계가 자체 서명 인증서를 쓸 때는 필수입니다. 중계 시작 로그에 출력되는 SHA-256 지문을 붙여 넣으세요(콜론 유무는 상관없음). Caddy 등으로 발급된 신뢰할 수 있는 인증서라면 비워 두세요.',
+    'remote.relayFingerprintInvalid': '인증서 지문은 16진수 64자이며, 콜론으로 구분해도 됩니다.',
     'remote.relayMethod': '접속 방식',
     'remote.relayMethodCode': '접속 코드',
     'remote.relayMethodPassword': '중계 계정',
