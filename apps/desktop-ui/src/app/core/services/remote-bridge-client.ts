@@ -20,7 +20,8 @@ const RECONNECT_DELAYS_MS = [1_000, 2_000, 4_000, 8_000, 15_000];
 const PING_INTERVAL_MS = 20_000;
 /** No frame at all for this long means the socket is dead even though it never reported a close. */
 const IDLE_TIMEOUT_MS = 45_000;
-const BRIDGE_PATH = '/ws';
+/** Resolved against the page's base, so it is `/ws` on a LAN page and `/d/<id>/ws` behind a relay. */
+const BRIDGE_PATH = 'ws';
 
 const UNAUTHORIZED_ERROR = '未授权';
 const DISCONNECTED_ERROR = '连接已断开';
@@ -46,10 +47,16 @@ function defaultSocketFactory(url: string): RemoteSocket {
   return new WebSocket(url) as unknown as RemoteSocket;
 }
 
-/** Derives the bridge URL from the page the remote workbench was served from. */
-function bridgeUrl(): string {
-  const scheme = window.location.protocol === 'https:' ? 'wss' : 'ws';
-  return `${scheme}://${window.location.host}${BRIDGE_PATH}`;
+/**
+ * Derives the bridge URL from the page the remote workbench was served from.
+ *
+ * It follows `<base href>` rather than the host alone: a relay serves this same app under
+ * `/d/<deviceId>/`, where the bridge sits beside the page instead of at the site root.
+ */
+export function bridgeUrl(): string {
+  const url = new URL(BRIDGE_PATH, document.baseURI);
+  const scheme = url.protocol === 'https:' ? 'wss' : 'ws';
+  return `${scheme}://${url.host}${url.pathname}`;
 }
 
 /**

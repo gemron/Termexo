@@ -44,13 +44,18 @@
     background: currentcolor;
   }
 
-  &[data-state='running'] {
+  &[data-state='running'],
+  &[data-state='connected'] {
     border-color: color-mix(in oklab, var(--color-success) 42%, var(--border));
     color: var(--color-success);
     background: var(--success-soft);
   }
 
-  &[data-state='failed'] {
+  /* A revoked link is not a warning to look at later: nothing reaches this machine until it is
+     joined again, which is the same dead end as a failed start. */
+  &[data-state='failed'],
+  &[data-state='error'],
+  &[data-state='revoked'] {
     border-color: color-mix(in oklab, var(--color-error) 46%, var(--border));
     color: var(--color-error);
     background: var(--error-soft);
@@ -177,6 +182,89 @@
   color: var(--color-error);
   font-size: 9px;
   line-height: 1.45;
+}
+
+/*
+   Joining a relay.
+
+   The fields keep the same narrow column as the listening options above them: a settings form
+   that stretches the full dialog width leaves a URL box wide enough for a paragraph.
+   --------------------------------------------------------------------------- */
+.remote-relay-fields {
+  margin-top: 12px;
+  align-items: start;
+  justify-content: start;
+  gap: 12px 16px;
+  grid-template-columns: 340px 200px;
+}
+
+.remote-relay-method {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 14px;
+  margin-top: 14px;
+
+  > span {
+    color: var(--text-secondary);
+    font-size: 11px;
+    font-weight: 560;
+  }
+}
+
+.remote-relay-actions {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 14px;
+}
+
+/* What the link is doing now, set apart from the fields the way the service switch is. */
+.remote-relay-state {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 9px 14px;
+  margin-top: 12px;
+  padding: 11px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-field);
+  background: var(--surface-inset);
+}
+
+.remote-relay-since {
+  color: var(--text-muted);
+  font-size: 9px;
+}
+
+.remote-relay-facts {
+  display: grid;
+  width: 100%;
+  gap: 8px 18px;
+  margin: 0;
+  grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+
+  > div {
+    display: grid;
+    min-width: 0;
+    gap: 3px;
+  }
+
+  dt {
+    color: var(--text-muted);
+    font-size: 9px;
+  }
+
+  dd {
+    margin: 0;
+    color: var(--text-secondary);
+    font: 10px/1.5 var(--mono);
+    overflow-wrap: anywhere;
+  }
+}
+
+.remote-relay-disconnect,
+.remote-relay-readonly {
+  margin-top: 12px;
 }
 
 /* The link and its QR code are two readings of the same address, so they sit side by side. */
@@ -318,6 +406,7 @@
   }
 
   .remote-fields,
+  .remote-relay-fields,
   .remote-notes-grid {
     grid-template-columns: minmax(0, 1fr);
   }

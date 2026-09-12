@@ -151,6 +151,10 @@ pub const REMOTE_DENIED: &[&str] = &[
     // A remote client may read the remote access state but never change it or rotate the token.
     "update_remote_access_settings",
     "regenerate_remote_access_token",
+    // Joining or leaving a relay is the same decision: it changes how this machine can be reached
+    // from outside, and the person holding the phone is not the one who has to live with it.
+    "enroll_relay_device",
+    "disconnect_relay",
 ];
 
 pub fn is_remote_command_allowed(command: &str) -> bool {

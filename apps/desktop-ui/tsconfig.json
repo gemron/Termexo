@@ -27,6 +27,12 @@
     },
     {
       "path": "./tsconfig.spec.json"
+    },
+    {
+      "path": "./projects/relay-console/tsconfig.app.json"
+    },
+    {
+      "path": "./projects/relay-console/tsconfig.spec.json"
     }
   ]
 }

@@ -1,0 +1,74 @@
+[package]
+name = "termexo-relay"
+version = "0.9.0"
+description = "Termexo relay service: inbound device tunnels, a public reverse proxy and an admin console"
+authors = ["Termexo contributors"]
+edition = "2021"
+rust-version = "1.88"
+license = "MIT"
+
+[lib]
+name = "termexo_relay"
+path = "src/lib.rs"
+
+[[bin]]
+name = "termexo-relay"
+path = "src/main.rs"
+
+# The relay runs on Linux servers, so nothing here may be Windows-only.
+[dependencies]
+argon2 = { version = "0.5", features = ["std"] }
+axum = { version = "0.8.9", features = ["ws"] }
+axum-server = { version = "0.8.0", features = ["tls-rustls"] }
+bytes = "1"
+clap = { version = "4", features = ["derive", "env"] }
+data-encoding = "2"
+futures-util = { version = "0.3", default-features = false, features = [
+    "sink",
+    "std",
+] }
+getrandom = "0.4"
+http-body-util = "0.1"
+hyper = { version = "1", features = ["client", "server", "http1"] }
+hyper-util = { version = "0.1", features = [
+    "client-legacy",
+    "http1",
+    "server",
+    "service",
+    "tokio",
+] }
+include_dir = "0.7"
+ipnet = "2"
+rcgen = { version = "0.14", default-features = false, features = [
+    "crypto",
+    "pem",
+    "aws_lc_rs",
+] }
+rusqlite = { version = "0.40.1", features = ["bundled"] }
+rustls = { version = "0.23", default-features = false, features = ["aws_lc_rs"] }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+sha2 = "0.10"
+termexo-relay-protocol = { path = "../../crates/termexo-relay-protocol" }
+thiserror = "2.0"
+tokio = { version = "1", features = [
+    "io-util",
+    "macros",
+    "net",
+    "rt-multi-thread",
+    "signal",
+    "sync",
+    "time",
+] }
+tokio-util = { version = "0.7", features = ["compat"] }
+tower = { version = "0.5", features = ["util"] }
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+yamux = "0.14"
+
+[dev-dependencies]
+reqwest = { version = "0.13.4", default-features = false, features = [
+    "cookies",
+    "json",
+] }
+tokio-tungstenite = "0.28"

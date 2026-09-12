@@ -133,7 +133,7 @@ pub fn run() {
             app.manage(RepositoryWatcher::new(app.handle().clone(), events.clone()));
             app.manage(QuotaCache::default());
 
-            let remote = Arc::new(RemoteAccessManager::new(app.handle().clone(), events));
+            let remote = RemoteAccessManager::new(app.handle().clone(), events);
             app.manage(remote.clone());
             tauri::async_runtime::spawn(async move { remote.start_if_enabled().await });
             Ok(())
@@ -224,6 +224,8 @@ pub fn run() {
             commands::remote::update_remote_access_settings,
             commands::remote::regenerate_remote_access_token,
             commands::remote::render_remote_access_qr,
+            commands::remote::enroll_relay_device,
+            commands::remote::disconnect_relay,
         ])
         .run(tauri::generate_context!())
         .expect("failed to run Termexo");

@@ -63,8 +63,21 @@ describe('RemoteBridgeClient', () => {
     client.setToken('secret');
 
     expect(urls).toHaveLength(1);
-    expect(urls[0]).toMatch(/^wss?:\/\/.+\/ws$/);
+    expect(urls[0]).toBe(`ws://${window.location.host}/ws`);
     expect(client.state).toBe('connecting');
+  });
+
+  it('keeps the bridge beside the page when a relay serves it from a sub-path', () => {
+    const base = document.createElement('base');
+    base.setAttribute('href', '/d/abc/');
+    document.head.appendChild(base);
+    try {
+      client.setToken('secret');
+
+      expect(urls[0]).toBe(`ws://${window.location.host}/d/abc/ws`);
+    } finally {
+      base.remove();
+    }
   });
 
   it('authenticates first and only then sends the calls it queued', async () => {

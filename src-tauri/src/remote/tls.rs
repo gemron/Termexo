@@ -3,14 +3,13 @@ use std::path::{Path, PathBuf};
 
 use axum_server::tls_rustls::RustlsConfig;
 
+use crate::remote::{machine_name, LOCALHOST_NAME};
+
 /// PEM material lives next to the database rather than in a temporary directory: the phone that
 /// accepted the certificate once must keep trusting it across restarts.
 const TLS_DIRECTORY: &str = "remote";
 const CERTIFICATE_FILE: &str = "cert.pem";
 const PRIVATE_KEY_FILE: &str = "key.pem";
-
-/// Always in the SAN list so `https://localhost:<port>` works from the machine itself.
-const LOCALHOST_NAME: &str = "localhost";
 
 /// Returns a TLS configuration backed by the persisted self-signed certificate.
 ///
@@ -96,17 +95,6 @@ fn subject_alt_names(host_addresses: &[String]) -> Vec<String> {
     names.sort();
     names.dedup();
     names
-}
-
-fn machine_name() -> Option<String> {
-    let raw = if cfg!(windows) {
-        std::env::var("COMPUTERNAME")
-    } else {
-        std::env::var("HOSTNAME")
-    };
-    raw.ok()
-        .map(|name| name.trim().to_ascii_lowercase())
-        .filter(|name| !name.is_empty() && name != LOCALHOST_NAME)
 }
 
 #[cfg(test)]

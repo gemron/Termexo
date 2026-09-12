@@ -3,7 +3,8 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use axum::extract::ws::{CloseFrame, Message, Utf8Bytes, WebSocket, WebSocketUpgrade};
-use axum::extract::{ConnectInfo, State};
+use axum::extract::{ConnectInfo, FromRequestParts, State};
+use axum::http::request::Parts;
 use axum::http::{header, HeaderMap, HeaderValue, StatusCode, Uri};
 use axum::response::{IntoResponse, Response};
 use axum::routing::get;
@@ -13,6 +14,9 @@ use futures_util::SinkExt;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use tauri::{AppHandle, Manager};
+use termexo_relay_protocol::tunnel::{
+    HEADER_FORWARDED_FOR, HEADER_FORWARDED_HOST, HEADER_FORWARDED_PROTO, HEADER_TERMEXO_BASE,
+};
 use tokio::sync::{broadcast, mpsc, watch};
 use tokio::time::{timeout, Instant};
 
@@ -26,6 +30,15 @@ const INDEX_ASSET: &str = "index.html";
 const HTML_MIME_PREFIX: &str = "text/html";
 const HTML_EXTENSIONS: [&str; 2] = ["html", "htm"];
 
+/// What `<base href>` is when the workbench is served from the root, which is every LAN request.
+const DEFAULT_BASE_HREF: &str = "/";
+/// Start of the tag the bundler emits; its exact spelling (`/>` or `>`) is not relied upon.
+const BASE_TAG_OPENING: &str = "<base";
+/// A relay's base is `/d/<deviceId>/`, so anything remotely this long is not one.
+const MAX_BASE_LENGTH: usize = 128;
+
+const SECURE_FORWARDED_PROTO: &str = "https";
+
 /// A client that never authenticates must not hold a slot open.
 const AUTH_TIMEOUT: Duration = Duration::from_secs(5);
 /// The client pings every 20 s, so three missed pings end the connection.
@@ -38,6 +51,8 @@ const OUTBOUND_CAPACITY: usize = 256;
 const CLOSE_GOING_AWAY: u16 = 1001;
 const CLOSE_UNAUTHORIZED: u16 = 4401;
 const CLOSE_AUTH_TIMEOUT: u16 = 4408;
+
+const UNKNOWN_PEER_MESSAGE: &str = "无法确定请求来源地址。";
 
 /// Tells every open WebSocket task what the service wants it to do next.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -71,9 +86,18 @@ pub struct ServerContext {
     pub hub: Arc<RemoteEventHub>,
     pub auth: Arc<RemoteAuth>,
     pub commands: watch::Receiver<ConnectionCommand>,
+    /// LAN listener only: whether it terminates TLS itself.
     pub secure: bool,
+    /// LAN listener only: the port a request's `Host` has to name.
     pub port: u16,
     pub version: String,
+    /// Whether this router serves the relay tunnel rather than the LAN listener.
+    ///
+    /// Both routers share every handler; the three places that differ — origin validation, the
+    /// source address and the shell document — branch on this rather than on the presence of a
+    /// forwarding header, because a header can be forged on the local network and a listener
+    /// cannot.
+    pub via_relay: bool,
 }
 
 pub fn router(context: Arc<ServerContext>) -> Router {
@@ -81,8 +105,9 @@ pub fn router(context: Arc<ServerContext>) -> Router {
         .route(HEALTH_PATH, get(health))
         .route(WEBSOCKET_PATH, get(websocket))
         .fallback(static_asset)
-        // Every response is uncacheable: the bundle is replaced by an app update the browser has
-        // no other way to learn about, and index.html carries a per-service runtime descriptor.
+        // `no-cache` means "revalidate", not "do not store": paired with the `ETag` below it lets a
+        // browser answer a reload with a conditional request, so an unchanged bundle crosses the
+        // tunnel once per version instead of once per refresh.
         .layer(axum::middleware::map_response(attach_no_cache))
         .with_state(context)
 }
@@ -108,11 +133,63 @@ async fn health(State(context): State<Arc<ServerContext>>) -> Json<HealthRespons
     })
 }
 
-async fn static_asset(State(context): State<Arc<ServerContext>>, uri: Uri) -> Response {
-    serve_asset(&context, uri.path())
+/// How the shell document has to be rendered for one request.
+///
+/// The LAN listener always serves the workbench from the root over the scheme it terminates
+/// itself; behind a relay both facts come from the entry relay's forwarding headers.
+#[derive(Debug, PartialEq, Eq)]
+struct DocumentContext {
+    base: String,
+    secure: bool,
 }
 
-fn serve_asset(context: &ServerContext, request_path: &str) -> Response {
+impl DocumentContext {
+    fn resolve(context: &ServerContext, headers: &HeaderMap) -> Self {
+        if !context.via_relay {
+            return Self {
+                base: DEFAULT_BASE_HREF.to_string(),
+                secure: context.secure,
+            };
+        }
+        Self {
+            base: sanitized_base(header_str(headers, HEADER_TERMEXO_BASE)),
+            secure: header_str(headers, HEADER_FORWARDED_PROTO) == Some(SECURE_FORWARDED_PROTO),
+        }
+    }
+}
+
+fn header_str<'a>(headers: &'a HeaderMap, name: &str) -> Option<&'a str> {
+    headers.get(name).and_then(|value| value.to_str().ok())
+}
+
+/// Keeps a base path that could break out of the `href` attribute, or that is not an absolute
+/// directory, from ever reaching the document; such a header means a broken relay, not a new form.
+fn sanitized_base(raw: Option<&str>) -> String {
+    let accepted = raw.filter(|value| {
+        value.starts_with('/')
+            && value.ends_with('/')
+            // A protocol-relative base points the whole bundle at another host.
+            && !value.starts_with("//")
+            && !value.contains("..")
+            && value.len() <= MAX_BASE_LENGTH
+            && value.bytes().all(is_base_byte)
+    });
+    accepted.unwrap_or(DEFAULT_BASE_HREF).to_string()
+}
+
+const fn is_base_byte(byte: u8) -> bool {
+    matches!(byte, b'a'..=b'z' | b'A'..=b'Z' | b'0'..=b'9' | b'/' | b'-' | b'_' | b'.' | b'~')
+}
+
+async fn static_asset(
+    State(context): State<Arc<ServerContext>>,
+    headers: HeaderMap,
+    uri: Uri,
+) -> Response {
+    serve_asset(&context, &headers, uri.path())
+}
+
+fn serve_asset(context: &ServerContext, headers: &HeaderMap, request_path: &str) -> Response {
     let requested = request_path.trim_start_matches('/');
     // A path without a file extension is a client-side route, so it gets the shell document.
     let target = match asset_extension(requested) {
@@ -133,14 +210,40 @@ fn serve_asset(context: &ServerContext, request_path: &str) -> Response {
     if is_production_html_fallback(&target, &asset.mime_type) {
         return (StatusCode::NOT_FOUND, "资源不存在。").into_response();
     }
-    if target == INDEX_ASSET {
-        let document = inject_runtime_meta(
-            &String::from_utf8_lossy(&asset.bytes),
-            &runtime_meta(&context.version, context.secure),
-        );
-        return ([(header::CONTENT_TYPE, asset.mime_type)], document).into_response();
+
+    let page = DocumentContext::resolve(context, headers);
+    let etag = asset_etag(&context.version, &target, &page.base);
+    if matches_if_none_match(headers, &etag) {
+        return (StatusCode::NOT_MODIFIED, [(header::ETAG, etag)]).into_response();
     }
-    ([(header::CONTENT_TYPE, asset.mime_type)], asset.bytes).into_response()
+
+    let response_headers = [
+        (header::CONTENT_TYPE, asset.mime_type.clone()),
+        (header::ETAG, etag),
+    ];
+    if target == INDEX_ASSET {
+        let document = render_shell_document(
+            &String::from_utf8_lossy(&asset.bytes),
+            &context.version,
+            &page,
+        );
+        return (response_headers, document).into_response();
+    }
+    (response_headers, asset.bytes).into_response()
+}
+
+/// The validator a conditional request is answered against.
+///
+/// It is weak because the shell document is rendered per request — the same version under the same
+/// base is the same page, not the same bytes — and it carries the base because the very same asset
+/// path is a different document behind a relay than it is on the LAN.
+fn asset_etag(version: &str, target: &str, base: &str) -> String {
+    format!("W/\"{version}:{base}:{target}\"")
+}
+
+fn matches_if_none_match(headers: &HeaderMap, etag: &str) -> bool {
+    header_str(headers, header::IF_NONE_MATCH.as_str())
+        .is_some_and(|value| value.split(',').any(|candidate| candidate.trim() == etag))
 }
 
 /// In dev the resolver reads `frontendDist` straight from disk and has no SPA fallback, so a miss
@@ -184,6 +287,13 @@ fn is_production_html_fallback(target: &str, mime_type: &str) -> bool {
         .unwrap_or(false)
 }
 
+/// Renders `index.html` for one request: the descriptor the bundle reads, and — behind a relay —
+/// the base path the browser resolves every asset and the WebSocket address against.
+fn render_shell_document(document: &str, version: &str, page: &DocumentContext) -> String {
+    let injected = inject_runtime_meta(document, &runtime_meta(version, page.secure));
+    rewrite_base_href(&injected, &page.base)
+}
+
 /// The descriptor that tells the Angular bundle it is running remotely.
 fn runtime_meta(version: &str, secure: bool) -> String {
     let descriptor = serde_json::json!({ "version": version, "secure": secure }).to_string();
@@ -208,39 +318,117 @@ fn inject_runtime_meta(document: &str, meta: &str) -> String {
     }
 }
 
+/// Points the document at the path the relay serves this device under.
+///
+/// The whole tag is replaced rather than the attribute, because the bundler decides whether it
+/// writes `<base href="/">` or `<base href="/" />` and either spelling has to be retargeted.
+fn rewrite_base_href(document: &str, base: &str) -> String {
+    if base == DEFAULT_BASE_HREF {
+        return document.to_string();
+    }
+    let Some(start) = document.find(BASE_TAG_OPENING) else {
+        tracing::warn!("前端产物缺少 <base> 标签，经中继打开的页面将解析错资源地址");
+        return document.to_string();
+    };
+    let Some(offset) = document[start..].find('>') else {
+        return document.to_string();
+    };
+    let mut rewritten = String::with_capacity(document.len() + base.len());
+    rewritten.push_str(&document[..start]);
+    rewritten.push_str("<base href=\"");
+    rewritten.push_str(base);
+    rewritten.push_str("\">");
+    rewritten.push_str(&document[start + offset + 1..]);
+    rewritten
+}
+
+/// The address of the browser on the other end, whichever route the request came in on.
+///
+/// The failure lockout counts against it, so behind a relay it has to be the browser's own address:
+/// counting the relay's egress address instead would lock every remote viewer out at once.
+struct ClientPeer(IpAddr);
+
+impl FromRequestParts<Arc<ServerContext>> for ClientPeer {
+    type Rejection = (StatusCode, &'static str);
+
+    async fn from_request_parts(
+        parts: &mut Parts,
+        context: &Arc<ServerContext>,
+    ) -> Result<Self, Self::Rejection> {
+        let address = if context.via_relay {
+            forwarded_peer(&parts.headers)
+        } else {
+            parts
+                .extensions
+                .get::<ConnectInfo<SocketAddr>>()
+                .map(|ConnectInfo(peer)| peer.ip())
+        };
+        address
+            .map(Self)
+            .ok_or((StatusCode::FORBIDDEN, UNKNOWN_PEER_MESSAGE))
+    }
+}
+
+/// The first entry of `X-Forwarded-For`, which the entry relay sets to the browser's own address.
+fn forwarded_peer(headers: &HeaderMap) -> Option<IpAddr> {
+    header_str(headers, HEADER_FORWARDED_FOR)?
+        .split(',')
+        .next()?
+        .trim()
+        .parse()
+        .ok()
+}
+
 async fn websocket(
     State(context): State<Arc<ServerContext>>,
-    ConnectInfo(peer): ConnectInfo<SocketAddr>,
+    ClientPeer(peer): ClientPeer,
     headers: HeaderMap,
     upgrade: WebSocketUpgrade,
 ) -> Response {
-    if let Err(message) = validate_request_origin(&headers, context.secure, context.port) {
+    if let Err(message) = validate_request_origin(&headers, &context) {
         return (StatusCode::FORBIDDEN, message).into_response();
     }
-    upgrade.on_upgrade(move |socket| handle_connection(socket, context, peer.ip()))
+    upgrade.on_upgrade(move |socket| handle_connection(socket, context, peer))
+}
+
+fn validate_request_origin(
+    headers: &HeaderMap,
+    context: &ServerContext,
+) -> Result<(), &'static str> {
+    if context.via_relay {
+        return validate_tunnel_origin(headers);
+    }
+    validate_lan_origin(headers, context.secure, context.port)
 }
 
 /// Rejects an upgrade whose `Host` or `Origin` is not this very service.
 ///
 /// Without it any page the user visits could open a WebSocket to `https://127.0.0.1:7420` and,
-/// with a leaked token, drive the workbench.
-fn validate_request_origin(
-    headers: &HeaderMap,
-    secure: bool,
-    port: u16,
-) -> Result<(), &'static str> {
-    let host = headers
-        .get(header::HOST)
-        .and_then(|value| value.to_str().ok())
-        .ok_or("缺少 Host 头。")?;
+/// with a leaked token, drive the workbench. The forwarding headers are deliberately not read
+/// here: on the local network anyone can send them, and the listener already proves the route.
+fn validate_lan_origin(headers: &HeaderMap, secure: bool, port: u16) -> Result<(), &'static str> {
+    let host = header_str(headers, header::HOST.as_str()).ok_or("缺少 Host 头。")?;
     if host_port(host, secure) != Some(port) {
         return Err("Host 与服务端口不一致。");
     }
-    if let Some(origin) = headers.get(header::ORIGIN).and_then(|it| it.to_str().ok()) {
+    if let Some(origin) = header_str(headers, header::ORIGIN.as_str()) {
         let scheme = if secure { "https" } else { "http" };
         if origin != format!("{scheme}://{host}") {
             return Err("Origin 与服务地址不一致。");
         }
+    }
+    Ok(())
+}
+
+/// Behind a relay the `Host` is the tunnel's synthetic authority, so the address the browser
+/// actually typed is the one the entry relay forwards. Every page reaching this router came out of
+/// a browser, so a missing `Origin` is a malformed request rather than a tolerable client.
+fn validate_tunnel_origin(headers: &HeaderMap) -> Result<(), &'static str> {
+    let proto = header_str(headers, HEADER_FORWARDED_PROTO).ok_or("缺少转发协议头。")?;
+    let host = header_str(headers, HEADER_FORWARDED_HOST).ok_or("缺少转发主机头。")?;
+    let origin = header_str(headers, header::ORIGIN.as_str()).ok_or("缺少 Origin 头。")?;
+    if origin != format!("{proto}://{host}") {
+        return Err("Origin 与中继地址不一致。");
     }
     Ok(())
 }
@@ -550,6 +738,30 @@ async fn send_close(outbound: &mpsc::Sender<Message>, code: u16, reason: &str) {
 mod tests {
     use super::*;
 
+    const RELAY_BASE: &str = "/d/abcdefghijklmnopqrstuvwxyz/";
+    const SHELL_DOCUMENT: &str = "<html><head><base href=\"/\" /><title>a</title></head><body>";
+
+    fn headers_of(entries: &[(&str, &str)]) -> HeaderMap {
+        let mut headers = HeaderMap::new();
+        for (name, value) in entries {
+            headers.insert(
+                axum::http::HeaderName::from_bytes(name.as_bytes()).expect("valid header name"),
+                HeaderValue::from_str(value).expect("valid header"),
+            );
+        }
+        headers
+    }
+
+    /// The forwarding headers a relay sets on every request it proxies.
+    fn forwarded_headers() -> HeaderMap {
+        headers_of(&[
+            (HEADER_FORWARDED_FOR, "203.0.113.7"),
+            (HEADER_FORWARDED_PROTO, "https"),
+            (HEADER_FORWARDED_HOST, "relay.example.com"),
+            (HEADER_TERMEXO_BASE, RELAY_BASE),
+        ])
+    }
+
     #[test]
     fn only_the_last_path_segment_decides_whether_a_path_has_an_extension() {
         assert_eq!(asset_extension("main-ABC.js"), Some("js"));
@@ -633,42 +845,190 @@ mod tests {
         assert_eq!(host_port("[::1]:7420", true), Some(7420));
     }
 
-    fn headers_of(entries: &[(header::HeaderName, &str)]) -> HeaderMap {
-        let mut headers = HeaderMap::new();
-        for (name, value) in entries {
-            headers.insert(name, HeaderValue::from_str(value).expect("valid header"));
-        }
-        headers
-    }
-
     #[test]
     fn upgrades_from_this_service_are_accepted() {
         let headers = headers_of(&[
-            (header::HOST, "192.168.1.20:7420"),
-            (header::ORIGIN, "https://192.168.1.20:7420"),
+            (header::HOST.as_str(), "192.168.1.20:7420"),
+            (header::ORIGIN.as_str(), "https://192.168.1.20:7420"),
         ]);
 
-        assert!(validate_request_origin(&headers, true, 7420).is_ok());
+        assert!(validate_lan_origin(&headers, true, 7420).is_ok());
     }
 
     #[test]
     fn upgrades_from_another_page_or_another_port_are_refused() {
         let foreign_origin = headers_of(&[
-            (header::HOST, "192.168.1.20:7420"),
-            (header::ORIGIN, "https://evil.example"),
+            (header::HOST.as_str(), "192.168.1.20:7420"),
+            (header::ORIGIN.as_str(), "https://evil.example"),
         ]);
-        assert!(validate_request_origin(&foreign_origin, true, 7420).is_err());
+        assert!(validate_lan_origin(&foreign_origin, true, 7420).is_err());
 
         let wrong_scheme = headers_of(&[
-            (header::HOST, "192.168.1.20:7420"),
-            (header::ORIGIN, "http://192.168.1.20:7420"),
+            (header::HOST.as_str(), "192.168.1.20:7420"),
+            (header::ORIGIN.as_str(), "http://192.168.1.20:7420"),
         ]);
-        assert!(validate_request_origin(&wrong_scheme, true, 7420).is_err());
+        assert!(validate_lan_origin(&wrong_scheme, true, 7420).is_err());
 
-        let wrong_port = headers_of(&[(header::HOST, "192.168.1.20:9999")]);
-        assert!(validate_request_origin(&wrong_port, true, 7420).is_err());
+        let wrong_port = headers_of(&[(header::HOST.as_str(), "192.168.1.20:9999")]);
+        assert!(validate_lan_origin(&wrong_port, true, 7420).is_err());
 
-        assert!(validate_request_origin(&HeaderMap::new(), true, 7420).is_err());
+        assert!(validate_lan_origin(&HeaderMap::new(), true, 7420).is_err());
+    }
+
+    /// The forwarding headers describe the entry relay, and only the tunnel route may believe
+    /// them: on the local network anyone can send them, so reading them there would let a page
+    /// on another origin talk its way past the check.
+    #[test]
+    fn the_lan_route_ignores_forged_forwarding_headers() {
+        let mut headers = forwarded_headers();
+        headers.insert(header::HOST, HeaderValue::from_static("192.168.1.20:7420"));
+        headers.insert(
+            header::ORIGIN,
+            HeaderValue::from_static("https://relay.example.com"),
+        );
+
+        // The `Origin` matches the forwarded host, and the LAN route still refuses it.
+        assert!(validate_lan_origin(&headers, true, 7420).is_err());
+        assert!(validate_tunnel_origin(&headers).is_ok());
+    }
+
+    #[test]
+    fn the_tunnel_route_compares_the_origin_with_the_forwarded_address() {
+        let mut headers = forwarded_headers();
+        headers.insert(
+            header::ORIGIN,
+            HeaderValue::from_static("https://relay.example.com"),
+        );
+        assert!(validate_tunnel_origin(&headers).is_ok());
+
+        headers.insert(
+            header::ORIGIN,
+            HeaderValue::from_static("https://evil.example"),
+        );
+        assert!(validate_tunnel_origin(&headers).is_err());
+    }
+
+    /// A request without the relay's own headers did not come through the relay.
+    #[test]
+    fn the_tunnel_route_refuses_a_request_without_the_forwarding_headers() {
+        let origin_only = headers_of(&[(header::ORIGIN.as_str(), "https://relay.example.com")]);
+        assert!(validate_tunnel_origin(&origin_only).is_err());
+
+        assert!(validate_tunnel_origin(&forwarded_headers()).is_err());
+    }
+
+    #[test]
+    fn the_browser_address_comes_from_the_first_forwarded_entry() {
+        let chained = headers_of(&[(HEADER_FORWARDED_FOR, "203.0.113.7, 10.0.0.1")]);
+
+        assert_eq!(
+            forwarded_peer(&chained),
+            Some("203.0.113.7".parse::<IpAddr>().expect("a valid address"))
+        );
+        assert_eq!(forwarded_peer(&HeaderMap::new()), None);
+        assert_eq!(
+            forwarded_peer(&headers_of(&[(HEADER_FORWARDED_FOR, "not-an-address")])),
+            None
+        );
+    }
+
+    #[test]
+    fn the_relay_base_replaces_the_base_tag_whatever_its_spelling() {
+        let rewritten = rewrite_base_href(SHELL_DOCUMENT, RELAY_BASE);
+
+        assert!(rewritten.contains(&format!("<base href=\"{RELAY_BASE}\">")));
+        assert!(!rewritten.contains("href=\"/\""));
+        assert!(rewritten.contains("<title>a</title>"));
+        assert_eq!(
+            rewrite_base_href("<html><head><base href=\"/\"></head>", RELAY_BASE),
+            format!("<html><head><base href=\"{RELAY_BASE}\"></head>")
+        );
+    }
+
+    #[test]
+    fn a_document_served_from_the_root_keeps_its_base_tag() {
+        assert_eq!(
+            rewrite_base_href(SHELL_DOCUMENT, DEFAULT_BASE_HREF),
+            SHELL_DOCUMENT
+        );
+    }
+
+    /// A base that could close the attribute would inject markup into the shell document.
+    #[test]
+    fn only_an_absolute_directory_path_is_accepted_as_a_base() {
+        assert_eq!(sanitized_base(Some(RELAY_BASE)), RELAY_BASE);
+        assert_eq!(sanitized_base(None), DEFAULT_BASE_HREF);
+        for forged in [
+            "/d/x/\"><script>alert(1)</script>",
+            "d/x/",
+            "/d/x",
+            "//evil.example/",
+            "/d/../../etc/",
+            "/d/ x/",
+        ] {
+            assert_eq!(
+                sanitized_base(Some(forged)),
+                DEFAULT_BASE_HREF,
+                "{forged} should not reach the document"
+            );
+        }
+    }
+
+    #[test]
+    fn a_base_longer_than_any_device_path_is_refused() {
+        let long = format!("/{}/", "a".repeat(MAX_BASE_LENGTH));
+
+        assert_eq!(sanitized_base(Some(&long)), DEFAULT_BASE_HREF);
+    }
+
+    #[test]
+    fn the_shell_document_is_rendered_for_the_route_it_is_served_on() {
+        let page = DocumentContext {
+            base: RELAY_BASE.to_string(),
+            secure: true,
+        };
+
+        let rendered = render_shell_document(SHELL_DOCUMENT, "0.9.0", &page);
+
+        assert!(rendered.contains(&format!("<base href=\"{RELAY_BASE}\">")));
+        assert!(rendered.contains("\"secure\":true"));
+        assert!(rendered.contains("termexo-remote"));
+    }
+
+    /// The same path is a different document behind a relay, so the tag has to say so; otherwise
+    /// a browser that opened the device on the LAN would reuse that copy through the tunnel.
+    #[test]
+    fn the_validator_covers_the_version_the_path_and_the_base() {
+        let lan = asset_etag("0.9.0", INDEX_ASSET, DEFAULT_BASE_HREF);
+        let tunnel = asset_etag("0.9.0", INDEX_ASSET, RELAY_BASE);
+
+        assert!(lan.starts_with("W/\""));
+        assert_ne!(lan, tunnel);
+        assert_ne!(lan, asset_etag("0.9.1", INDEX_ASSET, DEFAULT_BASE_HREF));
+        assert_ne!(lan, asset_etag("0.9.0", "main-ABC.js", DEFAULT_BASE_HREF));
+    }
+
+    #[test]
+    fn a_conditional_request_matches_the_tag_it_was_given() {
+        let etag = asset_etag("0.9.0", INDEX_ASSET, DEFAULT_BASE_HREF);
+
+        assert!(matches_if_none_match(
+            &headers_of(&[(header::IF_NONE_MATCH.as_str(), &etag)]),
+            &etag
+        ));
+        // Browsers send every tag they hold for the resource, separated by commas.
+        assert!(matches_if_none_match(
+            &headers_of(&[(
+                header::IF_NONE_MATCH.as_str(),
+                &format!("W/\"stale\", {etag}")
+            )]),
+            &etag
+        ));
+        assert!(!matches_if_none_match(
+            &headers_of(&[(header::IF_NONE_MATCH.as_str(), "W/\"0.8.0:/:index.html\"")]),
+            &etag
+        ));
+        assert!(!matches_if_none_match(&HeaderMap::new(), &etag));
     }
 
     #[test]
