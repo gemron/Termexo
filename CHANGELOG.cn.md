@@ -2,6 +2,12 @@
 
 按版本倒序记录每个版本的变更。当前版本的要点见 [README.cn.md](README.cn.md)。
 
+## 未发布
+
+- OpenCode 终端现在会在供应商余量面板显示通过 OpenCode 连接的 ChatGPT Codex 与 OpenCode Go
+  订阅额度，包括 5 小时、每周和每月窗口及重置时间。默认模型无法确定实际供应商时会同时显示两种
+  已连接订阅；所有数值均直接读取服务自身的内部用量接口，并明确作为非公开接口数据处理。
+
 ## V0.9.0
 
 - 新增第四个 agent：Antigravity，与 Claude Code、Codex CLI、OpenCode 并列。Termexo 会在它的安装器放置

@@ -39,6 +39,8 @@ const EVENT_LABELS: Readonly<Record<string, string>> = {
 
 /** Matches the backend default for a profile that has never had a threshold set. */
 const DEFAULT_ALERT_THRESHOLD = 80;
+const OPENCODE_CODEX_QUOTA_ID = 'agent:opencode:codex';
+const OPENCODE_GO_QUOTA_ID = 'agent:opencode:go';
 
 /** The collapsible sections below the overview; the overview itself is always open. */
 type SectionKey = 'agents' | 'details' | 'changes' | 'quota' | 'activity';
@@ -138,6 +140,19 @@ export class InspectorPanelComponent {
     const terminal = this.activeTerminal();
     const ids = new Set<string>();
     if (!terminal) {
+      return ids;
+    }
+    if (terminal.agentType === 'opencode') {
+      const model = terminal.model.trim().toLowerCase();
+      if (model.startsWith('openai/')) {
+        ids.add(OPENCODE_CODEX_QUOTA_ID);
+      } else if (model.startsWith('opencode-go/')) {
+        ids.add(OPENCODE_GO_QUOTA_ID);
+      } else {
+        // OpenCode resolves an omitted or unknown provider itself, so either subscription may pay.
+        ids.add(OPENCODE_CODEX_QUOTA_ID);
+        ids.add(OPENCODE_GO_QUOTA_ID);
+      }
       return ids;
     }
     const activeProfile = terminal.profileId
