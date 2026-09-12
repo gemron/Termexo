@@ -16,6 +16,7 @@ tauri-build = { version = "2.5.1", features = [] }
 [dependencies]
 aes-gcm = "0.10"
 avt = "0.18"
+base64 = "0.22"
 axum = { version = "0.8.9", features = ["ws"] }
 axum-server = { version = "0.8.0", features = ["tls-rustls"] }
 bytes = "1"

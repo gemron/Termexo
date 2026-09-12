@@ -4901,6 +4901,7 @@ dependencies = [
  "avt",
  "axum",
  "axum-server",
+ "base64 0.22.1",
  "bytes",
  "data-encoding",
  "futures-util",
