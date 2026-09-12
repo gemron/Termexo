@@ -11,7 +11,7 @@
 </p>
 
 <p align="center">
-  <img alt="Version 0.9.0" src="https://img.shields.io/badge/version-0.9.0-58c7a0">
+  <img alt="Version 0.10.0" src="https://img.shields.io/badge/version-0.10.0-58c7a0">
   <img alt="Windows" src="https://img.shields.io/badge/platform-Windows-0078D4?logo=windows">
   <img alt="Tauri 2" src="https://img.shields.io/badge/Tauri-2-24C8DB?logo=tauri&logoColor=white">
   <img alt="Angular 22" src="https://img.shields.io/badge/Angular-22-DD0031?logo=angular">
@@ -66,7 +66,7 @@ npx termexo@latest
 
 ## 最新版本
 
-**[v0.9.0](https://github.com/gemron/Termexo/releases/tag/v0.9.0)** 新增第四个 agent Antigravity，每个 CLI 都可以用厂商自己的安装脚本装，四个 agent 都换上了各自官方的标志。
+**[v0.10.0](https://github.com/gemron/Termexo/releases/tag/v0.10.0)** 通过你自建的中继把工作台延伸到任意网络，并把流量加封到中继自己也读不到它转发的终端内容。
 [完整更新记录](CHANGELOG.cn.md)。
 
 如果 Termexo 帮到了你，欢迎 **给仓库点一个 Star**，帮助更多开发者发现它。
@@ -328,7 +328,8 @@ flowchart LR
 | V0.8.6 | 屏幕级准确的终端重放与重连稳定性 | 已发布 |
 | V0.8.7 | 不会让终端卡死的屏幕解析器 | 已发布 |
 | V0.8.8 | 存储面板与可迁移的数据目录 | 已发布 |
-| V0.9.0 | 第四个 agent Antigravity 与厂商安装脚本 | 当前版本 |
+| V0.9.0 | 第四个 agent Antigravity 与厂商安装脚本 | 已发布 |
+| V0.10.0 | 自建中继与端到端加密的远程访问 | 当前版本 |
 | V1.0 | 稳定性、安全加固与恢复体验 | 规划中 |
 
 进行中的工作见 [Issues](https://github.com/gemron/Termexo/issues)，实际交付内容见

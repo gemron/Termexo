@@ -1,6 +1,6 @@
 [package]
 name = "termexo-relay-protocol"
-version = "0.9.0"
+version = "0.10.0"
 description = "Wire protocol shared by the Termexo desktop app and the Termexo relay service"
 authors = ["Termexo contributors"]
 edition = "2021"

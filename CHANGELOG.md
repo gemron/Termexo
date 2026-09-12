@@ -2,6 +2,26 @@
 
 Release notes for every Termexo version, newest first. The current release is summarised in [README.md](README.md).
 
+## V0.10.0
+
+- Remote access is no longer confined to one local network. The desktop can dial out to a **relay**,
+  and a phone or another computer then opens this machine's full workbench from anywhere — no public
+  IP, no port forward. The relay is yours to host: a single cross-platform binary with its own admin
+  console, in the [termexo-relay](https://github.com/gemron/termexo-relay) repository. Settings →
+  remote access gained a section for it: give it the address, join with an enrolment code or an
+  account on the relay, and the relay's address then sits beside the LAN ones in the same address
+  list, QR code and all.
+- **A relay cannot read the terminals it carries.** The `/ws` handshake between the browser and the
+  desktop is now v2: the access token is never sent, it proves itself and keys the session instead,
+  and every frame after that is sealed with AES-256-GCM under a key of its own per direction. A
+  2.68 MB capture taken between a relay and a browser holds no token, no workspace name and no path,
+  while the same browser renders all of them. A LAN page served over HTTPS gets this too.
+- A relay can hang off another relay. An office relay behind NAT publishes its desktops on a public
+  one, to any depth, and the desktop lists every address it can be reached at and which relay each
+  one goes through.
+- A device can require a relay sign-in before anyone reaches it — a gate on the relay's side, quite
+  separate from the desktop's own access token.
+
 ## V0.9.0
 
 - Antigravity is a fourth agent, alongside Claude Code, Codex CLI and OpenCode. Termexo detects
