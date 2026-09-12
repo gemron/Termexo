@@ -23,10 +23,8 @@ npm run build               # Angular production build -> apps/desktop-ui/dist/
 npm test                    # Frontend unit tests (Vitest), single run
 npm run tauri:dev           # Full desktop app with real PTYs
 npm run tauri:build         # Release bundle
-npm run build:relay-console # Relay admin console -> apps/desktop-ui/dist/relay-console/ (embedded by apps/relay)
 cargo test --manifest-path src-tauri/Cargo.toml   # Rust tests
 scripts\cargo-msvc.cmd test --manifest-path crates/termexo-relay-protocol/Cargo.toml  # Shared relay protocol crate
-scripts\cargo-msvc.cmd test --manifest-path apps/relay/Cargo.toml                     # termexo-relay server
 ```
 
 Run a single frontend test file or filter by test name:
@@ -55,9 +53,9 @@ npm run capture:readme                            # Regenerate docs/images scree
   `VsDevCmd.bat` (Visual Studio 2022 Build Tools, Desktop C++ workload) and prefers the
   vendored toolchain in `.tooling/cargo` + `.tooling/rustup` when present. A bare `cargo build`
   in a shell without the MSVC environment will fail to link. `scripts/cargo-msvc.cmd <args>`
-  runs any cargo command inside that same environment — use it for `crates/` and `apps/relay`,
-  which are separate crates (no root Cargo workspace, so `src-tauri/target` stays where the
-  npm packaging scripts expect it).
+  runs any cargo command inside that same environment — use it for `crates/`, which is a
+  separate crate (no root Cargo workspace, so `src-tauri/target` stays where the npm packaging
+  scripts expect it).
 - One Rust test is `#[ignore]`d because it writes to the real Windows Credential Manager; run
   it explicitly with `cargo test -- --ignored` when touching `CredentialStore`.
 
@@ -129,6 +127,17 @@ EXISTS`, guarded `ALTER`) and there is no version table or rollback. Data-shape 
 separate functions afterward (see `migrate_legacy_minimax_m3_model`) and must tolerate being
 re-applied.
 
+### Relay: what lives here and what does not
+
+The relay server and its admin console live in their own repository, `termexo-relay`. This
+repository keeps only the two halves the desktop app needs: the wire contract in
+`crates/termexo-relay-protocol/` (control frames, stream preface, credential format, tunnel
+crypto), which `src-tauri` depends on by path and the relay repository consumes as a git
+dependency, and the outbound tunnel client in `src-tauri/src/remote/relay/`. Changing the
+protocol crate is a cross-repository change — keep it backward compatible, or land both sides
+together. `docs/architecture/relay-service.md` is the shared design document; paths in it under
+`apps/relay/` refer to the other repository.
+
 ### Legacy identifiers (intentional)
 
 The database file is `agentdock.db`, the Tauri/keyring identifier is `dev.agentdock.desktop`,
@@ -154,6 +163,6 @@ compatibility with early installations — do not rename them.
 
 The version string is duplicated across `package.json`, `apps/desktop-ui/package.json`,
 `packages/termexo/package.json`, `src-tauri/Cargo.toml`, `src-tauri/tauri.conf.json`,
-`crates/termexo-relay-protocol/Cargo.toml`, and `apps/relay/Cargo.toml`, and is referenced in
+and `crates/termexo-relay-protocol/Cargo.toml`, and is referenced in
 both READMEs. `packages/termexo` is the npm distribution wrapper; its `prepack`
 stages the built Windows executable into `vendor/win32-x64/`.

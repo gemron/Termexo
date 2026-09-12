@@ -1,4 +1,0 @@
-@import 'tailwindcss' source(none);
-@import '../../../src/termexo-theme.css';
-
-@source './app/**/*.{html,ts}';

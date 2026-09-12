@@ -2,8 +2,8 @@
 setlocal
 
 rem Runs any cargo command inside the MSVC environment tauri-msvc.cmd uses, so crates outside the
-rem Tauri build (the relay, the shared protocol crate) link with the same toolchain:
-rem   scripts\cargo-msvc.cmd test --manifest-path apps/relay/Cargo.toml
+rem Tauri build (the shared relay protocol crate) link with the same toolchain:
+rem   scripts\cargo-msvc.cmd test --manifest-path crates/termexo-relay-protocol/Cargo.toml
 
 set "REPOSITORY_ROOT=%~dp0.."
 set "VSDEVCMD=C:\Program Files (x86)\Microsoft Visual Studio\2022\BuildTools\Common7\Tools\VsDevCmd.bat"

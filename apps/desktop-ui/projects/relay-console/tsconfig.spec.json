@@ -1,9 +1,0 @@
-{
-  "extends": "../../tsconfig.json",
-  "compilerOptions": {
-    "rootDir": "../..",
-    "outDir": "../../out-tsc/relay-console-spec",
-    "types": ["vitest/globals"]
-  },
-  "include": ["src/**/*.d.ts", "src/**/*.spec.ts"]
-}

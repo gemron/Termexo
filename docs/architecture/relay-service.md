@@ -1,5 +1,14 @@
 # Termexo 中继服务（Relay）设计
 
+> **本文横跨两个仓库。** 中继服务端（`termexo-relay` 二进制）与它的管理控制台已经独立成
+> **`termexo-relay` 仓库**，不再在 Termexo 里。本文正文写于拆分之前，其中的 `apps/relay/` 与
+> `apps/desktop-ui/projects/relay-console/` 指的是那个仓库里的代码，对应关系见「仓库布局」。
+>
+> Termexo 这边保留两样东西：两端共用的协议 crate `crates/termexo-relay-protocol/`（`src-tauri`
+> 按路径依赖它，`termexo-relay` 仓库按 git 依赖引用它），以及桌面端的隧道客户端
+> `src-tauri/src/remote/relay/`。正文其余部分按设计原样保留，下面的「仓库布局」一节是拆分后的
+> 真实情况。
+
 ## 目标
 
 现有远程访问只能在同一局域网 / VPN 里打开桌面端的工作台（见 `remote-access.md`）。中继服务把
@@ -74,26 +83,43 @@
 
 ## 仓库布局
 
+中继服务端与控制台已经拆到独立仓库，两个仓库的分工如下。
+
+**Termexo 仓库**
+
 ```
 crates/termexo-relay-protocol/          桌面端与中继共用：控制帧、流前导、凭据格式、
                                         WS ⇄ AsyncRead/AsyncWrite 适配、失败锁定表（从 remote/token.rs 迁出）
-apps/relay/                             termexo-relay 二进制（axum + rusqlite + rustls + yamux），跨平台
-apps/relay/migrations/                  中继自己的幂等迁移
-apps/desktop-ui/projects/relay-console/ 管理页面：同一个 Angular 工作区里的第二个 application
 src-tauri/src/remote/relay/             桌面端隧道客户端
 docs/architecture/relay-service.md      本文
 ```
 
-* 不建根级 Cargo workspace：`packages/termexo/scripts/stage-binary.mjs` 和 `tauri-msvc.cmd` 都以
-  `src-tauri/target` 为准，改成 workspace 会挪走 target 目录。两个二进制各自以
-  `path = "../crates/termexo-relay-protocol"` 依赖共用 crate；`cargo test` 分别按 manifest 跑。
-* 共用 crate 不依赖 tauri / keyring / Windows API，中继才能在 Linux 上构建。
-* 管理页面放进 `apps/desktop-ui` 的 Angular 工作区（`angular.json` 的 `newProjectRoot` 已是
-  `projects`）：复用 pinned Node、Tailwind 4 + DaisyUI 5、`IconComponent`、`I18nService`，不再养
-  第二份 `node_modules`。产物 `apps/desktop-ui/dist/relay-console/browser` 由 `apps/relay/build.rs`
-  通过 `include_dir` 嵌进二进制。
-* 版本号：`apps/relay/Cargo.toml` 加入 `CLAUDE.md`「Releasing」里那组需要同步的版本文件；隧道协议
-  另有独立的 `protocol` 整数版本，在握手里协商。
+**termexo-relay 仓库**
+
+```
+Cargo.toml + src/       termexo-relay 二进制（axum + rusqlite + rustls + yamux），跨平台
+migrations/             中继自己的幂等迁移
+console/                管理页面：独立的 Angular 工作区
+build.rs                把控制台产物嵌进二进制
+.cargo/config.toml      把协议 crate 指向相邻的 Termexo 检出（Docker 与全新克隆不用它）
+```
+
+中继在自己的仓库里位于根目录，所以本文正文里凡是写 `apps/relay/xxx` 的地方，在那个仓库里就是
+`xxx`；写 `apps/desktop-ui/projects/relay-console/` 的地方就是 `console/`。
+
+* 两个仓库都不建根级 Cargo workspace：Termexo 这边 `packages/termexo/scripts/stage-binary.mjs` 和
+  `tauri-msvc.cmd` 都以 `src-tauri/target` 为准，改成 workspace 会挪走 target 目录。`src-tauri` 用
+  `path = "../crates/termexo-relay-protocol"` 依赖共用 crate，中继仓库用 git 依赖引用同一个 crate；
+  `cargo test` 分别按 manifest 跑。
+* 共用 crate 不依赖 tauri / keyring / Windows API，中继才能在 Linux 上构建。它是两个仓库之间唯一的
+  契约：改动要么向后兼容，要么两边同时发版。
+* 管理页面沿用 Termexo 的前端技术栈（Angular 22 + Tailwind 4 + DaisyUI 5），但拆分后**自带**
+  `I18nService`、`TranslatePipe` 与 `IconComponent` 的精简实现——桌面端那两份带着七张翻译表和 65 个
+  图标，控制台一个都用不到，照搬过去等于白背 135 kB。产物由中继仓库的 `build.rs` 通过 `include_dir`
+  嵌进二进制，产物不存在时退回占位页，因此 `cargo test` 不依赖前端构建。
+* 版本号：中继二进制的版本在它自己的仓库里维护；Termexo 这边需要同步的是
+  `crates/termexo-relay-protocol/Cargo.toml`（见 `CLAUDE.md`「Releasing」）。隧道协议另有独立的
+  `protocol` 整数版本，在握手里协商，两个仓库都以它为准。
 
 ## 身份与凭据
 
@@ -671,5 +697,6 @@ S→C  { "type": "ready", "serverVersion": "x.y.z" }        ← 这一帧起全�
 
 实施时同步修改 `docs/architecture/remote-access.md`：「HTTP 路由」加转发头、`via_relay` 路由与
 ETag；「WebSocket 协议」加隧道下的 Origin 校验规则与 v2 握手（第三阶段）；「安全边界」加
-「中继出口 IP 不计入锁定」；「前端」加 base 相对的 ws 地址与分键存储。`CLAUDE.md`「Releasing」
-加 `apps/relay/Cargo.toml`，「Commands」加 `cargo test --manifest-path apps/relay/Cargo.toml`。
+「中继出口 IP 不计入锁定」；「前端」加 base 相对的 ws 地址与分键存储。Termexo 这边的 `CLAUDE.md`
+只登记共用协议 crate（`crates/termexo-relay-protocol/Cargo.toml` 的版本号与它的 `cargo test`）；
+中继二进制自己的命令与版本号在 `termexo-relay` 仓库的 `CLAUDE.md` 里维护。
