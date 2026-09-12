@@ -6,6 +6,7 @@ apps/desktop-ui/coverage/
 
 # Tauri / Rust
 src-tauri/target/
+crates/*/target/
 packages/termexo/vendor/
 .tooling/
 

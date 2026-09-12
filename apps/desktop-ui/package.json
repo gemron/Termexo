@@ -8,7 +8,7 @@
     "capture:readme": "node scripts/capture-readme.mjs",
     "capture:demo": "node scripts/capture-demo.mjs",
     "watch": "node scripts/run-angular.mjs build --watch --configuration development",
-    "test": "node scripts/run-angular.mjs test",
+    "test": "node scripts/run-angular.mjs test desktop-ui",
     "e2e:smoke": "node scripts/smoke.mjs",
     "e2e:responsive": "node scripts/responsive-smoke.mjs",
     "e2e:v05": "node scripts/v05-smoke.mjs",

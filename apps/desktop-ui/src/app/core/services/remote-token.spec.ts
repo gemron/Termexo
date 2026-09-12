@@ -1,9 +1,22 @@
 import {
   clearRemoteToken,
   REMOTE_TOKEN_STORAGE_KEY,
+  remoteTokenStorageKey,
   resolveRemoteToken,
   storeRemoteToken,
 } from './remote-token';
+
+/** Serves the rest of the test from a sub-path, the way a relay serves `/d/<deviceId>/`. */
+function withBaseHref(path: string, body: () => void): void {
+  const element = document.createElement('base');
+  element.setAttribute('href', path);
+  document.head.appendChild(element);
+  try {
+    body();
+  } finally {
+    element.remove();
+  }
+}
 
 describe('resolveRemoteToken', () => {
   beforeEach(() => {
@@ -39,5 +52,29 @@ describe('resolveRemoteToken', () => {
     clearRemoteToken();
 
     expect(resolveRemoteToken()).toBeNull();
+  });
+
+  it('keeps the unsuffixed key for a page served at the site root', () => {
+    expect(remoteTokenStorageKey()).toBe(REMOTE_TOKEN_STORAGE_KEY);
+  });
+
+  it('gives each relayed device its own key so they cannot overwrite each other', () => {
+    withBaseHref('/d/abc/', () => {
+      storeRemoteToken('device-abc');
+
+      expect(remoteTokenStorageKey()).toBe(`${REMOTE_TOKEN_STORAGE_KEY}:/d/abc/`);
+      expect(localStorage.getItem(`${REMOTE_TOKEN_STORAGE_KEY}:/d/abc/`)).toBe('device-abc');
+    });
+
+    withBaseHref('/d/xyz/', () => {
+      expect(resolveRemoteToken()).toBeNull();
+      storeRemoteToken('device-xyz');
+    });
+
+    withBaseHref('/d/abc/', () => {
+      expect(resolveRemoteToken()).toBe('device-abc');
+    });
+    // The LAN key is untouched by either of them.
+    expect(localStorage.getItem(REMOTE_TOKEN_STORAGE_KEY)).toBeNull();
   });
 });

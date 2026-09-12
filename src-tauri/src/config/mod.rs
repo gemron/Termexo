@@ -13,6 +13,12 @@ const CREDENTIAL_SERVICE: &str = "dev.agentdock.desktop";
 /// survive both a settings reset and a database file that was deleted by hand.
 pub const REMOTE_ACCESS_CREDENTIAL_TARGET: &str = "remote-access-token";
 
+/// Keyring target for the relay device credential, `tdc1.<deviceId>.<secret>`.
+///
+/// Fixed like the access token's: there is one relay per installation. Only the device id half of
+/// the credential is ever shown to the frontend; the secret never leaves this store.
+pub const RELAY_CREDENTIAL_TARGET: &str = "relay-device-credential";
+
 #[derive(Debug, Error)]
 pub enum ConfigError {
     #[error("credential store operation failed: {0}")]

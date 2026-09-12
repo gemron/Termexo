@@ -1,5 +1,15 @@
-import { RemoteConnectionState, RemoteServerFrame } from '../models/remote-access.models';
+import {
+  RemoteConnectionState,
+  RemoteSealedEnvelope,
+  RemoteServerFrame,
+} from '../models/remote-access.models';
 import type { BackendEvent, UnlistenFn } from './backend-bridge';
+import {
+  negotiateSession,
+  SealedSession,
+  SESSION_PROTOCOL_VERSION,
+  webCryptoAvailable,
+} from './remote-session-crypto';
 import { resolveRemoteToken } from './remote-token';
 import { runtimeClientId } from './tauri-runtime';
 
@@ -20,10 +30,15 @@ const RECONNECT_DELAYS_MS = [1_000, 2_000, 4_000, 8_000, 15_000];
 const PING_INTERVAL_MS = 20_000;
 /** No frame at all for this long means the socket is dead even though it never reported a close. */
 const IDLE_TIMEOUT_MS = 45_000;
-const BRIDGE_PATH = '/ws';
+/** Resolved against the page's base, so it is `/ws` on a LAN page and `/d/<id>/ws` behind a relay. */
+const BRIDGE_PATH = 'ws';
 
 const UNAUTHORIZED_ERROR = '未授权';
 const DISCONNECTED_ERROR = '连接已断开';
+/** A plaintext frame on a sealed session is either tampering or a peer that lost its keys. */
+const UNSEALED_FRAME_ERROR = '连接收到了未加密的帧，已断开重连。';
+const UNEXPECTED_SEAL_ERROR = '尚未完成加密握手就收到了封装帧，已断开重连。';
+const NESTED_SEAL_ERROR = '连接收到了嵌套的封装帧，已断开重连。';
 
 /** The event the client raises when the server reports that outbound frames were dropped. */
 export const RESYNC_EVENT = 'resync';
@@ -46,10 +61,30 @@ function defaultSocketFactory(url: string): RemoteSocket {
   return new WebSocket(url) as unknown as RemoteSocket;
 }
 
-/** Derives the bridge URL from the page the remote workbench was served from. */
-function bridgeUrl(): string {
-  const scheme = window.location.protocol === 'https:' ? 'wss' : 'ws';
-  return `${scheme}://${window.location.host}${BRIDGE_PATH}`;
+/**
+ * Which frames a sealed session still accepts in the clear.
+ *
+ * Only the refusal, and only before the session is up: the server produces it before it installs a
+ * key, so it has nowhere else to travel. Everything after `ready` must come out of an envelope.
+ */
+function acceptsUnsealed(type: RemoteServerFrame['type'], state: RemoteConnectionState): boolean {
+  return type === 'auth-failed' && state !== 'ready';
+}
+
+function errorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
+}
+
+/**
+ * Derives the bridge URL from the page the remote workbench was served from.
+ *
+ * It follows `<base href>` rather than the host alone: a relay serves this same app under
+ * `/d/<deviceId>/`, where the bridge sits beside the page instead of at the site root.
+ */
+export function bridgeUrl(): string {
+  const url = new URL(BRIDGE_PATH, document.baseURI);
+  const scheme = url.protocol === 'https:' ? 'wss' : 'ws';
+  return `${scheme}://${url.host}${url.pathname}`;
 }
 
 /**
@@ -67,6 +102,8 @@ export class RemoteBridgeClient {
   private readonly reconnectedHandlers = new Set<() => void>();
 
   private socket: RemoteSocket | null = null;
+  /** Set once the handshake produced keys; null on a v1 session and between connections. */
+  private sealed: SealedSession | null = null;
   private token: string | null = null;
   private stateValue: RemoteConnectionState = 'idle';
   private errorValue: string | null = null;
@@ -77,7 +114,11 @@ export class RemoteBridgeClient {
   private pingTimer?: ReturnType<typeof setInterval>;
   private idleTimer?: ReturnType<typeof setTimeout>;
 
-  constructor(private readonly createSocket: RemoteSocketFactory = defaultSocketFactory) {}
+  constructor(
+    private readonly createSocket: RemoteSocketFactory = defaultSocketFactory,
+    /** Whether this page can seal a session; a capability, so it is injected like the socket. */
+    private readonly canSeal: () => boolean = webCryptoAvailable,
+  ) {}
 
   get state(): RemoteConnectionState {
     return this.stateValue;
@@ -176,13 +217,13 @@ export class RemoteBridgeClient {
   }
 
   private handleOpen(): void {
-    const token = this.token;
-    if (!token) {
+    if (!this.token) {
       this.dropConnection();
       return;
     }
     this.setState('authenticating', this.errorValue);
-    this.send({ type: 'auth', token, clientId: runtimeClientId() });
+    // The server speaks first: nothing is sent until its challenge names the nonce the session
+    // keys are derived from.
     this.pingTimer = setInterval(() => this.send({ type: 'ping' }), PING_INTERVAL_MS);
     this.restartIdleTimer();
   }
@@ -196,8 +237,23 @@ export class RemoteBridgeClient {
       // A frame this client cannot parse is not worth tearing the connection down for.
       return;
     }
+    if (frame.type === 'sealed') {
+      this.openSealed(frame);
+      return;
+    }
+    if (this.sealed && !acceptsUnsealed(frame.type, this.stateValue)) {
+      this.failSession(UNSEALED_FRAME_ERROR);
+      return;
+    }
+    this.deliver(frame);
+  }
 
+  /** Acts on one frame, whether it arrived in the clear or came out of an envelope. */
+  private deliver(frame: RemoteServerFrame): void {
     switch (frame.type) {
+      case 'challenge':
+        this.handleChallenge(frame.protocol, frame.nonceS);
+        return;
       case 'ready':
         this.handleReady();
         return;
@@ -217,6 +273,86 @@ export class RemoteBridgeClient {
       default:
         return;
     }
+  }
+
+  /**
+   * Answers the server's challenge.
+   *
+   * A page without WebCrypto — plain http on the local network — has no way to seal the session
+   * and sends the older frame instead; the server accepts that only on the very link where the
+   * browser withholds `crypto.subtle`, and its refusal elsewhere says so in as many words.
+   */
+  private handleChallenge(protocol: number, nonceS: string): void {
+    const token = this.token;
+    const socket = this.socket;
+    if (!token || !socket) {
+      return;
+    }
+    if (protocol < SESSION_PROTOCOL_VERSION || !this.canSeal()) {
+      this.writeFrame({ type: 'auth', token, clientId: runtimeClientId() });
+      return;
+    }
+    negotiateSession(token, nonceS).then(
+      (handshake) => {
+        if (this.socket !== socket) {
+          return;
+        }
+        // Installed before the frame goes out, because the server seals its `ready` reply with it.
+        this.sealed = handshake.session;
+        this.writeFrame({
+          type: 'auth',
+          protocol: SESSION_PROTOCOL_VERSION,
+          clientId: runtimeClientId(),
+          nonceC: handshake.nonceC,
+          proof: handshake.proof,
+        });
+      },
+      (error: unknown) => {
+        if (this.socket === socket) {
+          this.failSession(errorMessage(error));
+        }
+      },
+    );
+  }
+
+  /** Opens one envelope and delivers what was inside it, in the order the counters were issued. */
+  private openSealed(envelope: RemoteSealedEnvelope): void {
+    const session = this.sealed;
+    const socket = this.socket;
+    if (!session) {
+      this.failSession(UNEXPECTED_SEAL_ERROR);
+      return;
+    }
+    session.open(envelope).then(
+      (plaintext) => {
+        if (this.socket !== socket) {
+          return;
+        }
+        let frame: RemoteServerFrame;
+        try {
+          frame = JSON.parse(plaintext) as RemoteServerFrame;
+        } catch {
+          // The desktop holds the key, so an unreadable payload is version skew, not an attack.
+          return;
+        }
+        if (frame.type === 'sealed') {
+          this.failSession(NESTED_SEAL_ERROR);
+          return;
+        }
+        this.deliver(frame);
+      },
+      (error: unknown) => {
+        if (this.socket === socket) {
+          this.failSession(errorMessage(error));
+        }
+      },
+    );
+  }
+
+  /** Ends a connection whose frames broke the session envelope, and retries with fresh keys. */
+  private failSession(message: string): void {
+    this.errorValue = message;
+    this.handleDisconnect();
   }
 
   private handleReady(): void {
@@ -291,9 +427,38 @@ export class RemoteBridgeClient {
     }
   }
 
+  /**
+   * Sends a frame, sealed once the session has keys.
+   *
+   * Sealing is asynchronous, so the writes are chained inside the session: the frames leave in the
+   * order their counters were issued rather than in whatever order the cipher finished.
+   */
   private send(frame: unknown): void {
+    const session = this.sealed;
+    const text = JSON.stringify(frame);
+    if (!session) {
+      this.write(text);
+      return;
+    }
+    const socket = this.socket;
+    session.seal(text).then(
+      (sealed) => {
+        if (this.socket === socket) {
+          this.write(sealed);
+        }
+      },
+      () => undefined,
+    );
+  }
+
+  /** Writes a frame exactly as given; only the handshake uses it, before any key exists. */
+  private writeFrame(frame: unknown): void {
+    this.write(JSON.stringify(frame));
+  }
+
+  private write(text: string): void {
     try {
-      this.socket?.send(JSON.stringify(frame));
+      this.socket?.send(text);
     } catch {
       // A socket that refuses a write is already closing; the close handler schedules the retry.
     }
@@ -303,6 +468,8 @@ export class RemoteBridgeClient {
   private dropConnection(): void {
     const socket = this.socket;
     this.socket = null;
+    // The keys belong to this socket alone; the next connection derives a fresh pair.
+    this.sealed = null;
     this.stopTimers();
     if (socket) {
       socket.onopen = null;
