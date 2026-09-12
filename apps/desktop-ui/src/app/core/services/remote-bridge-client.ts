@@ -39,6 +39,12 @@ const DISCONNECTED_ERROR = '连接已断开';
 const UNSEALED_FRAME_ERROR = '连接收到了未加密的帧，已断开重连。';
 const UNEXPECTED_SEAL_ERROR = '尚未完成加密握手就收到了封装帧，已断开重连。';
 const NESTED_SEAL_ERROR = '连接收到了嵌套的封装帧，已断开重连。';
+/**
+ * Why the page stopped before sending anything: it cannot seal the session, and this link refuses
+ * the older handshake. The token is the part worth saying out loud — it was never sent.
+ */
+const INSECURE_PAGE_ERROR =
+  '这个页面不是通过 HTTPS 打开的，无法加密连接。为保护访问令牌，页面没有发送令牌。请为中继启用 HTTPS 后再打开。';
 
 /** The event the client raises when the server reports that outbound frames were dropped. */
 export const RESYNC_EVENT = 'resync';
@@ -252,7 +258,7 @@ export class RemoteBridgeClient {
   private deliver(frame: RemoteServerFrame): void {
     switch (frame.type) {
       case 'challenge':
-        this.handleChallenge(frame.protocol, frame.nonceS);
+        this.handleChallenge(frame.protocol, frame.nonceS, frame.sealedRequired ?? false);
         return;
       case 'ready':
         this.handleReady();
@@ -278,17 +284,25 @@ export class RemoteBridgeClient {
   /**
    * Answers the server's challenge.
    *
-   * A page without WebCrypto — plain http on the local network — has no way to seal the session
-   * and sends the older frame instead; the server accepts that only on the very link where the
-   * browser withholds `crypto.subtle`, and its refusal elsewhere says so in as many words.
+   * A page without WebCrypto — plain http — has no way to seal the session. On the local network
+   * the server still takes the older frame, which carries the token in the clear. Anywhere a relay
+   * or https is involved it does not, and the challenge says so before this page sends a byte:
+   * **the token is withheld rather than sent and then refused**, because a refusal arrives only
+   * after the token has already crossed the network and passed through the relay.
    */
-  private handleChallenge(protocol: number, nonceS: string): void {
+  private handleChallenge(protocol: number, nonceS: string, sealedRequired: boolean): void {
     const token = this.token;
     const socket = this.socket;
     if (!token || !socket) {
       return;
     }
     if (protocol < SESSION_PROTOCOL_VERSION || !this.canSeal()) {
+      if (sealedRequired) {
+        // Ends the way a rejected token does: reconnecting would fetch the same challenge and stop
+        // again forever, and only reopening the page over HTTPS can get past it.
+        this.handleAuthFailed(INSECURE_PAGE_ERROR);
+        return;
+      }
       this.writeFrame({ type: 'auth', token, clientId: runtimeClientId() });
       return;
     }

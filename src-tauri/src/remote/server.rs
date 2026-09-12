@@ -522,12 +522,20 @@ enum ClientFrame {
 #[derive(Debug, Serialize)]
 #[serde(tag = "type", rename_all = "kebab-case")]
 enum ServerFrame {
-    /// The first frame on every connection: the server's half of the handshake nonce, and the
-    /// highest protocol it speaks.
+    /// The first frame on every connection: the server's half of the handshake nonce, the highest
+    /// protocol it speaks, and whether this link will take the older handshake at all.
     Challenge {
         protocol: u8,
         #[serde(rename = "nonceS")]
         nonce_s: String,
+        /// Said up front so a page that cannot seal withholds the token instead of sending it.
+        ///
+        /// The older handshake carries the access token in the clear. Refusing it after the frame
+        /// has arrived keeps the session closed but not the token secret — it has already crossed
+        /// the network, through the relay, by the time the refusal is written. A client told in
+        /// advance never puts it on the wire.
+        #[serde(rename = "sealedRequired")]
+        sealed_required: bool,
     },
     /// Every frame of a sealed session travels inside this one.
     Sealed(SealedFrame),
@@ -862,6 +870,7 @@ async fn authenticate(
     let offer = ServerFrame::Challenge {
         protocol: PROTOCOL_VERSION,
         nonce_s: challenge.encoded.clone(),
+        sealed_required,
     };
     sink.send(offer.into_message()).await.map_err(|_| ())?;
 
@@ -1392,11 +1401,12 @@ mod tests {
         let challenge = serde_json::to_string(&ServerFrame::Challenge {
             protocol: PROTOCOL_VERSION,
             nonce_s: "n".into(),
+            sealed_required: true,
         })
         .expect("the frame should serialize");
         assert_eq!(
             challenge,
-            "{\"type\":\"challenge\",\"protocol\":2,\"nonceS\":\"n\"}"
+            "{\"type\":\"challenge\",\"protocol\":2,\"nonceS\":\"n\",\"sealedRequired\":true}"
         );
 
         let sealed = serde_json::to_string(&ServerFrame::Sealed(SealedFrame {
@@ -1432,6 +1442,24 @@ mod tests {
         );
         assert_eq!(choose_handshake(1, true), HandshakeChoice::RefuseDowngrade);
         assert_eq!(choose_handshake(1, false), HandshakeChoice::Plain);
+    }
+
+    /// The refusal alone cannot keep the token secret: by the time it is written the older
+    /// handshake has already carried the token across the network. So the requirement travels in
+    /// the challenge, ahead of anything the client sends.
+    #[test]
+    fn the_challenge_says_whether_the_older_handshake_will_be_refused() {
+        for required in [true, false] {
+            let frame = ServerFrame::Challenge {
+                protocol: PROTOCOL_VERSION,
+                nonce_s: "nonce".into(),
+                sealed_required: required,
+            };
+            let encoded = serde_json::to_value(&frame).expect("the challenge should serialize");
+
+            assert_eq!(encoded["type"], "challenge");
+            assert_eq!(encoded["sealedRequired"], required);
+        }
     }
 
     fn session_secrets() -> SessionSecrets {

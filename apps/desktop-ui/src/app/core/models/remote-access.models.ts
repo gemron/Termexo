@@ -98,7 +98,13 @@ export type RemoteClientFrame =
 /** Frames the remote-access server sends back. */
 export type RemoteServerFrame =
   /** The first frame on every connection; its nonce seeds the session keys. */
-  | { type: 'challenge'; protocol: number; nonceS: string }
+  | {
+      type: 'challenge';
+      protocol: number;
+      nonceS: string;
+      /** Absent from a desktop older than the flag, which never refused the older handshake. */
+      sealedRequired?: boolean;
+    }
   | { type: 'ready'; serverVersion: string }
   | { type: 'auth-failed'; reason: string }
   | { type: 'result'; id: number; ok: true; value: unknown }

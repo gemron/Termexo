@@ -218,28 +218,66 @@ describe('RemoteBridgeClient', () => {
   });
 
   /**
-   * A page opened over plain http has no `crypto.subtle`, so it can only offer the older
-   * handshake. The server accepts that on the local network and refuses it anywhere a relay or
-   * https is involved, and its refusal is what tells the user to switch to HTTPS.
+   * The vulnerability this guards against: a page without `crypto.subtle` used to send the older
+   * handshake — token in the clear — and only then hear that the link refuses it. By then the token
+   * had already crossed the network and passed through the relay. Told up front, it sends nothing.
    */
-  it('falls back to the older handshake without WebCrypto and surfaces the refusal', async () => {
+  it('withholds the token when the link requires a sealed session this page cannot offer', () => {
     canSeal = false;
     client.setToken('secret');
     newestSocket().open();
 
-    newestSocket().receive({ type: 'challenge', protocol: 2, nonceS: SESSION_VECTOR.nonceS });
+    newestSocket().receive({
+      type: 'challenge',
+      protocol: 2,
+      nonceS: SESSION_VECTOR.nonceS,
+      sealedRequired: true,
+    });
+
+    const sent = JSON.stringify(newestSocket().frames());
+    expect(sent).not.toContain('secret');
+    expect(newestSocket().frames()).toEqual([]);
+    expect(client.state).toBe('unauthorized');
+    expect(client.error).toContain('没有发送令牌');
+  });
+
+  it('does not reconnect after withholding the token, since the same challenge would follow', async () => {
+    vi.useFakeTimers();
+    canSeal = false;
+    client.setToken('secret');
+    newestSocket().open();
+    const socketsBefore = sockets.length;
+
+    newestSocket().receive({
+      type: 'challenge',
+      protocol: 2,
+      nonceS: SESSION_VECTOR.nonceS,
+      sealedRequired: true,
+    });
+    await vi.advanceTimersByTimeAsync(60_000);
+
+    expect(sockets.length).toBe(socketsBefore);
+  });
+
+  /**
+   * On the local network over plain http the older handshake is still the only one available, and
+   * that link has no confidentiality to lose; the server says it will accept it.
+   */
+  it('still uses the older handshake on a plain-http local page the server accepts it on', () => {
+    canSeal = false;
+    client.setToken('secret');
+    newestSocket().open();
+
+    newestSocket().receive({
+      type: 'challenge',
+      protocol: 2,
+      nonceS: SESSION_VECTOR.nonceS,
+      sealedRequired: false,
+    });
 
     expect(newestSocket().frames()[0]).toEqual(
       expect.objectContaining({ type: 'auth', token: 'secret' }),
     );
-
-    newestSocket().receive({
-      type: 'auth-failed',
-      reason: '此连接要求加密握手，请改用 HTTPS 打开远程工作台。',
-    });
-
-    expect(client.state).toBe('unauthorized');
-    expect(client.error).toBe('此连接要求加密握手，请改用 HTTPS 打开远程工作台。');
   });
 
   it('passes a command error through unchanged', async () => {

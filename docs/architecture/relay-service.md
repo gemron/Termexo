@@ -576,7 +576,7 @@ enroll.rs   调用 /api/enroll、写 keyring
 ### 握手
 
 ```
-S→C  { "type": "challenge", "protocol": 2, "nonceS": <base64url, 32 B> }
+S→C  { "type": "challenge", "protocol": 2, "nonceS": <base64url, 32 B>, "sealedRequired": <bool> }
 C→S  { "type": "auth", "protocol": 2, "clientId": "<uuid>", "nonceC": <base64url, 32 B>,
        "proof": <base64url, HMAC-SHA256(authKey, nonceS ‖ nonceC)> }
 S→C  { "type": "ready", "serverVersion": "x.y.z" }        ← 这一帧起全部封装
@@ -596,7 +596,16 @@ S→C  { "type": "ready", "serverVersion": "x.y.z" }        ← 这一帧起全�
 * `proof` 用 HMAC 的 `verify_slice` 常量时间比较；不匹配按现有 `RemoteAuth` 的来源 IP 失败锁定
   计数（10 分钟 5 次，锁 10 分钟），回 `{"type":"auth-failed","reason":"…"}` 并关闭 4401。
   校验与派生都在 `RemoteAuth::authorize_with` 的闭包里完成，令牌不会被交回调用方。
-* **令牌本身不再出现在任何帧里**，LAN 直连一并受益。
+* 走 v2 时**令牌本身不出现在任何帧里**，LAN 直连走 HTTPS 时一并受益。
+* **`sealedRequired` 必须在 `challenge` 里预先声明，不能只靠事后拒绝。** 页面拿不到 `crypto.subtle`
+  （明文 HTTP）时只能发 v1，而 v1 帧里带着**明文令牌**。早期实现是客户端先发 v1、服务端再以
+  「此连接要求加密握手」拒绝——拒绝挡住了会话，却挡不住令牌：它在拒绝写回之前就已经明文穿过公网、
+  经过了中继。现在服务端在 `challenge` 里告诉客户端这条链路是否接受 v1；`sealedRequired` 为真而页面
+  又无法加密时，客户端**一个字节的令牌都不发**，直接在本地报错并停止重连（重连只会拿到同一个
+  `challenge`）。服务端的降级拒绝保留，作为纵深防御。
+  这个漏洞在经中继、中继又以明文 HTTP 对外（`--tls off` 且前面没有 HTTPS 反代）时触发，恰好是最需要
+  保护令牌的场景；早先的抓包验证之所以没发现，是因为验证页面开在 `localhost`，属于安全上下文，走的
+  是 v2。
 
 ### 封装帧
 
