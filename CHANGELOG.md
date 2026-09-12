@@ -21,6 +21,10 @@ Release notes for every Termexo version, newest first. The current release is su
   one goes through.
 - A device can require a relay sign-in before anyone reaches it — a gate on the relay's side, quite
   separate from the desktop's own access token.
+- OpenCode terminals now show the ChatGPT Codex and OpenCode Go subscriptions connected through
+  OpenCode in the provider allowance panel, including their five-hour, weekly and monthly windows
+  and reset times. An unresolved default model shows both connected subscriptions; every figure is
+  read directly from the service's own internal usage endpoint and treated as undocumented data.
 
 ## V0.9.0
 

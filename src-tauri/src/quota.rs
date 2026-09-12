@@ -10,8 +10,11 @@
 //! every provider's parsing testable without a network.
 
 use std::fs;
+use std::io::ErrorKind;
 use std::path::{Path, PathBuf};
 
+use base64::engine::general_purpose::{URL_SAFE, URL_SAFE_NO_PAD};
+use base64::Engine;
 use serde::Serialize;
 use serde_json::{Map, Value};
 use url::Url;
@@ -150,6 +153,7 @@ pub fn is_official(provider: &str) -> bool {
         AGENT_CLAUDE_LABEL,
         AGENT_CODEX_LABEL,
         AGENT_ANTIGRAVITY_LABEL,
+        OPENCODE_PROVIDER_LABEL,
     ]
     .iter()
     .any(|known| provider.eq_ignore_ascii_case(known))
@@ -458,11 +462,18 @@ fn minimax_window(
 pub const AGENT_CLAUDE_LABEL: &str = "Claude Code";
 pub const AGENT_CODEX_LABEL: &str = "Codex";
 pub const AGENT_ANTIGRAVITY_LABEL: &str = "Antigravity";
+pub const OPENCODE_PROVIDER_LABEL: &str = "OpenCode";
+pub const OPENCODE_CODEX_QUOTA_ID: &str = "agent:opencode:codex";
+pub const OPENCODE_GO_QUOTA_ID: &str = "agent:opencode:go";
+pub const OPENCODE_CODEX_PROFILE_NAME: &str = "OpenCode · Codex";
+pub const OPENCODE_GO_PROFILE_NAME: &str = "OpenCode Go";
 
 /// The endpoint behind Claude Code's `/usage`.
 const CLAUDE_USAGE_URL: &str = "https://api.anthropic.com/api/oauth/usage";
 /// The endpoint Codex CLI polls for its `/status` figures.
 const CODEX_USAGE_URL: &str = "https://chatgpt.com/backend-api/wham/usage";
+/// The endpoint OpenCode Go uses for its rolling, weekly and monthly subscription windows.
+const OPENCODE_GO_USAGE_URL: &str = "https://opencode.ai/zen/go/v1/usage";
 /// The beta gate on the usage endpoint; without it the request is rejected outright.
 const CLAUDE_OAUTH_BETA: &str = "oauth-2025-04-20";
 /// Anthropic buckets this endpoint by User-Agent. A client that does not look like Claude Code
@@ -475,6 +486,123 @@ pub fn agent_display_name(agent_type: &str) -> &'static str {
         "antigravity" => AGENT_ANTIGRAVITY_LABEL,
         _ => AGENT_CODEX_LABEL,
     }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct OpenCodeCodexCredential {
+    pub access_token: String,
+    pub account_id: Option<String>,
+}
+
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct OpenCodeCredentials {
+    pub codex: Option<OpenCodeCodexCredential>,
+    pub go_api_key: Option<String>,
+}
+
+/// Reads only the two credentials needed for allowance requests from OpenCode's own auth store.
+pub fn read_opencode_credentials() -> Result<OpenCodeCredentials, String> {
+    let fallback_go_api_key = std::env::var("OPENCODE_API_KEY").ok();
+    let injected = std::env::var("OPENCODE_AUTH_CONTENT")
+        .ok()
+        .and_then(|content| serde_json::from_str::<Value>(&content).ok())
+        .filter(Value::is_object);
+    let auth = match injected {
+        Some(auth) => auth,
+        None => {
+            let path = opencode_auth_path();
+            match fs::read_to_string(&path) {
+                Ok(content) => serde_json::from_str::<Value>(&content)
+                    .map_err(|error| format!("OpenCode 登录凭据解析失败：{error}"))?,
+                Err(error) if error.kind() == ErrorKind::NotFound => Value::Object(Map::new()),
+                Err(error) => return Err(format!("无法读取 OpenCode 登录凭据：{error}")),
+            }
+        }
+    };
+    parse_opencode_credentials(&auth, fallback_go_api_key.as_deref())
+}
+
+fn opencode_auth_path() -> PathBuf {
+    let data_home = std::env::var_os("XDG_DATA_HOME")
+        .map(PathBuf::from)
+        .or_else(|| {
+            std::env::var_os("USERPROFILE")
+                .or_else(|| std::env::var_os("HOME"))
+                .map(PathBuf::from)
+                .map(|home| home.join(".local").join("share"))
+        });
+    data_home
+        .unwrap_or_default()
+        .join("opencode")
+        .join("auth.json")
+}
+
+fn parse_opencode_credentials(
+    auth: &Value,
+    fallback_go_api_key: Option<&str>,
+) -> Result<OpenCodeCredentials, String> {
+    let auth = auth
+        .as_object()
+        .ok_or_else(|| "OpenCode 登录凭据必须是 JSON 对象".to_owned())?;
+    let codex = auth
+        .get("openai")
+        .and_then(Value::as_object)
+        .filter(|credential| credential.get("type").and_then(Value::as_str) == Some("oauth"))
+        .and_then(|credential| {
+            let access_token = credential
+                .get("access")
+                .and_then(Value::as_str)
+                .map(str::trim)
+                .filter(|token| !token.is_empty())?;
+            let account_id = credential
+                .get("accountId")
+                .and_then(Value::as_str)
+                .map(str::trim)
+                .filter(|id| !id.is_empty())
+                .map(str::to_owned)
+                .or_else(|| chatgpt_account_id(access_token));
+            Some(OpenCodeCodexCredential {
+                access_token: access_token.to_owned(),
+                account_id,
+            })
+        });
+    let stored_go_api_key = auth
+        .get("opencode-go")
+        .and_then(Value::as_object)
+        .filter(|credential| credential.get("type").and_then(Value::as_str) == Some("api"))
+        .and_then(|credential| credential.get("key"))
+        .and_then(Value::as_str)
+        .map(str::trim)
+        .filter(|key| !key.is_empty());
+    let go_api_key = stored_go_api_key
+        .or_else(|| {
+            fallback_go_api_key
+                .map(str::trim)
+                .filter(|key| !key.is_empty())
+        })
+        .map(str::to_owned);
+    Ok(OpenCodeCredentials { codex, go_api_key })
+}
+
+/// Reads the account claim OpenAI places in its OAuth JWT without validating or logging the token.
+fn chatgpt_account_id(token: &str) -> Option<String> {
+    let payload = token.split('.').nth(1)?;
+    let decoded = URL_SAFE_NO_PAD
+        .decode(payload)
+        .or_else(|_| URL_SAFE.decode(payload))
+        .ok()?;
+    let claims = serde_json::from_slice::<Value>(&decoded).ok()?;
+    claims
+        .get("chatgpt_account_id")
+        .or_else(|| {
+            claims
+                .get("https://api.openai.com/auth")
+                .and_then(|auth| auth.get("chatgpt_account_id"))
+        })
+        .and_then(Value::as_str)
+        .map(str::trim)
+        .filter(|id| !id.is_empty())
+        .map(str::to_owned)
 }
 
 /// Locates an agent's configuration home, honouring the per-account isolation.
@@ -546,6 +674,78 @@ pub fn build_agent_request(agent_type: &str, token: &str) -> QuotaRequest {
     } else {
         QuotaRequest::bearer(CODEX_USAGE_URL.to_owned(), token)
     }
+}
+
+pub fn build_opencode_codex_request(credential: &OpenCodeCodexCredential) -> QuotaRequest {
+    let mut request = QuotaRequest::bearer(CODEX_USAGE_URL.to_owned(), &credential.access_token);
+    request
+        .headers
+        .push(("Accept", "application/json".to_owned()));
+    if let Some(account_id) = credential.account_id.as_deref() {
+        request
+            .headers
+            .push(("ChatGPT-Account-Id", account_id.to_owned()));
+    }
+    request
+}
+
+pub fn build_opencode_go_request(api_key: &str) -> QuotaRequest {
+    let mut request = QuotaRequest::bearer(OPENCODE_GO_USAGE_URL.to_owned(), api_key);
+    request
+        .headers
+        .push(("Accept", "application/json".to_owned()));
+    request
+}
+
+pub fn parse_opencode_codex_response(body: &Value) -> Result<Vec<QuotaEntry>, String> {
+    let rate_limit = body
+        .get("rate_limit")
+        .ok_or_else(|| "OpenCode Codex 未返回订阅额度".to_owned())?;
+    Ok(vec![
+        parse_used_window(
+            rate_limit.get("primary_window"),
+            "5 小时窗口",
+            "used_percent",
+            "reset_at",
+        )?,
+        parse_used_window(
+            rate_limit.get("secondary_window"),
+            "每周额度",
+            "used_percent",
+            "reset_at",
+        )?,
+    ])
+}
+
+pub fn parse_opencode_go_response(body: &Value) -> Result<Vec<QuotaEntry>, String> {
+    let usage = body
+        .get("usage")
+        .ok_or_else(|| "OpenCode Go 未返回订阅额度".to_owned())?;
+    Ok(vec![
+        parse_used_window(usage.get("rolling"), "5 小时窗口", "percent", "resetsAt")?,
+        parse_used_window(usage.get("weekly"), "每周额度", "percent", "resetsAt")?,
+        parse_used_window(usage.get("monthly"), "每月额度", "percent", "resetsAt")?,
+    ])
+}
+
+fn parse_used_window(
+    value: Option<&Value>,
+    label: &str,
+    percent_key: &str,
+    reset_key: &str,
+) -> Result<QuotaEntry, String> {
+    let value = value.ok_or_else(|| format!("{label}不可用"))?;
+    let percent = loose_number(value, percent_key)
+        .filter(|percent| percent.is_finite())
+        .ok_or_else(|| format!("{label}的已用比例无效"))?;
+    let resets_at = value
+        .get(reset_key)
+        .and_then(parse_timestamp)
+        .ok_or_else(|| format!("{label}的重置时间无效"))?;
+    let mut entry = QuotaEntry::new(label, QuotaUnit::Percent);
+    entry.percent = Some(percent.clamp(0.0, 100.0));
+    entry.resets_at = Some(resets_at);
+    Ok(entry)
 }
 
 /// Turns an agent's usage response into allowance lines.
@@ -1019,6 +1219,7 @@ mod tests {
         assert!(!is_official(AGENT_CLAUDE_LABEL));
         assert!(!is_official(AGENT_CODEX_LABEL));
         assert!(!is_official(AGENT_ANTIGRAVITY_LABEL));
+        assert!(!is_official(OPENCODE_PROVIDER_LABEL));
     }
 
     #[test]
@@ -1102,5 +1303,119 @@ mod tests {
         assert!(error.contains("未识别"));
         assert!(error.contains("plan"));
         assert!(!error.contains("pro"));
+    }
+
+    #[test]
+    fn reads_opencode_codex_and_go_credentials_without_exposing_other_auth_entries() {
+        let payload = URL_SAFE_NO_PAD.encode(
+            br#"{"https://api.openai.com/auth":{"chatgpt_account_id":"account-from-jwt"}}"#,
+        );
+        let auth = json!({
+            "openai": { "type": "oauth", "access": format!("header.{payload}.signature") },
+            "opencode-go": { "type": "api", "key": "stored-go-key" },
+            "another-provider": { "type": "api", "key": "must-not-be-read" }
+        });
+
+        let credentials = parse_opencode_credentials(&auth, Some("fallback-go-key")).unwrap();
+
+        assert_eq!(
+            credentials.codex,
+            Some(OpenCodeCodexCredential {
+                access_token: format!("header.{payload}.signature"),
+                account_id: Some("account-from-jwt".to_owned()),
+            })
+        );
+        assert_eq!(credentials.go_api_key.as_deref(), Some("stored-go-key"));
+    }
+
+    #[test]
+    fn opencode_go_uses_the_environment_fallback_only_without_a_stored_key() {
+        let credentials =
+            parse_opencode_credentials(&json!({}), Some("environment-go-key")).unwrap();
+
+        assert_eq!(
+            credentials.go_api_key.as_deref(),
+            Some("environment-go-key")
+        );
+        assert!(credentials.codex.is_none());
+    }
+
+    #[test]
+    fn builds_opencode_usage_requests_with_the_required_identity_headers() {
+        let codex = build_opencode_codex_request(&OpenCodeCodexCredential {
+            access_token: "codex-token".to_owned(),
+            account_id: Some("account-2".to_owned()),
+        });
+        assert_eq!(codex.url, CODEX_USAGE_URL);
+        assert_eq!(
+            codex.headers,
+            vec![
+                (AUTHORIZATION, "Bearer codex-token".to_owned()),
+                ("Accept", "application/json".to_owned()),
+                ("ChatGPT-Account-Id", "account-2".to_owned()),
+            ]
+        );
+
+        let go = build_opencode_go_request("go-key");
+        assert_eq!(go.url, OPENCODE_GO_USAGE_URL);
+        assert_eq!(
+            go.headers,
+            vec![
+                (AUTHORIZATION, "Bearer go-key".to_owned()),
+                ("Accept", "application/json".to_owned()),
+            ]
+        );
+    }
+
+    #[test]
+    fn parses_opencode_codex_primary_and_secondary_windows() {
+        let entries = parse_opencode_codex_response(&json!({
+            "rate_limit": {
+                "primary_window": { "used_percent": 25, "reset_at": 1_800_000_000u64 },
+                "secondary_window": { "used_percent": 50, "reset_at": 1_800_100_000u64 }
+            }
+        }))
+        .unwrap();
+
+        assert_eq!(entries.len(), 2);
+        assert_eq!(entries[0].label, "5 小时窗口");
+        assert_eq!(entries[0].percent, Some(25.0));
+        assert_eq!(entries[0].resets_at, Some(1_800_000_000_000));
+        assert_eq!(entries[1].label, "每周额度");
+        assert_eq!(entries[1].percent, Some(50.0));
+    }
+
+    #[test]
+    fn parses_all_opencode_go_windows() {
+        let entries = parse_opencode_go_response(&json!({
+            "usage": {
+                "rolling": { "percent": 20, "resetsAt": "2027-01-15T10:00:00.000Z" },
+                "weekly": { "percent": 40, "resetsAt": "2027-01-18T00:00:00.000Z" },
+                "monthly": { "percent": 60, "resetsAt": "2027-02-01T00:00:00.000Z" }
+            }
+        }))
+        .unwrap();
+
+        assert_eq!(entries.len(), 3);
+        assert_eq!(entries[0].label, "5 小时窗口");
+        assert_eq!(entries[0].percent, Some(20.0));
+        assert_eq!(entries[1].label, "每周额度");
+        assert_eq!(entries[2].label, "每月额度");
+        assert_eq!(entries[2].percent, Some(60.0));
+    }
+
+    #[test]
+    fn rejects_an_incomplete_opencode_usage_window() {
+        let error = parse_opencode_go_response(&json!({
+            "usage": {
+                "rolling": { "percent": null, "resetsAt": "2027-01-15T10:00:00.000Z" },
+                "weekly": { "percent": 40, "resetsAt": "2027-01-18T00:00:00.000Z" },
+                "monthly": { "percent": 60, "resetsAt": "2027-02-01T00:00:00.000Z" }
+            }
+        }))
+        .unwrap_err();
+
+        assert!(error.contains("5 小时窗口"));
+        assert!(error.contains("已用比例无效"));
     }
 }
