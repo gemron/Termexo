@@ -328,6 +328,27 @@ html[lang="zh-CN"] .hero h1 {
   font-size: 15px;
   line-height: 1.85;
 }
+/* The four agents the lead line names, each by the mark its own project publishes. */
+.hero-agents {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 18px;
+  margin: 18px 0 0;
+  padding: 0;
+  list-style: none;
+}
+.hero-agents li {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  color: #4c6774;
+  font-size: 12px;
+}
+.hero-agents img {
+  width: 22px;
+  height: 22px;
+  opacity: 0.9;
+}
 .hero-remote-note {
   max-width: 400px;
   margin: 17px 0 0;

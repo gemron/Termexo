@@ -23,6 +23,13 @@
   <a href="https://www.npmjs.com/package/termexo">npm</a>
 </p>
 
+<p>
+  <img src="website/assets/agent-claude.svg" alt="Claude Code" title="Claude Code" width="26" height="26">&nbsp;&nbsp;
+  <img src="website/assets/agent-codex.svg" alt="Codex CLI" title="Codex CLI" width="26" height="26">&nbsp;&nbsp;
+  <img src="website/assets/agent-opencode.svg" alt="OpenCode" title="OpenCode" width="26" height="26">&nbsp;&nbsp;
+  <img src="website/assets/agent-antigravity.svg" alt="Antigravity" title="Antigravity" width="26" height="26">
+</p>
+
 Termexo runs Claude Code, Codex, OpenCode, and Antigravity in one Windows workbench.
 Keep your agents running on your PC, then use your phone to check output,
 answer an approval, or send the next instruction to the same live terminal.

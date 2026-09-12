@@ -23,6 +23,13 @@
   <a href="https://www.npmjs.com/package/termexo">npm</a>
 </p>
 
+<p>
+  <img src="website/assets/agent-claude.svg" alt="Claude Code" title="Claude Code" width="26" height="26">&nbsp;&nbsp;
+  <img src="website/assets/agent-codex.svg" alt="Codex CLI" title="Codex CLI" width="26" height="26">&nbsp;&nbsp;
+  <img src="website/assets/agent-opencode.svg" alt="OpenCode" title="OpenCode" width="26" height="26">&nbsp;&nbsp;
+  <img src="website/assets/agent-antigravity.svg" alt="Antigravity" title="Antigravity" width="26" height="26">
+</p>
+
 Termexo 把 Claude Code、Codex、OpenCode 和 Antigravity 放进同一个 Windows 工作台。
 Agent 留在电脑上运行；离开桌面后，用手机查看输出、回复审批，或向同一个终端发送下一条指令。
 
