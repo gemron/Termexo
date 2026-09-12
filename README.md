@@ -23,7 +23,7 @@
   <a href="https://www.npmjs.com/package/termexo">npm</a>
 </p>
 
-Termexo runs Claude Code, Codex, and OpenCode in one Windows workbench.
+Termexo runs Claude Code, Codex, OpenCode, and Antigravity in one Windows workbench.
 Keep your agents running on your PC, then use your phone to check output,
 answer an approval, or send the next instruction to the same live terminal.
 
@@ -49,7 +49,7 @@ Install and configure your chosen agent CLI and model access; Termexo does not i
 
 ## From your desk to your phone
 
-1. Open a project on your PC and start Claude Code, Codex, or OpenCode.
+1. Open a project on your PC and start Claude Code, Codex, OpenCode, or Antigravity.
 2. Enable remote access in Termexo; keep your PC awake and connect your phone through a trusted LAN or VPN.
 3. Open the remote link in your phone's browser to read output, respond to approvals, and send instructions.
 
@@ -78,9 +78,9 @@ Trying it for the first time? [Tell us what worked or where you got stuck](https
   <tr>
     <td width="50%" valign="top">
       <strong>Four agents. One screen.</strong><br><br>
-      Run Claude Code, Codex, and OpenCode side by side in as many real PTY terminals as you
-      need, choose which stay visible, and arrange them in a custom 1–6 row/column grid. Reorder
-      tabs by dragging, close one with the middle mouse button, and drive the workbench from the
+      Run Claude Code, Codex, OpenCode, and Antigravity side by side in as many real PTY
+      terminals as you need, choose which stay visible, and arrange them in a custom 1–6
+      row/column grid. Reorder tabs by dragging, close one with the middle mouse button, and drive the workbench from the
       keyboard. Each workspace remembers its folder, tabs, layout, model, and theme.
       <br><br>
       <a href="website/assets/termexo-workbench.png"><img src="website/assets/termexo-workbench.png" alt="Termexo multi-agent workbench"></a>
@@ -97,11 +97,11 @@ Trying it for the first time? [Tell us what worked or where you got stuck](https
   <tr>
     <td width="50%" valign="top">
       <strong>Pick up yesterday's conversation.</strong><br><br>
-      Search local Claude Code, Codex, and OpenCode sessions across projects, accounts,
-      branches, and models. Termexo restores them through the CLIs' own
-      <code>claude --resume</code>, <code>codex resume</code>, and <code>opencode --session</code>
-      commands, reclaims a Claude session the CLI still holds open, and keeps native session
-      files read-only.
+      Search local Claude Code, Codex, OpenCode, and Antigravity sessions across projects,
+      accounts, branches, and models. Termexo restores them through the CLIs' own
+      <code>claude --resume</code>, <code>codex resume</code>, <code>opencode --session</code>,
+      and <code>agy --conversation</code> commands, reclaims a Claude session the CLI still holds
+      open, and keeps native session files read-only.
       <br><br>
       <a href="website/assets/termexo-session-center.png"><img src="website/assets/termexo-session-center.png" alt="Termexo native session center"></a>
     </td>
@@ -145,7 +145,8 @@ Trying it for the first time? [Tell us what worked or where you got stuck](https
     <td width="50%" valign="top">
       <strong>Let it run without babysitting.</strong><br><br>
       Start any agent with automatic confirmation — <code>--permission-mode auto</code> for
-      Claude, <code>--approve-for-me</code> for Codex, <code>--auto</code> for OpenCode — so the
+      Claude, <code>--approve-for-me</code> for Codex, <code>--auto</code> for OpenCode,
+      <code>--dangerously-skip-permissions</code> for Antigravity — so the
       AUTO chip on a terminal means the same thing whichever agent drew it.
     </td>
   </tr>
@@ -182,14 +183,14 @@ a local control plane that is observable, recoverable, and extensible.
 | ------------------------ | ------------------------------------------------------------------------------------------------------------------ |
 | Workspace management     | Create, rename, theme, manually reorder, and switch workspaces; persist paths, layouts, and terminal configuration |
 | Multi-terminal workbench | Unlimited tabs, explicit pane selection, configurable 1–6 row/column grids, pane/workspace maximize, and real PTYs |
-| Agent detection          | Detect the Claude Code, Codex, and OpenCode executables, their versions, and health on Windows                     |
-| Start agent sessions     | Launch Claude, Codex, or OpenCode with a working directory, isolated login account, Agent-specific model configuration, and optional automatic confirmation |
-| Session center           | Read-only multi-account Claude/Codex/OpenCode discovery, search, workspace filtering, native resume, and reclaim of a Claude session the CLI still holds open |
+| Agent detection          | Detect the Claude Code, Codex, OpenCode, and Antigravity executables, their versions, and health on Windows         |
+| Start agent sessions     | Launch Claude, Codex, OpenCode, or Antigravity with a working directory, isolated login account, Agent-specific model configuration, and optional automatic confirmation |
+| Session center           | Read-only multi-account Claude/Codex/OpenCode/Antigravity discovery, search, workspace filtering, native resume, and reclaim of a Claude session the CLI still holds open |
 | Agent status tracking    | Isolated hooks per terminal for thinking, tool use, approval, user input, completion, and failure states           |
 | Model and MCP profiles   | Manage endpoints, keys, and MCP configuration; switch Claude CLI across Anthropic-compatible backends              |
 | Network and npm profiles | Scope HTTP/HTTPS/SOCKS and npm settings globally or per workspace, test reachability, and inject them at launch    |
 | Account management       | Manage multiple isolated Claude and ChatGPT/Codex logins, defaults, authentication status, and launch-time choice  |
-| Managed CLI lifecycle    | Preview, confirm, install, or upgrade the official Claude Code, Codex, and OpenCode npm packages, then verify the result |
+| Managed CLI lifecycle    | Preview, confirm, install, or upgrade each agent's CLI — from its official npm package, or from the vendor's own Windows installer where one is published — then verify the result |
 | Task board               | Organise projects and tasks with priorities and acceptance criteria, run one as a Claude/Codex/OpenCode terminal, and track it from todo through executing, completed, and verified |
 | Prompt assets            | Recover live per-terminal drafts; search, favorite, pin, delete, and reuse submitted prompts                       |
 | Session handoff          | Build redacted, token-budgeted Git/task packages; import/export documents and continue in another Agent            |
@@ -252,7 +253,7 @@ These requirements are for contributors building Termexo, not for installing the
   when it finds an older one, and Windows 11 and the installers both provide a current runtime;
 - Node.js `^22.22.3`, `^24.15.0`, or `>=26.0.0`;
 - Rust stable and Visual Studio C++ Build Tools for the desktop runtime;
-- a local Claude Code and/or Codex CLI installation (Termexo can also manage installation and upgrades).
+- a local installation of at least one agent CLI (Termexo can also install and upgrade them).
 
 ### 1. Clone and install frontend dependencies
 

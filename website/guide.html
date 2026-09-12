@@ -33,7 +33,7 @@
         </a>
         <nav aria-label="文档导航">
           <a href="./">返回官网</a>
-          <a class="guide-download" href="downloads/termexo-user-guide.pdf" download="Termexo-使用说明-v0.8.1.pdf">下载 PDF</a>
+          <a class="guide-download" href="downloads/termexo-user-guide.pdf" download="Termexo-使用说明-v0.9.0.pdf">下载 PDF</a>
         </nav>
         <div class="language-switch" role="group" aria-label="文档语言">
           <a href="guide.en.html" data-lang="en" lang="en" hreflang="en" aria-label="Read in English">EN</a>
@@ -55,16 +55,16 @@
           <a href="#faq">07　常见问题</a>
           <a href="#privacy">08　数据与安全</a>
         </nav>
-        <p class="guide-sidebar-note">适用于 Windows 桌面版<br />V0.8.1 · 简体中文</p>
+        <p class="guide-sidebar-note">适用于 Windows 桌面版<br />V0.9.0 · 简体中文</p>
       </aside>
       <article id="guide-content" class="guide-content" lang="zh-CN">
         <header class="guide-intro">
           <p class="guide-label">TERMEXO / USER GUIDE</p>
           <h1>使用说明</h1>
           <p class="guide-lead">从第一个工作空间开始，把终端、Agent 和项目进度放在一起。</p>
-          <p class="guide-meta">适用版本 V0.8.1 · 更新日期 2026-09-07 · Windows 10/11 x64</p>
+          <p class="guide-meta">适用版本 V0.9.0 · 更新日期 2026-09-12 · Windows 10/11 x64</p>
           <div class="guide-actions" data-pdf-skip>
-            <a class="button primary" href="downloads/termexo-user-guide.pdf" download="Termexo-使用说明-v0.8.1.pdf">下载使用说明 · PDF</a>
+            <a class="button primary" href="downloads/termexo-user-guide.pdf" download="Termexo-使用说明-v0.9.0.pdf">下载使用说明 · PDF</a>
             <a class="button secondary" href="#quick-start">开始阅读 ↓</a>
           </div>
           <p class="guide-note" data-pdf-skip>PDF 与本页内容同步，可离线阅读。本文以中文界面为例；其他版本的按钮位置可能略有不同。</p>
@@ -83,10 +83,16 @@
           <h3>第一次使用：完成这三步</h3>
           <ol>
             <li><strong>创建工作空间。</strong>在首次启动引导中创建工作空间，填写项目名称并选择这台电脑上实际存在的项目目录。</li>
-            <li><strong>准备 Agent。</strong>在设置中检查 Claude Code、Codex 或 OpenCode 的检测状态。未安装时，可使用 CLI 安装/升级入口，确认安装预览后继续；按提示完成所选 Agent 的登录或模型配置。</li>
+            <li><strong>准备 Agent。</strong>在设置中检查 Claude Code、Codex、OpenCode 与 Antigravity 的检测状态。未安装时可用「CLI 安装与升级」，确认安装预览后继续；按提示完成所选 Agent 的登录或模型配置。为没装的 Agent 新建终端时，启动对话框里也会直接给出「去安装」，并把安装界面停在那个 Agent 上。</li>
             <li><strong>新建终端。</strong>点击标签栏的「新建」，选择 Agent，确认工作目录、账号与模型，启动后输入任务。也可以先选择普通终端，检查项目目录与命令环境。</li>
           </ol>
           <p class="guide-callout">先用一条小任务验证环境，例如「阅读这个项目，说明如何运行测试，先不要修改文件」。确认目录、账号和连接正确后，再安排修改代码的任务。</p>
+          <h3>安装 Agent 的 CLI</h3>
+          <p>设置里的「CLI 安装与升级」按 Agent 安装它自己的命令行工具，执行前给出完整命令与安装位置，装完再做一次健康检查。有两种来源：</p>
+          <ul>
+            <li><strong>官方 npm 包：</strong>可以指定版本，失败时自动回滚到原来的版本；需要本机的 Node.js 与 npm，并使用当前生效的代理与 registry。</li>
+            <li><strong>厂商官方安装脚本：</strong>Claude Code、Codex CLI 与 Antigravity 都发布了 Windows 脚本，装的是厂商当前发布的版本，没有版本可选，失败后也不会自动还原；OpenCode 没有发布 Windows 脚本。</li>
+          </ul>
         </section>
 
         <section id="workbench" class="guide-section" data-pdf-page>
@@ -98,7 +104,7 @@
           </figure>
           <h3>安排你的工作台</h3>
           <ul>
-            <li>从标签栏「新建」启动普通 Shell、Claude Code、Codex 或 OpenCode。工作目录指向本机文件夹，不是 GitHub 网页地址。</li>
+            <li>从标签栏「新建」启动普通 Shell、Claude Code、Codex、OpenCode 或 Antigravity。工作目录指向本机文件夹，不是 GitHub 网页地址。</li>
             <li>打开多个标签后，选择要显示的终端，再调整网格行列；支持 1 至 6 行/列以及最大化查看。拖动标签可以调整顺序。</li>
             <li>每个终端运行独立的真实进程。多个 Agent 在同一目录中修改文件会相互影响；需要隔离改动时，请使用不同目录或 Git worktree。</li>
           </ul>
@@ -114,7 +120,7 @@
         <section id="sessions" class="guide-section" data-pdf-page>
           <h2>03 / 恢复会话</h2>
           <ol>
-            <li>打开「会话中心」，搜索本机已有的 Claude Code、Codex 或 OpenCode 会话；可结合项目、账号等条件筛选。</li>
+            <li>打开「会话中心」，搜索本机已有的 Claude Code、Codex、OpenCode 或 Antigravity 会话；可结合项目、账号等条件筛选。</li>
             <li>查看会话的目录、Agent、账号与最近活动，确认是要继续的那一次。</li>
             <li>选择恢复，确认启动选项。Termexo 调用 CLI 的原生会话恢复能力，再在终端中继续对话。</li>
           </ol>
@@ -132,7 +138,10 @@
             <li>确认协议与所选 Agent 相匹配。Claude Code 的兼容后端需要支持相应 Anthropic 接口；不是任意模型地址都能直接使用。</li>
             <li>保存后，在启动或恢复终端时选择 Profile，先发起一条简短请求验证。切换现有终端前，阅读界面提示并确认当前任务可以中断。</li>
           </ol>
-          <p>API Key 由 Windows 凭据管理器保存。供应商余额与额度并非都支持查询；界面标为估算或不可用的数据，不应当作官方账单。</p>
+          <p>API Key 由 Windows 凭据管理器保存。余量面板按 Profile 显示各供应商的可用额度，Antigravity 的余量通过它自己的 <code>/usage</code> 读取。供应商余额与额度并非都支持查询；界面标为估算或不可用的数据，不应当作官方账单。</p>
+          <h3>Antigravity 的模型与状态回传</h3>
+          <p>Antigravity 不使用 Termexo 的模型 Profile。它的模型与推理强度在新建终端的对话框里选择，可选项由本机的 agy 自己提供。</p>
+          <p>它也没有按次启动的配置方式，所以要让终端知道它在思考、在跑工具还是在等你回答，Termexo 需要写入 agy 自己设置里的状态行。这一项默认开启，可以在设置中关闭；关闭时会还原你原本的状态行。Termexo 只认自己写的那一段，不会动你自己配置的状态行。</p>
           <h3>代理与 npm 网络</h3>
           <p>需要代理时，在网络配置中创建全局或工作空间 Profile，按实际环境填写代理和 npm registry，测试连接后再启动终端或安装 CLI。工作空间配置优先于全局配置；调整后应重新启动相关终端，使新环境生效。</p>
         </section>
@@ -147,6 +156,7 @@
           </ol>
           <h3>检查 Git 改动</h3>
           <p>选中对应终端后打开 Git 视图，查看分支、提交和文件 Diff；可切换单栏/双栏显示。Git 视图跟随当前终端的工作目录，以该终端启动时的 HEAD 为会话基线。</p>
+          <p>文件改动较多时，用工具栏的上下箭头按变更位置翻动（快捷键 <code>Alt+↑</code> / <code>Alt+↓</code>）。一次跳过一处连续改动，而不是一行一行走；跳到的位置会被标出，并保留引出这处改动的上文。</p>
           <p class="guide-callout">「会话改动」是这段时间里观察到的仓库差异，不是该 Agent 独占的操作记录。编辑器、其他终端和其他 Agent 的同期修改也可能出现。提交前仍应逐项审查。</p>
           <h3>复用提示词与交接上下文</h3>
           <ul>
@@ -184,7 +194,7 @@
         <section id="faq" class="guide-section" data-pdf-page>
           <h2>07 / 常见问题</h2>
           <h3>提示未检测到 Agent，或命令无法启动？</h3>
-          <p>先在设置中确认安装状态，再检查对应 CLI 是否能在系统终端启动。安装后重新检测；核对 PATH、Node/npm 环境、工作目录和网络配置。登录失败时，确认当前选择的隔离账号已完成授权。</p>
+          <p>先在设置中确认安装状态，再检查对应 CLI 是否能在系统终端启动。安装后重新检测；核对 PATH、Node/npm 环境、工作目录和网络配置。用 npm 装不上时可以改用厂商官方脚本，但两种方式装的是两份可执行文件，同时存在时实际运行哪一份由 PATH 决定。Antigravity 的命令行工具不在 PATH 上，Termexo 会到它安装器的固定位置去找。登录失败时，确认当前选择的隔离账号已完成授权。</p>
           <h3>会话中心找不到历史，或恢复时提示会话无效？</h3>
           <p>确认使用的是原账号与原项目目录，原生会话文件仍在，CLI 可以读取。更换账号、删除 CLI 数据或移动项目都可能影响恢复。不要手动修改原生会话 ID；必要时新建会话，并用经过检查的交接包继续。</p>
           <h3>模型请求失败，提示认证或接口错误？</h3>
@@ -199,6 +209,8 @@
           <h2>08 / 数据与安全</h2>
           <ul>
             <li>Termexo 默认本地工作，没有 Termexo 账号或强制云同步；工作空间等状态保存在本机，API Key 由 Windows 凭据管理器保存。</li>
+            <li>设置里的「存储」面板说明数据目录在哪、里面有哪些文件、各占多大，以及当前运行的可执行文件路径与版本。数据库是最值得关注的一项。</li>
+            <li>数据目录可以迁移到别的磁盘：选一个空目录，Termexo 会把内容复制过去并记录下来，下次启动使用新位置。迁移不会删除原来的副本，面板会告诉你它在哪，确认无误后再由你自行清理。目标目录必须为空。</li>
             <li>Agent CLI 仍会按你选择的模型服务发送请求。哪些代码和上下文会离开电脑，取决于 CLI、供应商配置及其隐私政策。</li>
             <li>官网有独立的第三方访问统计；它不是桌面应用或远程工作台的会话统计，也不代表下载量。</li>
           </ul>
@@ -208,7 +220,7 @@
       </article>
     </main>
     <footer class="guide-footer">
-      <div class="shell guide-footer-links"><span>Termexo 使用说明 · V0.8.1</span><a href="#guide-content">回到顶部 ↑</a><a href="downloads/termexo-user-guide.pdf" download="Termexo-使用说明-v0.8.1.pdf">下载 PDF</a></div>
+      <div class="shell guide-footer-links"><span>Termexo 使用说明 · V0.9.0</span><a href="#guide-content">回到顶部 ↑</a><a href="downloads/termexo-user-guide.pdf" download="Termexo-使用说明-v0.9.0.pdf">下载 PDF</a></div>
       <div class="shell site-counter">
         <p><span>官网累计访问量（PV）：</span> <span id="busuanzi_value_site_pv" class="site-counter-value">—</span></p>
         <p>第三方统计仅记录官网访问；“—”表示暂不可用。</p>

@@ -163,13 +163,13 @@ def build(output, regular_font, bold_font, language="zh"):
         canvas.line(46, 40, A4[0] - 46, 40)
         canvas.setFont("Guide", 8)
         canvas.setFillColor(colors.HexColor("#52685d"))
-        canvas.drawString(46, 26, f"{title} | V0.8.1")
+        canvas.drawString(46, 26, f"{title} | V0.9.0")
         canvas.drawRightString(A4[0] - 46, 26, f"www.termexo.com  /  {doc.page}")
         canvas.restoreState()
 
     output.parent.mkdir(parents=True, exist_ok=True)
     document = GuideDocument(str(output), pagesize=A4, rightMargin=46, leftMargin=46,
-                             topMargin=38, bottomMargin=58, title=f"{title} V0.8.1",
+                             topMargin=38, bottomMargin=58, title=f"{title} V0.9.0",
                              author="Termexo", subject="Setup, Agent sessions, model profiles and remote access" if english else "安装、Agent 会话、模型配置与远程访问")
     document.build(story, onFirstPage=page_chrome, onLaterPages=page_chrome)
     print(f"Built {output} ({output.stat().st_size:,} bytes)")

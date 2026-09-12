@@ -23,7 +23,7 @@
   <a href="https://www.npmjs.com/package/termexo">npm</a>
 </p>
 
-Termexo 把 Claude Code、Codex 和 OpenCode 放进同一个 Windows 工作台。
+Termexo 把 Claude Code、Codex、OpenCode 和 Antigravity 放进同一个 Windows 工作台。
 Agent 留在电脑上运行；离开桌面后，用手机查看输出、回复审批，或向同一个终端发送下一条指令。
 
 ![Termexo Windows 工作台](website/assets/termexo-workbench.png)
@@ -48,7 +48,7 @@ npx termexo@latest
 
 ## 从电脑接到手机
 
-1. 在电脑上打开项目，启动 Claude Code、Codex 或 OpenCode。
+1. 在电脑上打开项目，启动 Claude Code、Codex、OpenCode 或 Antigravity。
 2. 在 Termexo 中启用远程访问，保持电脑唤醒，让手机通过可信局域网或 VPN 连接。
 3. 用手机浏览器打开远程链接，查看输出、回复审批、发送下一条指令。
 
@@ -76,7 +76,7 @@ npx termexo@latest
   <tr>
     <td width="50%" valign="top">
       <strong>四个 Agent，一块屏幕。</strong><br><br>
-      Claude Code、Codex 和 OpenCode 可以并排跑在真实 PTY 终端里，想开多少开多少，再选择当前
+      Claude Code、Codex、OpenCode 和 Antigravity 可以并排跑在真实 PTY 终端里，想开多少开多少，再选择当前
       要显示的终端，排成 1–6 行/列的自定义网格。标签支持拖拽排序和中键关闭，工作台支持键盘
       快捷键。每个工作空间都会记住目录、标签、布局、模型和主题。
       <br><br>
@@ -93,8 +93,9 @@ npx termexo@latest
   <tr>
     <td width="50%" valign="top">
       <strong>接着昨天的会话继续。</strong><br><br>
-      跨项目、账号、分支和模型搜索本机 Claude Code/Codex/OpenCode 会话。Termexo 调用 CLI 原生的
-      <code>claude --resume</code>、<code>codex resume</code> 与 <code>opencode --session</code>
+      跨项目、账号、分支和模型搜索本机 Claude Code/Codex/OpenCode/Antigravity 会话。Termexo 调用 CLI
+      原生的 <code>claude --resume</code>、<code>codex resume</code>、<code>opencode --session</code>
+      与 <code>agy --conversation</code>
       恢复完整上下文，也能接管 CLI 仍然持有的 Claude 后台会话，并始终只读原生会话文件。
       <br><br>
       <a href="website/assets/termexo-session-center.png"><img src="website/assets/termexo-session-center.png" alt="Termexo 原生会话中心"></a>
@@ -134,8 +135,9 @@ npx termexo@latest
     </td>
     <td width="50%" valign="top">
       <strong>不用盯着一路点确认。</strong><br><br>
-      三个 Agent 都可以带自动确认启动——Claude 用 <code>--permission-mode auto</code>，Codex 用
-      <code>--approve-for-me</code>，OpenCode 用 <code>--auto</code>——终端上的 AUTO 标记在任意
+      每个 Agent 都可以带自动确认启动——Claude 用 <code>--permission-mode auto</code>，Codex 用
+      <code>--approve-for-me</code>，OpenCode 用 <code>--auto</code>，Antigravity 用
+      <code>--dangerously-skip-permissions</code>——终端上的 AUTO 标记在任意
       Agent 下含义一致。
     </td>
   </tr>
@@ -169,14 +171,14 @@ Termexo 以 **Workspace** 为组织单位，把这些信息集中到一个可观
 | ------------------ | --------------------------------------------------------------------------------- |
 | Workspace 管理     | 创建、改名、换色、手动排序和切换 Workspace，并持久化项目路径、布局与终端配置      |
 | 多终端工作台       | 不限终端数量、指定窗口显示、1–6 行列网格、终端/工作区最大化；桌面端启动真实 PTY   |
-| Agent 检测         | 在 Windows 上检测 Claude Code、Codex 与 OpenCode 的可执行文件、版本与健康状态     |
-| 新建 Agent 会话    | 按目录启动 Claude/Codex/OpenCode，选择隔离账号与 Agent 对应的模型配置，并可开启自动确认 |
-| Agent 会话中心     | 只读发现多账号 Claude/Codex/OpenCode 会话，支持搜索、Workspace 过滤、原生恢复，以及接管 CLI 仍持有的 Claude 后台会话 |
+| Agent 检测         | 在 Windows 上检测 Claude Code、Codex、OpenCode 与 Antigravity 的可执行文件、版本与健康状态 |
+| 新建 Agent 会话    | 按目录启动 Claude/Codex/OpenCode/Antigravity，选择隔离账号与 Agent 对应的模型配置，并可开启自动确认 |
+| Agent 会话中心     | 只读发现多账号 Claude/Codex/OpenCode/Antigravity 会话，支持搜索、Workspace 过滤、原生恢复，以及接管 CLI 仍持有的 Claude 后台会话 |
 | Agent 状态识别     | 为每个终端生成隔离 Hooks 设置，识别思考、工具调用、权限确认、用户输入和完成状态   |
 | 模型与 MCP Profile | 管理模型、Endpoint、API Key 与 MCP 配置；Claude CLI 可切换 Anthropic 兼容后端     |
 | 网络与 npm Profile | 按全局/Workspace 管理 HTTP/HTTPS/SOCKS 与 npm 配置，测试连通性并在启动时注入      |
 | 多账号管理         | 管理多个隔离 Claude 与 ChatGPT/Codex 登录、默认账号、认证状态和启动时选择         |
-| CLI 生命周期管理   | 预览、确认、安装或升级官方 Claude Code/Codex/OpenCode npm 包，并在完成后验证结果  |
+| CLI 生命周期管理   | 预览、确认、安装或升级各 Agent 的 CLI——可用官方 npm 包，也可用厂商自己发布的 Windows 安装脚本——并在完成后验证结果 |
 | 任务看板           | 按项目管理任务，带优先级与验收标准；可将一条任务跑成 Claude/Codex/OpenCode 终端，并从待办跟踪到执行中、已完成、已验收 |
 | 提示词资产         | 按终端恢复实时草稿；搜索、收藏、置顶、删除和复用已提交提示词                     |
 | 会话交接           | 生成带脱敏和 Token 预算的 Git/任务包；导入导出文档并交给另一个 Agent 继续         |
@@ -229,7 +231,7 @@ Termexo 以 **Workspace** 为组织单位，把这些信息集中到一个可观
   也会补装；
 - Node.js `^22.22.3`、`^24.15.0` 或 `>=26.0.0`；
 - 桌面模式需要 Rust stable 和 Visual Studio C++ Build Tools；
-- 本机已安装 Claude Code 和/或 Codex CLI（也可由 Termexo 管理安装与升级）。
+- 本机已安装至少一个 Agent CLI（也可由 Termexo 安装与升级）。
 
 ### 1. 获取代码与安装前端依赖
 

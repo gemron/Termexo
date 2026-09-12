@@ -13,8 +13,24 @@ from pypdf import PdfReader
 
 
 ROOT = Path(__file__).resolve().parents[1]
+# The page count each guide is expected to come to. Pinned rather than bounded so that a layout
+# that silently reflows is caught; update it deliberately when the guide's content changes.
+EXPECTED_PAGES = {"zh": 6, "en": 7}
 builder = runpy.run_path(str(ROOT / "scripts" / "build-user-guide.py"))
 Element, GuideParser = builder["Element"], builder["GuideParser"]
+
+
+# The two lines of running footer each page carries. They fall between the halves of any
+# paragraph that spans a page break, where comparing the text straight through reads the footer
+# as part of the paragraph and reports a corrupted block. Dropped by line rather than by pattern
+# over the joined text, where a page number runs into whatever the next page opens with.
+FOOTER_LINE = re.compile(r"^(?:Termexo .*\| V[\d.]+|www\.termexo\.com\s*/\s*\d+)$")
+
+
+def page_body(page):
+    """One page's text with the running footer removed."""
+    lines = page.extract_text().splitlines()
+    return "\n".join(line for line in lines if not FOOTER_LINE.match(line.strip()))
 
 
 def normalize(text):
@@ -42,13 +58,15 @@ def verify(render_dir, language="zh"):
     parser.feed((ROOT / "website" / source).read_text(encoding="utf-8"))
     article = next(node for node in builder["walk"](parser.root) if node.attrs.get("id") == "guide-content")
     reader = PdfReader(ROOT / "website" / "downloads" / filename)
-    text = normalize("".join(page.extract_text() for page in reader.pages))
+    text = normalize("".join(page_body(page) for page in reader.pages))
     expected = list(blocks(article))
     for index, block in enumerate(expected):
         assert normalize(block) in text, f"HTML block {index} is missing or corrupted in PDF"
     assert len(reader.outline) == 8, "Each chapter needs a PDF bookmark"
     document = pymupdf.open(ROOT / "website" / "downloads" / filename)
-    assert len(document) == 6, "Check unexpected pagination before publishing"
+    assert len(document) == EXPECTED_PAGES[language], (
+        "Check unexpected pagination before publishing"
+    )
     if render_dir:
         render_dir.mkdir(parents=True, exist_ok=True)
     for index, page in enumerate(document, 1):
