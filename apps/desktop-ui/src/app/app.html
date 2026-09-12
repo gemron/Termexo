@@ -405,10 +405,7 @@
                 (auxclick)="closeTerminalOnMiddleClick($event, terminal.id)"
               >
                 <i [attr.data-status]="terminal.status"></i>
-                <app-icon
-                  [name]="terminal.agentType === 'shell' ? 'terminal' : 'bot'"
-                  [size]="12"
-                />
+                <app-icon [name]="agentIcons[terminal.agentType]" [size]="12" />
                 <span>{{ terminal.name }}</span>
               </button>
               <button
@@ -709,6 +706,7 @@
     [launching]="launchingClaude()"
     (launched)="launchClaude($event)"
     (cancelled)="closeClaudeLaunch()"
+    (installRequested)="installAgent('claude')"
   />
 }
 
@@ -721,7 +719,21 @@
     [launching]="launchingCodex()"
     (launched)="launchCodex($event)"
     (cancelled)="closeCodexLaunch()"
+    (installRequested)="installAgent('codex')"
   />
+}
+
+@defer (when antigravityLaunchOpen()) {
+  @if (antigravityLaunchOpen()) {
+    <app-antigravity-launch-dialog
+      [installation]="agents.antigravityInstallation()"
+      [workingDirectory]="selectedTerminalDirectory() ?? ''"
+      [launching]="launchingAntigravity()"
+      (launched)="launchAntigravity($event)"
+      (cancelled)="closeAntigravityLaunch()"
+      (installRequested)="installAgent('antigravity')"
+    />
+  }
 }
 
 @defer (when openCodeLaunchOpen()) {
@@ -732,6 +744,7 @@
       [launching]="launchingOpenCode()"
       (launched)="launchOpenCode($event)"
       (cancelled)="closeOpenCodeLaunch()"
+      (installRequested)="installAgent('opencode')"
     />
   }
 }
@@ -795,6 +808,7 @@
       [installation]="agents.installation()"
       [codexInstallation]="agents.codexInstallation()"
       [openCodeInstallation]="agents.openCodeInstallation()"
+      [antigravityInstallation]="agents.antigravityInstallation()"
       [modelProfiles]="agents.modelProfiles()"
       [mcpProfiles]="agents.mcpProfiles()"
       [networkProfiles]="agents.networkProfiles()"
@@ -802,6 +816,7 @@
       [activeWorkspaceId]="state.activeWorkspace()?.id ?? ''"
       [activeWorkspaceName]="state.activeWorkspace()?.name ?? ('common.currentWorkspace' | t)"
       [initialTab]="settingsInitialTab()"
+      [initialCliAgent]="settingsInitialCliAgent()"
       [initialModelProfileId]="settingsInitialModelProfileId()"
       [networkTestResult]="networkTestResult()"
       [cliPlan]="cliOperationPlan()"

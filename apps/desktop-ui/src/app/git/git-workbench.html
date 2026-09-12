@@ -153,6 +153,27 @@
               }
             </div>
           </div>
+          @if (changeBlocks().length > 0) {
+            <div class="diff-nav">
+              <button
+                type="button"
+                [title]="'git.previousChange' | t"
+                [attr.aria-label]="'git.previousChange' | t"
+                (click)="stepToChange(-1)"
+              >
+                <app-icon name="arrow-up" [size]="13" />
+              </button>
+              <span [attr.aria-label]="'git.changesInFile' | t">{{ changePosition() }}</span>
+              <button
+                type="button"
+                [title]="'git.nextChange' | t"
+                [attr.aria-label]="'git.nextChange' | t"
+                (click)="stepToChange(1)"
+              >
+                <app-icon name="arrow-down" [size]="13" />
+              </button>
+            </div>
+          }
           <div class="diff-layout" role="tablist" [attr.aria-label]="'git.diffLayout' | t">
             <button
               type="button"
@@ -177,7 +198,7 @@
           </div>
         </header>
 
-        <div class="diff-viewport" [class.split]="layout() === 'split'">
+        <div #diffViewport class="diff-viewport" [class.split]="layout() === 'split'">
           @if (diffLoading()) {
             <div class="empty-state">
               <span class="loading loading-spinner loading-sm"></span>{{ 'git.loadingDiff' | t }}
@@ -204,14 +225,14 @@
               <app-icon name="check" [size]="22" /><strong>{{ 'git.noTextChanges' | t }}</strong>
             </div>
           } @else if (layout() === 'split') {
-            <div class="split-head">
-              <span>{{ 'git.before' | t }}</span
-              ><span>{{ 'git.after' | t }}</span>
-            </div>
             <div class="split-grid">
+              <span class="split-head">{{ 'git.before' | t }}</span>
+              <span class="split-head">{{ 'git.after' | t }}</span>
               @for (row of rows(); track $index) {
                 <div
                   class="diff-line old"
+                  [attr.data-row]="$index"
+                  [class.change-anchor]="$index === anchoredRow()"
                   [attr.data-kind]="
                     row.oldLine === undefined
                       ? 'blank'
@@ -226,6 +247,7 @@
                 </div>
                 <div
                   class="diff-line new"
+                  [class.change-anchor]="$index === anchoredRow()"
                   [attr.data-kind]="
                     row.newLine === undefined
                       ? 'blank'
@@ -248,7 +270,12 @@
                   row.newLine !== undefined &&
                   row.oldText !== row.newText
                 ) {
-                  <div class="diff-line unified" data-kind="removed">
+                  <div
+                    class="diff-line unified"
+                    data-kind="removed"
+                    [attr.data-row]="$index"
+                    [class.change-anchor]="$index === anchoredRow()"
+                  >
                     <span>{{ row.oldLine }}</span
                     ><span></span><b>−</b><code>{{ row.oldText }}</code>
                   </div>
@@ -257,7 +284,12 @@
                     ><b>+</b><code>{{ row.newText }}</code>
                   </div>
                 } @else {
-                  <div class="diff-line unified" [attr.data-kind]="row.kind">
+                  <div
+                    class="diff-line unified"
+                    [attr.data-row]="$index"
+                    [class.change-anchor]="$index === anchoredRow()"
+                    [attr.data-kind]="row.kind"
+                  >
                     <span>{{ row.oldLine ?? '' }}</span
                     ><span>{{ row.newLine ?? '' }}</span>
                     <b>{{ row.kind === 'added' ? '+' : row.kind === 'removed' ? '−' : ' ' }}</b>

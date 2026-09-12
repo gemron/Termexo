@@ -41,6 +41,11 @@ pub fn capture_codex_notification_from_cli() -> Result<(), String> {
     hooks::capture_codex_notification_from_cli().map_err(|error| error.to_string())
 }
 
+/// Records one Antigravity status update, which is how its agent state reaches Termexo.
+pub fn capture_antigravity_status_from_cli() -> Result<(), String> {
+    hooks::capture_antigravity_status_from_cli().map_err(|error| error.to_string())
+}
+
 pub fn capture_codex_hook_event_from_cli() -> Result<(), String> {
     hooks::capture_codex_hook_event_from_cli().map_err(|error| error.to_string())
 }
@@ -99,6 +104,18 @@ pub fn run() {
                 tracing::warn!("{error}");
             }
 
+            // A status line left behind by an older or relocated Termexo fails on every agy
+            // session on this machine, including ones that have nothing to do with Termexo. It is
+            // repaired at startup rather than waiting for the next Antigravity terminal, which
+            // may never be opened. Nothing is installed where the user has no feed.
+            if let Ok(executable) = std::env::current_exe() {
+                match agent::antigravity_settings::refresh(&executable) {
+                    Ok(true) => tracing::info!("已更新 Antigravity 状态回传配置中的可执行文件路径"),
+                    Ok(false) => {}
+                    Err(error) => tracing::warn!(%error, "无法检查 Antigravity 状态回传配置"),
+                }
+            }
+
             let database = WorkspaceDatabase::open(app_data_dir.join("agentdock.db"))?;
             let hooks = HookEventStore::new(&app_data_dir)?;
             app.manage(database);
@@ -125,6 +142,12 @@ pub fn run() {
             commands::agent::detect_claude,
             commands::agent::detect_codex,
             commands::agent::detect_opencode,
+            commands::agent::detect_antigravity,
+            commands::agent::scan_antigravity_sessions,
+            commands::agent::list_antigravity_models,
+            commands::agent::read_antigravity_status_feed,
+            commands::agent::set_antigravity_status_feed,
+            commands::agent::prepare_antigravity_launch,
             commands::agent::scan_claude_sessions,
             commands::agent::scan_codex_sessions,
             commands::agent::scan_opencode_sessions,

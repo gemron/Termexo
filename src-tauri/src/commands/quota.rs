@@ -10,6 +10,7 @@ use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use tauri::State;
 
+use crate::agent::{AgentAdapter, AntigravityAdapter, AntigravityUsage};
 use crate::commands::agent::network_environment;
 use crate::config::{AccountProfile, CredentialStore, ModelProfile};
 use crate::database::WorkspaceDatabase;
@@ -29,6 +30,7 @@ const AGENT_CACHE_TTL: Duration = Duration::from_secs(300);
 
 /// Distinguishes an agent subscription's cache entry from a model profile of the same id.
 const AGENT_CACHE_PREFIX: &str = "agent:";
+const ANTIGRAVITY_QUOTA_ID: &str = "agent:antigravity";
 
 /// Remembers the last reading per profile so reopening the panel does not re-hit every provider.
 #[derive(Default)]
@@ -108,6 +110,23 @@ pub async fn get_provider_quotas(
         }
     }
 
+    // Antigravity does not use per-account profiles, but is driven directly as an installation.
+    // Its allowance status is reported under a dedicated agent entry.
+    let antigravity_task = if !force {
+        if let Some(cached) = cache.fresh(ANTIGRAVITY_QUOTA_ID, now, AGENT_CACHE_TTL) {
+            resolved.push(cached);
+            None
+        } else {
+            Some(tauri::async_runtime::spawn_blocking(move || {
+                resolve_antigravity(now)
+            }))
+        }
+    } else {
+        Some(tauri::async_runtime::spawn_blocking(move || {
+            resolve_antigravity(now)
+        }))
+    };
+
     if !pending.is_empty() {
         let client = build_client(proxy.as_deref())?;
         // One slow provider must not hold up the rest, so every request is in flight at once.
@@ -125,6 +144,14 @@ pub async fn get_provider_quotas(
             cache.store(&quota);
             resolved.push(quota);
         }
+    }
+
+    if let Some(task) = antigravity_task {
+        let quota = task
+            .await
+            .map_err(|error| format!("查询 Antigravity 余量状态失败：{error}"))?;
+        cache.store(&quota);
+        resolved.push(quota);
     }
 
     resolved.sort_by(|left, right| left.profile_name.cmp(&right.profile_name));
@@ -184,6 +211,84 @@ fn resolve_agent(
         agent_type: Some(account.agent_type.clone()),
         request: quota::build_agent_request(&account.agent_type, &token),
     })
+}
+
+fn resolve_antigravity(now: i64) -> ProviderQuota {
+    let adapter = AntigravityAdapter::new();
+    match adapter.detect() {
+        Ok(installation) if installation.installed => {}
+        _ => {
+            return ProviderQuota::unavailable(
+                ANTIGRAVITY_QUOTA_ID,
+                quota::AGENT_ANTIGRAVITY_LABEL,
+                quota::AGENT_ANTIGRAVITY_LABEL,
+                now,
+                "未检测到 Antigravity CLI（agy）",
+            )
+        }
+    }
+
+    // The allowance lives behind the CLI's own `/usage` command; there is no endpoint to call.
+    let usage = match adapter.read_usage() {
+        Ok(usage) => usage,
+        Err(error) => {
+            return ProviderQuota::unavailable(
+                ANTIGRAVITY_QUOTA_ID,
+                quota::AGENT_ANTIGRAVITY_LABEL,
+                quota::AGENT_ANTIGRAVITY_LABEL,
+                now,
+                error.to_string(),
+            )
+        }
+    };
+
+    let entries = antigravity_entries(&usage);
+    if entries.is_empty() {
+        return ProviderQuota::unavailable(
+            ANTIGRAVITY_QUOTA_ID,
+            quota::AGENT_ANTIGRAVITY_LABEL,
+            quota::AGENT_ANTIGRAVITY_LABEL,
+            now,
+            "Antigravity 未报告任何额度窗口",
+        );
+    }
+    ProviderQuota {
+        profile_id: ANTIGRAVITY_QUOTA_ID.to_owned(),
+        profile_name: quota::AGENT_ANTIGRAVITY_LABEL.to_owned(),
+        provider: quota::AGENT_ANTIGRAVITY_LABEL.to_owned(),
+        official: quota::is_official(quota::AGENT_ANTIGRAVITY_LABEL),
+        entries,
+        checked_at: now,
+        diagnostic: None,
+    }
+}
+
+/// One line per allowance window, named by the group of models that shares it.
+///
+/// A group's name is what distinguishes the windows — "Gemini Models" and "Claude and GPT models"
+/// each have a window called "Weekly Limit Remaining", so the bucket's own name alone would give
+/// two identical rows.
+fn antigravity_entries(usage: &AntigravityUsage) -> Vec<quota::QuotaEntry> {
+    let mut entries = Vec::new();
+    for group in &usage.groups {
+        for bucket in &group.buckets {
+            let Some(remaining) = bucket.remaining_fraction else {
+                continue;
+            };
+            let label = match (group.name.trim(), bucket.name.trim()) {
+                ("", "") => continue,
+                ("", name) => name.to_owned(),
+                (group_name, "") => group_name.to_owned(),
+                (group_name, name) => format!("{group_name} · {name}"),
+            };
+            entries.push(quota::remaining_share_entry(
+                label,
+                remaining,
+                bucket.reset_time.as_deref(),
+            ));
+        }
+    }
+    entries
 }
 
 async fn execute(client: reqwest::Client, query: PendingQuery) -> ProviderQuota {
@@ -269,4 +374,46 @@ fn now_ms() -> i64 {
         .duration_since(UNIX_EPOCH)
         .map(|elapsed| elapsed.as_millis() as i64)
         .unwrap_or_default()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn usage(payload: &str) -> AntigravityUsage {
+        serde_json::from_str(payload).unwrap()
+    }
+
+    /// Both groups name their window the same thing, so the group has to be part of the label or
+    /// the panel shows two identical rows.
+    #[test]
+    fn each_group_window_becomes_its_own_named_line() {
+        let usage = usage(
+            r#"{"groups":[
+                {"name":"Gemini Models","buckets":[
+                    {"name":"Weekly Limit Remaining","remaining_fraction":0,
+                     "reset_time":"2026-09-18T16:45:19Z"}]},
+                {"name":"Claude and GPT models","buckets":[
+                    {"name":"Weekly Limit Remaining","remaining_fraction":1}]}]}"#,
+        );
+
+        let entries = antigravity_entries(&usage);
+
+        assert_eq!(entries.len(), 2);
+        assert_eq!(entries[0].label, "Gemini Models · Weekly Limit Remaining");
+        assert_eq!(entries[0].percent, Some(100.0));
+        assert_eq!(
+            entries[1].label,
+            "Claude and GPT models · Weekly Limit Remaining"
+        );
+        assert_eq!(entries[1].percent, Some(0.0));
+    }
+
+    /// A window with no figure is skipped rather than drawn as an empty bar.
+    #[test]
+    fn a_window_without_a_share_is_skipped() {
+        let usage = usage(r#"{"groups":[{"name":"G","buckets":[{"name":"W"}]}]}"#);
+
+        assert!(antigravity_entries(&usage).is_empty());
+    }
 }

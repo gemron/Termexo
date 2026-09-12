@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { buildDiffRows } from './git.models';
+import { buildDiffRows, changeBlockStarts } from './git.models';
 
 describe('buildDiffRows', () => {
   it('aligns replacements for split view', () => {
@@ -43,5 +43,24 @@ describe('buildDiffRows', () => {
         newText: '',
       },
     ]);
+  });
+});
+
+describe('changeBlockStarts', () => {
+  it('reports one stop per run of changed lines, not one per line', () => {
+    const rows = buildDiffRows('a\nb\nc\nd\ne\n', 'a\nB\nC\nd\nE\n');
+
+    // Rows 1 and 2 are one edit to the reader; the unchanged row 3 ends it, and row 4 is a second.
+    expect(changeBlockStarts(rows)).toEqual([1, 4]);
+  });
+
+  it('stops at a change that opens the file', () => {
+    const rows = buildDiffRows('old\nkeep\n', 'new\nkeep\n');
+
+    expect(changeBlockStarts(rows)).toEqual([0]);
+  });
+
+  it('has nowhere to stop in a file that did not change', () => {
+    expect(changeBlockStarts(buildDiffRows('same\n', 'same\n'))).toEqual([]);
   });
 });

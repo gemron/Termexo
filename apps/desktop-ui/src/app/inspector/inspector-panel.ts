@@ -13,6 +13,7 @@ import { I18nService } from '../core/i18n/i18n.service';
 import { TranslatePipe } from '../core/i18n/translate.pipe';
 import { RepositoryOverview, repositoryChangeStatus } from '../core/models/git.models';
 import {
+  AGENT_ICONS,
   AGENT_LABELS,
   type AgentType,
   TerminalSession,
@@ -153,6 +154,11 @@ export class InspectorPanelComponent {
         // Compatibility providers authenticate with the model profile's own API key.
         ids.add(terminal.profileId);
       }
+    } else if (terminal.agentType === 'antigravity') {
+      ids.add('agent:antigravity');
+      if (terminal.profileId) {
+        ids.add(terminal.profileId);
+      }
     } else {
       // Keep restored legacy terminals useful when their old model profile no longer exists.
       if (terminal.profileId) {
@@ -279,9 +285,8 @@ export class InspectorPanelComponent {
 
   protected readonly agentLabels = AGENT_LABELS;
 
-  /** OpenCode and a plain shell are terminal-shaped; only the two hosted Agents get the bot mark. */
   protected agentIcon(agentType: AgentType): string {
-    return agentType === 'claude' || agentType === 'codex' ? 'bot' : 'terminal';
+    return AGENT_ICONS[agentType];
   }
 
   protected eventLabel(event: AgentEvent): string {

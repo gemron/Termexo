@@ -16,11 +16,12 @@ const CODEX_INSTALLATION: AgentInstallation = {
   diagnostic: 'Codex CLI 已连接',
 };
 
-/** Only the three installations the list reads; the real service reaches for the backend. */
+/** Only the installations the list reads; the real service reaches for the backend. */
 class AgentServiceStub {
   readonly installation = signal<AgentInstallation | null>(null);
   readonly codexInstallation = signal<AgentInstallation | null>(CODEX_INSTALLATION);
   readonly openCodeInstallation = signal<AgentInstallation | null>(null);
+  readonly antigravityInstallation = signal<AgentInstallation | null>(null);
 }
 
 describe('AgentLaunchOptionsComponent', () => {
@@ -44,7 +45,7 @@ describe('AgentLaunchOptionsComponent', () => {
   }
 
   it('offers every Agent alongside a plain shell', () => {
-    expect(optionTypes()).toEqual(['claude', 'codex', 'opencode', 'shell']);
+    expect(optionTypes()).toEqual(['claude', 'codex', 'opencode', 'antigravity', 'shell']);
   });
 
   it('shows each Agent version, and why an Agent is unavailable', () => {

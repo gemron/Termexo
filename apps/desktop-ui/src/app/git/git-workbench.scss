@@ -399,6 +399,37 @@ button:disabled {
   border-radius: 5px;
   background: var(--surface-inset);
 }
+.diff-nav {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: 2px;
+  padding: 2px;
+  border-radius: 5px;
+  background: var(--surface-inset);
+}
+.diff-nav span {
+  min-width: 32px;
+  color: var(--text-muted);
+  text-align: center;
+  font: 9px/1 var(--mono);
+}
+.diff-nav button {
+  display: flex;
+  width: 22px;
+  height: 22px;
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  border-radius: 3px;
+  color: var(--text-muted);
+  background: transparent;
+}
+.diff-nav button:hover {
+  color: var(--text);
+  background: var(--surface-2);
+}
+
 .diff-layout button {
   display: flex;
   height: 24px;
@@ -430,26 +461,23 @@ button:disabled {
 }
 .split-grid {
   display: grid;
-  min-width: 900px;
-  grid-template-columns: minmax(450px, 1fr) minmax(450px, 1fr);
+  width: max-content;
+  min-width: 100%;
+  grid-template-columns: repeat(2, minmax(450px, auto));
   padding-bottom: 24px;
 }
+/* Inside the grid rather than above it, so the headings follow the columns as those grow. */
 .split-head {
   position: sticky;
   z-index: 3;
   top: 0;
-  display: grid;
-  min-width: 900px;
-  grid-template-columns: 1fr 1fr;
-  border-bottom: 1px solid var(--border);
-  background: var(--surface-1);
-}
-.split-head span {
   padding: 6px 10px;
+  border-bottom: 1px solid var(--border);
   color: var(--text-muted);
+  background: var(--surface-1);
   font: 8px/1 var(--mono);
 }
-.split-head span + span {
+.split-head + .split-head {
   border-left: 1px solid var(--border);
 }
 
@@ -513,6 +541,9 @@ button:disabled {
 }
 .diff-line.blank {
   background: color-mix(in srgb, var(--surface-2) 55%, var(--surface-inset));
+}
+.diff-line.change-anchor {
+  box-shadow: inset 2px 0 0 var(--accent);
 }
 .diff-line.blank code {
   opacity: 0;
@@ -608,11 +639,7 @@ button:disabled {
     font-size: 0;
     gap: 0;
   }
-  .diff-viewport.split .split-grid,
-  .diff-viewport.split .split-head {
-    min-width: 720px;
-  }
   .diff-viewport.split .split-grid {
-    grid-template-columns: repeat(2, minmax(360px, 1fr));
+    grid-template-columns: repeat(2, minmax(360px, auto));
   }
 }

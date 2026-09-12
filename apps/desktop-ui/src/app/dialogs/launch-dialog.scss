@@ -36,6 +36,21 @@
     font: 9px/1 var(--mono);
   }
 
+  /* The way out of the state the banner is reporting, so a missing CLI is not a dead end. */
+  .install-link {
+    min-height: 22px;
+    padding: 0 9px;
+    border: 1px solid currentcolor;
+    border-radius: var(--radius-selector);
+    color: inherit;
+    background: transparent;
+    font-size: 10px;
+
+    &:hover {
+      background: color-mix(in srgb, currentcolor 12%, transparent);
+    }
+  }
+
   &.unavailable {
     color: var(--color-warning);
     background: var(--warning-soft);

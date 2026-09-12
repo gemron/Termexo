@@ -2,6 +2,7 @@ import { Component, computed, inject, input, output, signal } from '@angular/cor
 import { FormsModule } from '@angular/forms';
 
 import { type AgentInstallation } from '../core/models/agent.models';
+import { AGENT_ICONS } from '../core/models/workspace.models';
 import { I18nService } from '../core/i18n/i18n.service';
 import { TranslatePipe } from '../core/i18n/translate.pipe';
 import { LaunchDialogShellComponent } from './launch-dialog-shell';
@@ -17,7 +18,7 @@ export interface OpenCodeLaunchDialogValue {
   imports: [FormsModule, LaunchDialogShellComponent, TranslatePipe],
   template: `
     <app-launch-dialog-shell
-      icon="terminal"
+      [icon]="agentIcon"
       [heading]="'launch.newOpenCode' | t"
       [detecting]="'launch.detectingOpenCode' | t"
       [installation]="installation()"
@@ -27,6 +28,7 @@ export interface OpenCodeLaunchDialogValue {
       [blockedReason]="blockedReason()"
       (launched)="submit()"
       (cancelled)="cancelled.emit()"
+      (installRequested)="installRequested.emit()"
     >
       <div class="form-grid">
         <label class="wide session-name-field">
@@ -67,6 +69,12 @@ export interface OpenCodeLaunchDialogValue {
   styleUrls: ['./agent-dialog.scss', './launch-dialog.scss'],
 })
 export class OpenCodeLaunchDialogComponent {
+  /** Passed through to the workbench, which owns the settings window. */
+  readonly installRequested = output<void>();
+
+  /** The agent's own mark, which the heading shows. */
+  protected readonly agentIcon = AGENT_ICONS.opencode;
+
   readonly installation = input<AgentInstallation | null>(null);
   readonly workingDirectory = input('');
   readonly launching = input(false);

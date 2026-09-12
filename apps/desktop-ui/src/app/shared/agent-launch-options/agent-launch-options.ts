@@ -2,7 +2,7 @@ import { Component, computed, inject, input, output } from '@angular/core';
 
 import { I18nService } from '../../core/i18n/i18n.service';
 import { AgentInstallation } from '../../core/models/agent.models';
-import { AgentType } from '../../core/models/workspace.models';
+import { AGENT_ICONS, AgentType } from '../../core/models/workspace.models';
 import { AgentService } from '../../core/services/agent.service';
 import { IconComponent } from '../icon/icon';
 
@@ -116,7 +116,12 @@ interface AgentLaunchGroup {
       background: var(--warning-soft);
     }
 
-    /* A plain shell carries no Agent identity, so it stays neutral against the coloured three. */
+    button > span[data-tone='purple'] {
+      color: var(--color-secondary);
+      background: var(--secondary-soft);
+    }
+
+    /* A plain shell carries no Agent identity, so it stays neutral against the coloured ones. */
     button > span[data-tone='slate'] {
       color: var(--text-secondary);
       background: var(--surface-2);
@@ -171,22 +176,29 @@ export class AgentLaunchOptionsComponent {
           type: 'claude',
           title: 'Claude Code',
           hint: this.installationLabel(this.agents.installation()),
-          icon: 'bot',
+          icon: AGENT_ICONS.claude,
           tone: 'green',
         },
         {
           type: 'codex',
           title: 'Codex CLI',
           hint: this.installationLabel(this.agents.codexInstallation()),
-          icon: 'bot',
+          icon: AGENT_ICONS.codex,
           tone: 'blue',
         },
         {
           type: 'opencode',
           title: 'OpenCode',
           hint: this.installationLabel(this.agents.openCodeInstallation()),
-          icon: 'terminal',
+          icon: AGENT_ICONS.opencode,
           tone: 'amber',
+        },
+        {
+          type: 'antigravity',
+          title: 'Antigravity',
+          hint: this.installationLabel(this.agents.antigravityInstallation()),
+          icon: AGENT_ICONS.antigravity,
+          tone: 'purple',
         },
       ],
     },
@@ -197,7 +209,7 @@ export class AgentLaunchOptionsComponent {
           type: 'shell',
           title: 'Shell',
           hint: this.i18n.t('terminal.shellHint'),
-          icon: 'terminal',
+          icon: AGENT_ICONS.shell,
           tone: 'slate',
         },
       ],

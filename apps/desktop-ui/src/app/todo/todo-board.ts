@@ -21,7 +21,12 @@ import {
   isTodoAgentTerminal,
   todoWorkingDirectory,
 } from '../core/models/todo.models';
-import type { TerminalSession, Workspace } from '../core/models/workspace.models';
+import {
+  AGENT_ICONS,
+  AGENT_LABELS,
+  type TerminalSession,
+  type Workspace,
+} from '../core/models/workspace.models';
 import { DirectoryPickerService } from '../core/services/directory-picker.service';
 import { TodoService } from '../core/services/todo.service';
 import { IconComponent } from '../shared/icon/icon';
@@ -66,6 +71,10 @@ function formatRunDuration(elapsedMs: number): string {
   styleUrl: './todo-board.scss',
 })
 export class TodoBoardComponent {
+  /** The agents' own marks and names, for the task assignment line. */
+  protected readonly agentIcons = AGENT_ICONS;
+  protected readonly agentLabels = AGENT_LABELS;
+
   protected readonly todos = inject(TodoService);
   private readonly directoryPicker = inject(DirectoryPickerService);
 

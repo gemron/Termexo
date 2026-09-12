@@ -20,6 +20,7 @@ import { Terminal } from '@xterm/xterm';
 import { I18nService } from '../core/i18n/i18n.service';
 import { TranslatePipe } from '../core/i18n/translate.pipe';
 import {
+  AGENT_ICONS,
   normalizeTerminalFontSize,
   TerminalSession,
   TerminalStatus,
@@ -114,6 +115,9 @@ export class TerminalPanelComponent implements AfterViewInit {
   private outputTail = '';
   private lastRuntimeIssue: TerminalRuntimeIssue = null;
   private readonly replayGate = new TerminalReplayGate();
+
+  /** The mark of the agent this terminal runs, drawn in its title. */
+  protected readonly agentIcon = computed(() => AGENT_ICONS[this.session().agentType]);
   /**
    * Whether Ctrl is down, which is the whole gate on link detection.
    *

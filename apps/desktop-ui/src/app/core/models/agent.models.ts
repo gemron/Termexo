@@ -1,7 +1,50 @@
 import { AgentType, TerminalStatus } from './workspace.models';
 
-export type NativeAgentType = 'claude' | 'codex' | 'opencode';
+export type NativeAgentType = 'claude' | 'codex' | 'opencode' | 'antigravity';
+
+/**
+ * The agents Termexo can install and upgrade itself.
+ *
+ * These arrive as npm packages. Antigravity does not — it ships its own installer, puts its
+ * binary outside PATH and updates itself — so it is driven but never managed.
+ */
+export type ManagedAgentType = 'claude' | 'codex' | 'opencode' | 'antigravity';
+
+export type CliInstaller = 'npm' | 'script';
+
+/**
+ * How each managed CLI can be installed, best-supported first.
+ *
+ * npm can be pinned to a version and rolled back to one; a vendor's script always fetches what
+ * that vendor currently publishes and puts it where the vendor wants it. Where both are listed
+ * the user picks. OpenCode publishes no Windows script (its docs point at npm, Chocolatey or
+ * WSL) and Antigravity publishes no package, so those offer one way each.
+ *
+ * The panel needs this before a plan exists, which is why it is stated here rather than read off
+ * the plan the backend returns.
+ */
+export const MANAGED_AGENT_INSTALLERS: Record<ManagedAgentType, readonly CliInstaller[]> = {
+  claude: ['npm', 'script'],
+  codex: ['npm', 'script'],
+  opencode: ['npm'],
+  antigravity: ['script'],
+};
 export type AccountAgentType = 'claude' | 'codex';
+
+/** One model the Antigravity CLI offers, as it reports them itself. */
+export interface AntigravityModel {
+  /** The value passed to `--model`. */
+  readonly slug: string;
+  readonly displayName: string;
+}
+
+/** Whether Termexo's status feed is installed in the Antigravity CLI's own settings. */
+export interface AntigravityStatusFeed {
+  readonly settingsPath: string;
+  readonly installed: boolean;
+  /** A status line is configured that is not Termexo's, which installing would replace. */
+  readonly foreignStatusLine: boolean;
+}
 
 export interface AgentInstallation {
   agentType: NativeAgentType;
@@ -73,7 +116,9 @@ export interface AgentLaunchSpec {
 }
 
 export interface CliOperationRequest {
-  agentType: NativeAgentType;
+  agentType: ManagedAgentType;
+  /** Which of the agent's installers to use; its own default when absent. */
+  installer?: CliInstaller;
   targetVersion?: string;
   workspaceId?: string;
   confirmed?: boolean;
@@ -84,6 +129,10 @@ export interface CliOperationPlan {
   displayName: string;
   packageName: string;
   targetVersion: string;
+  /** `npm` for a published package, `script` for the vendor's own installer. */
+  installer: CliInstaller;
+  /** False when the installer offers no version to pin, as a script install does not. */
+  supportsVersion: boolean;
   packageSpec: string;
   /** `reinstall` when the installed version already matches the resolved one. */
   action: 'install' | 'upgrade' | 'reinstall';
@@ -198,6 +247,18 @@ export interface CodexLaunchRequest {
   autoConfirm?: boolean;
   /** Overrides the profile's reasoning depth for this terminal only; omitted keeps it. */
   reasoningEffort?: string;
+}
+
+export interface AntigravityLaunchRequest {
+  terminalId: string;
+  workspaceId?: string;
+  /** Recorded as trusted, so the CLI does not stop to ask about an unfamiliar workspace. */
+  workingDirectory?: string;
+  sessionId?: string;
+  model?: string;
+  effort?: string;
+  continueLast?: boolean;
+  autoConfirm?: boolean;
 }
 
 export interface OpenCodeLaunchRequest {

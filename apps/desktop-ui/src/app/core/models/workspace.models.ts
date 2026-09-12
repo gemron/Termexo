@@ -1,4 +1,4 @@
-export type AgentType = 'claude' | 'codex' | 'opencode' | 'shell';
+export type AgentType = 'claude' | 'codex' | 'opencode' | 'antigravity' | 'shell';
 
 /**
  * Model label for an OpenCode terminal that named no model.
@@ -8,6 +8,8 @@ export type AgentType = 'claude' | 'codex' | 'opencode' | 'shell';
  * pass no `--model` at all rather than feeding this text back to the CLI.
  */
 export const OPENCODE_DEFAULT_MODEL = 'OpenCode 默认模型';
+/** Shown until the CLI reports which model it chose; Antigravity picks its own default. */
+export const ANTIGRAVITY_DEFAULT_MODEL = 'Antigravity 默认模型';
 
 export type TerminalStatus =
   | 'STARTING'
@@ -127,9 +129,26 @@ export const TERMINAL_STATUS_LABELS: Record<TerminalStatus, string> = {
   DISCONNECTED: '已断开',
 };
 
+/**
+ * The mark each agent is shown by, wherever it is shown.
+ *
+ * Every place that draws an agent reads this: the new-terminal menu, a terminal's own title, the
+ * session centre and the settings health strip. They used to choose separately, which had three of
+ * the four agents sharing one generic icon and made them hard to tell apart at a glance.
+ */
+export const AGENT_ICONS: Record<AgentType, string> = {
+  claude: 'brand-claude',
+  codex: 'brand-codex',
+  opencode: 'brand-opencode',
+  antigravity: 'brand-antigravity',
+  /** A plain shell is not a product and has no mark of its own. */
+  shell: 'terminal',
+};
+
 export const AGENT_LABELS: Record<AgentType, string> = {
   claude: 'Claude Code',
   codex: 'Codex CLI',
   opencode: 'OpenCode',
+  antigravity: 'Antigravity',
   shell: 'Shell',
 };

@@ -5,7 +5,7 @@ export interface PromptAsset {
   workspaceId: string;
   terminalId?: string;
   terminalName: string;
-  agentType: 'claude' | 'codex' | 'opencode';
+  agentType: 'claude' | 'codex' | 'opencode' | 'antigravity';
   kind: PromptAssetKind;
   content: string;
   redacted: boolean;

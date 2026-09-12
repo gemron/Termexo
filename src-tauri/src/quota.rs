@@ -143,11 +143,16 @@ impl QuotaRequest {
 
 /// Whether the provider publishes this endpoint in its own documentation.
 pub fn is_official(provider: &str) -> bool {
-    // GLM's endpoint is a community finding, and the two agent CLIs read their subscription
-    // allowance from private endpoints their own clients call. None of the three is documented.
-    ![PROVIDER_GLM, AGENT_CLAUDE_LABEL, AGENT_CODEX_LABEL]
-        .iter()
-        .any(|known| provider.eq_ignore_ascii_case(known))
+    // GLM's endpoint is a community finding, and the agent CLIs read their subscription
+    // allowance from private endpoints their own clients call. None of them is documented.
+    ![
+        PROVIDER_GLM,
+        AGENT_CLAUDE_LABEL,
+        AGENT_CODEX_LABEL,
+        AGENT_ANTIGRAVITY_LABEL,
+    ]
+    .iter()
+    .any(|known| provider.eq_ignore_ascii_case(known))
 }
 
 /// Whether a balance can be read for this provider at all.
@@ -452,6 +457,7 @@ fn minimax_window(
 
 pub const AGENT_CLAUDE_LABEL: &str = "Claude Code";
 pub const AGENT_CODEX_LABEL: &str = "Codex";
+pub const AGENT_ANTIGRAVITY_LABEL: &str = "Antigravity";
 
 /// The endpoint behind Claude Code's `/usage`.
 const CLAUDE_USAGE_URL: &str = "https://api.anthropic.com/api/oauth/usage";
@@ -464,10 +470,10 @@ const CLAUDE_OAUTH_BETA: &str = "oauth-2025-04-20";
 const CLAUDE_USER_AGENT: &str = "claude-code/2.0.0";
 
 pub fn agent_display_name(agent_type: &str) -> &'static str {
-    if agent_type == "claude" {
-        AGENT_CLAUDE_LABEL
-    } else {
-        AGENT_CODEX_LABEL
+    match agent_type.trim() {
+        "claude" => AGENT_CLAUDE_LABEL,
+        "antigravity" => AGENT_ANTIGRAVITY_LABEL,
+        _ => AGENT_CODEX_LABEL,
     }
 }
 
@@ -650,6 +656,27 @@ fn window_label(key: &str) -> String {
 }
 
 /// Accepts a numeric epoch or an RFC 3339 string, which both endpoints have been seen to use.
+/// Builds an allowance line from the share of a window that is left.
+///
+/// The agent CLIs report what remains rather than what was spent, and give no absolute figure to
+/// go with it — there is no token count or balance behind a weekly cap. `percent` carries the
+/// consumed share, which is what the rest of the app reads, so the reported share is inverted here
+/// once rather than at each place that draws it.
+pub fn remaining_share_entry(
+    label: impl Into<String>,
+    remaining_fraction: f64,
+    reset_time: Option<&str>,
+) -> QuotaEntry {
+    let mut entry = QuotaEntry::new(label, QuotaUnit::Percent);
+    let remaining = remaining_fraction.clamp(0.0, 1.0);
+    entry.percent = Some(((1.0 - remaining) * 100.0).clamp(0.0, 100.0));
+    entry.resets_at = reset_time
+        .map(|text| Value::String(text.to_owned()))
+        .as_ref()
+        .and_then(parse_timestamp);
+    entry
+}
+
 fn parse_timestamp(value: &Value) -> Option<i64> {
     match value {
         Value::Number(number) => number.as_f64().map(normalize_timestamp),
@@ -753,6 +780,27 @@ fn key_outline(value: &Value) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// The CLIs report what is left; the app draws what has been consumed.
+    #[test]
+    fn a_remaining_share_becomes_a_consumed_percentage() {
+        let spent = remaining_share_entry("周额度", 0.0, Some("2026-09-18T16:45:19Z"));
+        assert_eq!(spent.unit, QuotaUnit::Percent);
+        assert_eq!(spent.percent, Some(100.0));
+        // 2026-09-18T16:45:19Z
+        assert_eq!(spent.resets_at, Some(1_789_749_919_000));
+
+        let untouched = remaining_share_entry("周额度", 1.0, None);
+        assert_eq!(untouched.percent, Some(0.0));
+        assert_eq!(untouched.resets_at, None);
+    }
+
+    /// A share outside 0-1 is a provider bug, not a reason to draw a nonsense bar.
+    #[test]
+    fn a_share_outside_the_range_is_clamped() {
+        assert_eq!(remaining_share_entry("x", 1.5, None).percent, Some(0.0));
+        assert_eq!(remaining_share_entry("x", -0.5, None).percent, Some(100.0));
+    }
     use serde_json::json;
 
     #[test]
@@ -967,9 +1015,17 @@ mod tests {
         assert!(is_official("Kimi"));
         assert!(is_official("MiniMax"));
         assert!(!is_official("GLM"));
-        // Both agent endpoints are private APIs their own clients call.
+        // The agent endpoints are private APIs their own clients call or undocumented.
         assert!(!is_official(AGENT_CLAUDE_LABEL));
         assert!(!is_official(AGENT_CODEX_LABEL));
+        assert!(!is_official(AGENT_ANTIGRAVITY_LABEL));
+    }
+
+    #[test]
+    fn reports_expected_agent_display_names() {
+        assert_eq!(agent_display_name("claude"), AGENT_CLAUDE_LABEL);
+        assert_eq!(agent_display_name("codex"), AGENT_CODEX_LABEL);
+        assert_eq!(agent_display_name("antigravity"), AGENT_ANTIGRAVITY_LABEL);
     }
 
     #[test]

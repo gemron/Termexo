@@ -1,4 +1,4 @@
-import { effect, inject, Injectable, signal } from '@angular/core';
+import { effect, inject, Injectable, signal, type WritableSignal } from '@angular/core';
 import { open as openDialog, save } from '@tauri-apps/plugin-dialog';
 
 import { I18nService } from '../i18n/i18n.service';
@@ -10,6 +10,9 @@ import {
   AgentInstallation,
   AgentLaunchSpec,
   AgentSession,
+  AntigravityLaunchRequest,
+  AntigravityModel,
+  AntigravityStatusFeed,
   ClaudeBackgroundSession,
   ClaudeLaunchRequest,
   CliOperationPlan,
@@ -17,6 +20,7 @@ import {
   CliOperationResult,
   CodexLaunchRequest,
   ImportSummary,
+  ManagedAgentType,
   McpProfile,
   McpProfileInput,
   ModelProfile,
@@ -28,8 +32,36 @@ import {
   ProviderQuota,
   SystemProxyDiscovery,
 } from '../models/agent.models';
+import { AGENT_LABELS } from '../models/workspace.models';
 import { invoke, listen } from './backend-bridge';
 import { hasBackend, isTauriRuntime } from './tauri-runtime';
+
+/**
+ * What the browser preview reports for each managed CLI.
+ *
+ * The preview has no npm and no installer script to ask, so it describes the operation from this
+ * table instead: the npm package it would install, and the vendor script it would run.
+ */
+const CLI_PREVIEWS: Record<
+  ManagedAgentType,
+  { displayName: string; package?: string; script?: string }
+> = {
+  claude: {
+    displayName: 'Claude Code',
+    package: '@anthropic-ai/claude-code',
+    script: 'https://claude.ai/install.ps1',
+  },
+  codex: {
+    displayName: 'Codex CLI',
+    package: '@openai/codex',
+    script: 'https://chatgpt.com/codex/install.ps1',
+  },
+  opencode: { displayName: 'OpenCode', package: 'opencode-ai' },
+  antigravity: {
+    displayName: 'Antigravity',
+    script: 'https://antigravity.google/cli/install.ps1',
+  },
+};
 
 const EVENT_POLL_INTERVAL_MS = 1_000;
 const MAX_RECENT_EVENTS = 250;
@@ -40,6 +72,7 @@ export class AgentService {
   private readonly installationState = signal<AgentInstallation | null>(null);
   private readonly codexInstallationState = signal<AgentInstallation | null>(null);
   private readonly openCodeInstallationState = signal<AgentInstallation | null>(null);
+  private readonly antigravityInstallationState = signal<AgentInstallation | null>(null);
   private readonly sessionItems = signal<AgentSession[]>([]);
   private readonly eventItems = signal<AgentEvent[]>([]);
   private readonly modelProfileItems = signal<ModelProfile[]>([]);
@@ -57,6 +90,7 @@ export class AgentService {
   readonly installation = this.installationState.asReadonly();
   readonly codexInstallation = this.codexInstallationState.asReadonly();
   readonly openCodeInstallation = this.openCodeInstallationState.asReadonly();
+  readonly antigravityInstallation = this.antigravityInstallationState.asReadonly();
   readonly sessions = this.sessionItems.asReadonly();
   readonly events = this.eventItems.asReadonly();
   readonly modelProfiles = this.modelProfileItems.asReadonly();
@@ -92,6 +126,7 @@ export class AgentService {
       this.detectClaude(),
       this.detectCodex(),
       this.detectOpenCode(),
+      this.detectAntigravity(),
       this.loadProfiles(),
       this.loadSessions(),
     ]);
@@ -134,6 +169,51 @@ export class AgentService {
     });
   }
 
+  async detectAntigravity(): Promise<void> {
+    if (!hasBackend()) {
+      this.antigravityInstallationState.set(this.browserInstallation('antigravity'));
+      return;
+    }
+    await this.run(async () => {
+      this.antigravityInstallationState.set(await invoke<AgentInstallation>('detect_antigravity'));
+    });
+  }
+
+  /**
+   * The models this installation offers, which the CLI reports rather than Termexo knowing them.
+   *
+   * Antigravity does not use Termexo's model profiles: it reaches its own service, so the list
+   * comes from `agy models` and is only meaningful while it is installed and signed in.
+   */
+  async listAntigravityModels(): Promise<AntigravityModel[]> {
+    if (!hasBackend()) {
+      return [];
+    }
+    return invoke<AntigravityModel[]>('list_antigravity_models');
+  }
+
+  /** Whether Termexo's status feed is installed in the Antigravity CLI's own settings. */
+  async readAntigravityStatusFeed(): Promise<AntigravityStatusFeed | null> {
+    if (!hasBackend()) {
+      return null;
+    }
+    return invoke<AntigravityStatusFeed>('read_antigravity_status_feed');
+  }
+
+  /**
+   * Installs or removes the status feed.
+   *
+   * Antigravity has no per-launch configuration, so this writes into the settings file its own
+   * installation reads — the only file Termexo edits that it does not own. It is therefore a
+   * switch the user throws rather than something a launch does on their behalf.
+   */
+  async setAntigravityStatusFeed(enabled: boolean): Promise<AntigravityStatusFeed | null> {
+    if (!hasBackend()) {
+      return null;
+    }
+    return invoke<AntigravityStatusFeed>('set_antigravity_status_feed', { enabled });
+  }
+
   async refreshSessions(projectPath?: string): Promise<void> {
     if (!hasBackend()) {
       this.sessionItems.set([]);
@@ -148,6 +228,9 @@ export class AgentService {
           projectPath: projectPath || null,
         }),
         invoke<AgentSession[]>('scan_opencode_sessions', {
+          projectPath: projectPath || null,
+        }),
+        invoke<AgentSession[]>('scan_antigravity_sessions', {
           projectPath: projectPath || null,
         }),
       ]);
@@ -224,6 +307,20 @@ export class AgentService {
     return invoke<AgentLaunchSpec>('prepare_codex_launch', { request });
   }
 
+  async prepareAntigravityLaunch(request: AntigravityLaunchRequest): Promise<AgentLaunchSpec> {
+    if (!hasBackend()) {
+      return {
+        command: `agy${request.sessionId ? ` --conversation '${request.sessionId}'` : ''}${
+          request.continueLast && !request.sessionId ? ' --continue' : ''
+        }${request.model ? ` --model '${request.model}'` : ''}${
+          request.effort ? ` --effort '${request.effort}'` : ''
+        }${request.autoConfirm ? ' --dangerously-skip-permissions' : ''}`,
+        executablePath: 'agy',
+      };
+    }
+    return invoke<AgentLaunchSpec>('prepare_antigravity_launch', { request });
+  }
+
   async prepareOpenCodeLaunch(request: OpenCodeLaunchRequest): Promise<AgentLaunchSpec> {
     if (!hasBackend()) {
       return {
@@ -254,32 +351,28 @@ export class AgentService {
   async previewCliOperation(request: CliOperationRequest): Promise<CliOperationPlan> {
     if (!hasBackend()) {
       const installation = this.installationFor(request.agentType);
-      const packageName =
-        request.agentType === 'claude'
-          ? '@anthropic-ai/claude-code'
-          : request.agentType === 'codex'
-            ? '@openai/codex'
-            : 'opencode-ai';
-      const targetVersion = request.targetVersion?.trim() || 'latest';
+      const preview = CLI_PREVIEWS[request.agentType];
+      const script = preview.package ? request.installer === 'script' : true;
+      const source = (script ? preview.script : preview.package) ?? '';
+      const targetVersion = script ? 'latest' : request.targetVersion?.trim() || 'latest';
       return {
         agentType: request.agentType,
-        displayName:
-          request.agentType === 'claude'
-            ? 'Claude Code'
-            : request.agentType === 'codex'
-              ? 'Codex CLI'
-              : 'OpenCode',
-        packageName,
+        displayName: preview.displayName,
+        packageName: script ? '' : source,
         targetVersion,
-        packageSpec: `${packageName}@${targetVersion}`,
+        installer: script ? 'script' : 'npm',
+        supportsVersion: !script,
+        packageSpec: script ? source : `${source}@${targetVersion}`,
         action: installation?.installed ? 'upgrade' : 'install',
         currentVersion: installation?.version,
         // Browser preview cannot reach the registry, so no version is resolved and the plan
         // never claims to be current.
         upToDate: false,
-        npmPath: 'browser-preview/npm',
-        npmVersion: 'preview',
-        commandPreview: `npm install --global ${packageName}@${targetVersion} --no-fund --no-audit`,
+        npmPath: script ? undefined : 'browser-preview/npm',
+        npmVersion: script ? undefined : 'preview',
+        commandPreview: script
+          ? `powershell -NoProfile -ExecutionPolicy Bypass -Command "irm ${source} | iex"`
+          : `npm install --global ${source}@${targetVersion} --no-fund --no-audit`,
         networkProfileId: this.networkProfileItems().find(
           (profile) =>
             profile.enabled &&
@@ -318,13 +411,7 @@ export class AgentService {
         request: { ...request, confirmed: true },
       }),
     );
-    if (result.installation.agentType === 'claude') {
-      this.installationState.set(result.installation);
-    } else if (result.installation.agentType === 'codex') {
-      this.codexInstallationState.set(result.installation);
-    } else {
-      this.openCodeInstallationState.set(result.installation);
-    }
+    this.setInstallation(result.installation);
     return result;
   }
 
@@ -522,17 +609,30 @@ export class AgentService {
     this.accountProfileItems.update((items) => items.filter((item) => item.id !== profileId));
   }
 
-  private installationFor(agentType: 'claude' | 'codex' | 'opencode'): AgentInstallation | null {
-    return agentType === 'claude'
-      ? this.installationState()
-      : agentType === 'codex'
-        ? this.codexInstallationState()
-        : this.openCodeInstallationState();
+  private installationFor(agentType: ManagedAgentType): AgentInstallation | null {
+    return this.installationStates()[agentType]();
   }
 
-  private browserInstallation(agentType: 'claude' | 'codex' | 'opencode'): AgentInstallation {
-    const name =
-      agentType === 'claude' ? 'Claude Code' : agentType === 'codex' ? 'Codex CLI' : 'OpenCode';
+  /** Records a freshly detected installation against the agent it belongs to. */
+  private setInstallation(installation: AgentInstallation): void {
+    const state = this.installationStates()[installation.agentType as ManagedAgentType];
+    state?.set(installation);
+  }
+
+  /** The signal holding each managed agent's installation, so neither lookup has to branch. */
+  private installationStates(): Record<ManagedAgentType, WritableSignal<AgentInstallation | null>> {
+    return {
+      claude: this.installationState,
+      codex: this.codexInstallationState,
+      opencode: this.openCodeInstallationState,
+      antigravity: this.antigravityInstallationState,
+    };
+  }
+
+  private browserInstallation(
+    agentType: 'claude' | 'codex' | 'opencode' | 'antigravity',
+  ): AgentInstallation {
+    const name = AGENT_LABELS[agentType];
     return {
       agentType,
       installed: false,

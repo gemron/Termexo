@@ -1,9 +1,13 @@
+mod antigravity;
+pub mod antigravity_settings;
 mod claude;
 mod codex;
 mod opencode;
 
 use serde::{Deserialize, Serialize};
 
+pub use antigravity::{AntigravityAdapter, AntigravityModel, AntigravityUsage};
+pub use antigravity_settings::AntigravityStatusFeed;
 pub use claude::{ClaudeBackgroundSession, ClaudeCodeAdapter};
 pub use codex::CodexCliAdapter;
 pub use opencode::OpenCodeAdapter;
@@ -67,6 +71,20 @@ pub struct CodexLaunchOptions {
     pub hook_configs: Vec<String>,
     /// `-c` overrides pointing Codex at a compatible provider, empty for the official endpoint.
     pub provider_configs: Vec<String>,
+    #[serde(default)]
+    pub auto_confirm: bool,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AntigravityLaunchOptions {
+    pub session_id: Option<String>,
+    pub model: Option<String>,
+    /// Reasoning depth, which the CLI takes as `--effort`; absent leaves its own default alone.
+    #[serde(default)]
+    pub effort: Option<String>,
+    #[serde(default)]
+    pub continue_last: bool,
     #[serde(default)]
     pub auto_confirm: bool,
 }

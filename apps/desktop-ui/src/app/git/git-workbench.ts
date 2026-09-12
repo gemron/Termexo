@@ -1,7 +1,19 @@
-import { Component, computed, effect, inject, input, output, signal } from '@angular/core';
+import {
+  Component,
+  computed,
+  effect,
+  type ElementRef,
+  HostListener,
+  inject,
+  input,
+  output,
+  signal,
+  viewChild,
+} from '@angular/core';
 
 import {
   buildDiffRows,
+  changeBlockStarts,
   DiffLayout,
   RepositoryChange,
   RepositoryCommit,
@@ -14,6 +26,14 @@ import { I18nService } from '../core/i18n/i18n.service';
 import { TranslatePipe } from '../core/i18n/translate.pipe';
 import { GitService } from '../core/services/git.service';
 import { IconComponent } from '../shared/icon/icon';
+
+/**
+ * How far below the viewport's top edge a jumped-to change is placed, as a share of the height.
+ *
+ * A change pinned to the very top loses the lines leading into it, which are most of what says
+ * whether this is the edit being looked for.
+ */
+const CHANGE_SCROLL_HEADROOM = 0.3;
 
 interface CommitGraphRow {
   commit: RepositoryCommit;
@@ -74,6 +94,22 @@ export class GitWorkbenchComponent {
   });
   protected readonly graphRows = computed(() => buildCommitGraph(this.overview()?.commits ?? []));
 
+  private readonly diffViewport = viewChild<ElementRef<HTMLElement>>('diffViewport');
+  protected readonly changeBlocks = computed(() => changeBlockStarts(this.rows()));
+  /** Which change was stepped to, or -1 before the first step. */
+  private readonly activeChange = signal(-1);
+  /** The row the last jump landed on, which the view marks. */
+  protected readonly anchoredRow = computed(() => {
+    const index = this.activeChange();
+    return index < 0 ? -1 : (this.changeBlocks()[index] ?? -1);
+  });
+  /** The stepper's readout: how many changes there are, and which one is showing. */
+  protected readonly changePosition = computed(() => {
+    const total = this.changeBlocks().length;
+    const index = this.activeChange();
+    return index < 0 ? `${total}` : `${index + 1}/${total}`;
+  });
+
   constructor() {
     effect(() => {
       const overview = this.overview();
@@ -104,6 +140,51 @@ export class GitWorkbenchComponent {
       if (!this.refreshing()) {
         this.manualRefreshing.set(false);
       }
+    });
+    effect(() => {
+      // Another file's changes are not this one's, so stepping starts over with the diff.
+      this.rows();
+      this.activeChange.set(-1);
+    });
+  }
+
+  /**
+   * Moves to the next or previous run of changed lines, wrapping at either end.
+   *
+   * Wrapping rather than stopping: a diff is usually walked more than once, and a button that
+   * goes dead at the last change reads as broken rather than as the end of the file.
+   */
+  protected stepToChange(step: 1 | -1): void {
+    const blocks = this.changeBlocks();
+    if (blocks.length === 0) return;
+    const current = this.activeChange();
+    const next =
+      step > 0 ? (current + 1) % blocks.length : current <= 0 ? blocks.length - 1 : current - 1;
+    this.activeChange.set(next);
+    this.scrollToRow(blocks[next]);
+  }
+
+  /** Alt with an arrow key, which nothing in the diff consumes. */
+  @HostListener('keydown', ['$event'])
+  protected onKeyDown(event: KeyboardEvent): void {
+    if (!event.altKey || event.ctrlKey || event.metaKey) return;
+    if (event.key === 'ArrowDown') {
+      this.stepToChange(1);
+    } else if (event.key === 'ArrowUp') {
+      this.stepToChange(-1);
+    } else {
+      return;
+    }
+    event.preventDefault();
+  }
+
+  private scrollToRow(rowIndex: number): void {
+    const viewport = this.diffViewport()?.nativeElement;
+    const line = viewport?.querySelector<HTMLElement>(`[data-row="${rowIndex}"]`);
+    if (!viewport || !line) return;
+    viewport.scrollTo({
+      top: Math.max(0, line.offsetTop - viewport.clientHeight * CHANGE_SCROLL_HEADROOM),
+      behavior: 'smooth',
     });
   }
 

@@ -1,12 +1,15 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 
 import {
+  type CliOperationRequest,
   ModelProfile,
   ModelProfileInput,
   NetworkProfile,
   NetworkProfileInput,
 } from '../core/models/agent.models';
 import { AgentSettingsDialogComponent } from './agent-settings-dialog';
+
+type CliRequest = CliOperationRequest;
 
 const CUSTOM_PROFILE: ModelProfile = {
   id: 'custom-default',
@@ -222,14 +225,66 @@ describe('AgentSettingsDialogComponent', () => {
 
     clickButton('CLI 安装与升级');
     setLabeledInputValue('目标版本', '0.145.0');
-    const requests: Array<{ agentType: string; targetVersion?: string; workspaceId?: string }> = [];
+    const requests: CliRequest[] = [];
     component.cliPreviewRequested.subscribe((request) => requests.push(request));
     clickButton('生成安装计划');
 
     expect(requests).toEqual([
       {
         agentType: 'claude',
+        installer: 'npm',
         targetVersion: '0.145.0',
+        workspaceId: 'workspace-1',
+      },
+    ]);
+  });
+
+  it('asks for no version when the agent is installed by its own script', async () => {
+    fixture.componentRef.setInput('activeWorkspaceId', 'workspace-1');
+    fixture.detectChanges();
+    await fixture.whenStable();
+
+    clickButton('CLI 安装与升级');
+    setLabeledInputValue('目标版本', '0.145.0');
+    clickButton('Antigravity');
+    fixture.detectChanges();
+
+    // The version box is gone, and the request carries no version for the script to ignore.
+    expect(root.textContent).toContain('官方脚本始终安装');
+    const requests: CliRequest[] = [];
+    component.cliPreviewRequested.subscribe((request) => requests.push(request));
+    clickButton('生成安装计划');
+
+    expect(requests).toEqual([
+      {
+        agentType: 'antigravity',
+        installer: 'script',
+        targetVersion: undefined,
+        workspaceId: 'workspace-1',
+      },
+    ]);
+  });
+
+  /** Claude Code publishes both, so the choice is the user's rather than Termexo's. */
+  it('can install an npm-published agent from its vendor script instead', async () => {
+    fixture.componentRef.setInput('activeWorkspaceId', 'workspace-1');
+    fixture.detectChanges();
+    await fixture.whenStable();
+
+    clickButton('CLI 安装与升级');
+    setLabeledInputValue('目标版本', '0.145.0');
+    clickButton('官方脚本');
+    fixture.detectChanges();
+
+    const requests: CliRequest[] = [];
+    component.cliPreviewRequested.subscribe((request) => requests.push(request));
+    clickButton('生成安装计划');
+
+    expect(requests).toEqual([
+      {
+        agentType: 'claude',
+        installer: 'script',
+        targetVersion: undefined,
         workspaceId: 'workspace-1',
       },
     ]);
@@ -242,6 +297,8 @@ describe('AgentSettingsDialogComponent', () => {
       displayName: 'Claude Code',
       packageName: '@anthropic-ai/claude-code',
       targetVersion: 'latest',
+      installer: 'npm',
+      supportsVersion: true,
       packageSpec: '@anthropic-ai/claude-code@latest',
       action: 'upgrade',
       currentVersion: '2.1.220',

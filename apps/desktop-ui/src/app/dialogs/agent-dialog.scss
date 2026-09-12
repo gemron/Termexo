@@ -1224,6 +1224,46 @@ button:disabled {
   }
 }
 
+/* Where a vendor publishes both a package and an installer script, the choice is segmented:
+   there are only two of them, and which one is picked decides whether a version can be named. */
+.cli-installer {
+  display: flex;
+  flex: 0 0 auto;
+  gap: 2px;
+  padding: 2px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-field);
+  background: var(--surface-inset);
+
+  button {
+    min-height: 25px;
+    padding: 0 10px;
+    border: 0;
+    border-radius: var(--radius-selector);
+    color: var(--text-muted);
+    background: transparent;
+    font-size: 11px;
+
+    &:hover:not(.active) {
+      color: var(--text);
+    }
+
+    &.active {
+      color: var(--text);
+      background: var(--surface-raised);
+    }
+  }
+}
+
+/* Stands in for the version field when the chosen installer takes none. */
+.cli-installer-note {
+  min-width: 0;
+  flex: 1;
+  color: var(--text-muted);
+  font-size: 11px;
+  line-height: 1.45;
+}
+
 /* Hint on the left, the one confirming action on the right — same shape as .editor-actions. */
 .cli-actions {
   display: flex;

@@ -1,4 +1,12 @@
-import { Component, ElementRef, afterNextRender, input, output, viewChild } from '@angular/core';
+import {
+  Component,
+  computed,
+  ElementRef,
+  afterNextRender,
+  input,
+  output,
+  viewChild,
+} from '@angular/core';
 
 import { TranslatePipe } from '../core/i18n/translate.pipe';
 import { AgentInstallation } from '../core/models/agent.models';
@@ -49,6 +57,11 @@ import { IconComponent } from '../shared/icon/icon';
         <div class="installation-line" [class.unavailable]="!installation()?.healthy">
           <i></i>
           <span>{{ installation()?.diagnostic ?? detecting() }}</span>
+          @if (offersInstall()) {
+            <button type="button" class="install-link" (click)="installRequested.emit()">
+              {{ 'launch.install' | t }}
+            </button>
+          }
           <code>{{ installation()?.version ?? '' }}</code>
         </div>
 
@@ -95,6 +108,19 @@ export class LaunchDialogShellComponent {
   readonly blockedReason = input('');
   readonly launched = output<void>();
   readonly cancelled = output<void>();
+  /** Asks the workbench for the installer, which is the only way out of a missing CLI. */
+  readonly installRequested = output<void>();
+
+  /**
+   * Whether to offer the installer, which is only once detection has actually answered.
+   *
+   * Offering it while detection is still running would put the button under a banner that is
+   * about to say the CLI is there.
+   */
+  protected readonly offersInstall = computed(() => {
+    const installation = this.installation();
+    return installation !== null && !installation.healthy;
+  });
 
   private readonly dialog = viewChild.required<ElementRef<HTMLElement>>('dialog');
 

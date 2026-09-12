@@ -216,8 +216,8 @@
 
               <div class="assignment">
                 <span [attr.data-agent]="task.agentType">
-                  <app-icon name="bot" [size]="12" />
-                  {{ task.agentType === 'claude' ? 'Claude' : 'Codex' }}
+                  <app-icon [name]="agentIcons[task.agentType]" [size]="12" />
+                  {{ agentLabels[task.agentType] }}
                 </span>
                 <code>{{ task.modelName }}</code>
               </div>
@@ -587,7 +587,7 @@
               }
               @for (terminal of availableTerminals(); track terminal.id) {
                 <option [value]="terminal.id">
-                  {{ terminal.name }} · {{ terminal.agentType === 'claude' ? 'Claude' : 'Codex' }} ·
+                  {{ terminal.name }} · {{ agentLabels[terminal.agentType] }} ·
                   {{ terminalStatusLabel(terminal.status) }}
                 </option>
               }
@@ -604,8 +604,8 @@
             <label>
               <span>执行配置</span>
               <div class="terminal-selection-summary" data-testid="task-terminal-summary">
-                <app-icon name="terminal" [size]="14" />
-                <strong>{{ terminal.agentType === 'claude' ? 'Claude' : 'Codex' }}</strong>
+                <app-icon [name]="agentIcons[terminal.agentType]" [size]="14" />
+                <strong>{{ agentLabels[terminal.agentType] }}</strong>
                 <code>{{ terminal.model }}</code>
               </div>
               <small>Agent 类型、模型和工作目录都跟随这个终端。</small>

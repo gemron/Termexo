@@ -106,4 +106,30 @@ describe('LaunchDialogShellComponent', () => {
 
     expect(root.querySelector('footer .primary')?.getAttribute('title')).toBe('未检测到 OpenCode');
   });
+
+  /** A missing CLI used to leave the user to find the installer on their own. */
+  it('offers the installer when the CLI is not usable', () => {
+    const installs: number[] = [];
+    fixture.componentInstance.installRequested.subscribe(() => installs.push(1));
+    expect(root.querySelector('.install-link')).toBeNull();
+
+    fixture.componentRef.setInput('installation', {
+      ...INSTALLATION,
+      installed: false,
+      healthy: false,
+      diagnostic: '未检测到 OpenCode',
+    });
+    fixture.detectChanges();
+
+    root.querySelector<HTMLButtonElement>('.install-link')!.click();
+    expect(installs).toHaveLength(1);
+  });
+
+  /** Detection has not answered yet, and it is about to say the CLI is there. */
+  it('offers nothing while detection is still running', () => {
+    fixture.componentRef.setInput('installation', null);
+    fixture.detectChanges();
+
+    expect(root.querySelector('.install-link')).toBeNull();
+  });
 });

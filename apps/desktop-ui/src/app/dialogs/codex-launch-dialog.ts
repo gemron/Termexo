@@ -14,6 +14,7 @@ import {
   resolveAccountProfileId,
   ModelProfile,
 } from '../core/models/agent.models';
+import { AGENT_ICONS } from '../core/models/workspace.models';
 import { IconComponent } from '../shared/icon/icon';
 import { LaunchDialogShellComponent } from './launch-dialog-shell';
 
@@ -32,7 +33,7 @@ export interface CodexLaunchDialogValue {
   imports: [FormsModule, IconComponent, LaunchDialogShellComponent, TranslatePipe],
   template: `
     <app-launch-dialog-shell
-      icon="terminal"
+      [icon]="agentIcon"
       [heading]="'launch.newCodex' | t"
       [detecting]="'launch.detectingCodex' | t"
       [installation]="installation()"
@@ -42,6 +43,7 @@ export interface CodexLaunchDialogValue {
       [blockedReason]="blockedReason()"
       (launched)="submit()"
       (cancelled)="cancelled.emit()"
+      (installRequested)="installRequested.emit()"
     >
       <div class="form-grid">
         <label class="wide session-name-field">
@@ -150,6 +152,12 @@ export interface CodexLaunchDialogValue {
   styleUrls: ['./agent-dialog.scss', './launch-dialog.scss'],
 })
 export class CodexLaunchDialogComponent {
+  /** Passed through to the workbench, which owns the settings window. */
+  readonly installRequested = output<void>();
+
+  /** The agent's own mark, which the heading shows. */
+  protected readonly agentIcon = AGENT_ICONS.codex;
+
   readonly installation = input<AgentInstallation | null>(null);
   readonly profiles = input<ModelProfile[]>([]);
   readonly accountProfiles = input<AccountProfile[]>([]);

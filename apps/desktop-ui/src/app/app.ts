@@ -18,6 +18,7 @@ import {
   CliOperationRequest,
   CliOperationResult,
   compatibleNativeSessionId,
+  type ManagedAgentType,
   McpProfileInput,
   ModelProfileInput,
   needsCredential,
@@ -35,10 +36,12 @@ import {
   normalizeTerminalFontSize,
   normalizeTerminalGridDimension,
   normalizeWorkspaceThemeColor,
+  ANTIGRAVITY_DEFAULT_MODEL,
   OPENCODE_DEFAULT_MODEL,
   TerminalStatus,
   TerminalSession,
   Workspace,
+  AGENT_ICONS,
 } from './core/models/workspace.models';
 import type { HandoffPackage, HandoffRecord } from './core/models/handoff';
 import type { PromptAsset } from './core/models/prompt-assets';
@@ -92,6 +95,10 @@ import {
   ClaudeLaunchDialogValue,
 } from './dialogs/claude-launch-dialog';
 import { CodexLaunchDialogComponent, CodexLaunchDialogValue } from './dialogs/codex-launch-dialog';
+import {
+  AntigravityLaunchDialogComponent,
+  type AntigravityLaunchDialogValue,
+} from './dialogs/antigravity-launch-dialog';
 import {
   OpenCodeLaunchDialogComponent,
   type OpenCodeLaunchDialogValue,
@@ -229,6 +236,7 @@ function readStoredString(key: string, fallback: string): string {
     AgentSettingsDialogComponent,
     ClaudeLaunchDialogComponent,
     CodexLaunchDialogComponent,
+    AntigravityLaunchDialogComponent,
     OpenCodeLaunchDialogComponent,
     CreateWorkspaceDialogComponent,
     DirectoryPromptDialogComponent,
@@ -312,6 +320,8 @@ export class App {
   protected readonly claudeLaunchOpen = signal(false);
   protected readonly codexLaunchOpen = signal(false);
   protected readonly openCodeLaunchOpen = signal(false);
+  protected readonly antigravityLaunchOpen = signal(false);
+  protected readonly launchingAntigravity = signal(false);
   protected readonly sessionCenterOpen = signal(false);
   protected readonly promptLibraryOpen = signal(false);
   /** Empty until the shell reports it, and in browser preview, where there is no packaged build. */
@@ -323,6 +333,8 @@ export class App {
   protected readonly settingsOpen = signal(false);
   protected readonly settingsInitialTab = signal<SettingsTab>('diagnostics');
   protected readonly settingsInitialModelProfileId = signal('');
+  /** The agent the settings window opens on when a launch dialog sent the user to install it. */
+  protected readonly settingsInitialCliAgent = signal<ManagedAgentType | ''>('');
   protected readonly modelSwitchOpen = signal(false);
   /** Terminal the switch applies to; null means every terminal of that agent type. */
   protected readonly modelSwitchTerminalId = signal<string | null>(null);
@@ -439,6 +451,9 @@ export class App {
   protected readonly networkTestResult = signal<NetworkTestResult | null>(null);
   protected readonly cliOperationPlan = signal<CliOperationPlan | null>(null);
   protected readonly cliOperationResult = signal<CliOperationResult | null>(null);
+  /** The agents' own marks, for the tab strip. */
+  protected readonly agentIcons = AGENT_ICONS;
+
   protected readonly activeTerminalId = computed(() => this.state.activeTerminal()?.id ?? null);
   protected readonly gitTarget = computed<RepositoryTarget | null>(() => {
     const workspace = this.state.activeWorkspace();
@@ -761,6 +776,9 @@ export class App {
       case 'opencode':
         await this.openOpenCodeLaunch();
         break;
+      case 'antigravity':
+        await this.openAntigravityLaunch();
+        break;
       case 'shell':
         await this.createTerminal('shell');
         break;
@@ -817,6 +835,71 @@ export class App {
     this.selectedTerminalDirectory.set(workingDirectory);
     this.refreshAccountsFor('codex');
     this.codexLaunchOpen.set(true);
+  }
+
+  protected async openAntigravityLaunch(): Promise<void> {
+    this.agentMenuOpen.set(false);
+    const workingDirectory = await this.selectTerminalDirectory();
+    if (!workingDirectory) {
+      return;
+    }
+    this.selectedTerminalDirectory.set(workingDirectory);
+    this.antigravityLaunchOpen.set(true);
+  }
+
+  protected async launchAntigravity(value: AntigravityLaunchDialogValue): Promise<void> {
+    const workspace = this.state.activeWorkspace();
+    const workingDirectory = this.selectedTerminalDirectory();
+    if (!workspace || !workingDirectory || this.launchingAntigravity()) {
+      return;
+    }
+    if (!this.agents.antigravityInstallation()) {
+      await this.agents.detectAntigravity();
+    }
+    const installation = this.agents.antigravityInstallation();
+    if (!installation?.healthy) {
+      this.showToast(installation?.diagnostic ?? '未检测到 Antigravity CLI。', 'attention');
+      return;
+    }
+
+    const terminalId = createId();
+    this.launchingAntigravity.set(true);
+    try {
+      const launch = await this.agents.prepareAntigravityLaunch({
+        terminalId,
+        workspaceId: workspace.id,
+        workingDirectory,
+        model: value.model,
+        effort: value.effort,
+        continueLast: value.continueLast,
+        autoConfirm: value.autoConfirm,
+      });
+      const terminal = this.state.createTerminal({
+        id: terminalId,
+        agentType: 'antigravity',
+        name: value.name || undefined,
+        command: launch.command,
+        model: value.model ?? ANTIGRAVITY_DEFAULT_MODEL,
+        workingDirectory,
+        autoConfirm: value.autoConfirm,
+      });
+      this.antigravityLaunchOpen.set(false);
+      this.selectedTerminalDirectory.set(null);
+      if (terminal) {
+        this.armStartupDialogs(terminal.id);
+        this.revealCreatedTerminal(terminal.id);
+        this.showToast(this.i18n.t('terminal.started', { name: terminal.name }));
+      }
+    } catch (error) {
+      this.showToast(this.errorMessage(error), 'attention');
+    } finally {
+      this.launchingAntigravity.set(false);
+    }
+  }
+
+  protected closeAntigravityLaunch(): void {
+    this.antigravityLaunchOpen.set(false);
+    this.selectedTerminalDirectory.set(null);
   }
 
   protected async openOpenCodeLaunch(): Promise<void> {
@@ -2151,7 +2234,12 @@ export class App {
   /** Opens the switcher scoped to one terminal, preselecting its agent type. */
   protected openSingleModelSwitch(terminalId: string): void {
     const terminal = this.state.activeWorkspace()?.terminals.find((item) => item.id === terminalId);
-    if (!terminal || terminal.agentType === 'shell' || terminal.agentType === 'opencode') {
+    if (
+      !terminal ||
+      terminal.agentType === 'shell' ||
+      terminal.agentType === 'opencode' ||
+      terminal.agentType === 'antigravity'
+    ) {
       return;
     }
     this.modelSwitchTerminalId.set(terminalId);
@@ -2402,6 +2490,21 @@ export class App {
     } catch (error) {
       this.showToast(this.errorMessage(error));
     }
+  }
+
+  /**
+   * Takes the user from a launch dialog that found nothing installed to the installer for it.
+   *
+   * The dialog closes first: it is modal, and leaving it stacked under the settings window would
+   * put two dialogs on screen over one decision.
+   */
+  protected installAgent(agentType: ManagedAgentType): void {
+    this.closeClaudeLaunch();
+    this.closeCodexLaunch();
+    this.closeOpenCodeLaunch();
+    this.closeAntigravityLaunch();
+    this.settingsInitialCliAgent.set(agentType);
+    this.openSettings('cli');
   }
 
   protected openSettings(tab: SettingsTab = 'diagnostics', modelProfileId = ''): void {
@@ -2707,6 +2810,7 @@ export class App {
       this.agents.detectClaude(),
       this.agents.detectCodex(),
       this.agents.detectOpenCode(),
+      this.agents.detectAntigravity(),
     ]);
     this.showToast(this.i18n.t('agent.detectionComplete'));
   }
@@ -2947,6 +3051,14 @@ export class App {
       const installation = this.agents.openCodeInstallation();
       if (!installation?.healthy) {
         throw new Error(installation?.diagnostic ?? '未检测到可用的 OpenCode。');
+      }
+      return;
+    }
+    if (agentType === 'antigravity') {
+      if (!this.agents.antigravityInstallation()) await this.agents.detectAntigravity();
+      const installation = this.agents.antigravityInstallation();
+      if (!installation?.healthy) {
+        throw new Error(installation?.diagnostic ?? '未检测到可用的 Antigravity CLI。');
       }
       return;
     }

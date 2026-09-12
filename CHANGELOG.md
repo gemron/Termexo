@@ -2,6 +2,41 @@
 
 Release notes for every Termexo version, newest first. The current release is summarised in [README.md](README.md).
 
+## V0.9.0
+
+- Antigravity is a fourth agent, alongside Claude Code, Codex CLI and OpenCode. Termexo detects
+  the CLI where its installer puts it (it is not on PATH), lists the conversations it has on this
+  machine and resumes them, offers its models and reasoning efforts, and reads its allowance
+  through the CLI's own `/usage`.
+- Antigravity reports what its agent is doing, which is how a terminal knows whether it is
+  thinking, running a tool or waiting for an answer. It has no per-launch configuration of any
+  kind, so this is the one place Termexo writes into a file it does not own: the status line in
+  the CLI's own settings. Everything about it is reversible — a status line of the user's own is
+  kept and put back, and the block is recognised by the command it points at rather than by a
+  path, so a Termexo that moved still knows its own work.
+- Every agent is now shown by the mark its own project publishes, wherever it appears: the
+  new-terminal menu, a terminal's own title, the tab strip, the session centre, the settings
+  health strips and the task board. Three of the four used to share one generic icon.
+- A CLI can be installed from its vendor's own Windows installer instead of npm, where the vendor
+  publishes one — Claude Code, Codex CLI and Antigravity do. npm can be pinned to a version and
+  rolled back to one; a vendor's script always installs what that vendor currently publishes. The
+  choice is the user's, and asking for one an agent does not have is refused rather than quietly
+  swapped.
+- Starting a session for an agent that is not installed now offers the installer from the dialog
+  that discovered it, opened on that agent, instead of leaving the user to find the settings page
+  and the right tab themselves.
+- The split diff no longer draws a long line over the other column. Its columns grow to their own
+  content and the panel scrolls sideways as a whole, and the column headings follow them.
+- The diff toolbar steps through the changes in a file, by run of changed lines rather than by
+  line, with `Alt+Up` and `Alt+Down`. Where a jump lands is marked, and it keeps the lines leading
+  into the change in view.
+- An OpenCode terminal reads its own state correctly again. OpenCode goes idle at the end of every
+  step of its own loop, and the next step begins in the same instant; taking the first of those
+  for a finished turn announced completion several times per turn, and announced it again while
+  the agent sat waiting for an answer. Waiting for a person is no longer reported as work or as
+  completion, and a subagent — OpenCode runs those as sessions of their own — no longer takes the
+  turn over from the session that started it, which had left the real turn unable to end at all.
+
 ## V0.8.8
 
 - Settings has a Storage panel. It names the data directory, lists what is in it with the size of

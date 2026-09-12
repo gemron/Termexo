@@ -14,6 +14,7 @@ import {
   McpProfile,
   ModelProfile,
 } from '../core/models/agent.models';
+import { AGENT_ICONS } from '../core/models/workspace.models';
 import { IconComponent } from '../shared/icon/icon';
 import { LaunchDialogShellComponent } from './launch-dialog-shell';
 
@@ -40,7 +41,7 @@ const CONTEXT_1M_OFF = 'off';
   imports: [FormsModule, IconComponent, LaunchDialogShellComponent, TranslatePipe],
   template: `
     <app-launch-dialog-shell
-      icon="bot"
+      [icon]="agentIcon"
       [heading]="'launch.newClaude' | t"
       [detecting]="'launch.detectingClaude' | t"
       [installation]="installation()"
@@ -50,6 +51,7 @@ const CONTEXT_1M_OFF = 'off';
       [blockedReason]="blockedReason()"
       (launched)="submit()"
       (cancelled)="cancelled.emit()"
+      (installRequested)="installRequested.emit()"
     >
       <div class="form-grid">
         <label class="wide session-name-field">
@@ -169,6 +171,12 @@ const CONTEXT_1M_OFF = 'off';
   styleUrls: ['./agent-dialog.scss', './launch-dialog.scss'],
 })
 export class ClaudeLaunchDialogComponent {
+  /** Passed through to the workbench, which owns the settings window. */
+  readonly installRequested = output<void>();
+
+  /** The agent's own mark, which the heading shows. */
+  protected readonly agentIcon = AGENT_ICONS.claude;
+
   readonly installation = input<AgentInstallation | null>(null);
   readonly profiles = input<ModelProfile[]>([]);
   readonly mcpProfiles = input<McpProfile[]>([]);

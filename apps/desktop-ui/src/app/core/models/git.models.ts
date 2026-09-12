@@ -69,6 +69,24 @@ export interface DiffRow {
 
 const MAX_LCS_CELLS = 2_000_000;
 
+/**
+ * The first row of every run of changed lines.
+ *
+ * Navigation steps by run rather than by row: one edit spanning twenty lines is one change to the
+ * reader, and stopping on each of its lines would make the button useless on exactly the diffs
+ * where it matters most.
+ */
+export function changeBlockStarts(rows: readonly DiffRow[]): number[] {
+  const starts: number[] = [];
+  let inBlock = false;
+  rows.forEach((row, index) => {
+    const changed = row.kind !== 'equal';
+    if (changed && !inBlock) starts.push(index);
+    inBlock = changed;
+  });
+  return starts;
+}
+
 function lines(value: string): string[] {
   if (!value) return [];
   return value.replace(/\r\n/g, '\n').split('\n');

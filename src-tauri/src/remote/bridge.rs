@@ -52,6 +52,11 @@ pub const REMOTE_ALLOWED: &[&str] = &[
     "detect_claude",
     "detect_codex",
     "detect_opencode",
+    "detect_antigravity",
+    "scan_antigravity_sessions",
+    "list_antigravity_models",
+    "read_antigravity_status_feed",
+    "prepare_antigravity_launch",
     "scan_claude_sessions",
     "scan_codex_sessions",
     "scan_opencode_sessions",
@@ -119,6 +124,10 @@ pub const REMOTE_ALLOWED: &[&str] = &[
 
 /// Commands a remote client must never reach, with the reason each one is held back.
 pub const REMOTE_DENIED: &[&str] = &[
+    // Writes the status feed into the desktop machine's own Antigravity settings, which is a
+    // deliberate change to a file Termexo does not own and belongs to whoever is at that
+    // machine.
+    "set_antigravity_status_feed",
     // Moves the desktop machine's data and changes what its next start opens. A remote client
     // cannot see that machine's drives to choose a sound destination, and getting it wrong is
     // answered by a restart the person holding the phone is not there to perform.

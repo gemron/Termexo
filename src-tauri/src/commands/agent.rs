@@ -7,9 +7,10 @@ use tauri::State;
 
 use crate::account;
 use crate::agent::{
-    AgentAdapter, AgentInstallation, AgentLaunchSpec, AgentSession, ClaudeBackgroundSession,
-    ClaudeCodeAdapter, ClaudeLaunchOptions, CodexCliAdapter, CodexLaunchOptions, OpenCodeAdapter,
-    OpenCodeLaunchOptions,
+    antigravity_settings, AgentAdapter, AgentInstallation, AgentLaunchSpec, AgentSession,
+    AntigravityAdapter, AntigravityLaunchOptions, AntigravityModel, AntigravityStatusFeed,
+    ClaudeBackgroundSession, ClaudeCodeAdapter, ClaudeLaunchOptions, CodexCliAdapter,
+    CodexLaunchOptions, OpenCodeAdapter, OpenCodeLaunchOptions,
 };
 use crate::config::{
     claude_launch_model, normalized_effort, AgentProtocol, CredentialStore, LaunchEnvironmentStore,
@@ -176,6 +177,12 @@ pub fn build_opencode_launch_command(
         .map_err(|error| error.to_string())
 }
 
+/// Set once the user turns the Antigravity status feed off.
+///
+/// The feed is on by default, so its absence cannot mean "not wanted yet" — only an explicit
+/// refusal can, and it has to outlive the launch that would otherwise reinstate it.
+const ANTIGRAVITY_FEED_OPT_OUT: &str = "antigravity_status_feed_opt_out";
+
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct PrepareClaudeLaunchRequest {
@@ -224,6 +231,21 @@ pub struct PrepareOpenCodeLaunchRequest {
     pub workspace_id: Option<String>,
     pub session_id: Option<String>,
     pub model: Option<String>,
+    #[serde(default)]
+    pub continue_last: bool,
+    #[serde(default)]
+    pub auto_confirm: bool,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PrepareAntigravityLaunchRequest {
+    pub terminal_id: String,
+    pub workspace_id: Option<String>,
+    pub working_directory: Option<String>,
+    pub session_id: Option<String>,
+    pub model: Option<String>,
+    pub effort: Option<String>,
     #[serde(default)]
     pub continue_last: bool,
     #[serde(default)]
@@ -504,6 +526,151 @@ pub fn prepare_opencode_launch(
         .build_launch_command(&OpenCodeLaunchOptions {
             session_id: request.session_id,
             model: request.model,
+            continue_last: request.continue_last,
+            auto_confirm: request.auto_confirm,
+        })
+        .map_err(|error| error.to_string())
+}
+
+#[tauri::command]
+pub async fn detect_antigravity() -> Result<AgentInstallation, String> {
+    tauri::async_runtime::spawn_blocking(|| {
+        AntigravityAdapter::new()
+            .detect()
+            .map_err(|error| error.to_string())
+    })
+    .await
+    .map_err(|error| error.to_string())?
+}
+
+#[tauri::command]
+pub async fn scan_antigravity_sessions(
+    project_path: Option<String>,
+    database: State<'_, WorkspaceDatabase>,
+) -> Result<Vec<AgentSession>, String> {
+    let sessions = tauri::async_runtime::spawn_blocking(move || {
+        let adapter = AntigravityAdapter::new();
+        let installation = adapter.detect().map_err(|error| error.to_string())?;
+        if !installation.installed {
+            return Ok(Vec::new());
+        }
+        adapter
+            .list_sessions(project_path.as_deref())
+            .map_err(|error| error.to_string())
+    })
+    .await
+    .map_err(|error| error.to_string())??;
+    database
+        .save_agent_sessions(&sessions)
+        .map_err(|error| error.to_string())?;
+    Ok(sessions)
+}
+
+/// The models this installation offers, for the launch dialog's picker.
+#[tauri::command]
+pub async fn list_antigravity_models() -> Result<Vec<AntigravityModel>, String> {
+    tauri::async_runtime::spawn_blocking(|| {
+        AntigravityAdapter::new()
+            .list_models()
+            .map_err(|error| error.to_string())
+    })
+    .await
+    .map_err(|error| error.to_string())?
+}
+
+/// Reports whether Termexo's status feed is installed in the CLI's own settings.
+#[tauri::command(async)]
+pub fn read_antigravity_status_feed() -> Result<AntigravityStatusFeed, String> {
+    antigravity_settings::describe().map_err(|error| error.to_string())
+}
+
+/// Installs or removes the status feed.
+///
+/// Turning it off is recorded, because the feed installs itself on first launch and would
+/// otherwise come straight back — a switch that undoes itself is not one.
+#[tauri::command(async)]
+pub fn set_antigravity_status_feed(
+    enabled: bool,
+    database: State<'_, WorkspaceDatabase>,
+) -> Result<AntigravityStatusFeed, String> {
+    database
+        .write_app_setting(ANTIGRAVITY_FEED_OPT_OUT, if enabled { "" } else { "1" })
+        .map_err(|error| error.to_string())?;
+    if !enabled {
+        return antigravity_settings::remove().map_err(|error| error.to_string());
+    }
+    let executable = std::env::current_exe().map_err(|error| error.to_string())?;
+    antigravity_settings::install(&executable).map_err(|error| error.to_string())
+}
+
+/// Installs the status feed unless the user has turned it off.
+///
+/// Called from the launch rather than from startup: this writes to a file Termexo does not own, so
+/// it happens at the first moment the write is worth anything — and never on a machine whose owner
+/// does not run Antigravity at all. A failure is logged and the launch continues, because losing
+/// the status display is a far smaller thing than losing the terminal.
+fn ensure_antigravity_status_feed(database: &WorkspaceDatabase) {
+    let opted_out = database
+        .read_app_setting(ANTIGRAVITY_FEED_OPT_OUT)
+        .ok()
+        .flatten()
+        .is_some_and(|value| value == "1");
+    if opted_out {
+        return;
+    }
+    let installed = match antigravity_settings::describe() {
+        Ok(feed) => feed.installed,
+        Err(error) => {
+            tracing::warn!(%error, "无法读取 Antigravity 配置，跳过状态回传的安装");
+            return;
+        }
+    };
+    let Ok(executable) = std::env::current_exe() else {
+        return;
+    };
+    // An installed feed still has to match this installation: the command carries the path of the
+    // executable that wrote it, and an older Termexo wrote it in a shape the CLI cannot run.
+    let written = if installed {
+        antigravity_settings::refresh(&executable).map(|_| ())
+    } else {
+        antigravity_settings::install(&executable).map(|_| ())
+    };
+    if let Err(error) = written {
+        tracing::warn!(%error, "无法写入 Antigravity 状态回传配置");
+    }
+}
+
+#[tauri::command(async)]
+pub fn prepare_antigravity_launch(
+    request: PrepareAntigravityLaunchRequest,
+    database: State<'_, WorkspaceDatabase>,
+    credentials: State<'_, CredentialStore>,
+    launch_environment: State<'_, LaunchEnvironmentStore>,
+    hooks: State<'_, HookEventStore>,
+) -> Result<AgentLaunchSpec, String> {
+    let mut environment =
+        network_environment(&database, &credentials, request.workspace_id.as_deref())?;
+    // The status script is a child of this terminal, so it reads which terminal it belongs to out
+    // of its own environment — the payload the CLI sends it names the conversation, not the
+    // terminal, and one workspace can have several.
+    environment.extend(hooks.antigravity_environment(&request.terminal_id));
+    ensure_antigravity_status_feed(&database);
+    // The CLI stops to ask about an unfamiliar workspace on first launch, which in a terminal
+    // opened to do something else is the last thing the user expects to deal with.
+    if let Some(directory) = request.working_directory.as_deref() {
+        if let Err(error) = antigravity_settings::trust_workspace(directory) {
+            tracing::warn!(%error, "无法将工作目录写入 Antigravity 的信任列表");
+        }
+    }
+    log_proxy_environment(&environment);
+    launch_environment
+        .put(request.terminal_id, environment)
+        .map_err(|error| error.to_string())?;
+    AntigravityAdapter::new()
+        .build_launch_command(&AntigravityLaunchOptions {
+            session_id: request.session_id,
+            model: request.model,
+            effort: request.effort,
             continue_last: request.continue_last,
             auto_confirm: request.auto_confirm,
         })

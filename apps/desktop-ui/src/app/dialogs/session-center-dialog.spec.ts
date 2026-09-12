@@ -127,7 +127,7 @@ describe('SessionCenterDialogComponent', () => {
   });
 
   it('shows Agent health, counts, and filters the session list by Agent', () => {
-    expect(root.querySelectorAll('.agent-health')).toHaveLength(3);
+    expect(root.querySelectorAll('.agent-health')).toHaveLength(4);
     expect(root.querySelectorAll('.session-row')).toHaveLength(3);
 
     clickButton('Codex');

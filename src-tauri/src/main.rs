@@ -16,6 +16,13 @@ fn main() {
             }
             return;
         }
+        Some("agy-status") => {
+            if let Err(error) = termexo_lib::capture_antigravity_status_from_cli() {
+                eprintln!("{error}");
+                std::process::exit(1);
+            }
+            return;
+        }
         Some("codex-hook-event") => {
             if let Err(error) = termexo_lib::capture_codex_hook_event_from_cli() {
                 eprintln!("{error}");

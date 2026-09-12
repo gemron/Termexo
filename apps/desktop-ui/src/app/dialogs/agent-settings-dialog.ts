@@ -33,6 +33,9 @@ import {
   NetworkProfileInput,
   NetworkProfileScope,
   NetworkTestResult,
+  type CliInstaller,
+  MANAGED_AGENT_INSTALLERS,
+  ManagedAgentType,
   NativeAgentType,
   PROVIDER_PRESETS,
 } from '../core/models/agent.models';
@@ -40,7 +43,9 @@ import { createId } from '../core/models/identifiers';
 import { UpdateCheck } from '../core/services/update.service';
 import { IconComponent } from '../shared/icon/icon';
 import { RemoteAccessPanelComponent } from './remote-access-panel';
+import { AntigravityStatusToggleComponent } from './antigravity-status-toggle';
 import { StoragePanelComponent } from './storage-panel';
+import { AGENT_ICONS } from '../core/models/workspace.models';
 
 export type SettingsTab =
   'diagnostics' | 'cli' | 'accounts' | 'models' | 'mcp' | 'network' | 'remote' | 'storage';
@@ -53,6 +58,7 @@ const DEFAULT_ALERT_THRESHOLD = 80;
   imports: [
     FormsModule,
     IconComponent,
+    AntigravityStatusToggleComponent,
     RemoteAccessPanelComponent,
     StoragePanelComponent,
     TranslatePipe,
@@ -157,7 +163,7 @@ const DEFAULT_ALERT_THRESHOLD = 80;
             @case ('diagnostics') {
               <section class="diagnostic-panel card">
                 <div class="diagnostic-status alert" [class.unavailable]="!installation()?.healthy">
-                  <span><app-icon name="shield" [size]="18" /></span>
+                  <span><app-icon [name]="agentIcons.claude" [size]="18" /></span>
                   <div>
                     <strong>{{
                       installation()?.healthy
@@ -174,7 +180,7 @@ const DEFAULT_ALERT_THRESHOLD = 80;
                   class="diagnostic-status alert"
                   [class.unavailable]="!codexInstallation()?.healthy"
                 >
-                  <span><app-icon name="terminal" [size]="18" /></span>
+                  <span><app-icon [name]="agentIcons.codex" [size]="18" /></span>
                   <div>
                     <strong>{{
                       codexInstallation()?.healthy
@@ -191,7 +197,7 @@ const DEFAULT_ALERT_THRESHOLD = 80;
                   class="diagnostic-status alert"
                   [class.unavailable]="!openCodeInstallation()?.healthy"
                 >
-                  <span><app-icon name="terminal" [size]="18" /></span>
+                  <span><app-icon [name]="agentIcons.opencode" [size]="18" /></span>
                   <div>
                     <strong>{{
                       openCodeInstallation()?.healthy
@@ -204,6 +210,26 @@ const DEFAULT_ALERT_THRESHOLD = 80;
                   </div>
                   <code>{{ openCodeInstallation()?.version ?? ('common.notDetected' | t) }}</code>
                 </div>
+                <div
+                  class="diagnostic-status alert"
+                  [class.unavailable]="!antigravityInstallation()?.healthy"
+                >
+                  <span><app-icon [name]="agentIcons.antigravity" [size]="18" /></span>
+                  <div>
+                    <strong>{{
+                      antigravityInstallation()?.healthy
+                        ? ('settings.available' | t: { name: 'Antigravity' })
+                        : ('settings.unavailable' | t: { name: 'Antigravity' })
+                    }}</strong>
+                    <small>{{
+                      antigravityInstallation()?.diagnostic ?? ('settings.awaitingDetection' | t)
+                    }}</small>
+                  </div>
+                  <code>{{
+                    antigravityInstallation()?.version ?? ('common.notDetected' | t)
+                  }}</code>
+                </div>
+                <app-antigravity-status-toggle />
                 <dl>
                   <div>
                     <dt>Claude</dt>
@@ -327,7 +353,7 @@ const DEFAULT_ALERT_THRESHOLD = 80;
                     [class.active]="cliAgentType === 'claude'"
                     (click)="selectCliAgent('claude')"
                   >
-                    <span><app-icon name="bot" [size]="16" /></span>
+                    <span><app-icon [name]="agentIcons.claude" [size]="16" /></span>
                     <strong>Claude Code</strong>
                     <small>{{
                       installation()?.healthy
@@ -340,7 +366,7 @@ const DEFAULT_ALERT_THRESHOLD = 80;
                     [class.active]="cliAgentType === 'opencode'"
                     (click)="selectCliAgent('opencode')"
                   >
-                    <span><app-icon name="terminal" [size]="16" /></span>
+                    <span><app-icon [name]="agentIcons.opencode" [size]="16" /></span>
                     <strong>OpenCode</strong>
                     <small>{{
                       openCodeInstallation()?.healthy
@@ -353,7 +379,7 @@ const DEFAULT_ALERT_THRESHOLD = 80;
                     [class.active]="cliAgentType === 'codex'"
                     (click)="selectCliAgent('codex')"
                   >
-                    <span><app-icon name="terminal" [size]="16" /></span>
+                    <span><app-icon [name]="agentIcons.codex" [size]="16" /></span>
                     <strong>Codex CLI</strong>
                     <small>{{
                       codexInstallation()?.healthy
@@ -361,22 +387,65 @@ const DEFAULT_ALERT_THRESHOLD = 80;
                         : ('common.notDetected' | t)
                     }}</small>
                   </button>
+                  <button
+                    type="button"
+                    [class.active]="cliAgentType === 'antigravity'"
+                    (click)="selectCliAgent('antigravity')"
+                  >
+                    <span><app-icon [name]="agentIcons.antigravity" [size]="16" /></span>
+                    <strong>Antigravity</strong>
+                    <small>{{
+                      antigravityInstallation()?.healthy
+                        ? (antigravityInstallation()?.version ?? ('settings.installed' | t))
+                        : ('common.notDetected' | t)
+                    }}</small>
+                  </button>
                 </div>
 
                 <div class="cli-version-row">
-                  <label>
-                    <span>{{ 'settings.targetVersion' | t }}</span>
-                    <input
-                      [attr.aria-label]="'settings.targetVersionAria' | t"
-                      [placeholder]="'settings.targetVersionPlaceholder' | t"
-                      [(ngModel)]="cliTargetVersion"
-                      (ngModelChange)="cliConfirmed = false"
-                    />
-                  </label>
+                  @if (cliInstallers().length > 1) {
+                    <div
+                      class="cli-installer"
+                      role="tablist"
+                      [attr.aria-label]="'settings.installVia' | t"
+                    >
+                      @for (installer of cliInstallers(); track installer) {
+                        <button
+                          type="button"
+                          role="tab"
+                          [class.active]="cliInstaller === installer"
+                          [attr.aria-selected]="cliInstaller === installer"
+                          (click)="selectCliInstaller(installer)"
+                        >
+                          {{
+                            (installer === 'script'
+                              ? 'settings.installerScript'
+                              : 'settings.installerNpm'
+                            ) | t
+                          }}
+                        </button>
+                      }
+                    </div>
+                  }
+                  @if (cliTakesVersion()) {
+                    <label>
+                      <span>{{ 'settings.targetVersion' | t }}</span>
+                      <input
+                        [attr.aria-label]="'settings.targetVersionAria' | t"
+                        [placeholder]="'settings.targetVersionPlaceholder' | t"
+                        [(ngModel)]="cliTargetVersion"
+                        (ngModelChange)="cliConfirmed = false"
+                      />
+                    </label>
+                  } @else {
+                    <small class="cli-installer-note">{{
+                      'settings.scriptInstallerHelp' | t
+                    }}</small>
+                  }
                   <button
                     type="button"
                     class="secondary"
-                    [disabled]="busy() || !cliTargetVersion.trim()"
+                    [disabled]="busy() || (cliTakesVersion() && !cliTargetVersion.trim())"
                     (click)="previewCli()"
                   >
                     <app-icon name="refresh" [size]="13" />{{ 'settings.generatePlan' | t }}
@@ -400,11 +469,20 @@ const DEFAULT_ALERT_THRESHOLD = 80;
                         </strong>
                         <small>{{ cliPlan()?.diagnostic }}</small>
                       </div>
-                      <code>{{ cliPlan()?.resolvedVersion ?? cliPlan()?.targetVersion }}</code>
+                      @if (cliPlan()?.installer !== 'script') {
+                        <code>{{ cliPlan()?.resolvedVersion ?? cliPlan()?.targetVersion }}</code>
+                      }
                     </div>
                     <dl>
                       <div>
-                        <dt>{{ 'settings.officialPackage' | t }}</dt>
+                        <dt>
+                          {{
+                            (cliPlan()?.installer === 'script'
+                              ? 'settings.officialInstaller'
+                              : 'settings.officialPackage'
+                            ) | t
+                          }}
+                        </dt>
                         <dd>{{ cliPlan()?.packageSpec }}</dd>
                       </div>
                       <div>
@@ -417,23 +495,25 @@ const DEFAULT_ALERT_THRESHOLD = 80;
                           <dd>{{ cliPlan()?.resolvedVersion }}</dd>
                         </div>
                       }
-                      <div>
-                        <dt>npm</dt>
-                        <dd>
-                          {{ cliPlan()?.npmVersion ?? ('common.unavailable' | t) }} ·
-                          {{ cliPlan()?.npmPath ?? ('settings.notFound' | t) }}
-                        </dd>
-                      </div>
-                      <div>
-                        <dt>{{ 'settings.activeProxy' | t }}</dt>
-                        <dd>
-                          {{ cliPlan()?.networkProfileName ?? ('settings.directConnection' | t) }}
-                        </dd>
-                      </div>
-                      <div>
-                        <dt>registry</dt>
-                        <dd>{{ cliPlan()?.npmRegistry ?? ('settings.defaultRegistry' | t) }}</dd>
-                      </div>
+                      @if (cliPlan()?.installer !== 'script') {
+                        <div>
+                          <dt>npm</dt>
+                          <dd>
+                            {{ cliPlan()?.npmVersion ?? ('common.unavailable' | t) }} ·
+                            {{ cliPlan()?.npmPath ?? ('settings.notFound' | t) }}
+                          </dd>
+                        </div>
+                        <div>
+                          <dt>{{ 'settings.activeProxy' | t }}</dt>
+                          <dd>
+                            {{ cliPlan()?.networkProfileName ?? ('settings.directConnection' | t) }}
+                          </dd>
+                        </div>
+                        <div>
+                          <dt>registry</dt>
+                          <dd>{{ cliPlan()?.npmRegistry ?? ('settings.defaultRegistry' | t) }}</dd>
+                        </div>
+                      }
                     </dl>
                     <code class="cli-command-preview">{{ cliPlan()?.commandPreview }}</code>
 
@@ -443,10 +523,20 @@ const DEFAULT_ALERT_THRESHOLD = 80;
                         [(ngModel)]="cliConfirmed"
                         [disabled]="busy() || !cliPlan()?.ready"
                       />
-                      <span>{{ 'settings.confirmCliSource' | t }}</span>
+                      <span>{{
+                        (cliPlan()?.installer === 'script'
+                          ? 'settings.confirmScriptSource'
+                          : 'settings.confirmCliSource'
+                        ) | t
+                      }}</span>
                     </label>
                     <div class="cli-actions">
-                      <span>{{ 'settings.cliFailureHelp' | t }}</span>
+                      <span>{{
+                        (cliPlan()?.installer === 'script'
+                          ? 'settings.scriptFailureHelp'
+                          : 'settings.cliFailureHelp'
+                        ) | t
+                      }}</span>
                       <button
                         type="button"
                         class="primary"
@@ -1150,6 +1240,9 @@ export class AgentSettingsDialogComponent {
   readonly installation = input<AgentInstallation | null>(null);
   readonly codexInstallation = input<AgentInstallation | null>(null);
   readonly openCodeInstallation = input<AgentInstallation | null>(null);
+  readonly antigravityInstallation = input<AgentInstallation | null>(null);
+  /** The agents' own marks, for the template. */
+  protected readonly agentIcons = AGENT_ICONS;
   readonly modelProfiles = input<ModelProfile[]>([]);
   readonly mcpProfiles = input<McpProfile[]>([]);
   readonly networkProfiles = input<NetworkProfile[]>([]);
@@ -1157,6 +1250,8 @@ export class AgentSettingsDialogComponent {
   readonly activeWorkspaceId = input('');
   readonly activeWorkspaceName = input('');
   readonly initialTab = input<SettingsTab>('diagnostics');
+  /** The agent the CLI tab opens on, when something sent the user here to install it. */
+  readonly initialCliAgent = input<ManagedAgentType | ''>('');
   readonly initialModelProfileId = input('');
   readonly networkTestResult = input<NetworkTestResult | null>(null);
   readonly cliPlan = input<CliOperationPlan | null>(null);
@@ -1216,7 +1311,9 @@ export class AgentSettingsDialogComponent {
   });
   protected readonly hasNetworkCredential = signal(false);
   protected readonly allPresets = PROVIDER_PRESETS;
-  protected cliAgentType: NativeAgentType = 'claude';
+  protected cliAgentType: ManagedAgentType = 'claude';
+  /** Which of the agent's installers to use; the first it offers until the user picks. */
+  protected cliInstaller: CliInstaller = MANAGED_AGENT_INSTALLERS.claude[0];
   protected cliTargetVersion = 'latest';
   protected cliConfirmed = false;
   protected modelName = 'Claude Sonnet';
@@ -1280,6 +1377,10 @@ export class AgentSettingsDialogComponent {
       }
       this.initialSelectionApplied = true;
       this.tab.set(requestedTab);
+      const requestedAgent = this.initialCliAgent();
+      if (requestedAgent) {
+        this.selectCliAgent(requestedAgent);
+      }
       if (requestedProfile) {
         this.editModel(requestedProfile);
       }
@@ -1303,9 +1404,21 @@ export class AgentSettingsDialogComponent {
     }
   }
 
-  protected selectCliAgent(agentType: NativeAgentType): void {
+  protected selectCliAgent(agentType: ManagedAgentType): void {
     this.cliAgentType = agentType;
+    // The installer belonged to the agent being left; this one may not even offer it.
+    this.cliInstaller = MANAGED_AGENT_INSTALLERS[agentType][0];
     this.cliConfirmed = false;
+  }
+
+  protected selectCliInstaller(installer: CliInstaller): void {
+    this.cliInstaller = installer;
+    this.cliConfirmed = false;
+  }
+
+  /** The ways the selected agent can be installed. */
+  protected cliInstallers(): readonly CliInstaller[] {
+    return MANAGED_AGENT_INSTALLERS[this.cliAgentType];
   }
 
   protected selectedAccount(): AccountProfile | undefined {
@@ -1388,16 +1501,25 @@ export class AgentSettingsDialogComponent {
 
   protected cliPlanMatches(): boolean {
     const plan = this.cliPlan();
+    if (plan?.agentType !== this.cliAgentType || plan.installer !== this.cliInstaller) {
+      return false;
+    }
+    // A script install has no version to match on: the plan is for the agent, not for a version.
     return (
-      plan?.agentType === this.cliAgentType &&
-      plan.targetVersion === (this.cliTargetVersion.trim() || 'latest')
+      !plan.supportsVersion || plan.targetVersion === (this.cliTargetVersion.trim() || 'latest')
     );
+  }
+
+  /** Whether the chosen installer takes a version at all; a script install always takes latest. */
+  protected cliTakesVersion(): boolean {
+    return this.cliInstaller === 'npm';
   }
 
   private cliRequest(): CliOperationRequest {
     return {
       agentType: this.cliAgentType,
-      targetVersion: this.cliTargetVersion.trim() || 'latest',
+      installer: this.cliInstaller,
+      targetVersion: this.cliTakesVersion() ? this.cliTargetVersion.trim() || 'latest' : undefined,
       workspaceId: this.activeWorkspaceId() || undefined,
     };
   }

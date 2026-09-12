@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use std::env;
 use std::fs::{self, File, OpenOptions};
 use std::io::{BufRead, BufReader, Read, Seek, SeekFrom, Write};
@@ -28,6 +29,16 @@ pub enum HookError {
     #[error("无法合并 OPENCODE_CONFIG_CONTENT：{0}")]
     InvalidOpenCodeConfig(String),
 }
+
+const TERMEXO_ANTIGRAVITY_EVENT_FILE: &str = "TERMEXO_ANTIGRAVITY_EVENT_FILE";
+const TERMEXO_ANTIGRAVITY_TERMINAL_ID: &str = "TERMEXO_ANTIGRAVITY_TERMINAL_ID";
+
+/// What the status script prints back to the CLI, which renders it as the status line.
+///
+/// The CLI replaces its own status line with this, so it has to carry the state a user would
+/// otherwise have lost. Termexo shows the same state in its own interface; this keeps the
+/// terminal readable on its own terms.
+const ANTIGRAVITY_STATUS_LINE: &str = "{model} · {state}";
 
 const TERMEXO_CODEX_EVENT_FILE: &str = "TERMEXO_CODEX_EVENT_FILE";
 const TERMEXO_CODEX_TERMINAL_ID: &str = "TERMEXO_CODEX_TERMINAL_ID";
@@ -228,6 +239,22 @@ impl HookEventStore {
         ]
     }
 
+    /// The variables the Antigravity status script reads out of its own environment.
+    ///
+    /// agy has no per-invocation configuration, so the script installed in the user's settings is
+    /// shared by every terminal; this is what tells each run which terminal it is reporting for.
+    pub fn antigravity_environment(&self, terminal_id: &str) -> HashMap<String, String> {
+        HashMap::from([
+            (
+                TERMEXO_ANTIGRAVITY_EVENT_FILE.into(),
+                self.event_file.to_string_lossy().into_owned(),
+            ),
+            (TERMEXO_ANTIGRAVITY_TERMINAL_ID.into(), terminal_id.into()),
+            // Keeps the self-updater from rewriting the binary underneath a running terminal.
+            ("AGY_CLI_DISABLE_AUTO_UPDATE".into(), "true".into()),
+        ])
+    }
+
     pub fn prepare_opencode_runtime(
         &self,
         terminal_id: &str,
@@ -371,6 +398,99 @@ pub fn capture_codex_hook_event_from_cli() -> Result<(), HookError> {
     Ok(())
 }
 
+/// Records one Antigravity status update and prints the line the CLI should show.
+///
+/// The CLI runs this whenever the agent's state changes, piping the state as JSON on stdin and
+/// taking the status line back on stdout. It is the only push-based state feed agy offers — hooks
+/// exist, but they fire around tools and invocations rather than describing what the agent is
+/// doing — and it is a child of the terminal's own process, so the terminal it belongs to comes
+/// from the environment rather than from anything in the payload.
+pub fn capture_antigravity_status_from_cli() -> Result<(), HookError> {
+    let mut input = String::new();
+    std::io::stdin().read_to_string(&mut input)?;
+    let payload: Value = serde_json::from_str(&input).unwrap_or_else(|_| json!({ "raw": input }));
+
+    // The status line is written into the CLI's own global settings, so it runs for every agy
+    // session on the machine — including ones Termexo did not start, which carry none of its
+    // environment. Those have no terminal to attribute the state to: the line is still drawn, and
+    // only the recording is skipped. Failing them instead would have the CLI report an error on
+    // every update and disable the status line after thirty of them.
+    let terminal = env::var(TERMEXO_ANTIGRAVITY_EVENT_FILE)
+        .ok()
+        .zip(env::var(TERMEXO_ANTIGRAVITY_TERMINAL_ID).ok());
+
+    // Printed first: a failure to record the event must not also cost the user their status line.
+    println!("{}", antigravity_status_line(&payload));
+    if let Some((event_file, terminal_id)) = terminal {
+        if let Err(error) = append_stored_event(&event_file, terminal_id, "antigravity", payload) {
+            eprintln!("{error}");
+        }
+    }
+    Ok(())
+}
+
+/// The status line shown in the CLI, built from the state it just reported.
+fn antigravity_status_line(payload: &Value) -> String {
+    let model = payload
+        .get("model")
+        .and_then(|model| model.get("display_name").or_else(|| model.get("id")))
+        .and_then(Value::as_str)
+        .unwrap_or("Antigravity");
+    let state = payload
+        .get("agent_state")
+        .and_then(Value::as_str)
+        .unwrap_or("idle");
+    ANTIGRAVITY_STATUS_LINE
+        .replace("{model}", model)
+        .replace("{state}", state)
+}
+
+/// Maps a status update onto the terminal states Termexo draws.
+///
+/// The payload describes what the agent is doing rather than what just happened, so the event type
+/// is derived here: `tool_confirmation_pending` outranks the state itself, because a terminal
+/// waiting for an answer is the one thing the user has to be told about.
+fn map_antigravity_event(stored: StoredHookEvent) -> AgentEvent {
+    let payload = &stored.payload;
+    let awaiting = payload
+        .get("tool_confirmation_pending")
+        .and_then(Value::as_bool)
+        .unwrap_or(false);
+    let state = payload
+        .get("agent_state")
+        .and_then(Value::as_str)
+        .unwrap_or_default();
+    let event_type = if awaiting {
+        "approval.required"
+    } else {
+        match state {
+            "thinking" => "agent.thinking",
+            "working" | "tool_use" => "tool.started",
+            "initializing" => "session.started",
+            // `idle` is the only state that means the turn is over.
+            _ => "task.completed",
+        }
+    };
+
+    AgentEvent {
+        event_key: stored.event_key,
+        agent_type: "antigravity".into(),
+        native_session_id: payload
+            .get("conversation_id")
+            .or_else(|| payload.get("session_id"))
+            .and_then(Value::as_str)
+            .map(str::to_owned),
+        terminal_id: stored.terminal_id,
+        event_type: event_type.into(),
+        detail: json!({
+            "agent_state": state,
+            "model": payload.get("model").and_then(|model| model.get("display_name")),
+            "tool_confirmation_pending": awaiting,
+        }),
+        created_at: stored.received_at,
+    }
+}
+
 pub fn capture_codex_notification_from_cli() -> Result<(), HookError> {
     let arguments = std::env::args().skip(2).collect::<Vec<_>>();
     let event_file =
@@ -415,6 +535,9 @@ fn append_stored_event(
 fn map_hook_event(stored: StoredHookEvent) -> AgentEvent {
     if stored.agent_type.as_deref() == Some("codex") {
         return map_codex_event(stored);
+    }
+    if stored.agent_type.as_deref() == Some("antigravity") {
+        return map_antigravity_event(stored);
     }
     if stored.agent_type.as_deref() == Some("opencode") {
         return map_opencode_event(stored);
@@ -665,6 +788,46 @@ fn unix_timestamp_millis() -> i64 {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// The Node this repository pins, which is the one its own scripts run.
+    fn pinned_node() -> Option<PathBuf> {
+        let node = Path::new(env!("CARGO_MANIFEST_DIR"))
+            .parent()?
+            .join("apps")
+            .join("desktop-ui")
+            .join("node_modules")
+            .join("node")
+            .join("bin")
+            .join(if cfg!(windows) { "node.exe" } else { "node" });
+        node.is_file().then_some(node)
+    }
+
+    /// The plugin decides what an OpenCode terminal's status says, and the reading that matters
+    /// is invisible at the moment it happens: OpenCode goes idle at the end of every step of its
+    /// own loop. Taking the first of those for a finished turn announced completion several times
+    /// per turn, and again while the agent sat waiting for an answer.
+    ///
+    /// The check is a replay of a recorded session, which only Node can run.
+    #[test]
+    fn the_opencode_plugin_reads_a_session_the_way_the_terminal_shows_it() {
+        let Some(node) = pinned_node() else {
+            eprintln!("跳过 OpenCode 插件回放：未找到仓库固定的 Node，请先安装前端依赖。");
+            return;
+        };
+        let hooks = Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("src")
+            .join("hooks");
+        let output = std::process::Command::new(node)
+            .arg(hooks.join("opencode-plugin.replay.mjs"))
+            .arg(hooks.join("opencode-plugin.mjs"))
+            .output()
+            .expect("无法运行 Node 回放脚本");
+        assert!(
+            output.status.success(),
+            "{}",
+            String::from_utf8_lossy(&output.stderr)
+        );
+    }
 
     fn test_directory(name: &str) -> PathBuf {
         let unique = SystemTime::now()

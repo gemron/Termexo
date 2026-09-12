@@ -10,7 +10,8 @@ use std::time::{Duration, Instant};
 use serde::{Deserialize, Serialize};
 
 use crate::agent::{
-    AgentAdapter, AgentInstallation, ClaudeCodeAdapter, CodexCliAdapter, OpenCodeAdapter,
+    AgentAdapter, AgentInstallation, AntigravityAdapter, ClaudeCodeAdapter, CodexCliAdapter,
+    OpenCodeAdapter,
 };
 use crate::config::NetworkProfile;
 use crate::process::{hide_window, terminate_process_tree};
@@ -21,10 +22,18 @@ const VERSION_TIMEOUT: Duration = Duration::from_secs(10);
 const MAX_CAPTURED_OUTPUT_BYTES: usize = 32 * 1024;
 const NPM_OVERRIDE_ENV: &str = "TERMEXO_NPM_PATH";
 
+/// A script install always fetches the current release; there is no version to ask for.
+const SCRIPT_TARGET_VERSION: &str = "latest";
+/// The value a request carries to ask for the vendor's script rather than npm.
+const SCRIPT_INSTALLER: &str = "script";
+const NPM_INSTALLER: &str = "npm";
+
 #[derive(Debug, Clone, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct CliOperationRequest {
     pub agent_type: String,
+    /// `npm` or `script`; the agent's own default when absent.
+    pub installer: Option<String>,
     pub target_version: Option<String>,
     pub workspace_id: Option<String>,
     #[serde(default)]
@@ -38,6 +47,10 @@ pub struct CliOperationPlan {
     pub display_name: String,
     pub package_name: String,
     pub target_version: String,
+    /// `npm` for a published package, `script` for a vendor installer.
+    pub installer: String,
+    /// False when the agent's installer offers no version to pin, as a script install does not.
+    pub supports_version: bool,
     pub package_spec: String,
     /// `install`, `upgrade`, or `reinstall` when the installed version already matches.
     pub action: String,
@@ -96,8 +109,50 @@ pub fn build_operation_plan(
     network_profile: Option<&NetworkProfile>,
 ) -> Result<CliOperationPlan, String> {
     let definition = definition(&request.agent_type)?;
+    match choose_installer(&definition, request.installer.as_deref())? {
+        Installer::Npm { package_name } => {
+            build_npm_plan(&definition, package_name, request, network_profile)
+        }
+        Installer::Script(script) => build_script_plan(&definition, script),
+    }
+}
+
+/// Picks the installer the request asked for, or the agent's own when it asked for none.
+///
+/// An installer the agent does not have is refused rather than quietly swapped: a request for
+/// the vendor's script must never end up running npm instead.
+fn choose_installer(
+    definition: &CliDefinition,
+    requested: Option<&str>,
+) -> Result<Installer, String> {
+    match requested {
+        Some(SCRIPT_INSTALLER) => definition
+            .script
+            .map(Installer::Script)
+            .ok_or_else(|| format!("{} 没有官方安装脚本。", definition.display_name)),
+        Some(NPM_INSTALLER) => definition
+            .package_name
+            .map(|package_name| Installer::Npm { package_name })
+            .ok_or_else(|| format!("{} 未发布到 npm。", definition.display_name)),
+        Some(other) => Err(format!("不支持的安装方式：{other}")),
+        // npm first where both exist: it is the one that can be pinned and rolled back.
+        None => definition
+            .package_name
+            .map(|package_name| Installer::Npm { package_name })
+            .or_else(|| definition.script.map(Installer::Script))
+            .ok_or_else(|| format!("{} 没有可用的安装方式。", definition.display_name)),
+    }
+}
+
+/// The plan for a CLI published to npm, which can be pinned, compared and rolled back.
+fn build_npm_plan(
+    definition: &CliDefinition,
+    package_name: &str,
+    request: &CliOperationRequest,
+    network_profile: Option<&NetworkProfile>,
+) -> Result<CliOperationPlan, String> {
     let target_version = normalize_target_version(request.target_version.as_deref())?;
-    let package_spec = format!("{}@{target_version}", definition.package_name);
+    let package_spec = format!("{package_name}@{target_version}");
     let installation = detect_agent(definition.agent_type)?;
     let npm_path = find_npm_executable();
     let npm_version = npm_path
@@ -162,8 +217,10 @@ pub fn build_operation_plan(
     Ok(CliOperationPlan {
         agent_type: definition.agent_type.into(),
         display_name: definition.display_name.into(),
-        package_name: definition.package_name.into(),
+        package_name: package_name.into(),
         target_version,
+        installer: NPM_INSTALLER.into(),
+        supports_version: true,
         package_spec: package_spec.clone(),
         action: action.into(),
         current_version: installation.version,
@@ -180,12 +237,90 @@ pub fn build_operation_plan(
     })
 }
 
+/// The plan for a CLI installed by the vendor's own script.
+///
+/// A script install takes no version, resolves nothing against a registry, and leaves nothing to
+/// roll back to: it fetches whatever the vendor currently publishes. The plan therefore says what
+/// will be run and where it lands, and leaves the npm fields empty rather than inventing them.
+fn build_script_plan(
+    definition: &CliDefinition,
+    script: ScriptInstaller,
+) -> Result<CliOperationPlan, String> {
+    let installation = detect_agent(definition.agent_type)?;
+    let ready = find_powershell().is_some();
+    let action = if installation.installed {
+        "reinstall"
+    } else {
+        "install"
+    };
+    let directory = script.directory();
+    let shown = directory
+        .as_deref()
+        .map(|path| path.to_string_lossy().into_owned())
+        .unwrap_or_else(|| script.directory_label.to_owned());
+
+    let diagnostic = if !ready {
+        "未找到 PowerShell，无法运行官方安装脚本。".into()
+    } else {
+        let elsewhere = installs_elsewhere(&installation, directory.as_deref());
+        let base = format!(
+            "将运行 {} 的官方安装脚本，安装当前发布的版本到 {shown}。",
+            definition.display_name
+        );
+        if elsewhere {
+            // Two copies on one machine differ in version, and PATH decides which one runs.
+            format!("{base} 当前检测到的是另一处安装（{}），安装后机器上会有两份，实际运行哪一份由 PATH 决定。",
+                installation.executable_path.as_deref().unwrap_or("未知路径"))
+        } else {
+            base
+        }
+    };
+
+    Ok(CliOperationPlan {
+        agent_type: definition.agent_type.into(),
+        display_name: definition.display_name.into(),
+        package_name: String::new(),
+        target_version: SCRIPT_TARGET_VERSION.into(),
+        installer: SCRIPT_INSTALLER.into(),
+        supports_version: false,
+        package_spec: script.url.into(),
+        action: action.into(),
+        current_version: installation.version,
+        // The script does not say what it is about to install, so there is no version to compare.
+        resolved_version: None,
+        up_to_date: false,
+        npm_path: None,
+        npm_version: None,
+        command_preview: script_command_preview(script.url),
+        network_profile_id: None,
+        network_profile_name: None,
+        npm_registry: None,
+        ready,
+        diagnostic,
+    })
+}
+
+/// Whether the CLI already on the machine sits somewhere the script will not replace.
+///
+/// Installing the vendor's build beside an npm one leaves two executables of different versions,
+/// and which of them runs comes down to PATH order — worth saying before the user commits to it.
+fn installs_elsewhere(installation: &AgentInstallation, directory: Option<&Path>) -> bool {
+    let (Some(existing), Some(directory)) = (installation.executable_path.as_deref(), directory)
+    else {
+        return false;
+    };
+    !Path::new(existing).starts_with(directory)
+}
+
 pub fn execute_operation(
     plan: CliOperationPlan,
     environment: HashMap<String, String>,
 ) -> Result<CliOperationResult, String> {
     if !plan.ready {
         return Err(plan.diagnostic.clone());
+    }
+    if plan.installer == SCRIPT_INSTALLER {
+        return execute_script_install(plan, environment);
     }
     let npm_path = plan
         .npm_path
@@ -270,6 +405,118 @@ pub fn execute_operation(
         rollback_succeeded: None,
         rollback_diagnostic: None,
     })
+}
+
+/// Runs the vendor's installer script and checks the CLI afterwards.
+///
+/// Nothing is rolled back on failure: the script owns its own directory and Termexo has no
+/// previous copy to put back, so a failed run is reported with its output and left as it lies.
+fn execute_script_install(
+    plan: CliOperationPlan,
+    environment: HashMap<String, String>,
+) -> Result<CliOperationResult, String> {
+    let Some(shell) = find_powershell() else {
+        return Err("未找到 PowerShell，无法运行官方安装脚本。".to_owned());
+    };
+    let script = definition(&plan.agent_type)?
+        .script
+        .ok_or_else(|| format!("{} 没有官方安装脚本。", plan.display_name))?;
+    let started = Instant::now();
+
+    let mut command = Command::new(shell);
+    command
+        .args([
+            "-NoProfile",
+            "-NonInteractive",
+            "-ExecutionPolicy",
+            "Bypass",
+            "-Command",
+            &script_expression(&plan.package_spec),
+        ])
+        .envs(&environment)
+        // Last, so a script that must not stop to ask cannot be overridden by the proxy
+        // environment carrying the same name.
+        .envs(script.environment.iter().copied());
+    let install = run_command(command, "PowerShell", CLI_OPERATION_TIMEOUT)?;
+    if !install.success {
+        return Ok(failed_result(
+            plan,
+            install.stdout,
+            install.stderr,
+            started,
+            "官方安装脚本执行失败。",
+        ));
+    }
+
+    let installation = detect_agent(&plan.agent_type)?;
+    if !installation.healthy {
+        return Ok(failed_result(
+            plan,
+            install.stdout,
+            install.stderr,
+            started,
+            "安装脚本已完成，但 CLI 健康检查失败。",
+        ));
+    }
+
+    let diagnostic = format!(
+        "安装完成，已验证 {}。",
+        installation.version.as_deref().unwrap_or("CLI 可正常执行")
+    );
+    Ok(CliOperationResult {
+        success: true,
+        plan,
+        installation,
+        stdout: install.stdout,
+        stderr: install.stderr,
+        duration_ms: started.elapsed().as_millis(),
+        diagnostic,
+        rollback_attempted: false,
+        rollback_succeeded: None,
+        rollback_diagnostic: None,
+    })
+}
+
+/// The one-liner the vendor documents, which downloads the script and runs it.
+fn script_expression(url: &str) -> String {
+    format!("irm {url} | iex")
+}
+
+/// The whole command as the user sees it before confirming, shell included.
+fn script_command_preview(url: &str) -> String {
+    format!(
+        "powershell -NoProfile -ExecutionPolicy Bypass -Command \"{}\"",
+        script_expression(url)
+    )
+}
+
+/// Windows PowerShell, which every supported Windows carries.
+fn find_powershell() -> Option<PathBuf> {
+    #[cfg(windows)]
+    {
+        if let Some(root) = env::var_os("SystemRoot") {
+            let path = PathBuf::from(root)
+                .join("System32")
+                .join("WindowsPowerShell")
+                .join("v1.0")
+                .join("powershell.exe");
+            if path.is_file() {
+                return Some(path);
+            }
+        }
+        return command_on_path("powershell.exe");
+    }
+    #[cfg(not(windows))]
+    {
+        command_on_path("pwsh")
+    }
+}
+
+fn command_on_path(name: &str) -> Option<PathBuf> {
+    let search_path = env::var_os("PATH")?;
+    env::split_paths(&search_path)
+        .map(|directory| directory.join(name))
+        .find(|path| path.is_file())
 }
 
 fn failed_result_with_rollback(
@@ -394,6 +641,9 @@ fn detect_agent(agent_type: &str) -> Result<AgentInstallation, String> {
             .detect()
             .map_err(|error| error.to_string()),
         "opencode" => OpenCodeAdapter::new()
+            .detect()
+            .map_err(|error| error.to_string()),
+        "antigravity" => AntigravityAdapter::new()
             .detect()
             .map_err(|error| error.to_string()),
         _ => Err(format!("不支持的 Agent CLI：{agent_type}")),
@@ -527,9 +777,19 @@ fn run_npm_command(
     timeout: Duration,
 ) -> Result<CommandResult, String> {
     let mut command = npm_command(npm_path);
+    command.args(arguments).envs(environment);
+    run_command(command, "npm", timeout)
+}
+
+/// Runs one installer command to completion, capturing its output and killing it on timeout.
+///
+/// `name` only names the program in the errors, so both installers report failures the same way.
+fn run_command(
+    mut command: Command,
+    name: &str,
+    timeout: Duration,
+) -> Result<CommandResult, String> {
     command
-        .args(arguments)
-        .envs(environment)
         .stdin(Stdio::null())
         .stdout(Stdio::piped())
         .stderr(Stdio::piped());
@@ -537,22 +797,22 @@ fn run_npm_command(
 
     let mut child = command
         .spawn()
-        .map_err(|error| format!("无法启动 npm：{error}"))?;
+        .map_err(|error| format!("无法启动 {name}：{error}"))?;
     let stdout = child
         .stdout
         .take()
-        .ok_or_else(|| "无法捕获 npm 标准输出。".to_owned())?;
+        .ok_or_else(|| format!("无法捕获 {name} 标准输出。"))?;
     let stderr = child
         .stderr
         .take()
-        .ok_or_else(|| "无法捕获 npm 错误输出。".to_owned())?;
+        .ok_or_else(|| format!("无法捕获 {name} 错误输出。"))?;
     let stdout_reader = thread::spawn(move || read_output(stdout));
     let stderr_reader = thread::spawn(move || read_output(stderr));
     let started = Instant::now();
     let status = loop {
         if let Some(status) = child
             .try_wait()
-            .map_err(|error| format!("等待 npm 退出失败：{error}"))?
+            .map_err(|error| format!("等待 {name} 退出失败：{error}"))?
         {
             break status;
         }
@@ -563,7 +823,7 @@ fn run_npm_command(
             return Ok(CommandResult {
                 success: false,
                 stdout,
-                stderr: append_message(stderr, "npm 操作超时，进程已终止。"),
+                stderr: append_message(stderr, &format!("{name} 操作超时，进程已终止。")),
             });
         }
         thread::sleep(Duration::from_millis(100));
@@ -610,25 +870,94 @@ fn append_message(value: String, message: &str) -> String {
 struct CliDefinition {
     agent_type: &'static str,
     display_name: &'static str,
-    package_name: &'static str,
+    /// The npm package, for the CLIs published to one.
+    package_name: Option<&'static str>,
+    /// The vendor's Windows installer, for the CLIs that publish one.
+    script: Option<ScriptInstaller>,
 }
+
+/// How an agent's CLI reaches the machine, for one operation.
+///
+/// The distinction runs through the whole operation: a published package can be pinned to a
+/// version, checked against a registry and rolled back to the version that was there before,
+/// while a vendor script installs whatever the vendor currently publishes.
+enum Installer {
+    /// A package installed globally with npm.
+    Npm { package_name: &'static str },
+    /// The vendor's own installer script.
+    Script(ScriptInstaller),
+}
+
+/// One vendor's Windows installer script, as its own documentation gives it.
+#[derive(Clone, Copy)]
+struct ScriptInstaller {
+    url: &'static str,
+    /// The environment variable naming the root the script installs under.
+    directory_root: &'static str,
+    /// The path below that root, and what the plan falls back to naming when it cannot resolve.
+    directory_suffix: &'static str,
+    directory_label: &'static str,
+    /// What the script needs to run without stopping to ask; captured output is not a console.
+    environment: &'static [(&'static str, &'static str)],
+}
+
+impl ScriptInstaller {
+    /// Where the script will put the binary, resolved so the plan can name the real path.
+    fn directory(&self) -> Option<PathBuf> {
+        let root = env::var_os(self.directory_root)?;
+        Some(PathBuf::from(root).join(self.directory_suffix))
+    }
+}
+
+/// Codex asks before replacing an existing install; captured output already suppresses the
+/// prompt, and this says so outright rather than relying on that.
+const CODEX_NON_INTERACTIVE: &[(&str, &str)] = &[("CODEX_NON_INTERACTIVE", "1")];
 
 fn definition(agent_type: &str) -> Result<CliDefinition, String> {
     match agent_type {
         "claude" => Ok(CliDefinition {
             agent_type: "claude",
             display_name: "Claude Code",
-            package_name: "@anthropic-ai/claude-code",
+            package_name: Some("@anthropic-ai/claude-code"),
+            script: Some(ScriptInstaller {
+                url: "https://claude.ai/install.ps1",
+                directory_root: "USERPROFILE",
+                directory_suffix: ".local\\bin",
+                directory_label: "%USERPROFILE%\\.local\\bin",
+                environment: &[],
+            }),
         }),
         "codex" => Ok(CliDefinition {
             agent_type: "codex",
             display_name: "Codex CLI",
-            package_name: "@openai/codex",
+            package_name: Some("@openai/codex"),
+            script: Some(ScriptInstaller {
+                url: "https://chatgpt.com/codex/install.ps1",
+                directory_root: "LOCALAPPDATA",
+                directory_suffix: "Programs\\OpenAI\\Codex\\bin",
+                directory_label: "%LOCALAPPDATA%\\Programs\\OpenAI\\Codex\\bin",
+                environment: CODEX_NON_INTERACTIVE,
+            }),
         }),
+        // OpenCode publishes no Windows installer script; its own documentation points at npm,
+        // Chocolatey or WSL, so npm is the only way Termexo can offer here.
         "opencode" => Ok(CliDefinition {
             agent_type: "opencode",
             display_name: "OpenCode",
-            package_name: "opencode-ai",
+            package_name: Some("opencode-ai"),
+            script: None,
+        }),
+        "antigravity" => Ok(CliDefinition {
+            agent_type: "antigravity",
+            display_name: "Antigravity",
+            package_name: None,
+            script: Some(ScriptInstaller {
+                url: "https://antigravity.google/cli/install.ps1",
+                directory_root: "LOCALAPPDATA",
+                directory_suffix: "agy\\bin",
+                directory_label: "%LOCALAPPDATA%\\agy\\bin",
+                environment: &[],
+            }),
         }),
         _ => Err(format!("不支持的 Agent CLI：{agent_type}")),
     }
@@ -684,11 +1013,81 @@ mod tests {
     fn exposes_only_supported_official_packages() {
         assert_eq!(
             definition("claude").unwrap().package_name,
-            "@anthropic-ai/claude-code"
+            Some("@anthropic-ai/claude-code")
         );
-        assert_eq!(definition("codex").unwrap().package_name, "@openai/codex");
-        assert_eq!(definition("opencode").unwrap().package_name, "opencode-ai");
+        assert_eq!(
+            definition("codex").unwrap().package_name,
+            Some("@openai/codex")
+        );
+        assert_eq!(
+            definition("opencode").unwrap().package_name,
+            Some("opencode-ai")
+        );
+        assert_eq!(definition("antigravity").unwrap().package_name, None);
         assert!(definition("shell").is_err());
+    }
+
+    /// Every script offered is the vendor's own, and the command shown is the documented
+    /// one-liner rather than anything Termexo invented.
+    #[test]
+    fn every_script_installer_is_the_vendors_own() {
+        let expected = [
+            ("claude", "https://claude.ai/install.ps1"),
+            ("codex", "https://chatgpt.com/codex/install.ps1"),
+            ("antigravity", "https://antigravity.google/cli/install.ps1"),
+        ];
+        for (agent_type, url) in expected {
+            let script = definition(agent_type).unwrap().script.unwrap();
+            assert_eq!(script.url, url);
+            assert!(script_command_preview(url).contains(&format!("irm {url} | iex")));
+        }
+        // OpenCode publishes none for Windows, and inventing one would install something else.
+        assert!(definition("opencode").unwrap().script.is_none());
+    }
+
+    /// Asking for an installer the agent does not have is refused, never quietly swapped.
+    #[test]
+    fn an_installer_the_agent_does_not_have_is_refused() {
+        let opencode = definition("opencode").unwrap();
+        assert!(choose_installer(&opencode, Some(SCRIPT_INSTALLER)).is_err());
+
+        let antigravity = definition("antigravity").unwrap();
+        assert!(choose_installer(&antigravity, Some(NPM_INSTALLER)).is_err());
+
+        // Both available means npm, which is the one that can be pinned and rolled back.
+        let claude = definition("claude").unwrap();
+        assert!(matches!(
+            choose_installer(&claude, None).unwrap(),
+            Installer::Npm { .. }
+        ));
+        assert!(matches!(
+            choose_installer(&claude, Some(SCRIPT_INSTALLER)).unwrap(),
+            Installer::Script(_)
+        ));
+    }
+
+    /// A CLI found outside the script's own directory stays where it is; the plan has to say so,
+    /// because the machine then carries two of them.
+    #[test]
+    fn a_second_copy_elsewhere_is_reported() {
+        let script = definition("claude").unwrap().script.unwrap();
+        let directory = script.directory().unwrap();
+        let npm_install = AgentInstallation {
+            agent_type: "claude".into(),
+            installed: true,
+            executable_path: Some("C:\\npm\\claude.cmd".into()),
+            version: Some("2.1.0".into()),
+            healthy: true,
+            diagnostic: String::new(),
+        };
+
+        assert!(installs_elsewhere(&npm_install, Some(&directory)));
+
+        let same_place = AgentInstallation {
+            executable_path: Some(directory.join("claude.exe").to_string_lossy().into_owned()),
+            ..npm_install
+        };
+        assert!(!installs_elsewhere(&same_place, Some(&directory)));
     }
 
     #[test]
@@ -707,6 +1106,8 @@ mod tests {
             display_name: "Claude Code".into(),
             package_name: "@anthropic-ai/claude-code".into(),
             target_version: "latest".into(),
+            installer: "npm".into(),
+            supports_version: true,
             package_spec: "@anthropic-ai/claude-code@latest".into(),
             action: "upgrade".into(),
             current_version: Some("2.1.224 (Claude Code)".into()),

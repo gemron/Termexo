@@ -25,6 +25,7 @@ import {
   type ModelProfile,
   type NativeAgentType,
 } from '../core/models/agent.models';
+import { AGENT_ICONS } from '../core/models/workspace.models';
 import { I18nService } from '../core/i18n/i18n.service';
 import { TranslatePipe } from '../core/i18n/translate.pipe';
 import { IconComponent } from '../shared/icon/icon';
@@ -62,9 +63,20 @@ interface AgentPresentation {
  * here, so a new Agent is added once instead of in three places that can drift apart.
  */
 const AGENT_PRESENTATIONS: readonly AgentPresentation[] = [
-  { agentType: 'claude', name: 'Claude Code', shortName: 'Claude', icon: 'bot' },
-  { agentType: 'codex', name: 'Codex CLI', shortName: 'Codex', icon: 'bot' },
-  { agentType: 'opencode', name: 'OpenCode', shortName: 'OpenCode', icon: 'terminal' },
+  { agentType: 'claude', name: 'Claude Code', shortName: 'Claude', icon: AGENT_ICONS.claude },
+  { agentType: 'codex', name: 'Codex CLI', shortName: 'Codex', icon: AGENT_ICONS.codex },
+  {
+    agentType: 'opencode',
+    name: 'OpenCode',
+    shortName: 'OpenCode',
+    icon: AGENT_ICONS.opencode,
+  },
+  {
+    agentType: 'antigravity',
+    name: 'Antigravity',
+    shortName: 'Antigravity',
+    icon: AGENT_ICONS.antigravity,
+  },
 ];
 
 const AGENT_FILTERS: readonly SessionAgentFilter[] = [
@@ -253,7 +265,7 @@ function presentationOf(agentType: NativeAgentType): AgentPresentation {
                   <section class="resume-options" data-agent="claude">
                     <h3>
                       <span class="session-agent" data-agent="claude">
-                        <app-icon name="bot" [size]="13" />
+                        <app-icon [name]="agentIcons.claude" [size]="13" />
                       </span>
                       <span>
                         <strong>{{ 'session.claudeResumeConfig' | t }}</strong>
@@ -300,7 +312,7 @@ function presentationOf(agentType: NativeAgentType): AgentPresentation {
                   <section class="resume-options" data-agent="codex">
                     <h3>
                       <span class="session-agent" data-agent="codex">
-                        <app-icon name="bot" [size]="13" />
+                        <app-icon [name]="agentIcons.codex" [size]="13" />
                       </span>
                       <span>
                         <strong>{{ 'session.codexResumeConfig' | t }}</strong>
@@ -512,14 +524,14 @@ export class SessionCenterDialogComponent {
       installation: this.installationOf(entry.agentType),
     })),
   );
+  /** Counted per Agent from the one description of them, so a new Agent needs no edit here. */
   protected readonly sessionCounts = computed(() => {
     const sessions = this.sessions();
-    return {
-      all: sessions.length,
-      claude: sessions.filter((session) => session.agentType === 'claude').length,
-      codex: sessions.filter((session) => session.agentType === 'codex').length,
-      opencode: sessions.filter((session) => session.agentType === 'opencode').length,
-    };
+    const counts = { all: sessions.length } as Record<SessionAgentFilter, number>;
+    for (const { agentType } of AGENT_PRESENTATIONS) {
+      counts[agentType] = sessions.filter((session) => session.agentType === agentType).length;
+    }
+    return counts;
   });
   protected readonly resolvedProfileId = computed(
     () =>
@@ -592,9 +604,18 @@ export class SessionCenterDialogComponent {
       (this.agentFilter() === 'all' || this.agentFilter() === 'opencode') &&
       this.sessionCounts().opencode > 0,
   );
+  protected readonly showsAntigravityOptions = computed(
+    () =>
+      (this.agentFilter() === 'all' || this.agentFilter() === 'antigravity') &&
+      this.sessionCounts().antigravity > 0,
+  );
   /** Automatic confirmation applies to every Agent, so one visible section is enough to offer it. */
   protected readonly showsResumeConfig = computed(
-    () => this.showsClaudeOptions() || this.showsCodexOptions() || this.showsOpenCodeOptions(),
+    () =>
+      this.showsClaudeOptions() ||
+      this.showsCodexOptions() ||
+      this.showsOpenCodeOptions() ||
+      this.showsAntigravityOptions(),
   );
   /** Keeps the active model profiles visible while the configuration panel is collapsed. */
   protected readonly configSummary = computed(() => {
@@ -706,6 +727,9 @@ export class SessionCenterDialogComponent {
   protected agentLabel(session: AgentSession): string {
     return presentationOf(session.agentType).name;
   }
+
+  /** The agents' own marks, for the template's fixed sections. */
+  protected readonly agentIcons = AGENT_ICONS;
 
   protected agentIcon(session: AgentSession): string {
     return presentationOf(session.agentType).icon;

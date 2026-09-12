@@ -1,6 +1,6 @@
 use std::path::PathBuf;
 
-use tauri::{Manager, State};
+use tauri::State;
 
 use crate::database::WorkspaceDatabase;
 use crate::storage::{self, DataDirectories, StorageOverview};
