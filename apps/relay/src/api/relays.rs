@@ -41,9 +41,13 @@ pub struct UpstreamEnvelope {
 }
 
 #[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct UpstreamRequest {
     url: String,
     code: String,
+    /// Only needed when the upstream serves a self-signed certificate; its SHA-256 digest, with or
+    /// without the colons a certificate viewer prints.
+    certificate_fingerprint: Option<String>,
 }
 
 pub async fn list(
@@ -81,8 +85,9 @@ pub async fn set_upstream(
 ) -> ApiResult<(StatusCode, Json<UpstreamEnvelope>)> {
     let url = require_text(&request.url, URL_FIELD, MAX_URL_LENGTH)?;
     let code = require_text(&request.code, CODE_FIELD, MAX_CODE_LENGTH)?;
+    let fingerprint = optional_fingerprint(request.certificate_fingerprint.as_deref())?;
 
-    let upstream = upstream::connect(&state, &url, &code, &admin.0.user.id)
+    let upstream = upstream::connect(&state, &url, &code, fingerprint, &admin.0.user.id)
         .await
         .map_err(ApiError::bad_request)?;
     Ok((StatusCode::CREATED, Json(UpstreamEnvelope { upstream })))
@@ -96,4 +101,49 @@ pub async fn clear_upstream(
         .await
         .map_err(ApiError::bad_request)?;
     Ok(no_content())
+}
+
+/// An empty field means "no pinning", which is what an upstream with a trusted certificate wants;
+/// anything else has to be a digest before it is dialled.
+fn optional_fingerprint(value: Option<&str>) -> ApiResult<Option<String>> {
+    value
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+        .map(upstream::normalize_fingerprint)
+        .transpose()
+        .map_err(ApiError::bad_request)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn an_omitted_or_blank_fingerprint_leaves_the_upstream_unpinned() {
+        assert_eq!(optional_fingerprint(None).expect("it should pass"), None);
+        assert_eq!(
+            optional_fingerprint(Some("  ")).expect("it should pass"),
+            None
+        );
+    }
+
+    #[test]
+    fn a_pasted_fingerprint_is_normalized_and_a_malformed_one_refused() {
+        let pinned = optional_fingerprint(Some(
+            "A1:B2:C3:D4:E5:F6:07:18:29:3A:4B:5C:6D:7E:8F:90:\
+             A1:B2:C3:D4:E5:F6:07:18:29:3A:4B:5C:6D:7E:8F:90",
+        ))
+        .expect("it should pass");
+
+        assert_eq!(
+            pinned.as_deref(),
+            Some("a1b2c3d4e5f60718293a4b5c6d7e8f90a1b2c3d4e5f60718293a4b5c6d7e8f90")
+        );
+        assert_eq!(
+            optional_fingerprint(Some("not-a-digest"))
+                .expect_err("it should be refused")
+                .status(),
+            StatusCode::BAD_REQUEST
+        );
+    }
 }

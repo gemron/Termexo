@@ -110,7 +110,7 @@ export const REMOTE_TRANSLATIONS: TranslationBundle = {
       'The relay has not announced an address yet; one appears here as soon as it does.',
     'remote.relayReadOnly': 'A remote client cannot join or leave a relay. Use the desktop app.',
     'remote.securityRelay':
-      'Until end-to-end encryption ships, whoever runs the relay can read the terminal content passing through it. Only join a relay you trust.',
+      'Terminal content is end-to-end encrypted, so whoever runs the relay cannot read it — but the relay still sees when this device is online and can cut it off at any time.',
     'remote.gateTitle': 'Connect to Termexo',
     'remote.gateIdle': 'Preparing the connection…',
     'remote.gateConnecting': 'Connecting to the desktop app…',
@@ -221,7 +221,7 @@ export const REMOTE_TRANSLATIONS: TranslationBundle = {
     'remote.relayNoAddress': '中继尚未下发访问地址，稍后会自动出现。',
     'remote.relayReadOnly': '远程端不能接入或断开中继，请在桌面端操作。',
     'remote.securityRelay':
-      '端到端加密落地前，中继运营者可以看到经它转发的终端内容，请只接入自己信任的中继。',
+      '终端内容已端到端加密，中继运营者看不到；但中继知道这台设备何时在线，也能随时断开它。',
     'remote.gateTitle': '连接到 Termexo',
     'remote.gateIdle': '正在准备连接…',
     'remote.gateConnecting': '正在连接桌面端…',
@@ -345,7 +345,7 @@ export const REMOTE_TRANSLATIONS: TranslationBundle = {
     'remote.relayReadOnly':
       'Un cliente remoto no puede unirse ni salir de un relé. Usa la aplicación de escritorio.',
     'remote.securityRelay':
-      'Hasta que llegue el cifrado de extremo a extremo, quien opere el relé puede leer el contenido del terminal que pasa por él. Únete solo a relés de confianza.',
+      'El contenido del terminal va cifrado de extremo a extremo, así que quien opere el relé no puede leerlo; el relé sí sabe cuándo este dispositivo está en línea y puede desconectarlo en cualquier momento.',
     'remote.gateTitle': 'Conectar con Termexo',
     'remote.gateIdle': 'Preparando la conexión…',
     'remote.gateConnecting': 'Conectando con la aplicación de escritorio…',
@@ -474,7 +474,7 @@ export const REMOTE_TRANSLATIONS: TranslationBundle = {
     'remote.relayReadOnly':
       'Un client distant ne peut pas rejoindre ni quitter un relais. Utilisez l’application de bureau.',
     'remote.securityRelay':
-      'Tant que le chiffrement de bout en bout n’est pas livré, l’exploitant du relais peut lire le contenu du terminal qui y transite. Ne rejoignez qu’un relais de confiance.',
+      'Le contenu du terminal est chiffré de bout en bout : l’exploitant du relais ne peut pas le lire. Le relais sait toutefois quand cet appareil est en ligne et peut le couper à tout moment.',
     'remote.gateTitle': 'Se connecter à Termexo',
     'remote.gateIdle': 'Préparation de la connexion…',
     'remote.gateConnecting': 'Connexion à l’application de bureau…',
@@ -601,7 +601,7 @@ export const REMOTE_TRANSLATIONS: TranslationBundle = {
     'remote.relayReadOnly':
       'Ein entfernter Client kann sich nicht an einem Relay an- oder abmelden. Nutzen Sie die Desktop-App.',
     'remote.securityRelay':
-      'Bis zur Ende-zu-Ende-Verschlüsselung kann der Betreiber des Relays die durchlaufenden Terminalinhalte mitlesen. Melden Sie sich nur an Relays an, denen Sie vertrauen.',
+      'Die Terminalinhalte sind Ende-zu-Ende verschlüsselt, der Betreiber des Relays kann sie also nicht mitlesen. Das Relay weiß aber, wann dieses Gerät online ist, und kann es jederzeit trennen.',
     'remote.gateTitle': 'Mit Termexo verbinden',
     'remote.gateIdle': 'Verbindung wird vorbereitet…',
     'remote.gateConnecting': 'Verbindung zur Desktop-App…',
@@ -725,7 +725,7 @@ export const REMOTE_TRANSLATIONS: TranslationBundle = {
     'remote.relayReadOnly':
       'リモートクライアントから中継への接続・切断はできません。デスクトップアプリで操作してください。',
     'remote.securityRelay':
-      'エンドツーエンド暗号化が入るまでは、中継の運営者はそこを通るターミナルの内容を読めます。信頼できる中継にだけ接続してください。',
+      'ターミナルの内容はエンドツーエンドで暗号化されるため、中継の運営者は読めません。ただし中継はこの端末がいつオンラインかを把握しており、いつでも切断できます。',
     'remote.gateTitle': 'Termexo に接続',
     'remote.gateIdle': '接続を準備しています…',
     'remote.gateConnecting': 'デスクトップ版に接続しています…',
@@ -844,7 +844,7 @@ export const REMOTE_TRANSLATIONS: TranslationBundle = {
     'remote.relayReadOnly':
       '원격 클라이언트에서는 중계 접속과 해제를 할 수 없습니다. 데스크톱 앱을 사용하세요.',
     'remote.securityRelay':
-      '종단 간 암호화가 적용되기 전까지는 중계 운영자가 중계를 지나는 터미널 내용을 볼 수 있습니다. 신뢰하는 중계에만 접속하세요.',
+      '터미널 내용은 종단 간 암호화되므로 중계 운영자는 볼 수 없습니다. 다만 중계는 이 기기가 언제 온라인인지 알 수 있고 언제든 연결을 끊을 수 있습니다.',
     'remote.gateTitle': 'Termexo에 연결',
     'remote.gateIdle': '연결을 준비하는 중…',
     'remote.gateConnecting': '데스크톱 앱에 연결하는 중…',

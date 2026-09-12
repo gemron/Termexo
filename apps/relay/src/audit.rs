@@ -19,6 +19,8 @@ pub mod action {
     pub const DEVICE_REVOKED: &str = "device-revoked";
     pub const DEVICE_DISCONNECTED: &str = "device-disconnected";
     pub const DEVICE_UPDATED: &str = "device-updated";
+    /// Who may reach a device through the relay changed: `public` ⇄ `relay-login`.
+    pub const DEVICE_ACCESS_CHANGED: &str = "device-access-changed";
     pub const TUNNEL_CONNECTED: &str = "tunnel-connected";
     pub const TUNNEL_DISCONNECTED: &str = "tunnel-disconnected";
     pub const TUNNEL_REJECTED: &str = "tunnel-rejected";

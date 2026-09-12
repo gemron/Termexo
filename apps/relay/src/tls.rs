@@ -21,11 +21,21 @@ const LOCALHOST_NAME: &str = "localhost";
 const CERTIFICATE_PEM_HEADER: &str = "-----BEGIN CERTIFICATE-----";
 const CERTIFICATE_PEM_FOOTER: &str = "-----END CERTIFICATE-----";
 
+/// The names a generated certificate has to be valid for.
+///
+/// A relay in subdomain mode answers on one name per device, so nothing short of a wildcard would
+/// let a browser open `https://<deviceId>.<base>/` without a warning.
+pub struct SubjectNames {
+    pub public_host: String,
+    /// `*.<base>`, present only when device subdomains are configured.
+    pub wildcard: Option<String>,
+}
+
 /// Builds the listener's TLS configuration, or `None` for plain HTTP.
 pub async fn configure(
     mode: &TlsMode,
     data_directory: &Path,
-    public_host_name: &str,
+    names: &SubjectNames,
 ) -> Result<Option<RustlsConfig>, String> {
     match mode {
         TlsMode::Disabled => Ok(None),
@@ -37,7 +47,7 @@ pub async fn configure(
             Ok(Some(load(material).await?))
         }
         TlsMode::SelfSigned => {
-            let material = load_or_generate(data_directory, public_host_name)?;
+            let material = load_or_generate(data_directory, names)?;
             // A self-signed relay is pinned by fingerprint on the desktop side, so the operator has
             // to be able to read it off the log once.
             tracing::info!(
@@ -83,7 +93,11 @@ impl MaterialPaths {
 }
 
 /// Reuses the persisted certificate, generating a new one only when there is none.
-fn load_or_generate(data_directory: &Path, public_host_name: &str) -> Result<PemMaterial, String> {
+///
+/// A certificate written before device subdomains were configured does not cover them; deleting
+/// `<data-dir>/tls/` is what regenerates it, and doing so silently would invalidate every
+/// fingerprint a desktop app has already pinned.
+fn load_or_generate(data_directory: &Path, names: &SubjectNames) -> Result<PemMaterial, String> {
     let directory = data_directory.join(TLS_DIRECTORY);
     fs::create_dir_all(&directory)
         .map_err(|error| format!("无法创建证书目录 {}：{error}", directory.display()))?;
@@ -92,13 +106,13 @@ fn load_or_generate(data_directory: &Path, public_host_name: &str) -> Result<Pem
     if let Some(material) = paths.read() {
         return Ok(material);
     }
-    let material = generate(public_host_name)?;
+    let material = generate(names)?;
     paths.write(&material)?;
     Ok(material)
 }
 
-fn generate(public_host_name: &str) -> Result<PemMaterial, String> {
-    let certified = rcgen::generate_simple_self_signed(subject_alt_names(public_host_name))
+fn generate(names: &SubjectNames) -> Result<PemMaterial, String> {
+    let certified = rcgen::generate_simple_self_signed(subject_alt_names(names))
         .map_err(|error| format!("无法生成自签名证书：{error}"))?;
     Ok(PemMaterial {
         certificate: certified.cert.pem().into_bytes(),
@@ -106,17 +120,19 @@ fn generate(public_host_name: &str) -> Result<PemMaterial, String> {
     })
 }
 
-/// The names the certificate is valid for: the relay's public host and `localhost`.
+/// The names the certificate is valid for: `localhost`, the relay's public host, and the device
+/// subdomain wildcard when one is configured.
 ///
 /// rcgen turns an entry that parses as an IP address into an `iPAddress` SAN by itself, which is
 /// what a browser checks when the relay is reached at `https://192.168.1.20:8443`.
-fn subject_alt_names(public_host_name: &str) -> Vec<String> {
-    let mut names = vec![LOCALHOST_NAME.to_string()];
-    let host = public_host_name.trim();
+fn subject_alt_names(names: &SubjectNames) -> Vec<String> {
+    let mut all = vec![LOCALHOST_NAME.to_string()];
+    let host = names.public_host.trim();
     if !host.is_empty() && host != LOCALHOST_NAME {
-        names.push(host.to_string());
+        all.push(host.to_string());
     }
-    names
+    all.extend(names.wildcard.clone().filter(|name| !all.contains(name)));
+    all
 }
 
 async fn load(material: PemMaterial) -> Result<RustlsConfig, String> {
@@ -152,22 +168,47 @@ fn certificate_fingerprint(certificate_pem: &[u8]) -> Option<String> {
 mod tests {
     use super::*;
 
+    fn names(public_host: &str, wildcard: Option<&str>) -> SubjectNames {
+        SubjectNames {
+            public_host: public_host.to_string(),
+            wildcard: wildcard.map(str::to_string),
+        }
+    }
+
     #[test]
     fn the_san_list_always_covers_localhost_without_duplicating_it() {
         assert_eq!(
-            subject_alt_names("relay.example.com"),
+            subject_alt_names(&names("relay.example.com", None)),
             vec!["localhost".to_string(), "relay.example.com".to_string()]
         );
         assert_eq!(
-            subject_alt_names("localhost"),
+            subject_alt_names(&names("localhost", None)),
             vec!["localhost".to_string()]
         );
-        assert_eq!(subject_alt_names("  "), vec!["localhost".to_string()]);
+        assert_eq!(
+            subject_alt_names(&names("  ", None)),
+            vec!["localhost".to_string()]
+        );
+    }
+
+    /// Without the wildcard a browser opening `https://<deviceId>.<base>/` would see a name
+    /// mismatch rather than the workbench.
+    #[test]
+    fn subdomain_mode_adds_the_wildcard_the_device_addresses_need() {
+        assert_eq!(
+            subject_alt_names(&names("relay.example.com", Some("*.relay.example.com"))),
+            vec![
+                "localhost".to_string(),
+                "relay.example.com".to_string(),
+                "*.relay.example.com".to_string()
+            ]
+        );
     }
 
     #[test]
     fn a_generated_certificate_has_a_readable_fingerprint() {
-        let material = generate("relay.example.com").expect("a certificate should be generated");
+        let material =
+            generate(&names("relay.example.com", None)).expect("a certificate should be generated");
 
         let fingerprint =
             certificate_fingerprint(&material.certificate).expect("it should be computable");
@@ -198,8 +239,9 @@ mod tests {
                 .replace(['-', '_'], "")
         ));
 
-        let first = load_or_generate(&directory, "relay.example.com").expect("it should generate");
-        let second = load_or_generate(&directory, "relay.example.com").expect("it should reuse");
+        let subject = names("relay.example.com", None);
+        let first = load_or_generate(&directory, &subject).expect("it should generate");
+        let second = load_or_generate(&directory, &subject).expect("it should reuse");
 
         assert_eq!(first.certificate, second.certificate);
         let _ = fs::remove_dir_all(&directory);

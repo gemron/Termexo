@@ -8,6 +8,8 @@
 //! The wire format lives in `termexo-relay-protocol`, shared with the desktop app, and the design it
 //! implements is `docs/architecture/relay-service.md`.
 
+pub mod access;
+pub mod address;
 pub mod api;
 pub mod audit;
 pub mod auth;

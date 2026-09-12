@@ -27,6 +27,7 @@ use tokio_util::sync::CancellationToken;
 use addresses::UpstreamReach;
 use session::{SessionEnd, SessionOutcome};
 
+pub use pinning::normalize_fingerprint;
 pub use settings::UpstreamSettings;
 
 use crate::audit::{self, action, target, AuditEntry};
@@ -243,8 +244,21 @@ pub async fn link(args: &LinkArgs) -> Result<(), String> {
     let database =
         Database::open(&args.data_dir).map_err(|error| format!("无法打开中继数据库：{error}"))?;
     let name = link_name(&database, args.name.as_deref());
+    let fingerprint = args
+        .certificate_fingerprint
+        .as_deref()
+        .map(pinning::normalize_fingerprint)
+        .transpose()?;
 
-    let settings = establish(&database, &args.upstream, &args.code, &name, None).await?;
+    let settings = establish(
+        &database,
+        &args.upstream,
+        &args.code,
+        &name,
+        fingerprint,
+        None,
+    )
+    .await?;
     println!("已接入上游中继：{}", settings.url);
     println!("本中继在上游显示的名称：{name}");
     println!("下次执行 termexo-relay serve 时会自动建立这条链接。");
@@ -281,14 +295,26 @@ pub async fn resume(state: &SharedState) {
 }
 
 /// Trades an enrollment code for a credential, stores it, and brings the link up.
+///
+/// `certificate_fingerprint` is what makes a self-signed upstream reachable: with it the link
+/// trusts exactly that certificate, without it the platform's root store decides.
 pub async fn connect(
     state: &SharedState,
     url: &str,
     code: &str,
+    certificate_fingerprint: Option<String>,
     actor_user_id: &str,
 ) -> Result<UpstreamView, String> {
-    let name = state.public_url.host().to_string();
-    let settings = establish(&state.database, url, code, &name, Some(actor_user_id)).await?;
+    let name = state.public_url().host().to_string();
+    let settings = establish(
+        &state.database,
+        url,
+        code,
+        &name,
+        certificate_fingerprint,
+        Some(actor_user_id),
+    )
+    .await?;
     state.upstream.start(state.clone(), settings).await;
     state.upstream.view().ok_or_else(|| NO_UPSTREAM.to_string())
 }
@@ -302,16 +328,22 @@ async fn establish(
     url: &str,
     code: &str,
     name: &str,
+    certificate_fingerprint: Option<String>,
     actor_user_id: Option<&str>,
 ) -> Result<UpstreamSettings, String> {
-    // The fingerprint is not collected anywhere yet: an upstream needs a certificate the platform
-    // trusts, or a reverse proxy in front of it. See the design's open items.
-    let settings = enroll::join(database, url, code, name, None).await?;
+    let settings = enroll::join(database, url, code, name, certificate_fingerprint).await?;
     let entry = match actor_user_id {
         Some(user_id) => AuditEntry::by_user(user_id, action::UPSTREAM_LINKED),
         None => AuditEntry::by_system(action::UPSTREAM_LINKED),
     };
-    audit::record(database, entry.detail("url", &*settings.url));
+    // Whether the upstream is pinned matters when reading the trail back; the digest itself is
+    // public information but adds nothing here, so only the fact is recorded.
+    audit::record(
+        database,
+        entry
+            .detail("url", &*settings.url)
+            .detail("pinned", settings.certificate_fingerprint.is_some()),
+    );
     Ok(settings)
 }
 

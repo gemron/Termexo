@@ -8,7 +8,8 @@ use termexo_relay_protocol::frames::DeviceKind;
 
 use super::error::ApiResult;
 use crate::db::{
-    now_millis, AuditRecord, DeviceRecord, EnrollmentRecord, EnrollmentStatus, UserRecord, UserRole,
+    now_millis, AuditRecord, DeviceAccess, DeviceRecord, EnrollmentRecord, EnrollmentStatus,
+    UserRecord, UserRole,
 };
 use crate::registry::OnlineDevice;
 use crate::state::RelayState;
@@ -45,6 +46,9 @@ pub struct DeviceView {
     pub revoked_at: Option<i64>,
     pub note: Option<String>,
     pub access_url: String,
+    /// Who the relay lets through to `access_url`. A device announced by a downstream relay is
+    /// reported as `public`: its policy belongs to the relay it enrolled with.
+    pub access: DeviceAccess,
 }
 
 #[derive(Debug, Serialize)]
@@ -161,6 +165,7 @@ impl<'a> ViewContext<'a> {
             revoked_at: record.revoked_at,
             note: record.note.clone(),
             access_url: self.state.device_access_url(&record.id),
+            access: record.access,
         }
     }
 
@@ -186,6 +191,9 @@ impl<'a> ViewContext<'a> {
             revoked_at: None,
             note: None,
             access_url: self.state.device_access_url(&device.device_id),
+            // This relay has no row to hold a policy for it, and the relay that does enforces it
+            // on its own hop; from here the device is simply routed to.
+            access: DeviceAccess::Public,
         }
     }
 
@@ -280,6 +288,20 @@ mod tests {
         assert_eq!(view.owner_username.as_deref(), Some("alice"));
         assert!(!view.online);
         assert!(view.via.is_empty());
+        assert_eq!(view.access, DeviceAccess::Public);
+    }
+
+    /// The console switches on these spellings, so they are part of the contract.
+    #[test]
+    fn the_access_policy_travels_in_the_spelling_the_console_reads() {
+        assert_eq!(
+            serde_json::to_string(&DeviceAccess::RelayLogin).expect("it should serialize"),
+            "\"relay-login\""
+        );
+        assert_eq!(
+            serde_json::to_string(&DeviceAccess::Public).expect("it should serialize"),
+            "\"public\""
+        );
     }
 
     #[test]

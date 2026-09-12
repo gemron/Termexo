@@ -10,7 +10,7 @@ import {
 } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 
-import type { DevicePatch, DeviceView } from '../core/console.models';
+import type { DeviceAccess, DevicePatch, DeviceView } from '../core/console.models';
 import { ConfirmBlockComponent } from '../shared/confirm-block';
 import { CopyButtonComponent } from '../shared/copy-button';
 import { deviceStatus } from '../shared/device-status';
@@ -77,72 +77,93 @@ import { I18nService, TranslatePipe } from '../shared/workspace-ui';
         <div class="alert error" role="alert">{{ error() }}</div>
       }
 
-      <form (ngSubmit)="save()">
-        <div class="field-row">
-          <label class="field">
-            <span>{{ 'console.devices.name' | t }}</span>
-            <input
-              name="name"
-              type="text"
-              [disabled]="busy()"
-              [ngModel]="name()"
-              (ngModelChange)="name.set($event)"
-            />
-            @if (nameInvalid()) {
-              <small class="field-error" role="alert">
-                {{ 'console.devices.nameRequired' | t }}
-              </small>
-            }
-          </label>
-          @if (canManage()) {
-            <label class="field">
-              <span>{{ 'console.devices.note' | t }}</span>
-              <input
-                name="note"
-                type="text"
-                [disabled]="busy()"
-                [ngModel]="note()"
-                (ngModelChange)="note.set($event)"
-              />
-            </label>
-          }
-        </div>
-        <div class="form-actions">
-          <button type="submit" class="btn btn-primary" [disabled]="!canSave()">
-            {{ (busy() ? 'console.common.saving' : 'console.common.save') | t }}
-          </button>
-        </div>
-      </form>
-
-      @if (canManage() && device().online) {
-        <div class="form-actions">
-          <button type="button" class="btn" [disabled]="busy()" (click)="disconnect()">
-            {{ 'console.devices.disconnect' | t }}
-          </button>
-        </div>
-        <small>{{ 'console.devices.disconnectHint' | t }}</small>
+      @if (!managedHere()) {
+        <p class="alert">{{ 'console.devices.managedElsewhere' | t: { relay: viaRelay() } }}</p>
       }
 
-      @if (!device().revokedAt) {
-        @if (confirmingRevoke()) {
-          <console-confirm
-            [message]="revokeMessage()"
-            [confirmLabel]="'console.devices.revokeAction' | t"
-            [busy]="busy()"
-            (confirmed)="revoke()"
-            (cancelled)="confirmingRevoke.set(false)"
-          />
-        } @else {
+      @if (managedHere()) {
+        <form (ngSubmit)="save()">
+          <div class="field-row">
+            <label class="field">
+              <span>{{ 'console.devices.name' | t }}</span>
+              <input
+                name="name"
+                type="text"
+                [disabled]="busy()"
+                [ngModel]="name()"
+                (ngModelChange)="name.set($event)"
+              />
+              @if (nameInvalid()) {
+                <small class="field-error" role="alert">
+                  {{ 'console.devices.nameRequired' | t }}
+                </small>
+              }
+            </label>
+            @if (canManage()) {
+              <label class="field">
+                <span>{{ 'console.devices.note' | t }}</span>
+                <input
+                  name="note"
+                  type="text"
+                  [disabled]="busy()"
+                  [ngModel]="note()"
+                  (ngModelChange)="note.set($event)"
+                />
+              </label>
+            }
+          </div>
+
+          <div class="field">
+            <label class="checkbox-field">
+              <input
+                name="relayLogin"
+                type="checkbox"
+                [disabled]="busy()"
+                [ngModel]="relayLogin()"
+                (ngModelChange)="relayLogin.set($event)"
+              />
+              <span>{{ 'console.devices.accessRelayLogin' | t }}</span>
+            </label>
+            <small>{{ 'console.devices.accessHint' | t }}</small>
+          </div>
+
           <div class="form-actions">
-            <button
-              type="button"
-              class="btn btn-danger"
-              [disabled]="busy()"
-              (click)="confirmingRevoke.set(true)"
-            >
-              {{ 'console.devices.revoke' | t }}
+            <button type="submit" class="btn btn-primary" [disabled]="!canSave()">
+              {{ (busy() ? 'console.common.saving' : 'console.common.save') | t }}
             </button>
           </div>
+        </form>
+
+        @if (canManage() && device().online) {
+          <div class="form-actions">
+            <button type="button" class="btn" [disabled]="busy()" (click)="disconnect()">
+              {{ 'console.devices.disconnect' | t }}
+            </button>
+          </div>
+          <small>{{ 'console.devices.disconnectHint' | t }}</small>
+        }
+
+        @if (!device().revokedAt) {
+          @if (confirmingRevoke()) {
+            <console-confirm
+              [message]="revokeMessage()"
+              [confirmLabel]="'console.devices.revokeAction' | t"
+              [busy]="busy()"
+              (confirmed)="revoke()"
+              (cancelled)="confirmingRevoke.set(false)"
+            />
+          } @else {
+            <div class="form-actions">
+              <button
+                type="button"
+                class="btn btn-danger"
+                [disabled]="busy()"
+                (click)="confirmingRevoke.set(true)"
+              >
+                {{ 'console.devices.revoke' | t }}
+              </button>
+            </div>
+          }
         }
       }
     </console-drawer>
@@ -164,6 +185,8 @@ export class DeviceDrawerComponent {
 
   protected readonly name = signal('');
   protected readonly note = signal('');
+  /** The switch behind `access`; the policy itself only has the two states. */
+  protected readonly relayLogin = signal(false);
   protected readonly confirmingRevoke = signal(false);
 
   protected readonly text = formatText;
@@ -174,6 +197,20 @@ export class DeviceDrawerComponent {
     ),
   );
   protected readonly nameInvalid = computed(() => this.name().trim().length === 0);
+
+  /**
+   * Whether this relay owns the device, rather than merely learning of it from a downstream one.
+   *
+   * An announced device has no row here, so renaming, revoking and changing its access policy all
+   * answer 404. Offering the controls anyway would mean every one of them fails; the relay that
+   * enrolled the device is the only place they work.
+   */
+  protected readonly managedHere = computed(() => this.device().via.length === 0);
+  protected readonly viaRelay = computed(() => {
+    const device = this.device();
+    return device.viaNames[0] ?? device.via[0] ?? '';
+  });
+
   protected readonly revokeMessage = computed(() =>
     this.i18n.t('console.devices.revokeConfirm', { name: this.device().name }),
   );
@@ -183,8 +220,16 @@ export class DeviceDrawerComponent {
       return false;
     }
     const device = this.device();
-    return this.name().trim() !== device.name || this.note().trim() !== (device.note ?? '');
+    return (
+      this.name().trim() !== device.name ||
+      this.note().trim() !== (device.note ?? '') ||
+      this.access() !== device.access
+    );
   });
+
+  private readonly access = computed<DeviceAccess>(() =>
+    this.relayLogin() ? 'relay-login' : 'public',
+  );
 
   /** Which device the form below was filled from, so a poll does not overwrite what is typed. */
   private loadedDeviceId = '';
@@ -201,6 +246,7 @@ export class DeviceDrawerComponent {
       untracked(() => {
         this.name.set(device.name);
         this.note.set(device.note ?? '');
+        this.relayLogin.set(device.access === 'relay-login');
         this.confirmingRevoke.set(false);
       });
     });
@@ -218,7 +264,7 @@ export class DeviceDrawerComponent {
     if (!this.canSave()) {
       return;
     }
-    const patch: DevicePatch = { name: this.name().trim() };
+    const patch: DevicePatch = { name: this.name().trim(), access: this.access() };
     if (this.canManage()) {
       patch.note = this.note().trim();
     }

@@ -20,7 +20,7 @@ use termexo_relay_protocol::secret::random_base64url;
 use thiserror::Error;
 
 pub use audit::{AuditQuery, AuditRecord, MAX_AUDIT_PAGE};
-pub use devices::{device_kind_label, DeviceRecord, DeviceUpdate, NewDevice};
+pub use devices::{device_kind_label, DeviceAccess, DeviceRecord, DeviceUpdate, NewDevice};
 pub use enrollments::{EnrollmentRecord, EnrollmentStatus, NewEnrollment};
 pub use sessions::SessionRecord;
 pub use users::{UserRecord, UserRole, UserUpdate};
@@ -76,25 +76,21 @@ impl Database {
         // Foreign keys are off by default in SQLite; `devices.owner_user_id` is only useful as a
         // constraint if they are on.
         connection.execute_batch("PRAGMA foreign_keys = ON;")?;
-        connection.execute_batch(INITIAL_MIGRATION)?;
-        ensure_column(&connection, "enrollment_codes", "cancelled_at", "INTEGER")?;
-        ensure_column(
-            &connection,
-            "enrollment_codes",
-            "created_at",
-            "INTEGER NOT NULL DEFAULT 0",
-        )?;
+        migrate(&connection)?;
         Ok(Self {
             connection: Mutex::new(connection),
         })
     }
 
     /// Opens a database that lives only in memory, for tests.
+    ///
+    /// It runs the very same migration as a file-backed one: a test that ran against a different
+    /// schema than production would be worth less than no test at all.
     #[cfg(test)]
     pub fn open_in_memory() -> Result<Self, DatabaseError> {
         let connection = Connection::open_in_memory()?;
         connection.execute_batch("PRAGMA foreign_keys = ON;")?;
-        connection.execute_batch(INITIAL_MIGRATION)?;
+        migrate(&connection)?;
         Ok(Self {
             connection: Mutex::new(connection),
         })
@@ -149,6 +145,33 @@ impl Database {
             .lock()
             .unwrap_or_else(|poisoned| poisoned.into_inner())
     }
+}
+
+/// Brings a connection's schema up to date.
+///
+/// Every statement runs on every start, so the SQL file is written with `IF NOT EXISTS` and the
+/// columns added after the fact go through [`ensure_column`]. There is no version table: a column
+/// that a released version added is simply part of both the create statement and this list, and
+/// applying it twice has to be a no-op.
+fn migrate(connection: &Connection) -> Result<(), DatabaseError> {
+    connection.execute_batch(INITIAL_MIGRATION)?;
+    ensure_column(connection, "enrollment_codes", "cancelled_at", "INTEGER")?;
+    ensure_column(
+        connection,
+        "enrollment_codes",
+        "created_at",
+        "INTEGER NOT NULL DEFAULT 0",
+    )?;
+    ensure_column(
+        connection,
+        "devices",
+        "access",
+        &format!(
+            "TEXT NOT NULL DEFAULT '{}'",
+            DeviceAccess::default().as_str()
+        ),
+    )?;
+    Ok(())
 }
 
 /// Adds a column when it is missing, which is the guarded `ALTER` the migration files cannot write.
@@ -228,6 +251,38 @@ mod tests {
             .expect("the first call should succeed");
         ensure_column(&connection, "enrollment_codes", "cancelled_at", "INTEGER")
             .expect("the second call should be a no-op");
+    }
+
+    /// A database from an earlier version has no `access` column; one from this version has it in
+    /// its create statement. Both have to survive every later start.
+    #[test]
+    fn the_whole_migration_is_idempotent_on_a_database_that_predates_a_column() {
+        let connection = Connection::open_in_memory().expect("the database should open");
+        connection
+            .execute_batch(
+                "CREATE TABLE devices (
+                   id TEXT PRIMARY KEY, kind TEXT NOT NULL, name TEXT NOT NULL,
+                   owner_user_id TEXT, secret_hash TEXT NOT NULL, note TEXT,
+                   created_at INTEGER NOT NULL, revoked_at INTEGER,
+                   last_seen_at INTEGER, last_ip TEXT, last_version TEXT);",
+            )
+            .expect("the legacy table should be created");
+
+        migrate(&connection).expect("the first migration should apply");
+        migrate(&connection).expect("a restart should change nothing");
+
+        let columns: Vec<String> = connection
+            .prepare("PRAGMA table_info(devices)")
+            .expect("the table should be readable")
+            .query_map([], |row| row.get::<_, String>(1))
+            .expect("the columns should list")
+            .collect::<Result<_, _>>()
+            .expect("the columns should read");
+        assert_eq!(
+            columns.iter().filter(|name| *name == "access").count(),
+            1,
+            "access 列应当恰好被加一次"
+        );
     }
 
     #[test]

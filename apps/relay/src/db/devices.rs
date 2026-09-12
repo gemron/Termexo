@@ -1,6 +1,9 @@
 //! Devices: desktop apps and downstream relays that hold a credential issued by this relay.
 
+use std::str::FromStr;
+
 use rusqlite::{params, Row};
+use serde::Serialize;
 use termexo_relay_protocol::frames::DeviceKind;
 
 use super::{now_millis, optional_text, Database, DatabaseError};
@@ -8,8 +11,11 @@ use super::{now_millis, optional_text, Database, DatabaseError};
 const DESKTOP_KIND: &str = "desktop";
 const RELAY_KIND: &str = "relay";
 
+const PUBLIC_ACCESS: &str = "public";
+const RELAY_LOGIN_ACCESS: &str = "relay-login";
+
 const DEVICE_COLUMNS: &str = "id, kind, name, owner_user_id, secret_hash, note, created_at, \
-     revoked_at, last_seen_at, last_ip, last_version FROM devices";
+     revoked_at, last_seen_at, last_ip, last_version, access FROM devices";
 
 /// The stored spelling of a device kind. `DeviceKind` lives in the shared crate and serializes the
 /// same way on the wire, so the two never drift.
@@ -31,6 +37,49 @@ fn parse_device_kind(value: &str) -> Result<DeviceKind, DatabaseError> {
     }
 }
 
+/// Who the relay lets through to `/d/<deviceId>/` at all.
+///
+/// It decides reachability only. Whether a browser that got through may *operate* the workbench is
+/// still the desktop's access token's question — the two gates are deliberately independent.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize)]
+#[serde(rename_all = "kebab-case")]
+pub enum DeviceAccess {
+    /// Anyone who has the link reaches the device; the desktop's token is the only gate.
+    #[default]
+    Public,
+    /// The browser must hold a console session that owns or administers this device.
+    RelayLogin,
+}
+
+impl DeviceAccess {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::Public => PUBLIC_ACCESS,
+            Self::RelayLogin => RELAY_LOGIN_ACCESS,
+        }
+    }
+
+    /// Whether reaching the device needs a console session at all.
+    pub fn requires_console_session(self) -> bool {
+        matches!(self, Self::RelayLogin)
+    }
+}
+
+/// The one sentence an unrecognised value is reported with, wherever it came from.
+pub const UNKNOWN_ACCESS_MESSAGE: &str = "设备访问策略只能是 public 或 relay-login。";
+
+impl FromStr for DeviceAccess {
+    type Err = &'static str;
+
+    fn from_str(value: &str) -> Result<Self, Self::Err> {
+        match value.trim() {
+            PUBLIC_ACCESS => Ok(Self::Public),
+            RELAY_LOGIN_ACCESS => Ok(Self::RelayLogin),
+            _ => Err(UNKNOWN_ACCESS_MESSAGE),
+        }
+    }
+}
+
 #[derive(Debug, Clone)]
 pub struct DeviceRecord {
     pub id: String,
@@ -44,25 +93,35 @@ pub struct DeviceRecord {
     pub last_seen_at: Option<i64>,
     pub last_ip: Option<String>,
     pub last_version: Option<String>,
+    pub access: DeviceAccess,
 }
 
 impl DeviceRecord {
     pub fn is_revoked(&self) -> bool {
         self.revoked_at.is_some()
     }
+
+    /// Whether one console account may reach this device when it is not public.
+    ///
+    /// Ownership is what the relay knows about a device; an administrator runs the relay and can
+    /// revoke the device outright, so withholding the page from them would protect nothing.
+    pub fn is_reachable_by(&self, user_id: &str, is_admin: bool) -> bool {
+        is_admin || self.owner_user_id.as_deref() == Some(user_id)
+    }
 }
 
-/// What the console may change about a device. Only the labels: identity, ownership and the secret
-/// are decided at enrollment and never edited.
+/// What the console may change about a device. Identity, ownership and the secret are decided at
+/// enrollment and never edited.
 #[derive(Debug, Default)]
 pub struct DeviceUpdate {
     pub name: Option<String>,
     pub note: Option<String>,
+    pub access: Option<DeviceAccess>,
 }
 
 impl DeviceUpdate {
     pub fn is_empty(&self) -> bool {
-        self.name.is_none() && self.note.is_none()
+        self.name.is_none() && self.note.is_none() && self.access.is_none()
     }
 }
 
@@ -90,6 +149,9 @@ impl Database {
             last_seen_at: None,
             last_ip: None,
             last_version: None,
+            // Reachable by anyone holding the link, which is what the address was made for; an
+            // operator tightens it afterwards on the device that needs it.
+            access: DeviceAccess::default(),
         };
         self.connection().execute(
             "INSERT INTO devices (id, kind, name, owner_user_id, secret_hash, note, created_at)
@@ -143,6 +205,12 @@ impl Database {
             connection.execute(
                 "UPDATE devices SET note = ?2 WHERE id = ?1",
                 params![id, optional_text(Some(note.clone()))],
+            )?;
+        }
+        if let Some(access) = update.access {
+            connection.execute(
+                "UPDATE devices SET access = ?2 WHERE id = ?1",
+                params![id, access.as_str()],
             )?;
         }
         Ok(())
@@ -236,19 +304,34 @@ fn read_device_row(row: &Row<'_>) -> rusqlite::Result<Result<DeviceRecord, Datab
     let last_seen_at: Option<i64> = row.get(8)?;
     let last_ip: Option<String> = row.get(9)?;
     let last_version: Option<String> = row.get(10)?;
-    Ok(parse_device_kind(&kind).map(|kind| DeviceRecord {
-        id,
-        kind,
-        name,
-        owner_user_id,
-        secret_hash,
-        note: optional_text(note),
-        created_at,
-        revoked_at,
-        last_seen_at,
-        last_ip: optional_text(last_ip),
-        last_version: optional_text(last_version),
-    }))
+    let access: String = row.get(11)?;
+    Ok(
+        parse_device_row(&kind, &access).map(|(kind, access)| DeviceRecord {
+            id,
+            kind,
+            name,
+            owner_user_id,
+            secret_hash,
+            note: optional_text(note),
+            created_at,
+            revoked_at,
+            last_seen_at,
+            last_ip: optional_text(last_ip),
+            last_version: optional_text(last_version),
+            access,
+        }),
+    )
+}
+
+/// The two stored enumerations of one row, refused together so a corrupted value is reported once
+/// rather than silently read as the permissive default.
+fn parse_device_row(kind: &str, access: &str) -> Result<(DeviceKind, DeviceAccess), DatabaseError> {
+    let kind = parse_device_kind(kind)?;
+    let access = DeviceAccess::from_str(access).map_err(|_| DatabaseError::UnknownValue {
+        field: "devices.access",
+        value: access.to_string(),
+    })?;
+    Ok((kind, access))
 }
 
 #[cfg(test)]
@@ -329,6 +412,65 @@ mod tests {
             .expect("the lookup should work")
             .expect("the device should exist")
             .is_revoked());
+    }
+
+    #[test]
+    fn an_access_policy_reads_back_from_the_two_spellings_it_is_stored_under() {
+        assert_eq!(DeviceAccess::from_str("public"), Ok(DeviceAccess::Public));
+        assert_eq!(
+            DeviceAccess::from_str("  relay-login "),
+            Ok(DeviceAccess::RelayLogin)
+        );
+        assert_eq!(
+            DeviceAccess::from_str("relayLogin"),
+            Err(UNKNOWN_ACCESS_MESSAGE)
+        );
+        assert_eq!(DeviceAccess::default(), DeviceAccess::Public);
+        assert_eq!(DeviceAccess::RelayLogin.as_str(), "relay-login");
+        assert!(DeviceAccess::RelayLogin.requires_console_session());
+        assert!(!DeviceAccess::Public.requires_console_session());
+    }
+
+    #[test]
+    fn a_device_starts_public_and_keeps_whatever_the_console_set() {
+        let database = database();
+        let created = insert(&database, None);
+        assert_eq!(created.access, DeviceAccess::Public);
+
+        database
+            .update_device(
+                &created.id,
+                &DeviceUpdate {
+                    access: Some(DeviceAccess::RelayLogin),
+                    ..Default::default()
+                },
+            )
+            .expect("the update should apply");
+
+        assert_eq!(
+            database
+                .find_device(&created.id)
+                .expect("the lookup should work")
+                .expect("the device should exist")
+                .access,
+            DeviceAccess::RelayLogin
+        );
+    }
+
+    /// An administrator runs the relay and can revoke the device anyway, so the gate is about the
+    /// owner; everybody else is kept out even when they hold a console session.
+    #[test]
+    fn a_restricted_device_is_reachable_by_its_owner_and_by_an_administrator() {
+        let database = database();
+        let owner = database
+            .create_user("alice", "hash", UserRole::User)
+            .expect("a user");
+        let device = insert(&database, Some(&owner.id));
+
+        assert!(device.is_reachable_by(&owner.id, false));
+        assert!(device.is_reachable_by("someone-else", true));
+        assert!(!device.is_reachable_by("someone-else", false));
+        assert!(!insert(&database, None).is_reachable_by("someone-else", false));
     }
 
     #[test]

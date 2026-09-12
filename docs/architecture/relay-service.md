@@ -217,7 +217,24 @@ enrollment_codes  一次性；kind、可选 owner、TTL（默认 15 分钟）、
 地址形态：`https://<中继>/d/<deviceId>/#token=<桌面端访问令牌>`。
 
 选路径前缀而不是每设备一个子域名，是因为它只要一个域名、一张普通证书，能放在 Caddy / nginx 后面，
-自建门槛最低。子域名模式（`<deviceId>.relay.example.com`）留作可选项，需要泛域名 DNS 和证书。
+自建门槛最低。子域名模式（`<deviceId>.relay.example.com`）是可选的第二个入口，需要泛域名 DNS 和证书。
+
+子域名模式由 `--subdomain-base <域名>`（`TERMEXO_RELAY_SUBDOMAIN_BASE`）开启。开启后：
+
+* `<deviceId>.<base>` 的请求整台主机都属于该设备，路径不再带 `/d/<id>` 前缀，`X-Termexo-Base` 为 `/`；
+* 中继对外通告的地址（`DeviceView.accessUrl`、`welcome.addresses`、通告给上游的地址）改为子域名
+  形式，并带上 `public_url` 的端口，使两种入口落到同一个监听器；
+* 路径形式 `/d/<id>/` **仍然可用**——已经发出去的链接不能失效，两种入口在同一台中继上同时有效；
+* 控制台 `/console/*`、`/api/*` 与 `/tunnel` 只在基础域名本身上提供。
+
+子域名路由必须在**所有路由之前**判断：`/`、`/api/health`、`/tunnel` 都是真实路由，否则会抢走设备
+子域名上本应转发的请求。实现上是一层包在整个 Router 外面的 middleware。
+
+Host 解析规则：去掉端口、去掉结尾的根点、大小写不敏感、**只认恰好一层**子域名，且该标签必须是
+合法 deviceId（26 位小写 base32）。任何不满足的 Host 都落回普通路由。
+
+TLS 需要泛域名证书：`--tls cert:` 由运维自备，`--tls self-signed` 会把 `*.<base>` 加进 SAN；已经
+生成过证书的数据目录不会自动重签，需要删掉 `<data-dir>/tls/`（桌面端固定过指纹的要重新固定）。
 
 路径前缀带来两处前端改动：
 
@@ -254,7 +271,8 @@ B 侧的隧道与桌面端的是同一套：`hello { kind: "relay", relayId }`�
 一律重连。数据面方向相反——上游是开流的一方，所以 B 在这条链接上跑 `yamux::Mode::Server`。
 
 审计动作：`upstream-linked`、`upstream-unlinked`、`upstream-connected`、`upstream-disconnected`、
-`upstream-loop-refused`、`upstream-revoked`；`detail` 只记地址，不含凭据与接入码。
+`upstream-loop-refused`、`upstream-revoked`；`detail` 只记地址与是否固定了证书（`pinned`），不含
+凭据、接入码与指纹值。设备侧另有 `device-access-changed`，`detail` 只记新的访问策略。
 
 ### 通告与路由表
 
@@ -333,9 +351,19 @@ src/audit.rs        审计写入
 | `GET/PATCH/DELETE /api/devices` | user | 用户自己的设备 |
 | `GET /console/*`、`GET /` | 无（页面本身） | 管理页面，`/` 302 到 `/console/` |
 
-`/d/<id>/` 默认不需要中继登录：链接本身不含秘密（枚举 `deviceId` 最多知道「有这么一台设备在线 /
-离线」），真正的门是桌面端令牌。设备可选 `access = relay-login`：浏览器必须先登录中继并且是设备的
-所有者或管理员，中继才转发——第三阶段的可选加固。
+`/d/<id>/` 默认不需要中继登录（`access = public`）：链接本身不含秘密（枚举 `deviceId` 最多知道
+「有这么一台设备在线 / 离线」），真正的门是桌面端令牌。设备可选 `access = relay-login`：浏览器
+必须先登录中继并且是设备的**所有者**或**管理员**，中继才转发。
+
+* 检查在查到设备记录之后、判断在线之前执行，因此不会向陌生人泄漏设备是否在线；
+* 覆盖该设备的**全部**请求——首页、静态资源和 `/ws` 升级一视同仁；
+* 未登录 → 302 到 `/console/login?next=<原路径>`（`next` 经百分号编码，控制台登录后跳回；控制台侧
+  只接受本站绝对路径，挡住开放重定向）；已登录但无权 → 403 中文页面；
+* 会话查询失败按「未登录」处理：宁可拒绝，也不让一次数据库抖动打开受限设备；
+* 经下游中继通告来的设备在本中继没有数据库行，本中继按 `public` 对待，`PATCH` 它的 `access` 返回
+  404（与 rename / revoke 一致）——它的策略由**它直连的那台中继**决定并在那一跳执行；
+* 子域名入口上 `relay-login` 设备一律 302 回路径形式：控制台会话 cookie 是 host-only 的，不会发到
+  设备子域名；放宽成 `Domain=.<base>` 又会让每台设备都收到这个 cookie。
 
 控制台会话：`HttpOnly; Secure; SameSite=Strict` cookie，修改类请求额外要求
 `X-Requested-With: termexo-console` 头，两者一起挡 CSRF。会话持久化，中继重启不掉线。
@@ -355,7 +383,8 @@ CREATE TABLE IF NOT EXISTS devices (
   id TEXT PRIMARY KEY, kind TEXT NOT NULL, name TEXT NOT NULL,
   owner_user_id TEXT REFERENCES users(id), secret_hash TEXT NOT NULL, note TEXT,
   created_at INTEGER NOT NULL, revoked_at INTEGER,
-  last_seen_at INTEGER, last_ip TEXT, last_version TEXT);
+  last_seen_at INTEGER, last_ip TEXT, last_version TEXT,
+  access TEXT NOT NULL DEFAULT 'public');   -- public | relay-login
 CREATE TABLE IF NOT EXISTS enrollment_codes (
   id TEXT PRIMARY KEY, code_hash TEXT NOT NULL UNIQUE, kind TEXT NOT NULL,
   owner_user_id TEXT, created_by TEXT NOT NULL, note TEXT,
@@ -379,6 +408,7 @@ termexo-relay serve --data-dir /var/lib/termexo-relay --listen 0.0.0.0:8443 \
   --public-url https://relay.example.com \
   --tls cert:/etc/termexo/fullchain.pem,/etc/termexo/privkey.pem \   # 或 self-signed | off
   [--trusted-proxy 10.0.0.0/8]   # 仅 --tls off 且前面有反代时读取反代的 X-Forwarded-*
+  [--subdomain-base relay.example.com]   # 子域名模式：<deviceId>.<base> 也能直接打开设备
 ```
 
 * 每个参数都有 `TERMEXO_RELAY_*` 环境变量等价物，便于容器；仓库提供 `apps/relay/Dockerfile`。
@@ -386,7 +416,10 @@ termexo-relay serve --data-dir /var/lib/termexo-relay --listen 0.0.0.0:8443 \
   `termexo-relay admin reset-password` 可重置。
 * `self-signed` 模式下桌面端首次接入时把证书指纹随 url 存进 `app_settings`（TOFU），之后指纹不符即
   拒连——面向没有域名的内网中继。
-* ACME（Let's Encrypt）自动证书留作可选项；公网部署首选放在 Caddy 后面。
+* ACME（Let's Encrypt）自动证书**不内置**：签发需要一个公网可达的域名才能完成验证，无法在本机
+  验证，而未经验证的取证代码比没有更糟。公网部署放在 Caddy 后面以 `--tls off` 运行，由它申请与
+  续期（含子域名模式的泛域名 DNS-01）；内网用 `--tls self-signed` 加指纹固定。
+  `apps/relay/README.md` 有可直接抄的 Caddy 与 nginx 配置。
 
 ### 资源上限
 
@@ -488,37 +521,110 @@ enroll.rs   调用 /api/enroll、写 keyring
 * 访问地址：每条中继地址（`hops > 0` 时标注「经 relay-a」）与现有 LAN 地址并列进同一个地址
   选择器，选中后生成 `${url}#token=…` 和二维码——复用现在的 `render_remote_access_qr` 和令牌
   展示逻辑，不另做一套；
-* 安全提示补一句：中继运营者能看到经它的终端内容（端到端加密落地前）。
+* 安全提示：经中继的终端内容已端到端加密，中继运营者看不到；但它知道设备何时在线，也能随时断开。
 * `remote.i18n.ts` 加 `remote.relay*` 键，7 种语言表都补。
 
 ## 安全边界
 
-* **中继看得到什么。** 第一、二阶段里中继在自己这一跳终止 TLS，能看到 `/ws` 上的明文帧（终端
-  输出、命令参数）。自建中继时运营者就是用户自己，可以接受；接到别人运营的上游中继时则不是——
-  第三阶段的端到端加密解决这个问题。文档和面板都必须写明。
+* **中继看得到什么。** 端到端加密落地后（见「端到端加密」），经中继的 `/ws` 帧全部封装在
+  AES-256-GCM 里：中继只看得到流量的时间与大小，看不到终端输出与命令参数，也拿不到访问令牌。
+  它仍然知道哪台设备在线、哪个浏览器 IP 在访问，并且随时可以断开连接——「中继决定能否到达」这一条
+  没有变。静态资源仍是明文，它们是公开的应用代码。
 * 桌面端令牌走 fragment，浏览器不会把它发给任何服务器；中继的日志、审计、数据库里都不会出现它。
 * 设备凭据只存哈希；泄露数据库不能冒充设备。
 * 撤销立即生效：在线隧道被关闭，浏览器侧所有经该设备的流一起断。禁用用户级联撤销设备。
 * 中继出口 IP 不会被桌面端锁定：锁定按 `X-Forwarded-For` 计数，而这个头只在隧道路由上被读取。
 * 下游中继对上游只是一台「会通告设备的设备」：上游拿不到下游的用户表，也不能撤销下游的设备，
   只能断开经自己的流。信任是单向的：B 信任 A 能看到 B 名下设备的流量，A 不需要信任 B。
+* 中继的控制台会话 cookie 不会进隧道：控制台与 `/d/<id>/` 同源，浏览器会把它带到设备请求上，所以
+  代理在转发前剥掉该 cookie（其它 cookie 保留），并剥掉设备响应里同名的 `Set-Cookie`。否则设备
+  运营者能拿到管理员的控制台会话，或对共享 origin 做会话固定。
+* `access = relay-login` 只决定「能不能到达」，不改变「能不能操作」：桌面端令牌仍然是第二道独立的门。
 * 所有 `/api/*` 错误信息与隧道关闭原因用中文；审计 `detail` 不含密码、凭据、令牌。
 
-## 端到端加密（第三阶段）
+## 端到端加密（第三阶段，已交付）
 
-前提已经具备：浏览器与桌面端共享一个中继不知道的秘密（访问令牌）。把 `/ws` 握手升级为 v2：
+前提已经具备：浏览器与桌面端共享一个中继不知道的秘密（访问令牌）。`/ws` 握手升级为 **v2**，
+握手之后的每一帧都封装在 AES-256-GCM 里，中继（以及任何中间人）只转发它读不懂的密文。
+
+### 握手
 
 ```
-S→C   challenge { nonceS }
-C→S   auth { clientId, nonceC, proof: HMAC-SHA256( HKDF(token, "termexo-auth"), nonceS ‖ nonceC ) }
-双方  k = HKDF(token, "termexo-session", nonceS ‖ nonceC)
-之后  每帧 { "type": "sealed", "n": <递增计数>, "c": base64( AES-256-GCM(k, nonce = n, 明文帧) ) }
+S→C  { "type": "challenge", "protocol": 2, "nonceS": <base64url, 32 B> }
+C→S  { "type": "auth", "protocol": 2, "clientId": "<uuid>", "nonceC": <base64url, 32 B>,
+       "proof": <base64url, HMAC-SHA256(authKey, nonceS ‖ nonceC)> }
+S→C  { "type": "ready", "serverVersion": "x.y.z" }        ← 这一帧起全部封装
 ```
 
-* `proof` 错误按现有失败锁定计数；令牌本身不再以明文出现在任何帧里，LAN 直连一并受益。
-* 浏览器用 WebCrypto（经中继一定是 https，安全上下文可用）；Rust 用 `aes-gcm` + `hkdf` + `hmac` + `sha2`。
-* 静态资源仍是明文——它们是公开的应用代码。
-* 隧道层不变：中继对 `sealed` 帧仍然只是对拷。
+三把密钥都由 HKDF-SHA256 从令牌派生，**salt 固定为 `nonceS ‖ nonceC`**，`info` 只用来区分用途：
+
+| 密钥 | `info` | 用途 |
+| --- | --- | --- |
+| `authKey` | `termexo-auth` | 计算 / 校验 `proof` |
+| `c2sKey` | `termexo-c2s` | 浏览器 → 桌面端的帧 |
+| `s2cKey` | `termexo-s2c` | 桌面端 → 浏览器的帧 |
+
+* IKM 是令牌的 UTF-8 字节，输出长度 32 字节。
+* 服务端在连接建立后**立即**发出 `challenge`，客户端必须在 `AUTH_TIMEOUT`（5 秒）内回 `auth`，
+  否则关闭 4408。由服务端先说话，会话密钥才能同时覆盖两侧的随机数。
+* `proof` 用 HMAC 的 `verify_slice` 常量时间比较；不匹配按现有 `RemoteAuth` 的来源 IP 失败锁定
+  计数（10 分钟 5 次，锁 10 分钟），回 `{"type":"auth-failed","reason":"…"}` 并关闭 4401。
+  校验与派生都在 `RemoteAuth::authorize_with` 的闭包里完成，令牌不会被交回调用方。
+* **令牌本身不再出现在任何帧里**，LAN 直连一并受益。
+
+### 封装帧
+
+```
+{ "type": "sealed", "n": <整数，从 0 递增>, "c": <base64url, AES-256-GCM 密文+标签> }
+```
+
+* 明文就是原来的 JSON 帧原文（`invoke` / `result` / `event` / `ping` / `pong` / `resync` /
+  `ready`），一行没改：封装层套在外面，上层协议不知道自己被加密了。
+* nonce（12 字节）= 4 字节 0 + 8 字节大端 `n`。方向已经由密钥区分，nonce 不必再编码方向。
+* AAD 为空。
+* 接收方要求 `n` **严格递增**（WebSocket 可靠有序）。重复或倒退的 `n`、解密失败、加密会话上收到
+  未封装帧、封装帧里再嵌套封装帧——一律按攻击处理：关闭连接（1002）并记日志；日志只记原因，
+  不记帧内容、令牌、nonce 或密钥。
+* 发送计数器是 u64，按每秒十亿帧算也要几百年才会回绕，因此**不做回绕处理**（代码注释写明原因）。
+* Close 帧不封装：关闭码属于 WebSocket 层，浏览器在密钥已经失效时也要能读到它。
+* 隧道层不变：中继对 `sealed` 帧仍然只是对拷。静态资源仍是明文——它们是公开的应用代码。
+
+### 与早期草案的三处不同
+
+1. **按方向派生两把密钥**，而不是双方共用一把 `k`。共用一把时，服务端的第 n 帧与客户端的第 n 帧
+   会落在同一组 (key, nonce) 上；AES-GCM 在 nonce 重用下会泄露两段明文的异或，并暴露 GHASH 的
+   认证密钥使标签可被伪造。这是必须修的缺陷，不是风格选择。
+2. **两个 nonce 放进 HKDF 的 salt**（`nonceS ‖ nonceC`），`info` 只留给用途标签。效果与放在 `info`
+   里等价，但 salt 才是 nonce 的标准位置，也让三把密钥的区分只由 `info` 承担。
+3. **v2 的适用范围按页面上下文决定**：
+   * 页面处于安全上下文（https；经中继必然如此）→ **强制 v2**，服务端直接拒绝 v1 的 `auth` 帧。
+     否则中间人只要把握手打回 v1 就能读到明文令牌——不堵死降级，加密就只是摆设。
+   * 明文 HTTP 的局域网直连（`RemoteAccessSettings.tls == false` 且不经中继）→ 保留 v1：浏览器在
+     非安全上下文里根本不提供 `crypto.subtle`，而这条链路本来就没有机密性，v1 不损失任何东西。
+   * 服务端的判断：`via_relay == true`，或请求是 https（隧道路由看 `X-Forwarded-Proto`，LAN 路由
+     看自身 `tls` 设置）→ 只接受 v2；否则两者皆可。
+   * 浏览器侧对应：`crypto.subtle` 不可用时回退 v1；被服务端拒绝时，未授权遮罩直接显示服务端给
+     的中文原因「此连接要求加密握手，请改用 HTTPS 打开远程工作台。」
+
+### 实现与一致性
+
+| 位置 | 内容 |
+| --- | --- |
+| `src-tauri/src/remote/session_crypto.rs` | HKDF 派生、`proof` 校验、封装 / 解封装、计数器递增校验 |
+| `src-tauri/src/remote/server.rs` | `challenge` → `auth` 握手；封装层夹在唯一持有 sink 的写任务与读循环之间，沿用「一个任务拥有 sink」的结构 |
+| `src-tauri/src/remote/token.rs` | `authorize_with`：把「怎么比对」交给调用方，失败锁定与中文文案不变 |
+| `apps/desktop-ui/src/app/core/services/remote-session-crypto.ts` | WebCrypto 版同一套算法；`CryptoKey` 在握手时导入一次并缓存 |
+| `apps/desktop-ui/src/app/core/services/remote-bridge-client.ts` | 等到 `challenge` 才应答；收发各串一条 promise 链 |
+
+`crypto.subtle.encrypt` / `decrypt` 都是异步的，多个 promise 可能乱序 resolve。因此浏览器侧
+**发送与接收各串一条 promise 链**：下一帧的密码学操作要等上一帧 resolve 之后才开始，于是写出的
+`n` 与实际发送顺序一致，解出的帧也按 `n` 顺序交付给上层。
+
+两端互通由一组写死的常量证明：同一份 token / nonceS / nonceC / 明文，Rust 与前端的测试断言同一个
+`proof`、同一个 c2s 密文、同一个 s2c 密文（`session_crypto.rs` 的
+`the_wire_format_matches_the_pinned_cross_language_vector`，以及
+`remote-session-crypto.fixtures.ts` 的 `SESSION_VECTOR`）。任何一侧改了派生、salt 或 nonce 布局，
+失败的是测试而不是线上连接。
 
 ## 分阶段交付
 
@@ -526,7 +632,7 @@ C→S   auth { clientId, nonceC, proof: HMAC-SHA256( HKDF(token, "termexo-auth")
 | --- | --- | --- |
 | 一：可用的中继 | 共用 crate；`termexo-relay serve`（隧道、`/d/` 代理、SQLite、`/api/*`、控制台的设备 / 用户 / 接入码 / 审计页）；桌面端 `RelayLink`、接入 UI、地址清单；隧道路由的转发头、base href、按 base 分键、ETag | 桌面端用接入码接入 → 手机在 4G 下打开 `https://relay/d/<id>/#token=…` → 看到工作台、终端实时交互、刷新后回放；控制台看到设备在线，撤销后手机被断开且桌面端不再重连；账号密码接入的设备出现在该用户名下；错误密码 5 次后锁定 |
 | 二：级联（已交付） | `upstream/`（出站隧道、通告、地址传播、流转发）、路由表变更订阅、环路防护、`/api/admin/relays/upstream`、`termexo-relay link`、控制台「中继」页接真实数据 | B 接入 A 后，A 的控制台列出 B 的设备并标注「经 B」；`https://A/d/<id>/` 可打开 B 名下的桌面端（含 WebSocket）；桌面端面板同时列出 A、B 两条地址；把 A 配成 B 的下游时被拒绝。`apps/relay/tests/relay_cascade.rs` 起两台真中继逐条验证 |
-| 三：加固（可选） | `/ws` v2 端到端加密；`access = relay-login`；子域名模式；ACME | 中继上抓包看不到终端明文；未登录中继时打开受限设备得到登录页 |
+| 三：加固（已交付） | `/ws` v2 端到端加密；`access = relay-login`；子域名模式；上游自签名证书的指纹入口（补第二阶段遗留）；ACME 不做，见「配置与部署」 | 中继上抓包看不到终端明文、也看不到令牌；未登录中继时打开受限设备得到登录页，登录后跳回；`<deviceId>.<base>` 与 `/d/<id>/` 同时可达。`apps/relay/tests/relay_access.rs` 与两端的跨语言加密向量逐条验证 |
 
 第一阶段内部再拆三条并行线：共用 crate + 中继二进制（一个 agent）；桌面端 Rust（一个 agent，依赖
 共用 crate 的接口）；控制台 + 面板 UI（一个 agent，依赖 `/api/*` 契约与 `RemoteAccessStatus`
@@ -543,19 +649,23 @@ C→S   auth { clientId, nonceC, proof: HMAC-SHA256( HKDF(token, "termexo-auth")
 * Rust（`src-tauri`）：隧道路由读 `X-Forwarded-*` 而 LAN 路由忽略它、base href 注入、`target`
   不匹配的流被拒、4403 后不重连且凭据被清、ETag 命中回 304。
 * 前端：ws 地址随 `baseURI`、存储键按 base 分、面板接入流程（假 invoke）；控制台各页 spec。
+* 会话加密：Rust 侧派生向量、`proof` 通过 / 失败、封装往返、`n` 倒退或重复被拒、解密失败被拒、
+  两个方向密钥不同、v1 在强制 v2 的上下文里被拒而在明文 LAN 上被接受；前端侧完整 v2 握手、
+  乱序 resolve 时仍按 `n` 顺序交付、非安全上下文回退 v1；两侧共用同一组跨语言常量。
 * 端到端：按「分阶段交付」的验收列。用 Chrome MCP 对远程页面与控制台截图并检查控制台无报错。
 
 ## 已知限制与后续可选项
 
 * 所有流量经中继，没有直连；延迟等于到中继的往返。
-* 第一、二阶段中继可见明文（见「安全边界」）。
+* 静态资源经中继时仍是明文（公开的应用代码）；`/ws` 的帧自 v2 起已端到端加密。
 * 一台桌面端只接一台中继；多中继冗余留作后续。
-* 上游是自签名中继时还不能接：`relay_settings.upstream` 里有 `certificateFingerprint` 字段，固定
-  证书的校验也已就位，但 `link` 子命令与控制台还没有收集指纹的入口，所以上游目前要么有受信证书，
-  要么放在反代后面以 `--tls off` 运行。桌面端接中继时的 TOFU 流程可以照搬过来。
+* 不内置 ACME：见「配置与部署」。公网部署放在反代后面，内网用自签名加指纹固定。
+* 子域名模式需要泛域名 DNS 与证书；`--tls self-signed` 生成过的证书不会因为后来加了
+  `--subdomain-base` 而自动重签。
+* `access = relay-login` 的设备在子域名入口上只能经 302 回路径形式访问（cookie 作用域所致）。
 * 上游被撤销（4403）后 `upstream` 设置连同凭据一起清掉，控制台的上游卡片回到未接入状态，原因只
   留在审计里。
-* 子域名模式、ACME、浏览器侧中继登录、手机专用布局、设备上下线的桌面通知——后续可选。
+* 手机专用布局、设备上下线的桌面通知——后续可选。
 
 ## 设计文档修订
 

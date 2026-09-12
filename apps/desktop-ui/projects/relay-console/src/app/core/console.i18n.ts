@@ -39,6 +39,7 @@ export const RELAY_CONSOLE_TRANSLATIONS: TranslationBundle = {
 
     'console.login.title': '登录中继控制台',
     'console.login.subtitle': '用中继上的账号登录，管理设备、接入码与用户。',
+    'console.login.subtitleDevice': '你要访问的设备要求先登录中继。登录后会自动回到该设备。',
     'console.login.username': '用户名',
     'console.login.password': '密码',
     'console.login.submit': '登录',
@@ -80,6 +81,12 @@ export const RELAY_CONSOLE_TRANSLATIONS: TranslationBundle = {
     'console.devices.accessUrl': '访问地址',
     'console.devices.accessUrlHint': '地址本身不含访问令牌，令牌由桌面端另行提供。',
     'console.devices.copyUrl': '复制地址',
+    'console.devices.accessRelayLogin': '访问前必须先登录中继',
+    'console.devices.accessHint':
+      '开启后，只有这台设备的所有者或中继管理员登录中继后才能打开它；其他人会看到登录页或无权提示。关闭时任何拿到链接的人都能到达，是否能操作仍由桌面端的访问令牌决定。',
+    'console.devices.accessTag': '需登录',
+    'console.devices.managedElsewhere':
+      '这台设备接入的是下游中继「{relay}」，改名、撤销和访问策略都要在那台中继上操作。本中继只负责把流量转发给它。',
     'console.devices.nameRequired': '设备名称不能为空',
     'console.devices.renamed': '已保存设备信息',
     'console.devices.disconnect': '断开当前隧道',
@@ -164,6 +171,10 @@ export const RELAY_CONSOLE_TRANSLATIONS: TranslationBundle = {
     'console.relays.upstreamUrl': '上游中继地址',
     'console.relays.upstreamRelayId': '上游中继 ID',
     'console.relays.upstreamCode': '上游签发的接入码',
+    'console.relays.upstreamFingerprint': '上游证书指纹（可选）',
+    'console.relays.fingerprintHint':
+      '只有上游使用自签名证书时才需要填：把它启动日志里打印的 SHA-256 指纹粘贴进来。上游有受信证书或放在反代后面时留空。',
+    'console.relays.fingerprintInvalid': '指纹应当是 64 位十六进制字符，可带冒号',
     'console.relays.connect': '接入上游',
     'console.relays.connecting': '接入中…',
     'console.relays.disconnect': '断开上游',
@@ -246,6 +257,8 @@ export const RELAY_CONSOLE_TRANSLATIONS: TranslationBundle = {
 
     'console.login.title': 'Sign in to the relay console',
     'console.login.subtitle': 'Use a relay account to manage devices, enrolment codes and users.',
+    'console.login.subtitleDevice':
+      'The device you asked for requires a relay sign-in. You will be taken back to it afterwards.',
     'console.login.username': 'Username',
     'console.login.password': 'Password',
     'console.login.submit': 'Sign in',
@@ -290,6 +303,12 @@ export const RELAY_CONSOLE_TRANSLATIONS: TranslationBundle = {
     'console.devices.accessUrlHint':
       'The address carries no access token; the desktop app hands that out separately.',
     'console.devices.copyUrl': 'Copy address',
+    'console.devices.accessRelayLogin': 'Require a relay sign-in before reaching this device',
+    'console.devices.accessHint':
+      'With this on, only the device’s owner or a relay administrator can open it once signed in; everybody else gets the login page or a refusal. With it off anyone holding the link reaches the device, and the desktop’s access token still decides what they may do.',
+    'console.devices.accessTag': 'Sign-in required',
+    'console.devices.managedElsewhere':
+      'This device is enrolled with the downstream relay “{relay}”. Renaming it, revoking it and changing its access policy all happen there; this relay only forwards traffic to it.',
     'console.devices.nameRequired': 'The device name cannot be empty',
     'console.devices.renamed': 'Device saved',
     'console.devices.disconnect': 'Drop the current tunnel',
@@ -381,6 +400,11 @@ export const RELAY_CONSOLE_TRANSLATIONS: TranslationBundle = {
     'console.relays.upstreamUrl': 'Upstream relay address',
     'console.relays.upstreamRelayId': 'Upstream relay ID',
     'console.relays.upstreamCode': 'Enrolment code from the upstream',
+    'console.relays.upstreamFingerprint': 'Upstream certificate fingerprint (optional)',
+    'console.relays.fingerprintHint':
+      'Only needed when the upstream serves a self-signed certificate: paste the SHA-256 fingerprint from its start-up log. Leave empty when the upstream has a trusted certificate or sits behind a reverse proxy.',
+    'console.relays.fingerprintInvalid':
+      'A fingerprint is 64 hexadecimal characters, with or without colons',
     'console.relays.connect': 'Join the upstream',
     'console.relays.connecting': 'Joining…',
     'console.relays.disconnect': 'Leave the upstream',

@@ -29,6 +29,9 @@ use termexo_relay_protocol::tunnel::{
 };
 use tower::Service;
 
+use crate::access;
+use crate::address::DeviceTarget;
+use crate::auth::session::SESSION_COOKIE_NAME;
 use crate::forwarded::ClientContext;
 use crate::registry::{Registry, Route};
 use crate::state::RelayState;
@@ -110,27 +113,37 @@ pub fn parse_device_path(path: &str) -> Option<DevicePath> {
 pub async fn forward(
     state: &RelayState,
     client: &ClientContext,
-    device_id: &str,
-    rest: &str,
+    target: &DeviceTarget,
     request: Request,
 ) -> Response {
+    let device_id = target.device_id.as_str();
     let device = match state.database.find_device(device_id) {
         Ok(device) => device,
         Err(error) => return internal_error(&error),
     };
+    // Before anything is revealed about the device, including whether it is online at all.
+    if let Some(refusal) = access::guard(
+        state,
+        request.headers(),
+        device.as_ref(),
+        target,
+        request.uri().query(),
+    ) {
+        return refusal;
+    }
     if !state.registry.is_online(device_id) {
         return unreachable_page(state, device_id, device);
     }
 
-    let base = format!("{DEVICE_PATH_PREFIX}{device_id}/");
+    let base = target.base_path();
     let (mut parts, body) = request.into_parts();
-    let target = match tunnel_uri(device_id, rest, parts.uri.query()) {
+    let uri = match tunnel_uri(device_id, &target.rest, parts.uri.query()) {
         Some(uri) => uri,
         None => return (StatusCode::BAD_REQUEST, "请求路径无效。").into_response(),
     };
     let websocket = is_websocket_upgrade(&parts.headers);
     prepare_request_headers(&mut parts.headers, client, &base, websocket);
-    parts.uri = target;
+    parts.uri = uri;
 
     if websocket {
         return bridge_websocket(&state.proxy, parts, body).await;
@@ -265,6 +278,7 @@ fn prepare_request_headers(
     // hyper fills `Host` from the tunnel authority; the browser's own host travels in
     // `X-Forwarded-Host`, which is what the device compares an `Origin` against.
     headers.remove(header::HOST);
+    take_console_session(headers);
     set_header(headers, HEADER_FORWARDED_FOR, &client.ip.to_string());
     set_header(headers, HEADER_FORWARDED_PROTO, &client.proto);
     set_header(headers, HEADER_FORWARDED_HOST, &client.host);
@@ -275,7 +289,70 @@ fn prepare_request_headers(
 fn relay_response(mut response: HttpResponse<Body>) -> Response {
     let upgrading = response.status() == StatusCode::SWITCHING_PROTOCOLS;
     strip_hop_by_hop(response.headers_mut(), upgrading);
+    refuse_console_session_cookies(response.headers_mut());
     response
+}
+
+/// Removes the relay's own session cookie from a request before it crosses a tunnel.
+///
+/// The console and the path form of a device address share one origin, so the browser attaches the
+/// console cookie to every device request. Carrying it into the tunnel would hand a console
+/// session — an administrator's, in the worst case — to whoever runs that device. Other cookies
+/// are left alone: they belong to whatever the device itself set.
+fn take_console_session(headers: &mut HeaderMap) {
+    let Some(remaining) = headers
+        .get(header::COOKIE)
+        .and_then(|value| value.to_str().ok())
+        .map(|value| without_cookie(value, SESSION_COOKIE_NAME))
+    else {
+        return;
+    };
+    match remaining.is_empty() {
+        true => {
+            headers.remove(header::COOKIE);
+        }
+        false => set_header(headers, header::COOKIE.as_str(), &remaining),
+    }
+}
+
+/// Drops a device's attempt to set the relay's session cookie on the shared origin.
+///
+/// Without this a device could answer a proxied request with a `Set-Cookie` for the console's
+/// session name and fixate the browser on a session of its choosing.
+fn refuse_console_session_cookies(headers: &mut HeaderMap) {
+    let kept: Vec<HeaderValue> = headers
+        .get_all(header::SET_COOKIE)
+        .iter()
+        .filter(|value| {
+            value
+                .to_str()
+                .is_ok_and(|value| cookie_name(value) != Some(SESSION_COOKIE_NAME))
+        })
+        .cloned()
+        .collect();
+    headers.remove(header::SET_COOKIE);
+    for value in kept {
+        headers.append(header::SET_COOKIE, value);
+    }
+}
+
+/// A `Cookie` header with one entry taken out, the rest in their original order.
+fn without_cookie(header: &str, name: &str) -> String {
+    header
+        .split(';')
+        .map(str::trim)
+        .filter(|entry| !entry.is_empty() && cookie_name(entry) != Some(name))
+        .collect::<Vec<_>>()
+        .join("; ")
+}
+
+/// The name of one `Cookie` entry or `Set-Cookie` value.
+fn cookie_name(entry: &str) -> Option<&str> {
+    entry
+        .split(';')
+        .next()?
+        .split_once('=')
+        .map(|(name, _)| name.trim())
 }
 
 /// Removes the headers that belong to one hop only.
@@ -355,7 +432,8 @@ fn offline_page(name: &str, last_seen_at: Option<i64>) -> Response {
     html_page(StatusCode::SERVICE_UNAVAILABLE, "设备离线", body)
 }
 
-fn html_page(status: StatusCode, title: &str, body: String) -> Response {
+/// The one page shape every refusal the proxy itself answers with uses.
+pub(crate) fn html_page(status: StatusCode, title: &str, body: String) -> Response {
     let document = format!(
         "<!doctype html><html lang=\"zh-CN\"><head><meta charset=\"utf-8\">\
          <meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">\
@@ -596,6 +674,67 @@ mod tests {
             "relay.example.com"
         );
         assert_eq!(headers.get(HEADER_TERMEXO_BASE).expect("set"), "/d/abc/");
+    }
+
+    /// The console and the path form of a device address are one origin, so the browser attaches
+    /// the console session to device requests; it must not travel any further than the relay.
+    #[test]
+    fn the_console_session_cookie_never_crosses_a_tunnel() {
+        let mut headers = HeaderMap::new();
+        headers.insert(
+            header::COOKIE,
+            HeaderValue::from_static("a=1; termexo_relay_session=secret; b=2"),
+        );
+        let client = ClientContext {
+            ip: "203.0.113.5".parse().expect("an address"),
+            proto: "https".into(),
+            host: "relay.example.com".into(),
+        };
+
+        prepare_request_headers(&mut headers, &client, "/d/abc/", false);
+
+        assert_eq!(headers.get(header::COOKIE).expect("kept"), "a=1; b=2");
+    }
+
+    #[test]
+    fn a_request_whose_only_cookie_was_the_session_arrives_without_a_cookie_header() {
+        assert_eq!(
+            without_cookie("termexo_relay_session=secret", "termexo_relay_session"),
+            ""
+        );
+        assert_eq!(
+            without_cookie(
+                " other=1 ; termexo_relay_session=s",
+                "termexo_relay_session"
+            ),
+            "other=1"
+        );
+        assert_eq!(
+            cookie_name("termexo_relay_session=s; Path=/"),
+            Some("termexo_relay_session")
+        );
+        assert_eq!(cookie_name("novalue"), None);
+    }
+
+    /// A device that answered with a `Set-Cookie` for the console's session name would be able to
+    /// fixate the browser on a session of its choosing, because the origin is shared.
+    #[test]
+    fn a_device_cannot_set_the_consoles_session_cookie() {
+        let mut headers = HeaderMap::new();
+        headers.append(
+            header::SET_COOKIE,
+            HeaderValue::from_static("termexo_relay_session=attacker; Path=/"),
+        );
+        headers.append(header::SET_COOKIE, HeaderValue::from_static("theme=dark"));
+
+        refuse_console_session_cookies(&mut headers);
+
+        let remaining: Vec<&str> = headers
+            .get_all(header::SET_COOKIE)
+            .iter()
+            .filter_map(|value| value.to_str().ok())
+            .collect();
+        assert_eq!(remaining, vec!["theme=dark"]);
     }
 
     #[test]

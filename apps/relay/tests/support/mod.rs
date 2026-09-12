@@ -75,8 +75,43 @@ pub struct TestRelay {
     _data_dir: TempDirectory,
 }
 
+/// How one test relay differs from the plain one. Everything here has a `serve` flag behind it.
+#[derive(Default)]
+pub struct RelayOptions<'a> {
+    /// `--subdomain-base`: devices also answer on `<deviceId>.<base>`.
+    pub subdomain_base: Option<&'a str>,
+    /// `--trusted-proxy`: the networks whose forwarding headers are believed.
+    pub trusted_proxies: &'a [&'a str],
+    /// `--public-url`: the origin browsers use, which differs from the listener behind a proxy.
+    pub public_url: Option<&'a str>,
+}
+
 impl TestRelay {
     pub async fn start() -> Self {
+        Self::start_with(RelayOptions::default()).await
+    }
+
+    /// Starts a relay that also answers on `<deviceId>.<base>`, for the subdomain-mode tests.
+    pub async fn start_with_subdomain_base(base: &str) -> Self {
+        Self::start_with(RelayOptions {
+            subdomain_base: Some(base),
+            ..RelayOptions::default()
+        })
+        .await
+    }
+
+    /// Starts a relay configured the way `--tls off` behind Caddy or nginx is: the listener is
+    /// plain HTTP on loopback, and the origin browsers use is the proxy's.
+    pub async fn start_behind_proxy(public_url: &str) -> Self {
+        Self::start_with(RelayOptions {
+            trusted_proxies: &["127.0.0.1/32"],
+            public_url: Some(public_url),
+            ..RelayOptions::default()
+        })
+        .await
+    }
+
+    pub async fn start_with(options: RelayOptions<'_>) -> Self {
         let data_dir = TempDirectory::new();
         // The socket is bound before the state is built so the public URL carries the real port.
         let listener = server::bind("127.0.0.1:0".parse().expect("a valid address"))
@@ -88,12 +123,22 @@ impl TestRelay {
             data_dir: data_dir.path().to_path_buf(),
             listen: address,
             public_url: Some(
-                format!("http://{address}")
+                options
+                    .public_url
+                    .map(str::to_string)
+                    .unwrap_or_else(|| format!("http://{address}"))
                     .parse()
                     .expect("a valid public url"),
             ),
             tls: TlsMode::Disabled,
-            trusted_proxy: Vec::new(),
+            trusted_proxy: options
+                .trusted_proxies
+                .iter()
+                .map(|network| network.parse().expect("a valid network"))
+                .collect(),
+            subdomain_base: options
+                .subdomain_base
+                .map(|base| base.parse().expect("a valid subdomain base")),
         };
 
         let state = server::prepare(&args)
@@ -131,11 +176,38 @@ impl TestRelay {
     }
 
     /// A client that keeps the console session cookie between calls.
+    ///
+    /// Redirects are not followed: a relay that answers one is making a decision the test is
+    /// usually there to assert, and following it would hide the status behind the next page.
     pub fn console_client(&self) -> reqwest::Client {
         reqwest::Client::builder()
             .cookie_store(true)
+            .redirect(reqwest::redirect::Policy::none())
             .build()
             .expect("the client should build")
+    }
+
+    /// A browser that holds no session, for the requests a stranger makes.
+    pub fn anonymous_client(&self) -> reqwest::Client {
+        reqwest::Client::builder()
+            .redirect(reqwest::redirect::Policy::none())
+            .build()
+            .expect("the client should build")
+    }
+
+    /// A browser that reaches this relay under `host`, the way DNS would point a device subdomain
+    /// at it. The port lives in the URL because DNS has no notion of one.
+    pub fn client_for_host(&self, host: &str) -> reqwest::Client {
+        reqwest::Client::builder()
+            .redirect(reqwest::redirect::Policy::none())
+            .resolve(host, self.address)
+            .build()
+            .expect("the client should build")
+    }
+
+    /// The origin a browser uses to reach this relay under `host`.
+    pub fn origin_for_host(&self, host: &str) -> String {
+        format!("http://{host}:{}", self.address.port())
     }
 
     async fn wait_until_ready(&self) {
@@ -518,14 +590,16 @@ async fn echo_loop(mut socket: WebSocket) {
 
 /// Logs the test administrator in and returns the client that holds the session.
 pub async fn login(relay: &TestRelay) -> reqwest::Client {
+    sign_in(relay, TEST_ADMIN_USERNAME, TEST_ADMIN_PASSWORD).await
+}
+
+/// Logs one account in and returns the client that holds its session.
+pub async fn sign_in(relay: &TestRelay, username: &str, password: &str) -> reqwest::Client {
     let client = relay.console_client();
     let response = client
         .post(format!("{}/api/auth/login", relay.origin()))
         .header("x-requested-with", "termexo-console")
-        .json(&serde_json::json!({
-            "username": TEST_ADMIN_USERNAME,
-            "password": TEST_ADMIN_PASSWORD,
-        }))
+        .json(&serde_json::json!({ "username": username, "password": password }))
         .send()
         .await
         .expect("the login should reach the relay");
@@ -533,12 +607,37 @@ pub async fn login(relay: &TestRelay) -> reqwest::Client {
     client
 }
 
+/// Creates a console account straight in the database and returns its id.
+pub fn create_user(relay: &TestRelay, username: &str, password: &str, role: UserRole) -> String {
+    let hash = termexo_relay::auth::password::hash_password(password).expect("the password hashes");
+    relay
+        .state
+        .database
+        .create_user(username, &hash, role)
+        .expect("the account should be created")
+        .id
+}
+
 /// Issues an enrollment code of the requested kind and returns it.
 pub async fn issue_code(relay: &TestRelay, client: &reqwest::Client, kind: &str) -> String {
+    issue_code_for(relay, client, kind, None).await
+}
+
+/// The same, for a code whose device will belong to one account.
+pub async fn issue_code_for(
+    relay: &TestRelay,
+    client: &reqwest::Client,
+    kind: &str,
+    owner_user_id: Option<&str>,
+) -> String {
+    let mut request = serde_json::json!({ "kind": kind });
+    if let Some(owner) = owner_user_id {
+        request["ownerUserId"] = serde_json::Value::String(owner.to_string());
+    }
     let response = client
         .post(format!("{}/api/admin/enrollments", relay.origin()))
         .header("x-requested-with", "termexo-console")
-        .json(&serde_json::json!({ "kind": kind }))
+        .json(&request)
         .send()
         .await
         .expect("the request should reach the relay");
@@ -548,6 +647,71 @@ pub async fn issue_code(relay: &TestRelay, client: &reqwest::Client, kind: &str)
         .as_str()
         .expect("the response should carry the code")
         .to_string()
+}
+
+/// A desktop device that has enrolled, opened its tunnel and been routed to at least once.
+pub struct ConnectedDevice {
+    pub device: FakeDevice,
+    pub device_id: String,
+    /// The first frame the relay sent, which carries the device's public addresses.
+    pub welcome: DeviceEvent,
+}
+
+/// Enrolls a desktop, brings its tunnel up and waits until the relay can route to it.
+pub async fn connect_desktop(
+    relay: &TestRelay,
+    console: &reqwest::Client,
+    name: &str,
+    owner_user_id: Option<&str>,
+) -> ConnectedDevice {
+    let code = issue_code_for(relay, console, "desktop", owner_user_id).await;
+    let (credential, device_id) = enroll(relay, &code, name).await;
+    let mut device = FakeDevice::connect(
+        relay,
+        &credential,
+        DeviceKind::Desktop,
+        None,
+        StreamHandling::Serve(device_router()),
+    )
+    .await;
+
+    let welcome = device.next_event().await;
+    wait_until_online(relay, &device_id).await;
+    ConnectedDevice {
+        device,
+        device_id,
+        welcome,
+    }
+}
+
+/// Sets one device's access policy through the console, the way the drawer's switch does.
+pub async fn set_device_access(
+    relay: &TestRelay,
+    console: &reqwest::Client,
+    device_id: &str,
+    access: &str,
+) {
+    let response = console
+        .patch(format!("{}/api/admin/devices/{device_id}", relay.origin()))
+        .header("x-requested-with", "termexo-console")
+        .json(&serde_json::json!({ "access": access }))
+        .send()
+        .await
+        .expect("the request should reach the relay");
+    assert_eq!(
+        response.status(),
+        reqwest::StatusCode::OK,
+        "修改访问策略应当成功"
+    );
+}
+
+/// The `Location` of a redirect, which is what an access decision is asserted on.
+pub fn redirect_location(response: &reqwest::Response) -> &str {
+    response
+        .headers()
+        .get("location")
+        .and_then(|value| value.to_str().ok())
+        .unwrap_or_default()
 }
 
 /// Trades an enrollment code for a device credential.

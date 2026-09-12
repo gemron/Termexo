@@ -4,13 +4,15 @@ use std::net::SocketAddr;
 use std::sync::Arc;
 
 use axum::extract::{ConnectInfo, Request, State};
-use axum::http::StatusCode;
+use axum::http::{header, StatusCode};
+use axum::middleware::Next;
 use axum::response::{IntoResponse, Response};
 use axum::routing::get;
 use axum::Router;
 use axum_server::tls_rustls::RustlsConfig;
 use termexo_relay_protocol::tunnel::TUNNEL_PATH;
 
+use crate::address::{DeviceAddressing, DeviceEntry, DeviceTarget};
 use crate::auth::LockoutTable;
 use crate::bootstrap;
 use crate::config::ServeArgs;
@@ -35,8 +37,16 @@ fn generate_relay_id() -> Result<String, crate::db::DatabaseError> {
 /// Opens the data directory, prepares the state and serves until the process is asked to stop.
 pub async fn serve(args: ServeArgs) -> Result<(), String> {
     let state = prepare(&args).await?;
-    let public_url = state.public_url.clone();
-    let tls = tls::configure(&args.tls, &args.data_dir, public_url.host_name()).await?;
+    let public_url = state.public_url().clone();
+    let tls = tls::configure(
+        &args.tls,
+        &args.data_dir,
+        &tls::SubjectNames {
+            public_host: public_url.host_name().to_string(),
+            wildcard: state.addressing.wildcard_name(),
+        },
+    )
+    .await?;
     let listener = bind(args.listen)?;
     let handle = axum_server::Handle::<SocketAddr>::new();
     tokio::spawn(shut_down_on_signal(handle.clone()));
@@ -44,6 +54,7 @@ pub async fn serve(args: ServeArgs) -> Result<(), String> {
     tracing::info!(
         listen = %args.listen,
         public_url = %public_url,
+        subdomain_base = args.subdomain_base.as_ref().map(ToString::to_string),
         version = RELAY_VERSION,
         tls = args.tls.is_secure(),
         "Termexo 中继已启动"
@@ -122,7 +133,7 @@ pub async fn prepare(args: &ServeArgs) -> Result<SharedState, String> {
         database,
         lockout: LockoutTable::new(),
         relay_id,
-        public_url,
+        addressing: DeviceAddressing::new(public_url, args.subdomain_base.clone()),
         trusted_proxies: args.trusted_proxy.clone(),
         tls_enabled: args.tls.is_secure(),
     });
@@ -133,12 +144,20 @@ pub async fn prepare(args: &ServeArgs) -> Result<SharedState, String> {
 }
 
 /// The complete routing table.
+///
+/// The subdomain layer sits outside every route: on `<deviceId>.<base>` the whole host belongs to
+/// that device, `/` and `/api/…` included, so the decision has to be made before a route can claim
+/// a path the device serves itself.
 pub fn router(state: SharedState) -> Router {
     crate::api::router()
         .route(TUNNEL_PATH, get(tunnel::upgrade))
         .route("/", get(root))
         .fallback(dispatch)
         .layer(axum::middleware::from_fn(crate::api::require_csrf_marker))
+        .layer(axum::middleware::from_fn_with_state(
+            state.clone(),
+            route_device_host,
+        ))
         .with_state(state)
 }
 
@@ -146,16 +165,44 @@ async fn root() -> Response {
     console::redirect_to_console()
 }
 
+/// Sends a request that arrived on a device subdomain to that device, untouched.
+async fn route_device_host(
+    State(state): State<SharedState>,
+    request: Request,
+    next: Next,
+) -> Response {
+    let Some(device_id) =
+        host_header(&request).and_then(|host| state.addressing.device_from_host(host))
+    else {
+        return next.run(request).await;
+    };
+    let rest = request.uri().path().trim_start_matches('/').to_string();
+    forward_to_device(
+        &state,
+        DeviceTarget {
+            device_id,
+            rest,
+            entry: DeviceEntry::Subdomain,
+        },
+        request,
+    )
+    .await
+}
+
+fn host_header(request: &Request) -> Option<&str> {
+    request
+        .headers()
+        .get(header::HOST)
+        .and_then(|value| value.to_str().ok())
+}
+
 /// Everything the routing table did not claim: device addresses, console assets, and 404s.
 ///
 /// The device prefix is handled here rather than as a route because `/d/<id>`, `/d/<id>/` and
 /// `/d/<id>/<rest>` are three shapes of the same address, and splitting the path once is clearer
-/// than three overlapping patterns.
-async fn dispatch(
-    State(state): State<SharedState>,
-    ConnectInfo(peer): ConnectInfo<SocketAddr>,
-    request: Request,
-) -> Response {
+/// than three overlapping patterns. It stays available in subdomain mode: a link that was handed
+/// out before the operator configured a wildcard domain has to keep working.
+async fn dispatch(State(state): State<SharedState>, request: Request) -> Response {
     let path = request.uri().path().to_string();
     if path.starts_with("/api/") {
         return crate::api::unknown_endpoint();
@@ -165,8 +212,16 @@ async fn dispatch(
             return proxy::redirect_to_directory(&device_id)
         }
         Some(DevicePath::Resource { device_id, rest }) => {
-            let client = forwarded::resolve(&state, request.headers(), peer);
-            return proxy::forward(&state, &client, &device_id, &rest, request).await;
+            return forward_to_device(
+                &state,
+                DeviceTarget {
+                    device_id,
+                    rest,
+                    entry: DeviceEntry::Path,
+                },
+                request,
+            )
+            .await
         }
         None => {}
     }
@@ -174,6 +229,24 @@ async fn dispatch(
         return console::serve(&path);
     }
     (StatusCode::NOT_FOUND, "页面不存在。").into_response()
+}
+
+/// The one place a browser request turns into a proxied one, whichever entry it arrived on.
+async fn forward_to_device(
+    state: &SharedState,
+    target: DeviceTarget,
+    request: Request,
+) -> Response {
+    let Some(ConnectInfo(peer)) = request
+        .extensions()
+        .get::<ConnectInfo<SocketAddr>>()
+        .copied()
+    else {
+        tracing::error!("请求缺少连接信息，无法确定来源地址");
+        return (StatusCode::INTERNAL_SERVER_ERROR, "中继内部错误。").into_response();
+    };
+    let client = forwarded::resolve(state, request.headers(), peer);
+    proxy::forward(state, &client, &target, request).await
 }
 
 /// rustls needs a provider installed before any TLS work; the desktop app picks the same one, so a

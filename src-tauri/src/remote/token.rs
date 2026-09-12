@@ -60,15 +60,31 @@ impl RemoteAuth {
     }
 
     pub fn authorize(&self, source: IpAddr, provided: &str) -> Result<(), AuthRejection> {
-        self.authorize_at(source, provided, Instant::now())
+        self.authorize_with(source, |expected| {
+            tokens_match(expected, provided).then_some(())
+        })
     }
 
-    fn authorize_at(
+    /// Checks a client against the live token under the same lockout a plain comparison passes
+    /// through, and hands back whatever `verify` produced from it.
+    ///
+    /// The sealed handshake never receives the token itself — it verifies an HMAC derived from it
+    /// and derives the session keys in the same step — so that work has to happen inside this gate
+    /// rather than on a copy of the token handed back out.
+    pub fn authorize_with<T>(
         &self,
         source: IpAddr,
-        provided: &str,
+        verify: impl FnOnce(&str) -> Option<T>,
+    ) -> Result<T, AuthRejection> {
+        self.authorize_at(source, verify, Instant::now())
+    }
+
+    fn authorize_at<T>(
+        &self,
+        source: IpAddr,
+        verify: impl FnOnce(&str) -> Option<T>,
         now: Instant,
-    ) -> Result<(), AuthRejection> {
+    ) -> Result<T, AuthRejection> {
         // A locked source is turned away before the token is even looked at, so a lockout also
         // covers the window in which no token exists yet.
         if self.failures.is_locked(&source, now) {
@@ -79,9 +95,9 @@ impl RemoteAuth {
         if expected.is_empty() {
             return Err(AuthRejection::NotConfigured);
         }
-        if tokens_match(&expected, provided) {
+        if let Some(accepted) = verify(&expected) {
             self.failures.clear(&source);
-            return Ok(());
+            return Ok(accepted);
         }
 
         self.failures.record_failure(source, now);
@@ -101,6 +117,20 @@ mod tests {
         IpAddr::V4(Ipv4Addr::new(192, 168, 1, 42))
     }
 
+    /// The v1 handshake's comparison, expressed through the gate every client now passes through.
+    fn authorize_token_at(
+        auth: &RemoteAuth,
+        source: IpAddr,
+        provided: &str,
+        now: Instant,
+    ) -> Result<(), AuthRejection> {
+        auth.authorize_at(
+            source,
+            |expected| tokens_match(expected, provided).then_some(()),
+            now,
+        )
+    }
+
     #[test]
     fn accepts_the_current_token_and_clears_previous_failures() {
         let auth = RemoteAuth::new("secret".into());
@@ -108,21 +138,21 @@ mod tests {
 
         for _ in 0..(MAX_FAILURES_PER_WINDOW - 1) {
             assert_eq!(
-                auth.authorize_at(source(), "wrong", now),
+                authorize_token_at(&auth, source(), "wrong", now),
                 Err(AuthRejection::InvalidToken)
             );
         }
-        assert_eq!(auth.authorize_at(source(), "secret", now), Ok(()));
+        assert_eq!(authorize_token_at(&auth, source(), "secret", now), Ok(()));
 
         // The success forgot the earlier failures, so the next ones start a fresh window instead
         // of tripping the lockout one attempt later.
         for _ in 0..(MAX_FAILURES_PER_WINDOW - 1) {
             assert_eq!(
-                auth.authorize_at(source(), "wrong", now),
+                authorize_token_at(&auth, source(), "wrong", now),
                 Err(AuthRejection::InvalidToken)
             );
         }
-        assert_eq!(auth.authorize_at(source(), "secret", now), Ok(()));
+        assert_eq!(authorize_token_at(&auth, source(), "secret", now), Ok(()));
     }
 
     #[test]
@@ -132,18 +162,18 @@ mod tests {
 
         for _ in 0..MAX_FAILURES_PER_WINDOW {
             assert_eq!(
-                auth.authorize_at(source(), "wrong", start),
+                authorize_token_at(&auth, source(), "wrong", start),
                 Err(AuthRejection::InvalidToken)
             );
         }
 
         // Even the correct token is refused while the lockout is in effect.
         assert_eq!(
-            auth.authorize_at(source(), "secret", start),
+            authorize_token_at(&auth, source(), "secret", start),
             Err(AuthRejection::Locked)
         );
         assert_eq!(
-            auth.authorize_at(source(), "secret", start + LOCKOUT_DURATION),
+            authorize_token_at(&auth, source(), "secret", start + LOCKOUT_DURATION),
             Ok(())
         );
     }
@@ -155,10 +185,10 @@ mod tests {
         let other = IpAddr::V4(Ipv4Addr::new(192, 168, 1, 43));
 
         for _ in 0..MAX_FAILURES_PER_WINDOW {
-            let _ = auth.authorize_at(source(), "wrong", now);
+            let _ = authorize_token_at(&auth, source(), "wrong", now);
         }
 
-        assert_eq!(auth.authorize_at(other, "secret", now), Ok(()));
+        assert_eq!(authorize_token_at(&auth, other, "secret", now), Ok(()));
     }
 
     #[test]
@@ -176,15 +206,15 @@ mod tests {
         let auth = RemoteAuth::new("secret".into());
         let now = Instant::now();
         for _ in 0..MAX_FAILURES_PER_WINDOW {
-            let _ = auth.authorize_at(source(), "wrong", now);
+            let _ = authorize_token_at(&auth, source(), "wrong", now);
         }
 
         auth.replace_token("rotated".into());
 
         assert_eq!(
-            auth.authorize_at(source(), "secret", now),
+            authorize_token_at(&auth, source(), "secret", now),
             Err(AuthRejection::InvalidToken)
         );
-        assert_eq!(auth.authorize_at(source(), "rotated", now), Ok(()));
+        assert_eq!(authorize_token_at(&auth, source(), "rotated", now), Ok(()));
     }
 }

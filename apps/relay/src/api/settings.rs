@@ -41,7 +41,7 @@ pub async fn settings(
 ) -> ApiResult<Json<SettingsResponse>> {
     Ok(Json(SettingsResponse {
         relay_id: state.relay_id.clone(),
-        public_url: state.public_url.origin().to_string(),
+        public_url: state.public_url().origin().to_string(),
         version: RELAY_VERSION,
     }))
 }

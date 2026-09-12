@@ -15,6 +15,10 @@ registerRelayConsoleTranslations();
 
 const RELAY_URL_PATTERN = /^https?:\/\/\S+$/i;
 
+/** A SHA-256 digest, with or without the colons a certificate viewer prints. */
+const FINGERPRINT_PATTERN = /^[0-9a-f]{64}$/i;
+const FINGERPRINT_SEPARATOR = /:/g;
+
 const UPSTREAM_STATE_KEYS: Readonly<Record<UpstreamView['state'], string>> = {
   disabled: 'console.relays.stateDisabled',
   connecting: 'console.relays.stateConnecting',
@@ -149,6 +153,28 @@ const UPSTREAM_STATE_KEYS: Readonly<Record<UpstreamView['state'], string>> = {
                 />
               </label>
             </div>
+            <div class="field-row">
+              <label class="field">
+                <span>{{ 'console.relays.upstreamFingerprint' | t }}</span>
+                <input
+                  name="certificateFingerprint"
+                  type="text"
+                  spellcheck="false"
+                  autocomplete="off"
+                  placeholder="A1:B2:…"
+                  [disabled]="acting()"
+                  [attr.aria-invalid]="fingerprintInvalid() ? 'true' : null"
+                  [ngModel]="fingerprint()"
+                  (ngModelChange)="fingerprint.set($event)"
+                />
+                @if (fingerprintInvalid()) {
+                  <small class="field-error" role="alert">
+                    {{ 'console.relays.fingerprintInvalid' | t }}
+                  </small>
+                }
+                <small>{{ 'console.relays.fingerprintHint' | t }}</small>
+              </label>
+            </div>
             <div class="form-actions">
               <button type="submit" class="btn btn-primary" [disabled]="!canConnect()">
                 {{ (acting() ? 'console.relays.connecting' : 'console.relays.connect') | t }}
@@ -214,6 +240,8 @@ export class RelaysPageComponent {
 
   protected readonly url = signal('');
   protected readonly code = signal('');
+  /** Optional: only an upstream with a self-signed certificate needs to be pinned. */
+  protected readonly fingerprint = signal('');
 
   protected readonly state = computed<PageState>(() => {
     if (this.loading()) return 'loading';
@@ -225,12 +253,23 @@ export class RelaysPageComponent {
     return value.length > 0 && !RELAY_URL_PATTERN.test(value);
   });
 
+  /** Empty means "not pinned", which is what an upstream with a trusted certificate wants. */
+  private readonly normalizedFingerprint = computed(() =>
+    this.fingerprint().trim().replace(FINGERPRINT_SEPARATOR, '').toLowerCase(),
+  );
+
+  protected readonly fingerprintInvalid = computed(() => {
+    const value = this.normalizedFingerprint();
+    return value.length > 0 && !FINGERPRINT_PATTERN.test(value);
+  });
+
   protected readonly canConnect = computed(
     () =>
       !this.acting() &&
       this.url().trim().length > 0 &&
       !this.urlInvalid() &&
-      this.code().trim().length > 0,
+      this.code().trim().length > 0 &&
+      !this.fingerprintInvalid(),
   );
 
   protected readonly stateLabel = computed(() => {
@@ -264,7 +303,13 @@ export class RelaysPageComponent {
     this.acting.set(true);
     this.formError.set('');
     try {
-      await this.api.connectUpstream(this.url().trim(), this.code().trim());
+      const pinned = this.normalizedFingerprint();
+      await this.api.connectUpstream({
+        url: this.url().trim(),
+        code: this.code().trim(),
+        ...(pinned ? { certificateFingerprint: pinned } : {}),
+      });
+      // The code is one-time, so leaving it in the field would only invite a second attempt.
       this.code.set('');
       this.toasts.success(this.i18n.t('console.relays.connected'));
       await this.load();

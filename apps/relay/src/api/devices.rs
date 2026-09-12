@@ -1,5 +1,7 @@
 //! Device listing and management, for administrators and for owners of their own devices.
 
+use std::str::FromStr;
+
 use axum::extract::{Path, State};
 use axum::http::StatusCode;
 use axum::Json;
@@ -9,7 +11,7 @@ use super::error::{ApiError, ApiResult};
 use super::views::{DeviceView, ViewContext};
 use super::{no_content, require_text, AdminUser, ApiJson, Client, SessionUser};
 use crate::audit::{self, action, target, AuditEntry};
-use crate::db::{DeviceRecord, DeviceUpdate};
+use crate::db::{DeviceAccess, DeviceRecord, DeviceUpdate};
 use crate::state::SharedState;
 use crate::tunnel;
 
@@ -40,6 +42,9 @@ pub struct DeviceEnvelope {
 pub struct DeviceUpdateRequest {
     name: Option<String>,
     note: Option<String>,
+    /// Taken as text rather than as the enum so an unknown value is refused with a sentence that
+    /// names the two it may be, instead of serde's generic "a field has the wrong type".
+    access: Option<String>,
 }
 
 pub async fn list_all(
@@ -90,13 +95,14 @@ pub async fn update_own(
     ApiJson(request): ApiJson<DeviceUpdateRequest>,
 ) -> ApiResult<Json<DeviceEnvelope>> {
     let device = find_own_device(&state, &session, &id)?;
-    // A note is an administrator's annotation, so an owner may only rename their device.
+    // A note is an administrator's annotation, so an owner may change everything but that.
     apply_update(
         &state,
         &device,
         DeviceUpdateRequest {
             name: request.name,
             note: None,
+            access: request.access,
         },
         &session.user.id,
         client.ip,
@@ -183,18 +189,52 @@ fn apply_update(
             .transpose()?,
         // An empty note is how the console clears one, so it is not put through `require_text`.
         note: request.note.map(|note| bounded_note(&note)).transpose()?,
+        access: request
+            .access
+            .map(|access| requested_access(&access))
+            .transpose()?,
     };
     if update.is_empty() {
         return Err(ApiError::bad_request(NOTHING_TO_UPDATE));
     }
     state.database.update_device(&device.id, &update)?;
+    record_update(state, device, &update, actor_id, ip);
+    envelope(state, &device.id)
+}
+
+fn requested_access(value: &str) -> ApiResult<DeviceAccess> {
+    DeviceAccess::from_str(value).map_err(ApiError::bad_request)
+}
+
+/// Audits what the update actually changed.
+///
+/// Who may reach a device is a security decision rather than a label, so it gets an action of its
+/// own and is recorded only when the policy really moved.
+fn record_update(
+    state: &SharedState,
+    device: &DeviceRecord,
+    update: &DeviceUpdate,
+    actor_id: &str,
+    ip: std::net::IpAddr,
+) {
+    if update.name.is_some() || update.note.is_some() {
+        audit::record(
+            &state.database,
+            AuditEntry::by_user(actor_id, action::DEVICE_UPDATED)
+                .target(target::DEVICE, &device.id)
+                .from_ip(ip),
+        );
+    }
+    let Some(access) = update.access.filter(|access| *access != device.access) else {
+        return;
+    };
     audit::record(
         &state.database,
-        AuditEntry::by_user(actor_id, action::DEVICE_UPDATED)
+        AuditEntry::by_user(actor_id, action::DEVICE_ACCESS_CHANGED)
             .target(target::DEVICE, &device.id)
-            .from_ip(ip),
+            .from_ip(ip)
+            .detail("access", access.as_str()),
     );
-    envelope(state, &device.id)
 }
 
 fn bounded_note(note: &str) -> ApiResult<String> {
@@ -247,5 +287,16 @@ mod tests {
         assert_eq!(bounded_note("  留言  ").expect("it should pass"), "留言");
         assert_eq!(bounded_note("   ").expect("an empty note clears it"), "");
         assert!(bounded_note(&"字".repeat(MAX_NOTE_LENGTH + 1)).is_err());
+    }
+
+    #[test]
+    fn an_access_policy_the_relay_does_not_have_is_refused_by_name() {
+        assert_eq!(
+            requested_access("relay-login").expect("it should pass"),
+            DeviceAccess::RelayLogin
+        );
+        let error = requested_access("everyone").expect_err("it should be refused");
+
+        assert_eq!(error.status(), StatusCode::BAD_REQUEST);
     }
 }

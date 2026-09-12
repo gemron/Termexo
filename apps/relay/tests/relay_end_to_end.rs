@@ -4,8 +4,8 @@ mod support;
 
 use futures_util::{SinkExt, StreamExt};
 use support::{
-    device_router, enroll, issue_code, login, wait_until_online, DeviceEvent, FakeDevice,
-    StreamHandling, TestRelay,
+    connect_desktop, device_router, enroll, issue_code, login, wait_until_online, DeviceEvent,
+    FakeDevice, StreamHandling, TestRelay,
 };
 use termexo_relay::audit::action;
 use termexo_relay::db::AuditQuery;
@@ -17,36 +17,25 @@ use tokio_tungstenite::tungstenite::{Error as WsError, Message as WsMessage};
 /// The relay never answers a redeemed code twice, so each test issues its own.
 async fn connected_device(relay: &TestRelay) -> (FakeDevice, String) {
     let console = login(relay).await;
-    let code = issue_code(relay, &console, "desktop").await;
-    let (credential, device_id) = enroll(relay, &code, "书房台式机").await;
-    let mut device = FakeDevice::connect(
-        relay,
-        &credential,
-        DeviceKind::Desktop,
-        None,
-        StreamHandling::Serve(device_router()),
-    )
-    .await;
+    let connected = connect_desktop(relay, &console, "书房台式机", None).await;
 
-    let welcome = device.next_event().await;
-    match &welcome {
+    match &connected.welcome {
         DeviceEvent::Welcome {
             device_id: welcomed,
             chain,
             ..
         } => {
-            assert_eq!(welcomed, &device_id);
+            assert_eq!(welcomed, &connected.device_id);
             assert_eq!(
-                welcome.urls(),
-                [format!("{}/d/{device_id}/", relay.origin())],
+                connected.welcome.urls(),
+                [format!("{}/d/{}/", relay.origin(), connected.device_id)],
                 "welcome 应当带上这台设备的公开地址"
             );
             assert!(chain.is_empty(), "没有上游的中继是链的顶端");
         }
         other => panic!("第一帧应当是 welcome，实际是 {other:?}"),
     }
-    wait_until_online(relay, &device_id).await;
-    (device, device_id)
+    (connected.device, connected.device_id)
 }
 
 #[tokio::test]

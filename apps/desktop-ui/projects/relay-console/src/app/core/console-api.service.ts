@@ -14,6 +14,7 @@ import type {
   NewUser,
   RelaySettingsView,
   RelayTopology,
+  UpstreamRequest,
   UpstreamView,
   UserPatch,
   UserView,
@@ -124,8 +125,8 @@ export class ConsoleApiService {
     return this.get<RelayTopology>('admin/relays');
   }
 
-  connectUpstream(url: string, code: string): Promise<UpstreamView> {
-    return this.post<{ upstream: UpstreamView }>('admin/relays/upstream', { url, code }).then(
+  connectUpstream(request: UpstreamRequest): Promise<UpstreamView> {
+    return this.post<{ upstream: UpstreamView }>('admin/relays/upstream', request).then(
       (body) => body.upstream,
     );
   }

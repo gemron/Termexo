@@ -14,15 +14,18 @@ crate-type = ["staticlib", "cdylib", "rlib"]
 tauri-build = { version = "2.5.1", features = [] }
 
 [dependencies]
+aes-gcm = "0.10"
+avt = "0.18"
 axum = { version = "0.8.9", features = ["ws"] }
 axum-server = { version = "0.8.0", features = ["tls-rustls"] }
-avt = "0.18"
 bytes = "1"
 data-encoding = "2"
 futures-util = { version = "0.3", default-features = false, features = [
     "sink",
     "std",
 ] }
+hkdf = "0.12"
+hmac = "0.12"
 hyper = { version = "1", features = ["http1", "server"] }
 hyper-util = { version = "0.1", features = ["server", "service", "tokio"] }
 if-addrs = "0.15"

@@ -36,7 +36,14 @@ import { I18nService, TranslatePipe } from '../shared/workspace-ui';
         <tbody>
           @for (device of devices(); track device.id) {
             <tr>
-              <td class="cell-name">{{ device.name }}</td>
+              <td class="cell-name">
+                {{ device.name }}
+                @if (device.access === 'relay-login') {
+                  <span class="tag" [title]="'console.devices.accessHint' | t">
+                    {{ 'console.devices.accessTag' | t }}
+                  </span>
+                }
+              </td>
               @if (detailed()) {
                 <td>{{ kindLabel(device) }}</td>
                 <td>{{ owner(device) }}</td>

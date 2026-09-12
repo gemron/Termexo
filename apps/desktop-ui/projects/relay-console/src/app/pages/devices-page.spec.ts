@@ -26,6 +26,7 @@ function device(overrides: Partial<DeviceView> = {}): DeviceView {
     revokedAt: null,
     note: null,
     accessUrl: 'https://relay.example.com/d/abc/',
+    access: 'public',
     ...overrides,
   };
 }

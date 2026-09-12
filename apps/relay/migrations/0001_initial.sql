@@ -28,7 +28,10 @@ CREATE TABLE IF NOT EXISTS devices (
   revoked_at INTEGER,
   last_seen_at INTEGER,
   last_ip TEXT,
-  last_version TEXT
+  last_version TEXT,
+  -- Who may reach /d/<id>/ at all: 'public' leaves the desktop's own token as the only gate,
+  -- 'relay-login' additionally requires a console session that owns or administers the device.
+  access TEXT NOT NULL DEFAULT 'public'
 );
 
 CREATE INDEX IF NOT EXISTS idx_devices_owner ON devices(owner_user_id);

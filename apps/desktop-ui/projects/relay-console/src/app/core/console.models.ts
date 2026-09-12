@@ -8,6 +8,13 @@
 export type UserRole = 'admin' | 'user';
 export type DeviceKind = 'desktop' | 'relay';
 export type EnrollmentStatus = 'pending' | 'used' | 'expired' | 'cancelled';
+/**
+ * Who the relay lets through to a device address.
+ *
+ * `public` leaves the desktop's own access token as the only gate; `relay-login` additionally
+ * requires a console session belonging to the device's owner or to an administrator.
+ */
+export type DeviceAccess = 'public' | 'relay-login';
 export type UpstreamState = 'disabled' | 'connecting' | 'connected' | 'error';
 export type AuditActorKind = 'user' | 'device' | 'system';
 
@@ -39,6 +46,8 @@ export interface DeviceView {
   note: string | null;
   /** Public address of the device, without the desktop's access token. */
   accessUrl: string;
+  /** Devices announced by a downstream relay are always reported as `public` from here. */
+  access: DeviceAccess;
 }
 
 export interface EnrollmentView {
@@ -104,6 +113,15 @@ export interface HealthView {
 export interface DevicePatch {
   name?: string;
   note?: string;
+  access?: DeviceAccess;
+}
+
+/** What the relay needs to join an upstream. */
+export interface UpstreamRequest {
+  url: string;
+  code: string;
+  /** Only for an upstream with a self-signed certificate: the SHA-256 digest to pin. */
+  certificateFingerprint?: string;
 }
 
 export interface UserPatch {

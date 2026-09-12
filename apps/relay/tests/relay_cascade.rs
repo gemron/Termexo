@@ -137,7 +137,7 @@ async fn a_desktop_behind_a_cascaded_relay_answers_at_the_top_of_the_chain() {
     );
     assert_eq!(
         announced["viaNames"][0],
-        cascade.edge.state.public_url.host(),
+        cascade.edge.state.public_url().host(),
         "跳应当显示下游中继接入时用的名称"
     );
 }

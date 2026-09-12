@@ -214,7 +214,7 @@ fn hello_frame(state: &SharedState) -> ControlFrame {
         protocol: PROTOCOL_VERSION,
         kind: DeviceKind::Relay,
         version: RELAY_VERSION.to_string(),
-        name: state.public_url.host().to_string(),
+        name: state.public_url().host().to_string(),
         // A downstream relay declares its own id, which is what an upstream's loop guard and its
         // announcement hop names are built on.
         relay_id: Some(state.relay_id.clone()),

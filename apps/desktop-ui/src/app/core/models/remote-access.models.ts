@@ -77,18 +77,33 @@ export interface QrCodeImage {
 export type RemoteConnectionState =
   'idle' | 'connecting' | 'authenticating' | 'ready' | 'reconnecting' | 'unauthorized';
 
+/** The envelope every frame of a sealed session travels in, in both directions. */
+export interface RemoteSealedEnvelope {
+  /** The sender's frame counter, which also supplies the cipher nonce. */
+  n: number;
+  /** base64url of the AES-256-GCM ciphertext with its tag appended. */
+  c: string;
+}
+
 /** Frames the browser sends over `/ws`. */
 export type RemoteClientFrame =
+  /** v1, kept for a plain-http page on the local network, where the browser has no WebCrypto. */
   | { type: 'auth'; token: string; clientId: string }
+  /** v2: the token stays in the browser and only a proof derived from it is sent. */
+  | { type: 'auth'; protocol: number; clientId: string; nonceC: string; proof: string }
   | { type: 'invoke'; id: number; command: string; args?: Record<string, unknown> }
-  | { type: 'ping' };
+  | { type: 'ping' }
+  | ({ type: 'sealed' } & RemoteSealedEnvelope);
 
 /** Frames the remote-access server sends back. */
 export type RemoteServerFrame =
+  /** The first frame on every connection; its nonce seeds the session keys. */
+  | { type: 'challenge'; protocol: number; nonceS: string }
   | { type: 'ready'; serverVersion: string }
   | { type: 'auth-failed'; reason: string }
   | { type: 'result'; id: number; ok: true; value: unknown }
   | { type: 'result'; id: number; ok: false; error: unknown }
   | { type: 'event'; name: string; payload: unknown }
   | { type: 'resync' }
-  | { type: 'pong' };
+  | { type: 'pong' }
+  | ({ type: 'sealed' } & RemoteSealedEnvelope);

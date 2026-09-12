@@ -31,6 +31,11 @@ const CERTIFICATE_PATH_SEPARATOR: char = ',';
 const HTTPS_SCHEME: &str = "https://";
 const HTTP_SCHEME: &str = "http://";
 
+/// Longest label a host name may carry, per DNS. A base longer than this could never resolve, and
+/// refusing it at start-up beats every request quietly falling back to path routing.
+const MAX_HOST_LABEL_LENGTH: usize = 63;
+const HOST_LABEL_SEPARATOR: char = '.';
+
 #[derive(Debug, Parser)]
 #[command(
     name = "termexo-relay",
@@ -68,6 +73,9 @@ pub struct LinkArgs {
     /// 本中继在上游中继上显示的名称，默认取本中继已保存的公开地址主机名。
     #[arg(long)]
     pub name: Option<String>,
+    /// 上游中继使用自签名证书时，它的证书 SHA-256 指纹；可带冒号，不区分大小写。
+    #[arg(long)]
+    pub certificate_fingerprint: Option<String>,
 }
 
 #[derive(Debug, Subcommand)]
@@ -98,6 +106,9 @@ pub struct ServeArgs {
     /// TLS 模式：self-signed、cert:<证书>,<私钥> 或 off。
     #[arg(long, env = "TERMEXO_RELAY_TLS", default_value = SELF_SIGNED_MODE)]
     pub tls: TlsMode,
+    /// 子域名基础域名，例如 relay.example.com：设置后 <设备id>.<基础域名> 也能直接打开设备。
+    #[arg(long, env = "TERMEXO_RELAY_SUBDOMAIN_BASE")]
+    pub subdomain_base: Option<SubdomainBase>,
     /// 受信任的反向代理网段，可重复。仅在 --tls off 时用于读取反代传来的转发头。
     #[arg(long = "trusted-proxy", env = "TERMEXO_RELAY_TRUSTED_PROXY", value_delimiter = ',', num_args = 1..)]
     pub trusted_proxy: Vec<IpNet>,
@@ -144,6 +155,8 @@ pub enum ConfigError {
     MissingHost,
     #[error("公开地址不能带路径、查询串或片段：{0}")]
     UnexpectedPath(String),
+    #[error("子域名基础域名只能是主机名，例如 relay.example.com，不能带协议、端口或路径：{0}")]
+    InvalidSubdomainBase(String),
 }
 
 impl FromStr for TlsMode {
@@ -206,6 +219,14 @@ impl PublicUrl {
         }
     }
 
+    /// `:8443` when the relay answers on a non-default port, otherwise empty.
+    ///
+    /// A subdomain address is built from a different host but the same port, so the two spellings
+    /// of one device's address reach the same listener.
+    pub fn port_suffix(&self) -> &str {
+        &self.host[self.host_name().len()..]
+    }
+
     fn from_listen_address(listen: SocketAddr, secure: bool) -> Self {
         let scheme = if secure { HTTPS_SCHEME } else { HTTP_SCHEME };
         // 0.0.0.0 is not reachable as an address, so the loopback name is the honest stand-in until
@@ -258,6 +279,74 @@ impl FromStr for PublicUrl {
             secure,
         })
     }
+}
+
+/// The domain device subdomains hang off, for example `relay.example.com` in
+/// `<deviceId>.relay.example.com`.
+///
+/// Stored lowercase and without a port: a `Host` header is compared against it after the same two
+/// normalizations, so `ABC.Relay.Example.COM:8443` and `abc.relay.example.com` are one address.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct SubdomainBase(String);
+
+impl SubdomainBase {
+    /// The base host itself, which is where the console and `/api/*` stay.
+    pub fn host(&self) -> &str {
+        &self.0
+    }
+
+    /// The certificate name that covers every device subdomain.
+    pub fn wildcard_name(&self) -> String {
+        format!("*{HOST_LABEL_SEPARATOR}{}", self.0)
+    }
+
+    /// The one label in front of the base, or `None` when `host` is not a subdomain of it.
+    ///
+    /// Exactly one label is accepted: a deeper name is not an address this relay hands out, and
+    /// treating it as one would route `a.b.<base>` to a device called `a.b`.
+    pub fn label_of<'a>(&self, host: &'a str) -> Option<&'a str> {
+        let label = host
+            .strip_suffix(&self.0)?
+            .strip_suffix(HOST_LABEL_SEPARATOR)?;
+        (!label.is_empty() && !label.contains(HOST_LABEL_SEPARATOR)).then_some(label)
+    }
+}
+
+impl fmt::Display for SubdomainBase {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter.write_str(&self.0)
+    }
+}
+
+impl FromStr for SubdomainBase {
+    type Err = ConfigError;
+
+    fn from_str(value: &str) -> Result<Self, Self::Err> {
+        let normalized = value
+            .trim()
+            .trim_matches(HOST_LABEL_SEPARATOR)
+            .to_lowercase();
+        let malformed = normalized.is_empty()
+            || !normalized.contains(HOST_LABEL_SEPARATOR)
+            || normalized
+                .split(HOST_LABEL_SEPARATOR)
+                .any(|label| !is_host_label(label));
+        if malformed {
+            return Err(ConfigError::InvalidSubdomainBase(value.trim().to_string()));
+        }
+        Ok(Self(normalized))
+    }
+}
+
+/// One DNS label: letters, digits and inner hyphens, within the length DNS allows.
+fn is_host_label(label: &str) -> bool {
+    !label.is_empty()
+        && label.len() <= MAX_HOST_LABEL_LENGTH
+        && !label.starts_with('-')
+        && !label.ends_with('-')
+        && label
+            .bytes()
+            .all(|byte| byte.is_ascii_alphanumeric() || byte == b'-')
 }
 
 /// Whether a source address is one of the reverse proxies allowed to speak for its clients.
@@ -334,6 +423,59 @@ mod tests {
             PublicUrl::from_str("https://relay.example.com/console"),
             Err(ConfigError::UnexpectedPath(_))
         ));
+    }
+
+    #[test]
+    fn a_public_url_reports_the_port_a_subdomain_address_has_to_repeat() {
+        assert_eq!(
+            PublicUrl::from_str("https://relay.example.com:8443")
+                .expect("it should parse")
+                .port_suffix(),
+            ":8443"
+        );
+        assert_eq!(
+            PublicUrl::from_str("https://relay.example.com")
+                .expect("it should parse")
+                .port_suffix(),
+            ""
+        );
+    }
+
+    #[test]
+    fn a_subdomain_base_is_normalized_to_a_lowercase_host() {
+        let base = SubdomainBase::from_str("  Relay.Example.COM. ").expect("it should parse");
+
+        assert_eq!(base.host(), "relay.example.com");
+        assert_eq!(base.wildcard_name(), "*.relay.example.com");
+        assert_eq!(base.to_string(), "relay.example.com");
+    }
+
+    #[test]
+    fn a_subdomain_base_that_is_not_a_bare_host_name_is_refused() {
+        for value in [
+            "https://relay.example.com",
+            "relay.example.com:8443",
+            "relay.example.com/console",
+            "localhost",
+            "",
+            "-bad.example.com",
+        ] {
+            assert!(
+                SubdomainBase::from_str(value).is_err(),
+                "{value} 不应当被接受"
+            );
+        }
+    }
+
+    #[test]
+    fn only_one_label_in_front_of_the_base_is_a_device_host() {
+        let base = SubdomainBase::from_str("relay.example.com").expect("it should parse");
+
+        assert_eq!(base.label_of("abc.relay.example.com"), Some("abc"));
+        assert_eq!(base.label_of("relay.example.com"), None);
+        assert_eq!(base.label_of("a.b.relay.example.com"), None);
+        assert_eq!(base.label_of("relay.example.com.evil.test"), None);
+        assert_eq!(base.label_of("xrelay.example.com"), None);
     }
 
     #[test]

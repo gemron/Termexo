@@ -2,6 +2,7 @@ pub mod bridge;
 pub mod qr;
 pub mod relay;
 pub mod server;
+pub mod session_crypto;
 pub mod settings;
 mod tls;
 pub mod token;

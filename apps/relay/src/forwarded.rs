@@ -31,7 +31,7 @@ pub struct ClientContext {
 pub fn resolve(state: &RelayState, headers: &HeaderMap, peer: SocketAddr) -> ClientContext {
     let trusted = !state.tls_enabled && is_trusted_proxy(&state.trusted_proxies, peer.ip());
     let fallback_host = header_value(headers, header::HOST.as_str())
-        .unwrap_or_else(|| state.public_url.host())
+        .unwrap_or_else(|| state.public_url().host())
         .to_string();
     if !trusted {
         return ClientContext {

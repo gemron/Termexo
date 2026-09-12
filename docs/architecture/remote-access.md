@@ -112,12 +112,15 @@ pub struct RemoteAccessSettings {
 
 ### WebSocket 协议（JSON 文本帧）
 
-连接建立后客户端必须在 5 秒内发送鉴权帧，否则服务端关闭连接（4408）。
+握手由**服务端先说话**：连接建立后立即发出 `challenge`，客户端必须在 5 秒内回 `auth`，否则服务端
+关闭连接（4408）。`ready` 之后的每一帧都封装在 `sealed` 里（见「会话加密（v2）」）。
 
 | 方向 | 帧 |
 | --- | --- |
-| C→S | `{"type":"auth","token":"…","clientId":"<uuid>"}` |
+| S→C | `{"type":"challenge","protocol":2,"nonceS":"<base64url, 32 B>"}` 连接后第一帧 |
+| C→S | `{"type":"auth","protocol":2,"clientId":"<uuid>","nonceC":"<base64url, 32 B>","proof":"<base64url>"}`；明文 HTTP 的局域网页面回退为 v1 的 `{"type":"auth","token":"…","clientId":"<uuid>"}` |
 | S→C | `{"type":"ready","serverVersion":"0.7.0"}` 成功；`{"type":"auth-failed","reason":"…"}` 后关闭（4401） |
+| 双向 | `{"type":"sealed","n":<递增计数>,"c":"<base64url 密文+标签>"}` 封装下面任意一帧 |
 | C→S | `{"type":"invoke","id":123,"command":"list_workspaces","args":{…}}`（`args` 可省略，等价 `{}`） |
 | S→C | `{"type":"result","id":123,"ok":true,"value":<json>}` 或 `{"type":"result","id":123,"ok":false,"error":<json>}` |
 | S→C | `{"type":"event","name":"terminal-output","payload":{…}}` |
@@ -133,9 +136,26 @@ pub struct RemoteAccessSettings {
   其他事件使用 `remote::broadcast_event(&app, &hub, name, &payload)`。
   预序列化帧经 `tokio::sync::broadcast`（容量 2048）广播；`Lagged` 时发送 `resync`。
 - 升级连接前校验 `Origin` / `Host` 与服务自身地址、端口和协议一致；服务端 60 秒无帧关闭。
-- 鉴权失败锁定：同一来源 IP 10 分钟内失败 5 次后，再锁定 10 分钟；令牌比较使用
-  `subtle::ConstantTimeEq`。
+- 鉴权失败锁定：同一来源 IP 10 分钟内失败 5 次后，再锁定 10 分钟；v1 的令牌比较使用
+  `subtle::ConstantTimeEq`，v2 的 `proof` 比较使用 HMAC 的 `verify_slice`，两者都是常量时间，并且
+  都在 `RemoteAuth::authorize_with` 这一道门里计数。
 - 状态里维护 `connected_clients` 计数。
+
+#### 会话加密（v2）
+
+握手把访问令牌变成一个证明和两把帧密钥，令牌本身不再出现在任何帧里：
+
+- `authKey` / `c2sKey` / `s2cKey` = HKDF-SHA256(ikm = 令牌的 UTF-8 字节, salt = `nonceS ‖ nonceC`,
+  info = `termexo-auth` / `termexo-c2s` / `termexo-s2c`, 32 字节)；
+- `proof` = HMAC-SHA256(`authKey`, `nonceS ‖ nonceC`)；
+- 封装帧的明文就是上表里原来的 JSON 帧原文，AES-256-GCM，AAD 为空，nonce = 4 字节 0 + 8 字节大端
+  `n`；**按方向各用一把密钥**，所以双方的第 n 帧不会复用同一组 (key, nonce)；
+- 接收方要求 `n` 严格递增；计数器倒退、解密失败、加密会话上出现未封装帧一律关闭连接（1002）。
+
+适用范围：安全上下文（https，以及一切经中继的页面）**只接受 v2**，堵死「中间人强制降级后读到明文
+令牌」；`tls: false` 的明文 HTTP 局域网直连保留 v1，因为浏览器在非安全上下文里不提供
+`crypto.subtle`，而那条链路本来就没有机密性。完整规格与跨语言一致性测试见
+`relay-service.md`「端到端加密」。
 
 ### invoke 分发（bridge.rs）
 
@@ -306,7 +326,8 @@ onReconnected(handler: () => void): () => void; // 重连成功后触发（首�
 - 静态资源无鉴权，但所有命令必须经过鉴权后的 WebSocket 与显式白名单。
   本地 origin 的应用命令不由 Tauri ACL 保护，命令白名单是唯一的命令授权防线。
 - 远程不能修改远程访问设置、执行原生文件导入导出或触发 npm 自更新。
-- 令牌不进日志；`tracing` 只记录来源 IP、命令名和耗时。
+- 令牌不进日志；`tracing` 只记录来源 IP、命令名和耗时。会话密钥、握手随机数和封装帧的内容同样
+  不进日志，封装层出问题时只记录原因。
 
 ## 后续可选项
 

@@ -250,6 +250,14 @@ a {
   .cell-name {
     color: var(--text);
     font-weight: 560;
+
+    // A marker beside the name flows inline with it; the cell keeps its table-cell display so the
+    // column stays aligned with the header.
+    .tag {
+      margin-left: $space-2;
+      vertical-align: middle;
+      font-weight: 400;
+    }
   }
 
   .cell-mono {
