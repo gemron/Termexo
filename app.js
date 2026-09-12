@@ -16,7 +16,7 @@ const translations = {
     heroLine1: "At your desk.",
     heroLine2: "Or on your phone.",
     heroLead:
-      "Claude Code, Codex, and OpenCode. One Windows workbench. Check output and send the next instruction from your phone. Your agents keep running on your PC.",
+      "Claude Code, Codex, OpenCode, and Antigravity. One Windows workbench. Check output and send the next instruction from your phone. Your agents keep running on your PC.",
     heroRemoteNote:
       "Keep your PC running. Enable remote access, then connect with a token over a trusted LAN or VPN.",
     heroRemoteGuide: "How to connect your phone ↗",
@@ -113,7 +113,7 @@ const translations = {
       "Project folder, grid layout, which terminals were open, what model each was running, even the colour you picked — it all comes back with the workspace.",
     featureSessionTitle: "Nothing you close is lost",
     featureSessionBody:
-      "Find any past Claude Code, Codex, or OpenCode session across your projects and reopen it with its full history intact.",
+      "Find any past Claude Code, Codex, OpenCode, or Antigravity session across your projects and reopen it with its full history intact.",
     featureTasksTitle: "Hand a task to an agent",
     featureTasksBody:
       "Write down the task and what counts as done, pick an agent, and it opens as a real terminal that reports its own progress back to the board.",
@@ -218,7 +218,7 @@ const translations = {
     heroLine1: "电脑上开工，",
     heroLine2: "手机上接着用。",
     heroLead:
-      "Claude Code、Codex、OpenCode，一个 Windows 工作台。离开书桌，用手机查看输出、发送下一步指令。Agent 继续在电脑上运行。",
+      "Claude Code、Codex、OpenCode、Antigravity，一个 Windows 工作台。离开书桌，用手机查看输出、发送下一步指令。Agent 继续在电脑上运行。",
     heroRemoteNote:
       "电脑需保持运行。开启远程访问后，在可信局域网或 VPN 内使用令牌连接。",
     heroRemoteGuide: "了解手机如何连接 ↗",
@@ -299,7 +299,7 @@ const translations = {
       "项目目录、网格布局、开过哪些终端、每个终端跑的什么模型，连你选的主题色，都跟着工作区一起回来。",
     featureSessionTitle: "关掉的东西没丢",
     featureSessionBody:
-      "翻出任意项目里的历史 Claude Code / Codex / OpenCode 会话，带着完整上下文重新打开。",
+      "翻出任意项目里的历史 Claude Code / Codex / OpenCode / Antigravity 会话，带着完整上下文重新打开。",
     featureTasksTitle: "把一条任务交给 Agent",
     featureTasksBody:
       "写清楚任务和验收标准，选一个 Agent，它就变成一个真实终端，并把自己的进展回报到看板上。",
