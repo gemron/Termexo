@@ -7,7 +7,7 @@ import {
   type ProviderQuota,
 } from '../core/models/agent.models';
 import type { RepositoryOverview } from '../core/models/git.models';
-import { type TerminalSession } from '../core/models/workspace.models';
+import { OPENCODE_DEFAULT_MODEL, type TerminalSession } from '../core/models/workspace.models';
 import { InspectorPanelComponent } from './inspector-panel';
 
 const MINUTE_MS = 60_000;
@@ -95,6 +95,39 @@ const MODEL_PROFILES: ModelProfile[] = [
   },
 ];
 
+const OPENCODE_QUOTAS: ProviderQuota[] = [
+  {
+    profileId: 'agent:opencode:codex',
+    profileName: 'OpenCode · Codex',
+    provider: 'OpenCode',
+    official: false,
+    checkedAt: Date.now(),
+    entries: [
+      {
+        label: '5 小时窗口',
+        unit: 'percent',
+        percent: 25,
+        resetsAt: Date.now() + 60 * MINUTE_MS,
+      },
+    ],
+  },
+  {
+    profileId: 'agent:opencode:go',
+    profileName: 'OpenCode Go',
+    provider: 'OpenCode',
+    official: false,
+    checkedAt: Date.now(),
+    entries: [
+      {
+        label: '每周额度',
+        unit: 'percent',
+        percent: 60,
+        resetsAt: Date.now() + 2 * 24 * 60 * MINUTE_MS,
+      },
+    ],
+  },
+];
+
 /** Opens a collapsible inspector section by its data hook, if it is not already open. */
 function openSection(root: HTMLElement, key: string): void {
   const toggle = root.querySelector<HTMLButtonElement>(`[data-section="${key}"]`);
@@ -164,6 +197,58 @@ describe('InspectorPanelComponent provider allowances', () => {
     fixture.detectChanges();
     expect(root.querySelectorAll('.quota-row')).toHaveLength(1);
     expect(root.textContent).not.toContain('DeepSeek Chat');
+  });
+
+  it('shows only the matching subscription for an explicit OpenCode provider', async () => {
+    fixture.componentRef.setInput('activeTerminal', {
+      ...TERMINAL,
+      agentType: 'opencode',
+      model: 'openai/gpt-5.2-codex',
+      profileId: undefined,
+      accountProfileId: undefined,
+    });
+    fixture.componentRef.setInput('quotas', OPENCODE_QUOTAS);
+    fixture.detectChanges();
+    await fixture.whenStable();
+
+    expect(root.querySelectorAll('.quota-row')).toHaveLength(1);
+    expect(root.textContent).toContain('OpenCode · Codex');
+    expect(root.textContent).not.toContain('OpenCode Go');
+  });
+
+  it('associates an explicit OpenCode Go model with only the Go subscription', async () => {
+    fixture.componentRef.setInput('activeTerminal', {
+      ...TERMINAL,
+      agentType: 'opencode',
+      model: 'opencode-go/glm-5.2',
+      profileId: undefined,
+      accountProfileId: undefined,
+    });
+    fixture.componentRef.setInput('quotas', OPENCODE_QUOTAS);
+    fixture.detectChanges();
+    await fixture.whenStable();
+
+    expect(root.querySelectorAll('.quota-row')).toHaveLength(1);
+    expect(root.textContent).toContain('OpenCode Go');
+    expect(root.textContent).not.toContain('OpenCode · Codex');
+  });
+
+  it('shows both OpenCode subscriptions for its default model and headlines the lowest remainder', async () => {
+    fixture.componentRef.setInput('activeTerminal', {
+      ...TERMINAL,
+      agentType: 'opencode',
+      model: OPENCODE_DEFAULT_MODEL,
+      profileId: undefined,
+      accountProfileId: undefined,
+    });
+    fixture.componentRef.setInput('quotas', OPENCODE_QUOTAS);
+    fixture.detectChanges();
+    await fixture.whenStable();
+
+    expect(root.querySelectorAll('.quota-row')).toHaveLength(2);
+    expect(root.textContent).toContain('OpenCode · Codex');
+    expect(root.textContent).toContain('OpenCode Go');
+    expect(root.querySelector('.overview-stats .stat b')?.textContent?.trim()).toBe('40%');
   });
 
   it('shows live session code changes and opens the full Git view', () => {

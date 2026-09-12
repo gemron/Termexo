@@ -27,6 +27,8 @@ const CACHE_TTL: Duration = Duration::from_secs(60);
 /// The agents' usage endpoints are rate limited far more aggressively than the providers' balance
 /// APIs — Anthropic's answers 429 to anything that polls it — so those readings are held longer.
 const AGENT_CACHE_TTL: Duration = Duration::from_secs(300);
+/// OpenCode's plugin refreshes these services once a minute; use the same conservative cadence.
+const OPENCODE_CACHE_TTL: Duration = Duration::from_secs(60);
 
 /// Distinguishes an agent subscription's cache entry from a model profile of the same id.
 const AGENT_CACHE_PREFIX: &str = "agent:";
@@ -57,9 +59,15 @@ struct PendingQuery {
     profile_id: String,
     profile_name: String,
     provider: String,
-    /// Set when this reads an agent's subscription rather than a provider's API key balance.
-    agent_type: Option<String>,
+    parser: QuotaParser,
     request: quota::QuotaRequest,
+}
+
+enum QuotaParser {
+    Provider,
+    Agent(String),
+    OpenCodeCodex,
+    OpenCodeGo,
 }
 
 #[tauri::command]
@@ -105,6 +113,27 @@ pub async fn get_provider_quotas(
             }
         }
         match resolve_agent(&account, &cache_key, now) {
+            Ok(query) => pending.push(query),
+            Err(unavailable) => resolved.push(unavailable),
+        }
+    }
+
+    let opencode_credentials = quota::read_opencode_credentials();
+    for source in [OpenCodeSource::Codex, OpenCodeSource::Go] {
+        if opencode_credentials
+            .as_ref()
+            .is_ok_and(|credentials| !source.is_configured(credentials))
+        {
+            continue;
+        }
+        let id = source.id();
+        if !force {
+            if let Some(cached) = cache.fresh(id, now, OPENCODE_CACHE_TTL) {
+                resolved.push(cached);
+                continue;
+            }
+        }
+        match resolve_opencode(source, opencode_credentials.as_ref(), now) {
             Ok(query) => pending.push(query),
             Err(unavailable) => resolved.push(unavailable),
         }
@@ -188,7 +217,7 @@ fn resolve(
         profile_id: profile.id.clone(),
         profile_name: profile.name.clone(),
         provider: profile.provider.clone(),
-        agent_type: None,
+        parser: QuotaParser::Provider,
         request,
     })
 }
@@ -208,8 +237,83 @@ fn resolve_agent(
         profile_id: cache_key.to_owned(),
         profile_name: account.name.clone(),
         provider: provider.to_owned(),
-        agent_type: Some(account.agent_type.clone()),
+        parser: QuotaParser::Agent(account.agent_type.clone()),
         request: quota::build_agent_request(&account.agent_type, &token),
+    })
+}
+
+#[derive(Clone, Copy)]
+enum OpenCodeSource {
+    Codex,
+    Go,
+}
+
+impl OpenCodeSource {
+    fn id(self) -> &'static str {
+        match self {
+            Self::Codex => quota::OPENCODE_CODEX_QUOTA_ID,
+            Self::Go => quota::OPENCODE_GO_QUOTA_ID,
+        }
+    }
+
+    fn profile_name(self) -> &'static str {
+        match self {
+            Self::Codex => quota::OPENCODE_CODEX_PROFILE_NAME,
+            Self::Go => quota::OPENCODE_GO_PROFILE_NAME,
+        }
+    }
+
+    fn is_configured(self, credentials: &quota::OpenCodeCredentials) -> bool {
+        match self {
+            Self::Codex => credentials.codex.is_some(),
+            Self::Go => credentials.go_api_key.is_some(),
+        }
+    }
+}
+
+fn resolve_opencode(
+    source: OpenCodeSource,
+    credentials: Result<&quota::OpenCodeCredentials, &String>,
+    now: i64,
+) -> Result<PendingQuery, ProviderQuota> {
+    let unavailable = |reason: String| {
+        ProviderQuota::unavailable(
+            source.id(),
+            source.profile_name(),
+            quota::OPENCODE_PROVIDER_LABEL,
+            now,
+            reason,
+        )
+    };
+    let credentials = credentials.map_err(|reason| unavailable(reason.clone()))?;
+    let (parser, request) = match source {
+        OpenCodeSource::Codex => {
+            let credential = credentials
+                .codex
+                .as_ref()
+                .ok_or_else(|| unavailable("OpenCode 尚未连接 ChatGPT Plus/Pro".to_owned()))?;
+            (
+                QuotaParser::OpenCodeCodex,
+                quota::build_opencode_codex_request(credential),
+            )
+        }
+        OpenCodeSource::Go => {
+            let api_key = credentials
+                .go_api_key
+                .as_deref()
+                .ok_or_else(|| unavailable("OpenCode 尚未连接 OpenCode Go".to_owned()))?;
+            (
+                QuotaParser::OpenCodeGo,
+                quota::build_opencode_go_request(api_key),
+            )
+        }
+    };
+    Ok(PendingQuery {
+        profile_id: source.id().to_owned(),
+        profile_name: source.profile_name().to_owned(),
+        provider: quota::OPENCODE_PROVIDER_LABEL.to_owned(),
+        parser,
+        request,
     })
 }
 
@@ -319,9 +423,11 @@ async fn execute(client: reqwest::Client, query: PendingQuery) -> ProviderQuota 
         Err(error) => return unavailable(format!("解析余量响应失败：{error}")),
     };
 
-    let parsed = match query.agent_type.as_deref() {
-        Some(agent_type) => quota::parse_agent_response(agent_type, &body),
-        None => quota::parse_response(&query.provider, &body),
+    let parsed = match &query.parser {
+        QuotaParser::Provider => quota::parse_response(&query.provider, &body),
+        QuotaParser::Agent(agent_type) => quota::parse_agent_response(agent_type, &body),
+        QuotaParser::OpenCodeCodex => quota::parse_opencode_codex_response(&body),
+        QuotaParser::OpenCodeGo => quota::parse_opencode_go_response(&body),
     };
     match parsed {
         Ok(entries) => ProviderQuota {
@@ -415,5 +521,34 @@ mod tests {
         let usage = usage(r#"{"groups":[{"name":"G","buckets":[{"name":"W"}]}]}"#);
 
         assert!(antigravity_entries(&usage).is_empty());
+    }
+
+    #[test]
+    fn opencode_sources_are_offered_only_for_credentials_that_exist() {
+        let credentials = quota::OpenCodeCredentials {
+            codex: Some(quota::OpenCodeCodexCredential {
+                access_token: "token".to_owned(),
+                account_id: None,
+            }),
+            go_api_key: None,
+        };
+
+        assert!(OpenCodeSource::Codex.is_configured(&credentials));
+        assert!(!OpenCodeSource::Go.is_configured(&credentials));
+    }
+
+    #[test]
+    fn an_opencode_source_resolves_to_its_stable_panel_identity() {
+        let credentials = quota::OpenCodeCredentials {
+            codex: None,
+            go_api_key: Some("go-key".to_owned()),
+        };
+
+        let query = resolve_opencode(OpenCodeSource::Go, Ok(&credentials), 42).unwrap();
+
+        assert_eq!(query.profile_id, quota::OPENCODE_GO_QUOTA_ID);
+        assert_eq!(query.profile_name, quota::OPENCODE_GO_PROFILE_NAME);
+        assert_eq!(query.provider, quota::OPENCODE_PROVIDER_LABEL);
+        assert!(matches!(query.parser, QuotaParser::OpenCodeGo));
     }
 }
