@@ -2,6 +2,7 @@
 //! timings and close codes of the control plane, the forwarding headers the reverse proxy sets,
 //! and the enrollment exchange that hands a device its credential.
 
+mod backoff;
 mod stream;
 
 use std::fmt;
@@ -11,6 +12,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::REDACTED_PLACEHOLDER;
 
+pub use backoff::{Backoff, INITIAL_RECONNECT_DELAY, MAX_RECONNECT_DELAY};
 pub use stream::ChannelByteStream;
 
 /// Where a device opens its outbound tunnel.

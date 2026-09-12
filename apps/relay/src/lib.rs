@@ -22,6 +22,7 @@ pub mod server;
 pub mod state;
 pub mod tls;
 pub mod tunnel;
+pub mod upstream;
 
 pub use server::serve;
 pub use state::RELAY_VERSION;

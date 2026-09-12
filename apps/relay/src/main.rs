@@ -5,6 +5,7 @@ use std::process::ExitCode;
 use clap::Parser;
 use termexo_relay::bootstrap;
 use termexo_relay::config::{AdminCommand, Cli, Command};
+use termexo_relay::upstream;
 use tracing_subscriber::EnvFilter;
 
 /// Log level when `RUST_LOG` says nothing. `info` covers tunnel lifecycle and start-up without
@@ -18,6 +19,7 @@ async fn main() -> ExitCode {
 
     let outcome = match cli.command {
         Command::Serve(args) => termexo_relay::serve(args).await,
+        Command::Link(args) => upstream::link(&args).await,
         Command::Admin {
             command: AdminCommand::ResetPassword(args),
         } => bootstrap::reset_password(&args),

@@ -197,9 +197,9 @@ async fn accept_hello(
     let welcome = ControlFrame::Welcome {
         device_id: device.id.clone(),
         relay_id: state.relay_id.clone(),
-        addresses: vec![state.relay_address(&device.id)],
-        // The upstream chain is empty until cascading lands; this relay is the top of it.
-        chain: Vec::new(),
+        // This relay first, then whatever its own upstream chain adds a hop further out.
+        addresses: state.device_addresses(&device.id),
+        chain: state.upstream_chain(),
     };
     if sink
         .send(Message::Text(Utf8Bytes::from(welcome.encode())))

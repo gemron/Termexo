@@ -28,6 +28,15 @@ pub mod action {
     pub const ENROLLMENT_CREATED: &str = "enrollment-created";
     pub const ENROLLMENT_CANCELLED: &str = "enrollment-cancelled";
     pub const BOOTSTRAP_ADMIN: &str = "bootstrap-admin";
+    /// An operator configured an upstream; the credential exchange had already succeeded.
+    pub const UPSTREAM_LINKED: &str = "upstream-linked";
+    pub const UPSTREAM_UNLINKED: &str = "upstream-unlinked";
+    pub const UPSTREAM_CONNECTED: &str = "upstream-connected";
+    pub const UPSTREAM_DISCONNECTED: &str = "upstream-disconnected";
+    /// The upstream's chain already contained this relay, so joining it would have made a loop.
+    pub const UPSTREAM_LOOP_REFUSED: &str = "upstream-loop-refused";
+    /// The upstream withdrew this relay's access; the stored credential was dropped with it.
+    pub const UPSTREAM_REVOKED: &str = "upstream-revoked";
 }
 
 /// Target kinds, for the console's object filter.
@@ -35,6 +44,8 @@ pub mod target {
     pub const USER: &str = "user";
     pub const DEVICE: &str = "device";
     pub const ENROLLMENT: &str = "enrollment";
+    /// Another relay, named by its relay id rather than by a device row of this relay's.
+    pub const RELAY: &str = "relay";
 }
 
 const ACTOR_USER: &str = "user";

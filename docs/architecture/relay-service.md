@@ -239,6 +239,23 @@ Angular 路由与相对资源路径本来就跟着 `<base href>` 走，无需其
 （或在 B 的控制台「中继」页填写）。B 用与桌面端相同的 `/api/enroll` 换到凭据，存进
 `relay_settings.upstream`，随后维持一条到 A 的出站隧道。
 
+`link` 子命令只换凭据并写设置，不启动服务；`serve` 每次启动时读 `relay_settings.upstream`，
+有就自动接上。控制台走两个端点：
+
+| 端点 | 行为 |
+| --- | --- |
+| `POST /api/admin/relays/upstream { url, code }` | 换凭据 → 写设置 → 启动链接 → `201 { upstream }`；换凭据失败时 4xx `{ error }` 且不写任何设置 |
+| `DELETE /api/admin/relays/upstream` | 断开、删设置与凭据、把地址清单推回给本地设备 → `204` |
+| `GET /api/admin/relays` | `{ upstream: { url, state, relayId, chain, error } \| null, downstreams: […] }`，`state` 为 `connecting \| connected \| error`；没有配置上游时 `upstream` 为 `null` |
+
+B 侧的隧道与桌面端的是同一套：`hello { kind: "relay", relayId }`、20 秒 ping、60 秒空闲断开、
+1s→30s 的退避重连（退避阶梯放在共用 crate 的 `tunnel::Backoff`）。关闭码语义也一致：4403 停止
+重连并清除凭据与 `upstream` 设置，4401（或升级握手返回 4xx）停止重连但保留凭据等运维处理，其余
+一律重连。数据面方向相反——上游是开流的一方，所以 B 在这条链接上跑 `yamux::Mode::Server`。
+
+审计动作：`upstream-linked`、`upstream-unlinked`、`upstream-connected`、`upstream-disconnected`、
+`upstream-loop-refused`、`upstream-revoked`；`detail` 只记地址，不含凭据与接入码。
+
 ### 通告与路由表
 
 * B 连上 A 后发 `announce`（全量），之后每台设备上下线发增量；A 的路由表：
@@ -252,19 +269,33 @@ Angular 路由与相对资源路径本来就跟着 `<base href>` 走，无需其
   ```
 
 * A 若自己也有上游 C，把收到的通告在 `via` 前面加上自己的 id 后再转发上去。递归到任意层。
+  直连设备的 `via` 就是 `[自己的 relay_id]`，所以通告的构造在两种情况下是同一行代码。
+* 下游中继链接本身不作为设备通告上去：它是链路不是终端，通告它只会给出一个打开中继而不是工作台
+  的地址。上游看到的是它名下的设备。
 * 同一设备可能短暂经两条路通告到（网络切换时的重叠）：以最新一次通告为准，`hops` 更短者优先。
+* 通告过来的设备在上游没有数据库行，所以上游把「链接还在、设备下线」的设备名记在路由表里，
+  `/d/<id>/` 因此仍能给出「设备离线」页而不是「设备不存在」；链接一断这份记忆也一起丢掉——那时
+  上游已经无法分辨「离线」和「从来不在这条链路后面」。
 
 ### 环路防护
 
-* `welcome.chain` 是上游一路到顶的 relay id 列表；B 若在其中看到自己的 id，拒绝连接并记审计；
-* 通告里 `via` 含接收方自己 id 的条目直接丢弃；
-* 前导里 `hops` 长度上限 8，超过即拒绝。
+* `welcome.chain` 是上游一路到顶的 relay id 列表；B 若在其中（或在 `welcome.relayId` 里，也就是
+  连到了自己）看到自己的 id，拒绝连接、记审计 `upstream-loop-refused`、状态置 `error` 并给出中文
+  原因，**不重连**——重连只会被同样地拒绝；
+* 通告里 `via` 含接收方自己 id 的条目直接丢弃，发送方也不会把这种条目发出去；
+* 前导里 `hops` 含本中继自己的 id 即拒绝该流（说明成环），长度上限 8，追加自己后会超过上限的也
+  拒绝。
 
 ### 地址在链上传播
 
 设备的 `welcome.addresses` 由它直连的那台中继计算：自己的公开地址（`hops = 0`）+ 上游
 `welcome.addresses` 逐级 `hops + 1`。上游链变化时（A 连上 / 断开 C），A 向所有下游推送
 `addresses`，下游再推给自己的设备。桌面端面板因此始终列出「从哪里都能打开」的完整地址清单。
+
+上游发给 B 的每条地址指向的是 **B 自己的链接设备 id**（`https://A/d/<B 的 deviceId>/`），B 把结尾
+的 `/d/<自己的 deviceId>/` 换成 `/d/<目标设备 id>/` 就得到该设备在 A 上的地址。公开地址的形状由
+协议固定，所以这个替换是精确的，不需要在 `Address` 里多加一个字段。推送范围是**直连**的隧道：
+经下游中继来的设备由那台中继自己推，而它正是收到这一帧后去做的。
 
 设备只在**直连的那台中继**上有归属和撤销权；上游只能看到它（只读），并断开经自己的流。
 
@@ -280,7 +311,10 @@ src/auth/           密码（argon2id）、控制台会话、失败锁定（共�
 src/registry.rs     在线设备表 + 路由表（内存）
 src/tunnel/         /tunnel 升级、hello / welcome、yamux 会话、流的打开与前导
 src/proxy.rs        /d/<id>/* 反向代理（hyper 客户端 + 自定义 Connect + WS 升级对拷）
-src/upstream.rs     作为下游时的出站隧道、通告、地址传播
+src/upstream/       作为下游时的出站隧道、通告、地址传播、上游开来的流的转发
+                    mod 链接状态机与退避 / session 单次会话 / forward 流转发 /
+                    addresses 上游地址链 / settings 持久化 / enroll 换凭据 / pinning 证书固定
+                    （通告的内容由 registry 给出：announcements() 快照 + subscribe() 增量）
 src/api/            /api/* handlers
 src/console.rs      嵌入的管理页面静态资源
 src/audit.rs        审计写入
@@ -491,7 +525,7 @@ C→S   auth { clientId, nonceC, proof: HMAC-SHA256( HKDF(token, "termexo-auth")
 | 阶段 | 内容 | 验收 |
 | --- | --- | --- |
 | 一：可用的中继 | 共用 crate；`termexo-relay serve`（隧道、`/d/` 代理、SQLite、`/api/*`、控制台的设备 / 用户 / 接入码 / 审计页）；桌面端 `RelayLink`、接入 UI、地址清单；隧道路由的转发头、base href、按 base 分键、ETag | 桌面端用接入码接入 → 手机在 4G 下打开 `https://relay/d/<id>/#token=…` → 看到工作台、终端实时交互、刷新后回放；控制台看到设备在线，撤销后手机被断开且桌面端不再重连；账号密码接入的设备出现在该用户名下；错误密码 5 次后锁定 |
-| 二：级联 | `upstream.rs`、通告与路由表、环路防护、地址传播、控制台「中继」页 | B 接入 A 后，A 的控制台列出 B 的设备并标注「经 B」；`https://A/d/<id>/` 可打开 B 名下的桌面端；桌面端面板同时列出 A、B 两条地址；把 A 配成 B 的下游时被拒绝 |
+| 二：级联（已交付） | `upstream/`（出站隧道、通告、地址传播、流转发）、路由表变更订阅、环路防护、`/api/admin/relays/upstream`、`termexo-relay link`、控制台「中继」页接真实数据 | B 接入 A 后，A 的控制台列出 B 的设备并标注「经 B」；`https://A/d/<id>/` 可打开 B 名下的桌面端（含 WebSocket）；桌面端面板同时列出 A、B 两条地址；把 A 配成 B 的下游时被拒绝。`apps/relay/tests/relay_cascade.rs` 起两台真中继逐条验证 |
 | 三：加固（可选） | `/ws` v2 端到端加密；`access = relay-login`；子域名模式；ACME | 中继上抓包看不到终端明文；未登录中继时打开受限设备得到登录页 |
 
 第一阶段内部再拆三条并行线：共用 crate + 中继二进制（一个 agent）；桌面端 Rust（一个 agent，依赖
@@ -501,8 +535,11 @@ C→S   auth { clientId, nonceC, proof: HMAC-SHA256( HKDF(token, "termexo-auth")
 ## 验证
 
 * Rust（`apps/relay`）：前导编解码、路由表与环路防护、凭据格式与哈希校验、接入码一次性 + TTL、
-  `/api/admin/*` 权限；进程内集成测试：起中继 + 用 `tokio::io::duplex` 假设备（hyper 服务）→
-  经 `/d/<id>/` GET 得到设备的响应、WS 回显经代理成功、A ← B ← 假设备三级链路成功。
+  `/api/admin/*` 权限；进程内集成测试：起中继 + 假设备（yamux + hyper 小路由）→ 经 `/d/<id>/`
+  GET 得到设备的响应、WS 回显经代理成功；级联另起**两台真中继** A 与 B，B 经
+  `/api/admin/relays/upstream` 接入 A，假设备接入 B，验证 A 上的 `/d/<id>/`、设备列表的
+  `via` / `viaNames`、两条 `welcome.addresses`、设备离线后的 503、断开上游后的 `addresses` 推送，
+  以及让 A 反过来接 B 时的环路拒绝。
 * Rust（`src-tauri`）：隧道路由读 `X-Forwarded-*` 而 LAN 路由忽略它、base href 注入、`target`
   不匹配的流被拒、4403 后不重连且凭据被清、ETag 命中回 304。
 * 前端：ws 地址随 `baseURI`、存储键按 base 分、面板接入流程（假 invoke）；控制台各页 spec。
@@ -513,6 +550,11 @@ C→S   auth { clientId, nonceC, proof: HMAC-SHA256( HKDF(token, "termexo-auth")
 * 所有流量经中继，没有直连；延迟等于到中继的往返。
 * 第一、二阶段中继可见明文（见「安全边界」）。
 * 一台桌面端只接一台中继；多中继冗余留作后续。
+* 上游是自签名中继时还不能接：`relay_settings.upstream` 里有 `certificateFingerprint` 字段，固定
+  证书的校验也已就位，但 `link` 子命令与控制台还没有收集指纹的入口，所以上游目前要么有受信证书，
+  要么放在反代后面以 `--tls off` 运行。桌面端接中继时的 TOFU 流程可以照搬过来。
+* 上游被撤销（4403）后 `upstream` 设置连同凭据一起清掉，控制台的上游卡片回到未接入状态，原因只
+  留在审计里。
 * 子域名模式、ACME、浏览器侧中继登录、手机专用布局、设备上下线的桌面通知——后续可选。
 
 ## 设计文档修订

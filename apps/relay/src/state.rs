@@ -11,6 +11,7 @@ use crate::config::PublicUrl;
 use crate::db::Database;
 use crate::proxy::Proxy;
 use crate::registry::Registry;
+use crate::upstream::UpstreamLink;
 
 /// The relay's own version, reported by `/api/health` and recorded in the console's settings page.
 pub const RELAY_VERSION: &str = env!("CARGO_PKG_VERSION");
@@ -20,6 +21,8 @@ pub struct RelayState {
     /// Shared with the proxy's connector, which must not hold the whole state back.
     pub registry: Arc<Registry>,
     pub proxy: Proxy,
+    /// This relay's own outbound link, when it is a downstream of another relay.
+    pub upstream: Arc<UpstreamLink>,
     pub lockout: LockoutTable,
     /// Stable for the life of the data directory: devices and downstream relays remember it.
     pub relay_id: String,
@@ -50,6 +53,19 @@ impl RelayState {
         }
     }
 
+    /// Every address one of this relay's devices can be opened at, across the whole chain: this
+    /// relay first, then one entry per relay above it.
+    pub fn device_addresses(&self, device_id: &str) -> Vec<RelayAddress> {
+        let mut addresses = vec![self.relay_address(device_id)];
+        addresses.extend(self.upstream.addresses_for(device_id));
+        addresses
+    }
+
+    /// The upstream relay ids a device is told about, so it can spot a loop of its own.
+    pub fn upstream_chain(&self) -> Vec<String> {
+        self.upstream.chain()
+    }
+
     /// Whether browsers reach this relay over https, which decides the `Secure` cookie attribute
     /// and the `X-Forwarded-Proto` the devices are told.
     pub fn is_public_secure(&self) -> bool {
@@ -61,3 +77,48 @@ impl RelayState {
 
 /// The axum state type, so handler signatures stay short.
 pub type SharedState = Arc<RelayState>;
+
+#[cfg(test)]
+pub mod tests {
+    use super::*;
+
+    use crate::db::Database;
+    use crate::registry::Registry;
+
+    /// A relay state backed by an in-memory database, shared by the unit tests that need one.
+    pub fn state_for_tests(relay_id: &str) -> SharedState {
+        state_behind_proxy(relay_id, Vec::new(), true)
+    }
+
+    /// The same state with the two knobs the forwarding rules are decided by.
+    pub fn state_behind_proxy(
+        relay_id: &str,
+        trusted_proxies: Vec<IpNet>,
+        tls_enabled: bool,
+    ) -> SharedState {
+        let registry = Arc::new(Registry::new(relay_id.to_string()));
+        Arc::new(RelayState {
+            database: Database::open_in_memory().expect("the database should open"),
+            proxy: Proxy::new(registry.clone(), relay_id),
+            registry,
+            upstream: Arc::new(UpstreamLink::new()),
+            lockout: LockoutTable::new(),
+            relay_id: relay_id.to_string(),
+            public_url: "https://relay.example.com".parse().expect("a public url"),
+            trusted_proxies,
+            tls_enabled,
+        })
+    }
+
+    #[test]
+    fn a_relay_without_an_upstream_offers_only_its_own_address() {
+        let state = state_for_tests("relay-a");
+
+        let addresses = state.device_addresses("device-a");
+
+        assert_eq!(addresses.len(), 1);
+        assert_eq!(addresses[0].hops, 0);
+        assert_eq!(addresses[0].url, "https://relay.example.com/d/device-a/");
+        assert!(state.upstream_chain().is_empty());
+    }
+}

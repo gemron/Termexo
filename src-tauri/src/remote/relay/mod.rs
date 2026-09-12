@@ -17,6 +17,7 @@ use std::time::{Duration, SystemTime, UNIX_EPOCH};
 use axum::Router;
 use serde::Serialize;
 use termexo_relay_protocol::frames::RelayAddress;
+use termexo_relay_protocol::tunnel::Backoff;
 use tokio::sync::{watch, Mutex as AsyncMutex};
 use tokio_util::sync::CancellationToken;
 
@@ -27,10 +28,6 @@ use client::{SessionConfig, SessionEnd, SessionOutcome};
 pub use endpoint::RelayEndpoint;
 pub use enroll::{enroll, RelayEnrollRequest};
 
-/// Reconnect delays: 1 s doubling to 30 s, so a relay that restarts is picked up almost at once
-/// while one that is simply unreachable is not hammered.
-const INITIAL_RECONNECT_DELAY: Duration = Duration::from_secs(1);
-const MAX_RECONNECT_DELAY: Duration = Duration::from_secs(30);
 /// Upper bound on waiting for the link to wind down, so a stuck session cannot hang a settings
 /// save the way the LAN listener's own shutdown must not.
 const LINK_SHUTDOWN_WAIT: Duration = Duration::from_secs(5);
@@ -386,33 +383,10 @@ fn next_step(outcome: &SessionOutcome, backoff: &mut Backoff) -> SupervisorStep 
     }
 }
 
-/// How long to wait before the next attempt, doubling up to a ceiling.
-struct Backoff {
-    next: Duration,
-}
-
-impl Backoff {
-    fn new() -> Self {
-        Self {
-            next: INITIAL_RECONNECT_DELAY,
-        }
-    }
-
-    fn take(&mut self) -> Duration {
-        let delay = self.next;
-        self.next = (self.next * 2).min(MAX_RECONNECT_DELAY);
-        delay
-    }
-
-    /// A session that actually reached the relay starts the ladder again, so a link that drops
-    /// once an hour reconnects in a second every time rather than inheriting an old ceiling.
-    fn reset(&mut self) {
-        self.next = INITIAL_RECONNECT_DELAY;
-    }
-}
-
 #[cfg(test)]
 mod tests {
+    use termexo_relay_protocol::tunnel::INITIAL_RECONNECT_DELAY;
+
     use super::*;
 
     fn addresses() -> Vec<RelayAddress> {

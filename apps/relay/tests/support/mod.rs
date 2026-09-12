@@ -1,5 +1,9 @@
 //! Shared scaffolding for the relay's integration tests: a relay in this process, a fake device on
 //! the other end of a real tunnel, and a fake downstream relay that forwards streams on.
+//!
+//! Several test binaries include this module and each uses a different part of it, so an item that
+//! looks unused here is simply one the other binary needs.
+#![allow(dead_code)]
 
 use std::future::poll_fn;
 use std::net::SocketAddr;
@@ -19,7 +23,7 @@ use termexo_relay::config::{ServeArgs, TlsMode};
 use termexo_relay::db::{new_identifier, UserRole};
 use termexo_relay::server;
 use termexo_relay::state::SharedState;
-use termexo_relay_protocol::frames::{ControlFrame, DeviceKind, PROTOCOL_VERSION};
+use termexo_relay_protocol::frames::{ControlFrame, DeviceKind, RelayAddress, PROTOCOL_VERSION};
 use termexo_relay_protocol::preface::{read_preface, StreamPreface};
 use termexo_relay_protocol::tunnel::{ChannelByteStream, HEADER_TERMEXO_BASE};
 use tokio::io::{AsyncRead, AsyncWrite};
@@ -155,6 +159,9 @@ impl TestRelay {
 
 impl Drop for TestRelay {
     fn drop(&mut self) {
+        // The upstream link holds a strong reference to the state, so it has to be told to stop or
+        // it would keep reconnecting to a relay the test has already finished with.
+        self.state.upstream.request_stop();
         self.handle.shutdown();
     }
 }
@@ -165,8 +172,11 @@ pub enum DeviceEvent {
     Welcome {
         device_id: String,
         relay_id: String,
-        addresses: Vec<String>,
+        addresses: Vec<RelayAddress>,
+        chain: Vec<String>,
     },
+    /// The relay's chain changed, so the address list was pushed again.
+    Addresses(Vec<RelayAddress>),
     /// One stream arrived, with the preface the relay wrote in front of it.
     Stream {
         target: String,
@@ -174,6 +184,20 @@ pub enum DeviceEvent {
     },
     Revoked(String),
     Closed(Option<u16>),
+}
+
+impl DeviceEvent {
+    /// The urls of an address-carrying event, which is what most assertions are about.
+    pub fn urls(&self) -> Vec<String> {
+        let addresses = match self {
+            Self::Welcome { addresses, .. } | Self::Addresses(addresses) => addresses,
+            _ => panic!("这个事件不带地址：{self:?}"),
+        };
+        addresses
+            .iter()
+            .map(|address| address.url.clone())
+            .collect()
+    }
 }
 
 /// How a fake tunnel peer answers the streams the relay opens.
@@ -192,6 +216,7 @@ pub enum StreamHandling {
 pub struct FakeDevice {
     pub events: mpsc::UnboundedReceiver<DeviceEvent>,
     control: mpsc::UnboundedSender<ControlFrame>,
+    task: tokio::task::JoinHandle<()>,
 }
 
 impl FakeDevice {
@@ -225,7 +250,7 @@ impl FakeDevice {
             name: "测试设备".into(),
             relay_id: relay_id.map(str::to_string),
         };
-        tokio::spawn(run_device(
+        let task = tokio::spawn(run_device(
             socket,
             hello,
             handling,
@@ -236,7 +261,14 @@ impl FakeDevice {
         Self {
             events: event_receiver,
             control,
+            task,
         }
+    }
+
+    /// Drops the tunnel the way a machine that is switched off does: no close frame, just a socket
+    /// that stops existing.
+    pub fn power_off(&self) {
+        self.task.abort();
     }
 
     /// Sends one control frame, which is how a fake downstream relay announces its devices.
@@ -323,13 +355,17 @@ async fn run_device(
                         device_id,
                         relay_id,
                         addresses,
-                        ..
+                        chain,
                     } => {
                         let _ = events.send(DeviceEvent::Welcome {
                             device_id,
                             relay_id,
-                            addresses: addresses.into_iter().map(|address| address.url).collect(),
+                            addresses,
+                            chain,
                         });
+                    }
+                    ControlFrame::Addresses { addresses } => {
+                        let _ = events.send(DeviceEvent::Addresses(addresses));
                     }
                     ControlFrame::Revoked { reason } => {
                         let _ = events.send(DeviceEvent::Revoked(reason));
@@ -535,12 +571,110 @@ pub async fn enroll(relay: &TestRelay, code: &str, name: &str) -> (String, Strin
 
 /// Wraps a shared registry snapshot lookup the tests use to wait for a device to come online.
 pub async fn wait_until_online(relay: &TestRelay, device_id: &str) {
-    let deadline = tokio::time::Instant::now() + READY_TIMEOUT;
+    wait_until(READY_TIMEOUT, || relay.state.registry.is_online(device_id))
+        .await
+        .unwrap_or_else(|| panic!("设备 {device_id} 在超时前没有上线"));
+}
+
+pub async fn wait_until_offline(relay: &TestRelay, device_id: &str) {
+    wait_until(READY_TIMEOUT, || !relay.state.registry.is_online(device_id))
+        .await
+        .unwrap_or_else(|| panic!("设备 {device_id} 在超时前没有下线"));
+}
+
+/// Polls a condition until it holds, which is how a test waits on something that travels a tunnel.
+async fn wait_until(within: Duration, mut ready: impl FnMut() -> bool) -> Option<()> {
+    let deadline = tokio::time::Instant::now() + within;
     while tokio::time::Instant::now() < deadline {
-        if relay.state.registry.is_online(device_id) {
-            return;
+        if ready() {
+            return Some(());
         }
         tokio::time::sleep(Duration::from_millis(20)).await;
     }
-    panic!("设备 {device_id} 在超时前没有上线");
+    None
+}
+
+/// Points one relay at another, the way the console's relay page does.
+pub async fn join_upstream(
+    downstream: &TestRelay,
+    console: &reqwest::Client,
+    upstream: &TestRelay,
+    code: &str,
+) -> reqwest::Response {
+    console
+        .post(format!("{}/api/admin/relays/upstream", downstream.origin()))
+        .header("x-requested-with", "termexo-console")
+        .json(&serde_json::json!({ "url": upstream.origin(), "code": code }))
+        .send()
+        .await
+        .expect("the request should reach the relay")
+}
+
+pub async fn leave_upstream(relay: &TestRelay, console: &reqwest::Client) -> reqwest::Response {
+    console
+        .delete(format!("{}/api/admin/relays/upstream", relay.origin()))
+        .header("x-requested-with", "termexo-console")
+        .send()
+        .await
+        .expect("the request should reach the relay")
+}
+
+/// `GET /api/admin/relays`, which is what the console's relay page renders.
+pub async fn relay_overview(relay: &TestRelay, console: &reqwest::Client) -> serde_json::Value {
+    console
+        .get(format!("{}/api/admin/relays", relay.origin()))
+        .send()
+        .await
+        .expect("the request should reach the relay")
+        .json()
+        .await
+        .expect("a JSON body")
+}
+
+/// Waits until the upstream link reports the state the test is after, and returns its view.
+pub async fn wait_for_upstream_state(
+    relay: &TestRelay,
+    console: &reqwest::Client,
+    expected: &str,
+) -> serde_json::Value {
+    let deadline = tokio::time::Instant::now() + READY_TIMEOUT;
+    let mut last = serde_json::Value::Null;
+    while tokio::time::Instant::now() < deadline {
+        last = relay_overview(relay, console).await["upstream"].clone();
+        if last["state"] == expected {
+            return last;
+        }
+        tokio::time::sleep(Duration::from_millis(20)).await;
+    }
+    panic!("上游状态在超时前没有变成 {expected}，最后一次是 {last}");
+}
+
+/// `GET /api/admin/devices`, as the console's device table sees it.
+pub async fn admin_devices(relay: &TestRelay, console: &reqwest::Client) -> Vec<serde_json::Value> {
+    let body: serde_json::Value = console
+        .get(format!("{}/api/admin/devices", relay.origin()))
+        .send()
+        .await
+        .expect("the request should reach the relay")
+        .json()
+        .await
+        .expect("a JSON body");
+    body["devices"]
+        .as_array()
+        .expect("an array of devices")
+        .clone()
+}
+
+/// Whether an audit action was recorded, which is how the cascade tests check a refusal.
+pub fn audited(relay: &TestRelay, action: &str) -> bool {
+    relay
+        .state
+        .database
+        .list_audit(&termexo_relay::db::AuditQuery {
+            limit: 100,
+            ..termexo_relay::db::AuditQuery::default()
+        })
+        .expect("the audit list should work")
+        .into_iter()
+        .any(|event| event.action == action)
 }

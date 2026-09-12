@@ -87,28 +87,18 @@ mod tests {
     use axum::http::{HeaderName, HeaderValue};
 
     use super::*;
-    use std::sync::Arc;
-
-    use crate::auth::LockoutTable;
-    use crate::db::Database;
-    use crate::proxy::Proxy;
-    use crate::registry::Registry;
+    use crate::state::tests::state_behind_proxy;
+    use crate::state::SharedState;
 
     const PROXY: SocketAddr = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(10, 0, 0, 1)), 40000);
     const STRANGER: SocketAddr = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(203, 0, 113, 9)), 40000);
 
-    fn state(tls_enabled: bool) -> RelayState {
-        let registry = Arc::new(Registry::new("relay-a".into()));
-        RelayState {
-            database: Database::open_in_memory().expect("the database should open"),
-            proxy: Proxy::new(registry.clone(), "relay-a"),
-            registry,
-            lockout: LockoutTable::new(),
-            relay_id: "relay-a".into(),
-            public_url: "https://relay.example.com".parse().expect("a public url"),
-            trusted_proxies: vec!["10.0.0.0/8".parse().expect("a network")],
+    fn state(tls_enabled: bool) -> SharedState {
+        state_behind_proxy(
+            "relay-a",
+            vec!["10.0.0.0/8".parse().expect("a network")],
             tls_enabled,
-        }
+        )
     }
 
     fn headers(entries: &[(&str, &str)]) -> HeaderMap {

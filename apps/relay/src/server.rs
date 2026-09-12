@@ -22,6 +22,7 @@ use crate::registry::Registry;
 use crate::state::{RelayState, SharedState, RELAY_VERSION};
 use crate::tls;
 use crate::tunnel;
+use crate::upstream::{self, UpstreamLink};
 
 /// A relay id is short, lowercase and free of URL-escaping, exactly like a device id: it travels in
 /// announcements, prefaces and address lists.
@@ -114,16 +115,21 @@ pub async fn prepare(args: &ServeArgs) -> Result<SharedState, String> {
 
     install_crypto_provider();
     let registry = Arc::new(Registry::new(relay_id.clone()));
-    Ok(Arc::new(RelayState {
+    let state = Arc::new(RelayState {
         proxy: proxy::Proxy::new(registry.clone(), &relay_id),
         registry,
+        upstream: Arc::new(UpstreamLink::new()),
         database,
         lockout: LockoutTable::new(),
         relay_id,
         public_url,
         trusted_proxies: args.trusted_proxy.clone(),
         tls_enabled: args.tls.is_secure(),
-    }))
+    });
+    // A stored upstream is dialled before the listener opens, so a relay that restarts is back in
+    // its chain by the time the first browser arrives.
+    upstream::resume(&state).await;
+    Ok(state)
 }
 
 /// The complete routing table.

@@ -233,29 +233,17 @@ pub fn live_device_count(devices: &[DeviceRecord]) -> usize {
 
 #[cfg(test)]
 mod tests {
-    use std::sync::Arc;
-
     use termexo_relay_protocol::credential::DeviceCredential;
 
     use super::*;
-    use crate::auth::LockoutTable;
-    use crate::db::{Database, NewDevice};
-    use crate::proxy::Proxy;
-    use crate::registry::{DirectPresence, Registry};
+    use crate::db::NewDevice;
+    use crate::registry::DirectPresence;
+    use crate::state::tests::state_for_tests;
+    use crate::state::SharedState;
     use crate::tunnel::TunnelHandle;
 
-    fn state() -> RelayState {
-        let registry = Arc::new(Registry::new("relay-a".into()));
-        RelayState {
-            database: Database::open_in_memory().expect("the database should open"),
-            proxy: Proxy::new(registry.clone(), "relay-a"),
-            registry,
-            lockout: LockoutTable::new(),
-            relay_id: "relay-a".into(),
-            public_url: "https://relay.example.com".parse().expect("a public url"),
-            trusted_proxies: Vec::new(),
-            tls_enabled: true,
-        }
+    fn state() -> SharedState {
+        state_for_tests("relay-a")
     }
 
     fn device(state: &RelayState, owner: Option<&str>) -> DeviceRecord {

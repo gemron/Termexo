@@ -118,15 +118,8 @@ pub async fn forward(
         Ok(device) => device,
         Err(error) => return internal_error(&error),
     };
-    let announced = state.registry.is_online(device_id);
-    if device.is_none() && !announced {
-        return unknown_device_page();
-    }
-    if !announced {
-        let (name, last_seen) = device
-            .map(|record| (record.name, record.last_seen_at))
-            .unwrap_or_else(|| (device_id.to_string(), None));
-        return offline_page(&name, last_seen);
+    if !state.registry.is_online(device_id) {
+        return unreachable_page(state, device_id, device);
     }
 
     let base = format!("{DEVICE_PATH_PREFIX}{device_id}/");
@@ -149,6 +142,25 @@ pub async fn forward(
             tracing::debug!(device = %device_id, %error, "转发到设备失败");
             offline_page(device_id, None)
         }
+    }
+}
+
+/// The page for a device the relay cannot open a stream to right now.
+///
+/// A device this relay enrolled itself always has a row, so it can be named. One that a downstream
+/// relay announced has none, and is named from what the routing table remembers of it — without
+/// that, an address that worked a minute ago would read as "no such device".
+fn unreachable_page(
+    state: &RelayState,
+    device_id: &str,
+    record: Option<crate::db::DeviceRecord>,
+) -> Response {
+    if let Some(record) = record {
+        return offline_page(&record.name, record.last_seen_at);
+    }
+    match state.registry.last_known(device_id) {
+        Some(known) => offline_page(&known.name, Some(known.last_seen_at)),
+        None => unknown_device_page(),
     }
 }
 

@@ -14,8 +14,6 @@ import { I18nService, TranslatePipe } from '../shared/workspace-ui';
 registerRelayConsoleTranslations();
 
 const RELAY_URL_PATTERN = /^https?:\/\/\S+$/i;
-/** The relay answers this while cascading is still unimplemented; it is a stage-two feature. */
-const NOT_IMPLEMENTED = 501;
 
 const UPSTREAM_STATE_KEYS: Readonly<Record<UpstreamView['state'], string>> = {
   disabled: 'console.relays.stateDisabled',
@@ -77,6 +75,10 @@ const UPSTREAM_STATE_KEYS: Readonly<Record<UpstreamView['state'], string>> = {
             <div>
               <dt>{{ 'console.relays.upstreamUrl' | t }}</dt>
               <dd>{{ link.url }}</dd>
+            </div>
+            <div>
+              <dt>{{ 'console.relays.upstreamRelayId' | t }}</dt>
+              <dd>{{ link.relayId ?? ('console.common.none' | t) }}</dd>
             </div>
             <div>
               <dt>{{ 'console.relays.chain' | t }}</dt>
@@ -287,12 +289,9 @@ export class RelaysPageComponent {
     }
   }
 
-  /** A relay without cascading answers 501; that is a missing feature, not a broken request. */
+  /** The relay's own sentence explains why a code or an address was refused, so it is shown as is. */
   private describeUpstreamError(error: unknown): string {
-    const status = (error as { status?: number } | null)?.status;
-    return status === NOT_IMPLEMENTED
-      ? this.i18n.t('console.relays.notImplemented')
-      : this.i18n.t('console.common.actionFailed', { error: describeConsoleError(error) });
+    return this.i18n.t('console.common.actionFailed', { error: describeConsoleError(error) });
   }
 
   private async load(): Promise<void> {

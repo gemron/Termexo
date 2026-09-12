@@ -32,15 +32,16 @@ async fn connected_device(relay: &TestRelay) -> (FakeDevice, String) {
     match &welcome {
         DeviceEvent::Welcome {
             device_id: welcomed,
-            addresses,
+            chain,
             ..
         } => {
             assert_eq!(welcomed, &device_id);
             assert_eq!(
-                addresses,
-                &[format!("{}/d/{device_id}/", relay.origin())],
+                welcome.urls(),
+                [format!("{}/d/{device_id}/", relay.origin())],
                 "welcome 应当带上这台设备的公开地址"
             );
+            assert!(chain.is_empty(), "没有上游的中继是链的顶端");
         }
         other => panic!("第一帧应当是 welcome，实际是 {other:?}"),
     }

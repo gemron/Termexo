@@ -52,10 +52,6 @@ impl ApiError {
         Self::new(StatusCode::CONFLICT, message)
     }
 
-    pub fn not_implemented(message: impl Into<String>) -> Self {
-        Self::new(StatusCode::NOT_IMPLEMENTED, message)
-    }
-
     /// Logs the real cause and answers with a generic sentence.
     pub fn internal(context: &str, error: impl std::fmt::Display) -> Self {
         tracing::error!(%error, context, "请求处理失败");

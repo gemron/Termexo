@@ -3,15 +3,20 @@
 //! Nothing here is persisted. Online state is a property of a live WebSocket, so a restart starts
 //! with an empty table and every device reconnects into it; only `devices.last_seen_at` survives.
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Mutex, MutexGuard};
 
 use termexo_relay_protocol::frames::{AnnouncedDevice, DeviceKind};
 use termexo_relay_protocol::preface::MAX_HOPS;
+use tokio::sync::broadcast;
 
 use crate::db::now_millis;
 use crate::tunnel::TunnelHandle;
+
+/// How far the upstream link may fall behind before it is told to resynchronize. Reachability
+/// changes are rare — one per tunnel coming up or going down — so this is generous already.
+const CHANGE_CAPACITY: usize = 256;
 
 /// How a stream to one device is opened.
 #[derive(Clone)]
@@ -97,12 +102,38 @@ struct Entry {
     sequence: u64,
 }
 
+/// One change in what this relay can reach, in the shape an upstream is told about it.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum RegistryChange {
+    Online(AnnouncedDevice),
+    Offline { device_id: String },
+}
+
+/// A device a downstream relay announced and then withdrew.
+///
+/// An announced device has no row here — ownership belongs to the relay it enrolled with — so
+/// without this the moment it goes offline its address turns into "no such device". Remembering it
+/// for as long as the link that announced it stays up is what lets the proxy answer the honest
+/// "device is offline" page instead, and it bounds the memory to one link's own session.
+#[derive(Clone)]
+pub struct KnownDevice {
+    pub name: String,
+    pub last_seen_at: i64,
+}
+
+#[derive(Clone)]
+struct WithdrawnDevice {
+    link_device_id: String,
+    device: KnownDevice,
+}
+
 #[derive(Default)]
 struct RegistryState {
     entries: HashMap<String, Entry>,
     /// Relay id to the device id of the downstream link that declared it, so an announced route's
     /// hops can be rendered with names instead of opaque ids.
     relay_links: HashMap<String, String>,
+    withdrawn: HashMap<String, WithdrawnDevice>,
 }
 
 pub struct Registry {
@@ -110,6 +141,9 @@ pub struct Registry {
     relay_id: String,
     state: Mutex<RegistryState>,
     sequence: AtomicU64,
+    /// Published after the table has been updated and its lock released, so a subscriber can never
+    /// deadlock the routing table by reacting to a change from inside the update.
+    changes: broadcast::Sender<RegistryChange>,
 }
 
 impl Registry {
@@ -118,6 +152,70 @@ impl Registry {
             relay_id,
             state: Mutex::new(RegistryState::default()),
             sequence: AtomicU64::new(0),
+            changes: broadcast::channel(CHANGE_CAPACITY).0,
+        }
+    }
+
+    /// Watches what this relay can reach, so the upstream link can pass changes on as they happen.
+    pub fn subscribe(&self) -> broadcast::Receiver<RegistryChange> {
+        self.changes.subscribe()
+    }
+
+    /// Everything this relay can offer an upstream right now, as a full announcement snapshot.
+    pub fn announcements(&self) -> Vec<AnnouncedDevice> {
+        let state = self.state();
+        state
+            .entries
+            .values()
+            .filter_map(|entry| self.announcement_of(entry))
+            .collect()
+    }
+
+    /// How one entry is announced upward, or `None` when it is not a destination at all.
+    ///
+    /// The `via` chain is this relay's own id followed by the hops the entry already carries: an
+    /// upstream reaches the device through us first, and through those relays after that.
+    fn announcement_of(&self, entry: &Entry) -> Option<AnnouncedDevice> {
+        // A downstream link is a hop, not a destination: announcing it would offer an address that
+        // opens a relay rather than a workbench.
+        if entry.device.kind == DeviceKind::Relay && matches!(entry.device.route, Route::Direct(_))
+        {
+            return None;
+        }
+        let mut via = Vec::with_capacity(entry.device.route.hops().len() + 1);
+        via.push(self.relay_id.clone());
+        via.extend(entry.device.route.hops().iter().cloned());
+        Some(AnnouncedDevice {
+            id: entry.device.device_id.clone(),
+            name: entry.device.name.clone(),
+            online: true,
+            via,
+        })
+    }
+
+    /// Turns "what this device looked like before and after an update" into the change to publish.
+    fn transition(
+        &self,
+        device_id: &str,
+        previous: Option<&Entry>,
+        current: Option<&Entry>,
+    ) -> Option<RegistryChange> {
+        if let Some(announcement) = current.and_then(|entry| self.announcement_of(entry)) {
+            return Some(RegistryChange::Online(announcement));
+        }
+        let was_announced = previous
+            .and_then(|entry| self.announcement_of(entry))
+            .is_some();
+        was_announced.then(|| RegistryChange::Offline {
+            device_id: device_id.to_string(),
+        })
+    }
+
+    /// Publishes changes once the routing table's lock is gone. An error only means nothing is
+    /// subscribed, which is the normal state of a relay without an upstream.
+    fn publish(&self, changes: Vec<RegistryChange>) {
+        for change in changes {
+            let _ = self.changes.send(change);
         }
     }
 
@@ -127,35 +225,41 @@ impl Registry {
     /// credential this relay checked itself.
     pub fn connect(&self, presence: DirectPresence) -> Registration {
         let serial = self.next_sequence();
-        let mut state = self.state();
-        if let (Some(relay_id), DeviceKind::Relay) = (&presence.relay_id, presence.kind) {
-            state
-                .relay_links
-                .insert(relay_id.clone(), presence.device_id.clone());
-        }
-        let entry = Entry {
-            device: OnlineDevice {
-                device_id: presence.device_id.clone(),
-                name: presence.name,
-                kind: presence.kind,
-                connected_since: now_millis(),
-                ip: presence.ip,
-                version: presence.version,
-                route: Route::Direct(presence.handle),
-            },
-            origin: Origin::Direct { serial },
-            sequence: serial,
-        };
-        let displaced = state
-            .entries
-            .insert(presence.device_id, entry)
-            .and_then(|previous| match previous.origin {
+        let device_id = presence.device_id.clone();
+        let (registration, change) = {
+            let mut state = self.state();
+            if let (Some(relay_id), DeviceKind::Relay) = (&presence.relay_id, presence.kind) {
+                state
+                    .relay_links
+                    .insert(relay_id.clone(), device_id.clone());
+            }
+            let entry = Entry {
+                device: OnlineDevice {
+                    device_id: device_id.clone(),
+                    name: presence.name,
+                    kind: presence.kind,
+                    connected_since: now_millis(),
+                    ip: presence.ip,
+                    version: presence.version,
+                    route: Route::Direct(presence.handle),
+                },
+                origin: Origin::Direct { serial },
+                sequence: serial,
+            };
+            state.withdrawn.remove(&device_id);
+            let previous = state.entries.insert(device_id.clone(), entry);
+            let change =
+                self.transition(&device_id, previous.as_ref(), state.entries.get(&device_id));
+            let displaced = previous.and_then(|previous| match previous.origin {
                 // Only a displaced *direct* tunnel has to be closed; an announced entry is just a
                 // routing hint that the downstream relay still owns.
                 Origin::Direct { .. } => Some(previous.device.route.link().clone()),
                 Origin::Announced { .. } => None,
             });
-        Registration { serial, displaced }
+            (Registration { serial, displaced }, change)
+        };
+        self.publish(change.into_iter().collect());
+        registration
     }
 
     /// Removes a tunnel, but only if it is still the registered one.
@@ -163,22 +267,34 @@ impl Registry {
     /// A device that reconnects faster than its previous tunnel task can finish tearing down would
     /// otherwise be evicted by the old task's cleanup.
     pub fn disconnect(&self, device_id: &str, serial: u64) -> bool {
-        let mut state = self.state();
-        let matches = state
-            .entries
-            .get(device_id)
-            .is_some_and(|entry| entry.origin == Origin::Direct { serial });
-        if !matches {
-            return false;
-        }
-        state.entries.remove(device_id);
-        state
-            .relay_links
-            .retain(|_, link_device_id| link_device_id != device_id);
-        // Everything this link announced is unreachable the moment the link is gone.
-        state.entries.retain(|_, entry| {
-            !matches!(&entry.origin, Origin::Announced { link_device_id } if link_device_id == device_id)
-        });
+        let changes = {
+            let mut state = self.state();
+            let matches = state
+                .entries
+                .get(device_id)
+                .is_some_and(|entry| entry.origin == Origin::Direct { serial });
+            if !matches {
+                return false;
+            }
+            state
+                .relay_links
+                .retain(|_, link_device_id| link_device_id != device_id);
+            // Nothing this link said is worth remembering once it is gone: the relay can no longer
+            // tell an offline device from one that was never behind this link at all.
+            state
+                .withdrawn
+                .retain(|_, withdrawn| withdrawn.link_device_id != device_id);
+            // Everything this link announced is unreachable the moment the link is gone.
+            let mut gone = vec![device_id.to_string()];
+            gone.extend(Self::announced_ids_of(&state, device_id));
+            gone.into_iter()
+                .filter_map(|id| {
+                    let entry = state.entries.remove(&id)?;
+                    self.transition(&id, Some(&entry), None)
+                })
+                .collect()
+        };
+        self.publish(changes);
         true
     }
 
@@ -193,22 +309,37 @@ impl Registry {
         self.state().entries.contains_key(device_id)
     }
 
+    /// What this relay remembers about a device it can no longer route to, for the offline page.
+    pub fn last_known(&self, device_id: &str) -> Option<KnownDevice> {
+        self.state()
+            .withdrawn
+            .get(device_id)
+            .map(|withdrawn| withdrawn.device.clone())
+    }
+
     /// Replaces everything one downstream relay had announced with a fresh snapshot.
+    ///
+    /// Installing first and withdrawing the leftovers afterwards is what keeps a device that is in
+    /// both snapshots from flickering offline and back for everyone further up the chain.
     pub fn apply_announcement(
         &self,
         link_device_id: &str,
         link: &TunnelHandle,
         devices: Vec<AnnouncedDevice>,
     ) {
-        {
-            let mut state = self.state();
-            Self::drop_announcements_from(&mut state, link_device_id);
-        }
+        let previous = Self::announced_ids_of(&self.state(), link_device_id);
+        let mut installed = HashSet::new();
         for device in devices {
             if !device.online {
                 continue;
             }
-            self.announce_device(link_device_id, link, device);
+            let device_id = device.id.clone();
+            if self.announce_device(link_device_id, link, device) {
+                installed.insert(device_id);
+            }
+        }
+        for stale in previous.into_iter().filter(|id| !installed.contains(id)) {
+            self.withdraw_device(link_device_id, &stale);
         }
     }
 
@@ -231,46 +362,69 @@ impl Registry {
             return false;
         }
         let sequence = self.next_sequence();
+        let device_id = device.id.clone();
         let route = Route::Via {
             link: link.clone(),
             hops: device.via,
         };
-        let mut state = self.state();
-        if let Some(existing) = state.entries.get(&device.id) {
-            if !replaces(&existing.device.route, existing.sequence, &route, sequence) {
-                return false;
+        let change = {
+            let mut state = self.state();
+            if let Some(existing) = state.entries.get(&device_id) {
+                if !replaces(&existing.device.route, existing.sequence, &route, sequence) {
+                    return false;
+                }
             }
-        }
-        state.entries.insert(
-            device.id.clone(),
-            Entry {
-                device: OnlineDevice {
-                    device_id: device.id,
-                    name: device.name,
-                    kind: DeviceKind::Desktop,
-                    connected_since: now_millis(),
-                    ip: None,
-                    version: None,
-                    route,
+            state.withdrawn.remove(&device_id);
+            let previous = state.entries.insert(
+                device_id.clone(),
+                Entry {
+                    device: OnlineDevice {
+                        device_id: device_id.clone(),
+                        name: device.name,
+                        kind: DeviceKind::Desktop,
+                        connected_since: now_millis(),
+                        ip: None,
+                        version: None,
+                        route,
+                    },
+                    origin: Origin::Announced {
+                        link_device_id: link_device_id.to_string(),
+                    },
+                    sequence,
                 },
-                origin: Origin::Announced {
-                    link_device_id: link_device_id.to_string(),
-                },
-                sequence,
-            },
-        );
+            );
+            self.transition(&device_id, previous.as_ref(), state.entries.get(&device_id))
+        };
+        self.publish(change.into_iter().collect());
         true
     }
 
     /// Withdraws one announced device, ignoring a withdrawal for a route another link owns.
     pub fn withdraw_device(&self, link_device_id: &str, device_id: &str) {
-        let mut state = self.state();
-        let owned = state.entries.get(device_id).is_some_and(
-            |entry| matches!(&entry.origin, Origin::Announced { link_device_id: owner } if owner == link_device_id),
-        );
-        if owned {
-            state.entries.remove(device_id);
-        }
+        let change = {
+            let mut state = self.state();
+            let owned = state.entries.get(device_id).is_some_and(
+                |entry| matches!(&entry.origin, Origin::Announced { link_device_id: owner } if owner == link_device_id),
+            );
+            if !owned {
+                return;
+            }
+            let removed = state.entries.remove(device_id);
+            if let Some(entry) = &removed {
+                state.withdrawn.insert(
+                    device_id.to_string(),
+                    WithdrawnDevice {
+                        link_device_id: link_device_id.to_string(),
+                        device: KnownDevice {
+                            name: entry.device.name.clone(),
+                            last_seen_at: now_millis(),
+                        },
+                    },
+                );
+            }
+            removed.and_then(|entry| self.transition(device_id, Some(&entry), None))
+        };
+        self.publish(change.into_iter().collect());
     }
 
     /// Every reachable device, for the console's device list.
@@ -329,10 +483,16 @@ impl Registry {
         via.len() < MAX_HOPS && !via.contains(&self.relay_id)
     }
 
-    fn drop_announcements_from(state: &mut RegistryState, link_device_id: &str) {
-        state.entries.retain(|_, entry| {
-            !matches!(&entry.origin, Origin::Announced { link_device_id: owner } if owner == link_device_id)
-        });
+    /// The devices one downstream link is currently the source of.
+    fn announced_ids_of(state: &RegistryState, link_device_id: &str) -> Vec<String> {
+        state
+            .entries
+            .iter()
+            .filter(|(_, entry)| {
+                matches!(&entry.origin, Origin::Announced { link_device_id: owner } if owner == link_device_id)
+            })
+            .map(|(device_id, _)| device_id.clone())
+            .collect()
     }
 
     fn next_sequence(&self) -> u64 {
@@ -579,6 +739,139 @@ mod tests {
 
         assert!(registry.route("device-b").is_none());
         assert!(registry.route("device-c").is_some());
+    }
+
+    /// What an upstream is offered: every destination, reached through this relay first. The link
+    /// itself is a hop rather than a destination, so it is left out.
+    #[test]
+    fn an_announcement_names_this_relay_first_and_leaves_the_links_out() {
+        let registry = registry();
+        let link = presence("relay-link", DeviceKind::Relay, Some("relay-b"));
+        let handle = link.handle.clone();
+        registry.connect(link);
+        registry.connect(presence("device-a", DeviceKind::Desktop, None));
+        registry.apply_announcement(
+            "relay-link",
+            &handle,
+            vec![announced("device-b", &["relay-b"])],
+        );
+
+        let mut announcements = registry.announcements();
+        announcements.sort_by(|left, right| left.id.cmp(&right.id));
+
+        assert_eq!(announcements.len(), 2, "下游链接本身不作为设备通告");
+        assert_eq!(announcements[0].id, "device-a");
+        assert_eq!(announcements[0].via, [RELAY_ID]);
+        assert_eq!(announcements[1].id, "device-b");
+        assert_eq!(announcements[1].via, [RELAY_ID, "relay-b"]);
+        assert!(announcements.iter().all(|device| device.online));
+    }
+
+    #[test]
+    fn a_tunnel_coming_up_and_going_down_is_published_to_subscribers() {
+        let registry = registry();
+        let mut changes = registry.subscribe();
+
+        let registration = registry.connect(presence("device-a", DeviceKind::Desktop, None));
+        registry.disconnect("device-a", registration.serial);
+
+        assert!(matches!(
+            changes.try_recv().expect("上线事件"),
+            RegistryChange::Online(device) if device.id == "device-a" && device.via == [RELAY_ID]
+        ));
+        assert!(matches!(
+            changes.try_recv().expect("下线事件"),
+            RegistryChange::Offline { device_id } if device_id == "device-a"
+        ));
+    }
+
+    /// Losing a link takes every device behind it offline, and the link is not itself announced.
+    #[test]
+    fn losing_a_link_publishes_a_withdrawal_for_everything_it_carried() {
+        let registry = registry();
+        let link = presence("relay-link", DeviceKind::Relay, Some("relay-b"));
+        let handle = link.handle.clone();
+        let registration = registry.connect(link);
+        registry.apply_announcement(
+            "relay-link",
+            &handle,
+            vec![announced("device-b", &["relay-b"])],
+        );
+        let mut changes = registry.subscribe();
+
+        registry.disconnect("relay-link", registration.serial);
+
+        let withdrawn: Vec<String> = std::iter::from_fn(|| changes.try_recv().ok())
+            .map(|change| match change {
+                RegistryChange::Offline { device_id } => device_id,
+                RegistryChange::Online(device) => panic!("断开不应产生上线事件：{}", device.id),
+            })
+            .collect();
+        assert_eq!(withdrawn, ["device-b"]);
+    }
+
+    /// An announced device has no row on this relay, so without this memory its address would turn
+    /// from "offline" into "no such device" the moment the desktop behind it went away.
+    #[test]
+    fn a_withdrawn_device_is_remembered_while_its_link_is_up() {
+        let registry = registry();
+        let link = presence("relay-link", DeviceKind::Relay, Some("relay-b"));
+        let handle = link.handle.clone();
+        let registration = registry.connect(link);
+        registry.announce_device("relay-link", &handle, announced("device-b", &["relay-b"]));
+
+        registry.withdraw_device("relay-link", "device-b");
+
+        let known = registry.last_known("device-b").expect("设备应当被记住");
+        assert_eq!(known.name, "设备 device-b");
+        assert!(known.last_seen_at > 0);
+        assert!(registry.last_known("never-announced").is_none());
+
+        // Coming back replaces the memory with a live route again.
+        registry.announce_device("relay-link", &handle, announced("device-b", &["relay-b"]));
+        assert!(registry.last_known("device-b").is_none());
+
+        // And once the link is gone the relay can no longer vouch for anything it said.
+        registry.withdraw_device("relay-link", "device-b");
+        registry.disconnect("relay-link", registration.serial);
+        assert!(registry.last_known("device-b").is_none());
+    }
+
+    /// A device present in two consecutive snapshots must not flicker: a withdrawal would take it
+    /// offline for everyone further up the chain for no reason.
+    #[test]
+    fn a_repeated_snapshot_publishes_no_withdrawal_for_a_device_that_stayed() {
+        let registry = registry();
+        let handle = TunnelHandle::disconnected("relay-link");
+        let snapshot = || {
+            vec![
+                announced("device-b", &["relay-b"]),
+                announced("device-c", &["relay-b"]),
+            ]
+        };
+        registry.apply_announcement("relay-link", &handle, snapshot());
+        let mut changes = registry.subscribe();
+
+        registry.apply_announcement("relay-link", &handle, snapshot());
+        registry.apply_announcement(
+            "relay-link",
+            &handle,
+            vec![announced("device-c", &["relay-b"])],
+        );
+
+        let published: Vec<RegistryChange> =
+            std::iter::from_fn(|| changes.try_recv().ok()).collect();
+        assert!(
+            !published.iter().any(|change| matches!(
+                change,
+                RegistryChange::Offline { device_id } if device_id == "device-c"
+            )),
+            "两次快照都包含的设备不应被撤回：{published:?}"
+        );
+        assert!(published.iter().any(|change| matches!(
+            change,
+            RegistryChange::Offline { device_id } if device_id == "device-b"
+        )));
     }
 
     #[test]

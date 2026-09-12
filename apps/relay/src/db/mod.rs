@@ -33,6 +33,8 @@ pub const DATABASE_FILE: &str = "relay.db";
 /// `relay_settings` keys.
 pub const SETTING_RELAY_ID: &str = "relay_id";
 pub const SETTING_PUBLIC_URL: &str = "public_url";
+/// The upstream relay this one dials, as the JSON of `upstream::UpstreamSettings`.
+pub const SETTING_UPSTREAM: &str = "upstream";
 
 /// 128 bits, rendered base64url: enough that two independently created rows never collide, short
 /// enough to sit in a URL path without wrapping.
@@ -113,6 +115,13 @@ impl Database {
              ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at",
             params![key, value, now_millis()],
         )?;
+        Ok(())
+    }
+
+    /// Removes a setting, so that "never configured" and "no longer configured" read the same way.
+    pub fn delete_setting(&self, key: &str) -> Result<(), DatabaseError> {
+        self.connection()
+            .execute("DELETE FROM relay_settings WHERE key = ?1", params![key])?;
         Ok(())
     }
 

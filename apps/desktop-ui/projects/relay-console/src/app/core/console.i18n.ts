@@ -162,6 +162,7 @@ export const RELAY_CONSOLE_TRANSLATIONS: TranslationBundle = {
     'console.relays.upstreamNone': '尚未接入上游中继',
     'console.relays.upstreamNoneHint': '接入上游后，本中继名下的设备在上游中继上也能被访问。',
     'console.relays.upstreamUrl': '上游中继地址',
+    'console.relays.upstreamRelayId': '上游中继 ID',
     'console.relays.upstreamCode': '上游签发的接入码',
     'console.relays.connect': '接入上游',
     'console.relays.connecting': '接入中…',
@@ -182,7 +183,6 @@ export const RELAY_CONSOLE_TRANSLATIONS: TranslationBundle = {
     'console.relays.downstreamEmptyHelp':
       '签发一个「下游中继」类型的接入码，另一台中继就能接到这里。',
     'console.relays.deviceCount': '通告设备数',
-    'console.relays.notImplemented': '当前中继版本还不支持建立上游链接，该功能属于第二阶段。',
 
     'console.audit.title': '审计',
     'console.audit.subtitle': '登录、接入、撤销与隧道变化的记录。',
@@ -379,6 +379,7 @@ export const RELAY_CONSOLE_TRANSLATIONS: TranslationBundle = {
     'console.relays.upstreamNoneHint':
       'With an upstream, the devices on this relay can also be reached through that relay.',
     'console.relays.upstreamUrl': 'Upstream relay address',
+    'console.relays.upstreamRelayId': 'Upstream relay ID',
     'console.relays.upstreamCode': 'Enrolment code from the upstream',
     'console.relays.connect': 'Join the upstream',
     'console.relays.connecting': 'Joining…',
@@ -399,8 +400,6 @@ export const RELAY_CONSOLE_TRANSLATIONS: TranslationBundle = {
     'console.relays.downstreamEmptyHelp':
       'Issue an enrolment code of kind "Downstream relay" and another relay can join here.',
     'console.relays.deviceCount': 'Announced devices',
-    'console.relays.notImplemented':
-      'This relay version cannot join an upstream yet; that arrives in the second stage.',
 
     'console.audit.title': 'Audit',
     'console.audit.subtitle': 'Sign-ins, enrolments, revocations and tunnel changes.',

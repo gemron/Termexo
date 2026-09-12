@@ -46,11 +46,28 @@ pub struct Cli {
 pub enum Command {
     /// 启动中继服务。
     Serve(ServeArgs),
+    /// 用上游中继签发的接入码建立上游链接，只写入配置，不启动服务。
+    Link(LinkArgs),
     /// 管理操作。
     Admin {
         #[command(subcommand)]
         command: AdminCommand,
     },
+}
+
+#[derive(Debug, Args)]
+pub struct LinkArgs {
+    #[arg(long, env = "TERMEXO_RELAY_DATA_DIR", default_value = DEFAULT_DATA_DIRECTORY)]
+    pub data_dir: PathBuf,
+    /// 上游中继的公开地址，例如 https://relay-a.example.com。
+    #[arg(long)]
+    pub upstream: String,
+    /// 上游中继签发的、类型为 relay 的接入码。
+    #[arg(long)]
+    pub code: String,
+    /// 本中继在上游中继上显示的名称，默认取本中继已保存的公开地址主机名。
+    #[arg(long)]
+    pub name: Option<String>,
 }
 
 #[derive(Debug, Subcommand)]

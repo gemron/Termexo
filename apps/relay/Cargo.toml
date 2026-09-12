@@ -44,6 +44,11 @@ rcgen = { version = "0.14", default-features = false, features = [
     "pem",
     "aws_lc_rs",
 ] }
+# Only used to trade an upstream's enrollment code for this relay's own device credential.
+reqwest = { version = "0.13.4", default-features = false, features = [
+    "json",
+    "rustls",
+] }
 rusqlite = { version = "0.40.1", features = ["bundled"] }
 rustls = { version = "0.23", default-features = false, features = ["aws_lc_rs"] }
 serde = { version = "1.0", features = ["derive"] }
@@ -60,6 +65,8 @@ tokio = { version = "1", features = [
     "sync",
     "time",
 ] }
+# The outbound half of a tunnel, for a relay that is the downstream of another relay.
+tokio-tungstenite = { version = "0.30", features = ["rustls-tls-native-roots"] }
 tokio-util = { version = "0.7", features = ["compat"] }
 tower = { version = "0.5", features = ["util"] }
 tracing = "0.1"
@@ -70,5 +77,5 @@ yamux = "0.14"
 reqwest = { version = "0.13.4", default-features = false, features = [
     "cookies",
     "json",
+    "rustls",
 ] }
-tokio-tungstenite = "0.28"
