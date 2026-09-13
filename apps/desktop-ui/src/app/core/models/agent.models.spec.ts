@@ -1,6 +1,9 @@
 import {
   AccountProfile,
+  AgentEvent,
+  chronologicalAgentEvents,
   compatibleNativeSessionId,
+  EVENT_STATUS,
   findProviderPreset,
   groupProfilesByProvider,
   isNativeModel,
@@ -10,6 +13,41 @@ import {
   resolveAccountProfileId,
   terminalAccountName,
 } from './agent.models';
+
+describe('EVENT_STATUS', () => {
+  it('maps the start-up and interruption events to states that ask nothing of the user', () => {
+    expect(EVENT_STATUS['session.starting']).toBe('STARTING');
+    expect(EVENT_STATUS['session.ready']).toBe('IDLE');
+    expect(EVENT_STATUS['agent.interrupted']).toBe('IDLE');
+  });
+
+  it('leaves informational events without a status', () => {
+    expect(EVENT_STATUS['agent.notification']).toBeUndefined();
+    expect(EVENT_STATUS['agent.event']).toBeUndefined();
+  });
+});
+
+describe('chronologicalAgentEvents', () => {
+  const event = (eventKey: string, createdAt: number): AgentEvent => ({
+    eventKey,
+    agentType: 'claude',
+    terminalId: 'terminal-1',
+    eventType: 'tool.completed',
+    detail: {},
+    createdAt,
+  });
+
+  it('orders a batch by when each hook fired, not by the order it arrived in', () => {
+    const batch = [event('late', 2_000), event('early', 1_500), event('tie', 2_000)];
+
+    expect(chronologicalAgentEvents(batch).map((item) => item.eventKey)).toEqual([
+      'early',
+      'late',
+      'tie',
+    ]);
+    expect(batch.map((item) => item.eventKey)).toEqual(['late', 'early', 'tie']);
+  });
+});
 
 describe('compatibleNativeSessionId', () => {
   it('rejects a session proven to belong to the other Agent', () => {

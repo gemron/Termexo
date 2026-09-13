@@ -29,8 +29,11 @@
   box-shadow: 0 6px 18px rgb(0 0 0 / 28%);
   animation: attention-banner-enter 180ms ease-out;
 
-  // Approval blocks the agent on an explicit decision, so it outranks a plain input prompt.
-  &[data-status='WAITING_APPROVAL'] {
+  // Approval blocks the agent on an explicit decision, so it outranks a plain input prompt; a
+  // failed or rate-limited agent has stopped working altogether.
+  &[data-status='WAITING_APPROVAL'],
+  &[data-status='FAILED'],
+  &[data-status='RATE_LIMITED'] {
     --attention-accent: var(--color-error);
     --attention-accent-content: var(--color-error-content);
   }

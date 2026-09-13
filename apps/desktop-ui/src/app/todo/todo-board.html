@@ -1,20 +1,20 @@
-<section class="todo-board" aria-label="任务面板">
+<section class="todo-board" [attr.aria-label]="'taskBoard.title' | t">
   <header class="board-header">
     <div class="board-context">
       <div class="board-heading">
         <span class="board-icon"><app-icon name="layout" [size]="18" /></span>
         <div>
-          <h1>任务面板</h1>
-          <p>从任务拆解、Agent 执行到人工验收，全程保持上下文</p>
+          <h1>{{ 'taskBoard.title' | t }}</h1>
+          <p>{{ 'taskBoard.subtitle' | t }}</p>
         </div>
       </div>
       @if (visibleSummary().total > 0) {
-        <div class="board-progress" aria-label="当前筛选的任务进度">
-          <span>已验收</span>
+        <div class="board-progress" [attr.aria-label]="'taskBoard.progressFilter' | t">
+          <span>{{ 'taskBoard.verified' | t }}</span>
           <div
             class="progress-track"
             role="progressbar"
-            aria-label="任务验收进度"
+            [attr.aria-label]="'taskBoard.progressBar' | t"
             aria-valuemin="0"
             aria-valuemax="100"
             [attr.aria-valuenow]="visibleSummary().progress"
@@ -28,7 +28,7 @@
 
     <div class="board-actions">
       <button type="button" class="secondary-action" (click)="openCreateProject()">
-        <app-icon name="folder" [size]="14" /> 添加项目
+        <app-icon name="folder" [size]="14" /> {{ 'taskBoard.addProject' | t }}
       </button>
       <button
         type="button"
@@ -36,26 +36,26 @@
         data-testid="task-create-button"
         (click)="openCreateTask()"
       >
-        <app-icon name="plus" [size]="14" /> 新建任务
+        <app-icon name="plus" [size]="14" /> {{ 'taskBoard.newTask' | t }}
       </button>
     </div>
   </header>
 
   <div class="board-toolbars">
-    <nav class="stage-navigation" aria-label="任务状态">
+    <nav class="stage-navigation" [attr.aria-label]="'todo.stageNavigation' | t">
       @for (column of columns; track column.stage) {
         <button type="button" (click)="scrollToStage(column.stage, kanban)">
-          {{ column.title }} {{ tasksFor(column.stage).length }}
+          {{ column.titleKey | t }} {{ tasksFor(column.stage).length }}
         </button>
       }
     </nav>
-    <nav class="project-switcher" aria-label="项目筛选">
+    <nav class="project-switcher" [attr.aria-label]="'taskBoard.projectFilter' | t">
       <button
         type="button"
         [class.active]="selectedProjectId() === allProjectsOption"
         (click)="selectedProjectId.set(allProjectsOption)"
       >
-        全部项目 <b>{{ workspaceTasks().length }}</b>
+        {{ 'taskBoard.allProjects' | t }} <b>{{ workspaceTasks().length }}</b>
       </button>
       @for (project of projects(); track project.id) {
         <span class="project-chip" [style.--project-color]="project.color">
@@ -71,8 +71,8 @@
             type="button"
             class="project-edit"
             data-testid="project-edit-button"
-            aria-label="编辑项目目录"
-            title="编辑项目目录"
+            [attr.aria-label]="'taskBoard.editProjectDirectory' | t"
+            [title]="'taskBoard.editProjectDirectory' | t"
             (click)="openEditProject(project)"
           >
             <app-icon name="edit" [size]="12" />
@@ -82,10 +82,14 @@
     </nav>
 
     @if (routineTasks().length > 0) {
-      <nav class="routine-bar" aria-label="常用任务" data-testid="routine-bar">
+      <nav
+        class="routine-bar"
+        [attr.aria-label]="'taskBoard.routineTasks' | t"
+        data-testid="routine-bar"
+      >
         <span class="routine-bar-label">
           <app-icon name="refresh" [size]="12" />
-          常用任务
+          {{ 'taskBoard.routineTasks' | t }}
         </span>
         @for (task of routineTasks(); track task.id) {
           <button
@@ -126,16 +130,16 @@
         <header>
           <span class="column-status" [attr.data-stage]="column.stage"></span>
           <div>
-            <h2>{{ column.title }}</h2>
-            <p>{{ column.description }}</p>
+            <h2>{{ column.titleKey | t }}</h2>
+            <p>{{ column.descriptionKey | t }}</p>
           </div>
           <b>{{ tasksFor(column.stage).length }}</b>
           @if (column.stage === 'todo') {
             <button
               type="button"
               class="column-add"
-              aria-label="新建任务"
-              title="新建任务"
+              [attr.aria-label]="'taskBoard.newTask' | t"
+              [title]="'taskBoard.newTask' | t"
               (click)="openCreateTask()"
             >
               <app-icon name="plus" [size]="12" />
@@ -173,16 +177,16 @@
               }
               <div class="task-card-topline">
                 <span class="priority" [attr.data-priority]="task.priority">
-                  {{ priorityLabel(task.priority) }}优先级
+                  {{ 'taskBoard.priority.badge' | t: { priority: priorityLabel(task.priority) } }}
                 </span>
                 @if (task.recurring) {
                   <!-- The run count stays in the tooltip so the badge survives a narrow card. -->
                   <span
                     class="routine-badge"
-                    [attr.title]="'常用任务 · 已完成 ' + task.runCount + ' 次，完成后可再次执行'"
+                    [attr.title]="'taskBoard.card.routineHint' | t: { count: task.runCount }"
                   >
                     <app-icon name="refresh" [size]="10" />
-                    常用
+                    {{ 'taskBoard.card.routineBadge' | t }}
                   </span>
                 }
                 @if (selectedProjectId() === allProjectsOption && projectFor(task); as project) {
@@ -194,8 +198,8 @@
                   <button
                     type="button"
                     class="icon-action"
-                    aria-label="编辑待办"
-                    title="编辑待办"
+                    [attr.aria-label]="'taskBoard.card.edit' | t"
+                    [title]="'taskBoard.card.edit' | t"
                     (click)="openEditTask(task)"
                   >
                     <app-icon name="edit" [size]="13" />
@@ -204,8 +208,8 @@
                     type="button"
                     class="icon-action danger-icon"
                     data-testid="task-card-delete"
-                    aria-label="删除任务卡片"
-                    title="删除任务"
+                    [attr.aria-label]="'taskBoard.card.deleteLabel' | t"
+                    [title]="'taskBoard.deleteTask' | t"
                     (click)="requestTaskDeletion(task)"
                   >
                     <app-icon name="trash" [size]="13" />
@@ -243,16 +247,16 @@
                 <button
                   type="button"
                   class="terminal-binding"
-                  aria-label="查看关联终端"
-                  title="打开关联终端"
+                  [attr.aria-label]="'taskBoard.card.viewTerminal' | t"
+                  [title]="'taskBoard.card.openTerminal' | t"
                   (click)="terminalRequested.emit(task.terminalId)"
                 >
                   <app-icon name="terminal" [size]="12" />
                   @if (terminalFor(task); as terminal) {
                     <strong>{{ terminal.name }}</strong>
                   } @else {
-                    <strong>关联终端不可用</strong>
-                    <span>可重试并创建新终端</span>
+                    <strong>{{ 'taskBoard.card.terminalUnavailable' | t }}</strong>
+                    <span>{{ 'taskBoard.card.terminalUnavailableHint' | t }}</span>
                   }
                   <app-icon class="chip-go" name="arrow-right" [size]="11" />
                 </button>
@@ -270,7 +274,9 @@
                     <time class="run-elapsed">{{ elapsed }}</time>
                   }
                   @if (task.attempts > 1) {
-                    <em class="run-attempts">第 {{ task.attempts }} 次</em>
+                    <em class="run-attempts">{{
+                      'taskBoard.card.attempt' | t: { count: task.attempts }
+                    }}</em>
                   }
                 </div>
                 @let outputLines = latestOutput(task);
@@ -282,7 +288,7 @@
                   </div>
                 }
                 @if (task.lastError) {
-                  <p class="task-error">{{ task.lastError }}</p>
+                  <p class="task-error">{{ task.lastError | t }}</p>
                 }
               } @else if (stoppedRunLabel(task); as stopped) {
                 <p class="stopped-note">
@@ -293,16 +299,17 @@
 
               @if (deleteConfirmTaskId() === task.id) {
                 <div class="delete-confirm" role="alert">
-                  <strong>删除这个任务？</strong>
+                  <strong>{{ 'taskBoard.card.deleteConfirm' | t }}</strong>
                   <span>
                     {{
-                      task.stage === 'executing'
-                        ? '正在执行的 Agent 会被同时终止，删除后无法恢复。'
-                        : '删除后无法恢复。'
+                      (task.stage === 'executing'
+                        ? 'taskBoard.card.deleteRunningWarning'
+                        : 'taskBoard.card.deleteWarning'
+                      ) | t
                     }}
                   </span>
                   <button type="button" class="quiet-action" (click)="cancelTaskDeletion()">
-                    取消
+                    {{ 'common.cancel' | t }}
                   </button>
                   <button
                     type="button"
@@ -310,7 +317,12 @@
                     data-testid="task-card-delete-confirm"
                     (click)="confirmTaskDeletion(task)"
                   >
-                    {{ task.stage === 'executing' ? '终止并删除' : '删除' }}
+                    {{
+                      (task.stage === 'executing'
+                        ? 'taskBoard.card.stopAndDelete'
+                        : 'common.delete'
+                      ) | t
+                    }}
                   </button>
                 </div>
               }
@@ -324,7 +336,10 @@
                     (click)="requestExecution(task)"
                   >
                     <app-icon name="play" [size]="12" />
-                    {{ busyTaskId() === task.id ? '正在启动' : '开始执行' }}
+                    {{
+                      (busyTaskId() === task.id ? 'taskBoard.card.starting' : 'taskBoard.card.run')
+                        | t
+                    }}
                   </button>
                 }
                 @if (task.stage === 'executing') {
@@ -333,26 +348,31 @@
                       type="button"
                       class="run-action"
                       data-testid="task-resume-button"
-                      title="在原来的终端和会话里接着执行"
+                      [title]="'taskBoard.card.resumeHint' | t"
                       [disabled]="busyTaskId() === task.id"
                       (click)="resumeRequested.emit(task.id)"
                     >
-                      <app-icon name="play" [size]="12" /> 继续执行
+                      <app-icon name="play" [size]="12" /> {{ 'taskBoard.card.resume' | t }}
                     </button>
                     <button
                       type="button"
                       class="quiet-action"
                       data-testid="task-backlog-button"
-                      title="放弃这一轮执行，任务回到待办"
+                      [title]="'taskBoard.card.backlogHint' | t"
                       (click)="backlogRequested.emit(task.id)"
                     >
-                      放回待办
+                      {{ 'taskBoard.card.backlog' | t }}
                     </button>
                   } @else {
                     @if (task.executionState === 'failed') {
                       <button type="button" class="run-action" (click)="requestExecution(task)">
                         <app-icon name="refresh" [size]="12" />
-                        {{ task.promptDeliveryState === 'failed' ? '重新发送' : '重试' }}
+                        {{
+                          (task.promptDeliveryState === 'failed'
+                            ? 'taskBoard.card.resend'
+                            : 'common.retry'
+                          ) | t
+                        }}
                       </button>
                     }
                     @if (canAmend(task)) {
@@ -360,55 +380,57 @@
                         type="button"
                         class="quiet-action"
                         data-testid="task-amend-button"
-                        title="给正在执行的 Agent 追加要求，任务不会重新开始"
+                        [title]="'taskBoard.card.amendHint' | t"
                         [disabled]="busyTaskId() === task.id"
                         (click)="openAmendment(task)"
                       >
-                        <app-icon name="message" [size]="12" /> 补充指令
+                        <app-icon name="message" [size]="12" /> {{ 'taskBoard.amend' | t }}
                       </button>
                     }
                     <button
                       type="button"
                       class="stop-action"
                       data-testid="task-stop-button"
-                      title="中止执行，保留终端与会话，之后可以继续或放回待办"
+                      [title]="'taskBoard.card.stopHint' | t"
                       [disabled]="busyTaskId() === task.id"
                       (click)="stopRequested.emit(task.id)"
                     >
-                      <app-icon name="square" [size]="11" /> 中止
+                      <app-icon name="square" [size]="11" /> {{ 'taskBoard.card.stop' | t }}
                     </button>
                   }
                   <button type="button" class="quiet-action" (click)="markCompleted(task)">
-                    送交验收
+                    {{ 'taskBoard.card.submitForReview' | t }}
                   </button>
                 }
                 @if (task.stage === 'completed') {
                   <button type="button" class="reject-action" (click)="openValidationFailure(task)">
-                    不通过 / 继续修改
+                    {{ 'taskBoard.card.reject' | t }}
                   </button>
                   <button
                     type="button"
                     class="verify-action"
                     data-testid="task-verify-button"
-                    title="验收通过，保留关联终端"
+                    [title]="'taskBoard.card.verifyHint' | t"
                     (click)="verify(task)"
                   >
-                    <app-icon name="shield" [size]="12" /> 验证通过
+                    <app-icon name="shield" [size]="12" /> {{ 'taskBoard.card.verify' | t }}
                   </button>
                   @if (closableTerminalFor(task); as terminal) {
                     <button
                       type="button"
                       class="stop-action"
                       data-testid="task-verify-close-terminal"
-                      [title]="'验收通过，并关闭终端 ' + terminal.name"
+                      [title]="'taskBoard.card.verifyCloseHint' | t: { terminal: terminal.name }"
                       (click)="verify(task, true)"
                     >
-                      <app-icon name="square" [size]="11" /> 验收并关闭终端
+                      <app-icon name="square" [size]="11" /> {{ 'taskBoard.card.verifyClose' | t }}
                     </button>
                   }
                 }
                 @if (task.stage === 'verified') {
-                  <span class="verified-label"><app-icon name="shield" [size]="13" /> 已验收</span>
+                  <span class="verified-label"
+                    ><app-icon name="shield" [size]="13" /> {{ 'taskBoard.verified' | t }}</span
+                  >
                 }
                 @if (canRestart(task)) {
                   <button
@@ -419,18 +441,18 @@
                     [disabled]="!canRunRoutine(task)"
                     (click)="runRoutine(task)"
                   >
-                    <app-icon name="refresh" [size]="12" /> 再次执行
+                    <app-icon name="refresh" [size]="12" /> {{ 'taskBoard.card.runAgain' | t }}
                   </button>
                 }
                 @if (task.executionState === 'waiting' && task.terminalId) {
                   <button
                     type="button"
                     class="attend-action"
-                    title="打开终端处理输入或确认"
+                    [title]="'taskBoard.card.attendHint' | t"
                     (click)="terminalRequested.emit(task.terminalId)"
                   >
                     <app-icon name="arrow-right" [size]="12" />
-                    前往处理
+                    {{ 'taskBoard.card.attend' | t }}
                   </button>
                 }
               </footer>
@@ -440,7 +462,7 @@
               <button type="button" class="empty-column empty-action" (click)="openCreateTask()">
                 <app-icon name="plus" [size]="18" />
                 <strong>{{ emptyColumnLabel(column.stage) }}</strong>
-                <span>先明确目标，再选择 Agent 和执行目录</span>
+                <span>{{ 'taskBoard.empty.todoHint' | t }}</span>
               </button>
             } @else {
               <div class="empty-column">
@@ -469,17 +491,22 @@
     >
       <header>
         <div>
-          <h2>{{ editingTask() ? '编辑任务' : '新建任务' }}</h2>
-          <p>写清目标，Agent 会直接收到这些上下文；执行设置已按当前项目填好。</p>
+          <h2>{{ (editingTask() ? 'taskBoard.editTask' : 'taskBoard.newTask') | t }}</h2>
+          <p>{{ 'taskBoard.taskDialog.subtitle' | t }}</p>
         </div>
-        <button type="button" class="icon-action" aria-label="关闭" (click)="closeTaskDialog()">
+        <button
+          type="button"
+          class="icon-action"
+          [attr.aria-label]="'common.close' | t"
+          (click)="closeTaskDialog()"
+        >
           <app-icon name="x" [size]="15" />
         </button>
       </header>
 
       @if (!editingTask()) {
         <div class="routine-presets">
-          <span>常用任务</span>
+          <span>{{ 'taskBoard.routineTasks' | t }}</span>
           @for (preset of routinePresets; track preset.id) {
             <button
               type="button"
@@ -488,46 +515,50 @@
               [attr.data-preset]="preset.id"
               (click)="applyRoutinePreset(preset)"
             >
-              <app-icon name="refresh" [size]="11" /> {{ preset.title }}
+              <app-icon name="refresh" [size]="11" /> {{ preset.titleKey | t }}
             </button>
           }
         </div>
       }
 
       <label>
-        <span>标题 *</span>
+        <span>{{ 'taskBoard.taskDialog.titleLabel' | t }}</span>
         <input
           type="text"
           data-testid="task-title-input"
           [ngModel]="taskTitle()"
           (ngModelChange)="taskTitle.set($event)"
-          placeholder="例如：为登录接口补充限流与测试"
+          [placeholder]="'taskBoard.taskDialog.titlePlaceholder' | t"
           autofocus
         />
       </label>
       <label>
-        <span>任务说明</span>
+        <span>{{ 'taskBoard.taskDialog.descriptionLabel' | t }}</span>
         <textarea
           rows="4"
           data-testid="task-description-input"
           [ngModel]="taskDescription()"
           (ngModelChange)="taskDescription.set($event)"
-          placeholder="背景、范围、约束和需要修改的内容"
+          [placeholder]="'taskBoard.taskDialog.descriptionPlaceholder' | t"
         ></textarea>
       </label>
       <label>
-        <span>验收标准</span>
+        <span>{{ 'taskBoard.taskDialog.acceptanceLabel' | t }}</span>
         <textarea
           rows="3"
           data-testid="task-acceptance-input"
           [ngModel]="taskAcceptance()"
           (ngModelChange)="taskAcceptance.set($event)"
-          placeholder="例如：单元测试通过；错误响应包含 Retry-After"
+          [placeholder]="'taskBoard.taskDialog.acceptancePlaceholder' | t"
         ></textarea>
       </label>
       <div class="priority-field">
-        <span>优先级</span>
-        <div class="priority-choice" role="group" aria-label="优先级">
+        <span>{{ 'taskBoard.priority.label' | t }}</span>
+        <div
+          class="priority-choice"
+          role="group"
+          [attr.aria-label]="'taskBoard.priority.label' | t"
+        >
           @for (option of priorities; track option.value) {
             <button
               type="button"
@@ -536,7 +567,7 @@
               [attr.aria-pressed]="taskPriority() === option.value"
               (click)="taskPriority.set(option.value)"
             >
-              {{ option.label }}
+              {{ option.labelKey | t }}
             </button>
           }
         </div>
@@ -550,9 +581,9 @@
             [ngModel]="taskRecurring()"
             (ngModelChange)="taskRecurring.set($event)"
           />
-          <span>设为常用任务</span>
+          <span>{{ 'taskBoard.taskDialog.recurringLabel' | t }}</span>
         </label>
-        <small>常用任务在完成或验收后可以一键再次执行，适合编译、打包、发布这类重复工作。</small>
+        <small>{{ 'taskBoard.taskDialog.recurringHint' | t }}</small>
       </div>
 
       <section class="execution-settings">
@@ -565,13 +596,13 @@
           (click)="toggleExecutionSettings()"
         >
           <app-icon name="chevron-down" [size]="13" />
-          <strong>执行设置</strong>
+          <strong>{{ 'taskBoard.taskDialog.executionSettings' | t }}</strong>
           <span data-testid="task-execution-summary">{{ executionSummary() }}</span>
         </button>
 
         @if (executionSettingsExpanded()) {
           <label>
-            <span>所属项目 *</span>
+            <span>{{ 'taskBoard.taskDialog.projectLabel' | t }}</span>
             <select
               data-testid="task-project-select"
               [ngModel]="taskProjectId()"
@@ -584,18 +615,23 @@
             </select>
           </label>
           <label>
-            <span>执行终端 *</span>
+            <span>{{ 'taskBoard.taskDialog.terminalLabel' | t }}</span>
             <select
               data-testid="task-terminal-select"
               [ngModel]="taskTerminalId()"
               [disabled]="taskExecutionLocked()"
               (ngModelChange)="changeTaskTerminal($event)"
             >
-              <option [value]="newTerminalOption">新建终端 · 开始执行时自动创建</option>
+              <option [value]="newTerminalOption">
+                {{ 'taskBoard.taskDialog.newTerminalOption' | t }}
+              </option>
               @if (taskTerminalUnavailable()) {
                 <option [value]="taskTerminalId()" disabled>
                   {{
-                    taskExecutionLocked() ? '当前执行终端 · 处理中' : '原终端当前不可用，请重新选择'
+                    (taskExecutionLocked()
+                      ? 'taskBoard.taskDialog.lockedTerminalOption'
+                      : 'taskBoard.taskDialog.unavailableTerminalOption'
+                    ) | t
                   }}
                 </option>
               }
@@ -608,25 +644,29 @@
             </select>
             @if (selectedTaskTerminal(); as terminal) {
               @if (taskExecutionLocked()) {
-                <small>任务正在“{{ terminal.name }}”中执行；完成或失败后才能调整执行终端。</small>
+                <small>{{
+                  'taskBoard.taskDialog.terminalLockedHint' | t: { terminal: terminal.name }
+                }}</small>
               } @else if (!selectedTaskTerminalAvailable()) {
-                <small class="field-error">该终端已关闭、断开或正被其他任务使用。</small>
+                <small class="field-error">{{
+                  'taskBoard.taskDialog.terminalUnavailable' | t
+                }}</small>
               }
             }
           </label>
           @if (selectedTaskTerminal(); as terminal) {
             <label>
-              <span>执行配置</span>
+              <span>{{ 'taskBoard.taskDialog.runConfigLabel' | t }}</span>
               <div class="terminal-selection-summary" data-testid="task-terminal-summary">
                 <app-icon [name]="agentIcons[terminal.agentType]" [size]="14" />
                 <strong>{{ agentLabels[terminal.agentType] }}</strong>
                 <code>{{ terminal.model }}</code>
               </div>
-              <small>Agent 类型、模型和工作目录都跟随这个终端。</small>
+              <small>{{ 'taskBoard.taskDialog.runConfigHint' | t }}</small>
             </label>
           } @else {
             <label>
-              <span>执行模型 *</span>
+              <span>{{ 'taskBoard.taskDialog.modelLabel' | t }}</span>
               <select
                 data-testid="task-model-select"
                 [ngModel]="taskModelKey()"
@@ -637,25 +677,25 @@
                 }
               </select>
               @if (modelOptions().length === 0) {
-                <small class="field-error">请先在 Agent 设置中添加可用的模型配置。</small>
+                <small class="field-error">{{ 'taskBoard.taskDialog.noModelProfiles' | t }}</small>
               }
             </label>
             @if (selectedTaskAgentType() === 'opencode') {
               <label>
-                <span>OpenCode 模型（可选）</span>
+                <span>{{ 'taskBoard.taskDialog.openCodeModelLabel' | t }}</span>
                 <input
                   type="text"
                   data-testid="task-opencode-model"
-                  placeholder="provider/model，留空则用 OpenCode 默认模型"
+                  [placeholder]="'taskBoard.taskDialog.openCodeModelPlaceholder' | t"
                   [ngModel]="taskOpenCodeModel()"
                   (ngModelChange)="taskOpenCodeModel.set($event)"
                 />
-                <small>凭据与供应商在 OpenCode 中配置，不由 Termexo 管理。</small>
+                <small>{{ 'taskBoard.taskDialog.openCodeModelHint' | t }}</small>
               </label>
             }
           }
           <label>
-            <span>工作目录 *</span>
+            <span>{{ 'taskBoard.workingDirectoryLabel' | t }}</span>
             <span class="directory-field">
               <input
                 type="text"
@@ -663,7 +703,7 @@
                 [ngModel]="taskWorkingDirectory()"
                 (ngModelChange)="taskWorkingDirectory.set($event)"
                 [readonly]="selectedTaskTerminal() !== null || taskExecutionLocked()"
-                placeholder="Agent 终端启动时所在的目录"
+                [placeholder]="'taskBoard.taskDialog.directoryPlaceholder' | t"
               />
               <button
                 type="button"
@@ -674,13 +714,13 @@
                 "
                 (click)="browseTaskDirectory()"
               >
-                <app-icon name="folder" [size]="13" /> 选择目录
+                <app-icon name="folder" [size]="13" /> {{ 'common.selectDirectory' | t }}
               </button>
             </span>
             @if (directoryError()) {
               <small class="field-error">{{ directoryError() }}</small>
             } @else if (!selectedTaskTerminal()) {
-              <small>默认跟随所属项目，可单独指定这条任务运行的目录。</small>
+              <small>{{ 'taskBoard.taskDialog.directoryHint' | t }}</small>
             }
           </label>
         }
@@ -689,14 +729,14 @@
       @if (taskDiscardPending()) {
         <div class="dialog-notice" role="alert">
           <div>
-            <strong>要放弃未保存的修改吗？</strong>
-            <span>当前填写的内容尚未保存。</span>
+            <strong>{{ 'taskBoard.taskDialog.discardPrompt' | t }}</strong>
+            <span>{{ 'taskBoard.taskDialog.discardDetail' | t }}</span>
           </div>
           <button type="button" class="secondary-action" (click)="keepEditingTask()">
-            继续编辑
+            {{ 'taskBoard.taskDialog.keepEditing' | t }}
           </button>
           <button type="button" class="danger-action" (click)="discardTaskChanges()">
-            放弃修改
+            {{ 'taskBoard.taskDialog.discardChanges' | t }}
           </button>
         </div>
       }
@@ -704,11 +744,13 @@
       <footer>
         @if (editingTask() && !taskExecutionLocked()) {
           <button type="button" class="danger-action" (click)="deleteEditingTask()">
-            {{ taskDeletePending() ? '再次点击确认删除' : '删除任务' }}
+            {{ (taskDeletePending() ? 'taskBoard.confirmDelete' : 'taskBoard.deleteTask') | t }}
           </button>
         }
         <span></span>
-        <button type="button" class="secondary-action" (click)="closeTaskDialog()">取消</button>
+        <button type="button" class="secondary-action" (click)="closeTaskDialog()">
+          {{ 'common.cancel' | t }}
+        </button>
         @if (editingTask()) {
           <button
             type="button"
@@ -718,7 +760,7 @@
             [disabled]="!canSaveTask()"
             (click)="saveTask()"
           >
-            保存修改
+            {{ 'taskBoard.taskDialog.saveChanges' | t }}
           </button>
         } @else {
           <button
@@ -728,7 +770,7 @@
             [disabled]="!canSaveTask()"
             (click)="saveTask()"
           >
-            仅创建
+            {{ 'taskBoard.taskDialog.createOnly' | t }}
           </button>
           <button
             type="button"
@@ -738,7 +780,7 @@
             [disabled]="!canSaveTask()"
             (click)="saveTask(true)"
           >
-            <app-icon name="play" [size]="12" /> 创建并执行
+            <app-icon name="play" [size]="12" /> {{ 'taskBoard.taskDialog.createAndRun' | t }}
           </button>
         }
       </footer>
@@ -760,23 +802,34 @@
         <div>
           <h2>
             {{
-              editingProjectId() ? '编辑项目' : resumeTaskAfterProject() ? '先添加项目' : '添加项目'
+              (editingProjectId()
+                ? 'taskBoard.projectDialog.editTitle'
+                : resumeTaskAfterProject()
+                  ? 'taskBoard.projectDialog.firstTitle'
+                  : 'taskBoard.addProject'
+              ) | t
             }}
           </h2>
           <p>
             {{
-              resumeTaskAfterProject()
-                ? '任务需要归属项目；创建后会自动继续填写任务。'
-                : '项目属于当前工作区，任务在项目目录执行；不会更改工作区的默认终端目录。'
+              (resumeTaskAfterProject()
+                ? 'taskBoard.projectDialog.resumeHint'
+                : 'taskBoard.projectDialog.hint'
+              ) | t
             }}
           </p>
         </div>
-        <button type="button" class="icon-action" aria-label="关闭" (click)="closeProjectDialog()">
+        <button
+          type="button"
+          class="icon-action"
+          [attr.aria-label]="'common.close' | t"
+          (click)="closeProjectDialog()"
+        >
           <app-icon name="x" [size]="15" />
         </button>
       </header>
       <label>
-        <span>项目名称 *</span>
+        <span>{{ 'taskBoard.projectDialog.nameLabel' | t }}</span>
         <input
           type="text"
           data-testid="project-name-input"
@@ -786,7 +839,7 @@
         />
       </label>
       <label>
-        <span>工作目录 *</span>
+        <span>{{ 'taskBoard.workingDirectoryLabel' | t }}</span>
         <span class="directory-field">
           <input
             type="text"
@@ -801,7 +854,7 @@
             [disabled]="directoryPickerBusy()"
             (click)="browseProjectDirectory()"
           >
-            <app-icon name="folder" [size]="13" /> 选择目录
+            <app-icon name="folder" [size]="13" /> {{ 'common.selectDirectory' | t }}
           </button>
         </span>
         @if (directoryError()) {
@@ -820,11 +873,18 @@
             data-testid="project-delete-button"
             (click)="deleteEditingProject()"
           >
-            {{ projectDeletePending() ? '再次点击确认删除' : '删除项目' }}
+            {{
+              (projectDeletePending()
+                ? 'taskBoard.confirmDelete'
+                : 'taskBoard.projectDialog.deleteProject'
+              ) | t
+            }}
           </button>
         }
         <span></span>
-        <button type="button" class="secondary-action" (click)="closeProjectDialog()">取消</button>
+        <button type="button" class="secondary-action" (click)="closeProjectDialog()">
+          {{ 'common.cancel' | t }}
+        </button>
         <button
           type="button"
           class="primary-action"
@@ -833,7 +893,12 @@
           (click)="saveProject()"
         >
           {{
-            editingProjectId() ? '保存项目' : resumeTaskAfterProject() ? '创建并继续' : '创建项目'
+            (editingProjectId()
+              ? 'taskBoard.projectDialog.save'
+              : resumeTaskAfterProject()
+                ? 'taskBoard.projectDialog.createAndContinue'
+                : 'taskBoard.projectDialog.create'
+            ) | t
           }}
         </button>
       </footer>
@@ -851,31 +916,31 @@
     >
       <header>
         <div>
-          <h2>{{ validationDialogCopy().heading }}</h2>
-          <p>{{ task.title }} · {{ validationDialogCopy().hint }}</p>
+          <h2>{{ validationDialogCopy().heading | t }}</h2>
+          <p>{{ task.title }} · {{ validationDialogCopy().hint | t }}</p>
         </div>
         <button
           type="button"
           class="icon-action"
-          aria-label="关闭"
+          [attr.aria-label]="'common.close' | t"
           (click)="closeValidationFailure()"
         >
           <app-icon name="x" [size]="15" />
         </button>
       </header>
       <label>
-        <span>{{ validationDialogCopy().feedbackLabel }}</span>
+        <span>{{ validationDialogCopy().feedbackLabel | t }}</span>
         <textarea
           rows="4"
           data-testid="validation-feedback-input"
           [ngModel]="validationFeedback()"
           (ngModelChange)="validationFeedback.set($event)"
-          [placeholder]="validationDialogCopy().feedbackPlaceholder"
+          [placeholder]="validationDialogCopy().feedbackPlaceholder | t"
           autofocus
         ></textarea>
       </label>
       <label>
-        <span>更新任务说明</span>
+        <span>{{ 'taskBoard.feedback.descriptionLabel' | t }}</span>
         <textarea
           rows="3"
           [ngModel]="validationDescription()"
@@ -883,7 +948,7 @@
         ></textarea>
       </label>
       <label>
-        <span>更新验收标准</span>
+        <span>{{ 'taskBoard.feedback.acceptanceLabel' | t }}</span>
         <textarea
           rows="3"
           [ngModel]="validationAcceptance()"
@@ -893,7 +958,7 @@
       <footer>
         <span></span>
         <button type="button" class="secondary-action" (click)="closeValidationFailure()">
-          取消
+          {{ 'common.cancel' | t }}
         </button>
         <button
           type="button"
@@ -902,7 +967,7 @@
           [disabled]="!validationFeedback().trim()"
           (click)="continueAfterFailure()"
         >
-          {{ validationDialogCopy().submit }}
+          {{ validationDialogCopy().submit | t }}
         </button>
       </footer>
     </section>

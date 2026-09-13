@@ -602,7 +602,8 @@ try {
   if (
     interrupted.executionState !== 'failed' ||
     interrupted.promptDeliveryState !== 'failed' ||
-    interrupted.lastError !== '任务指令未送达终端，请重新发送。'
+    // The service stores the translation key; the board renders it in the active language.
+    interrupted.lastError !== 'taskFlow.error.promptInterrupted'
   ) {
     throw new Error(`interrupted prompt was not recovered: ${JSON.stringify(interrupted)}`);
   }

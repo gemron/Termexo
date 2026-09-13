@@ -3,6 +3,7 @@ use std::env;
 use std::fs::{self, File, OpenOptions};
 use std::io::{BufRead, BufReader, Read, Seek, SeekFrom, Write};
 use std::path::{Path, PathBuf};
+use std::process::Stdio;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Mutex;
 use std::time::{SystemTime, UNIX_EPOCH};
@@ -11,6 +12,8 @@ use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use thiserror::Error;
 use url::Url;
+
+use crate::process::hidden_command;
 
 #[derive(Debug, Error)]
 pub enum HookError {
@@ -40,9 +43,30 @@ const TERMEXO_ANTIGRAVITY_TERMINAL_ID: &str = "TERMEXO_ANTIGRAVITY_TERMINAL_ID";
 /// terminal readable on its own terms.
 const ANTIGRAVITY_STATUS_LINE: &str = "{model} · {state}";
 
+/// The one agy state that means the agent is back at its prompt.
+const ANTIGRAVITY_IDLE_STATE: &str = "idle";
+
+/// Set by the status CLI on an `idle` update that ends a turn in which the agent did some work.
+///
+/// agy reports `idle` both when it first reaches its prompt and at the end of every turn, and the
+/// update itself cannot tell the two apart. Only the CLI, which remembers what came before, can.
+const ANTIGRAVITY_TURN_COMPLETED_FIELD: &str = "termexo_turn_completed";
+
+/// Set by the status CLI on an `idle` that comes straight after an approval prompt.
+///
+/// An approved tool reports `working` again before the turn ends; a declined one drops agy back
+/// to its prompt with no work in between, which is an interruption rather than a finished turn.
+/// A tool approved and finished inside one ~300 ms status throttle would read the same way, which
+/// is rare enough — the model still has to answer after it — to accept.
+const ANTIGRAVITY_APPROVAL_DECLINED_FIELD: &str = "termexo_approval_declined";
+
+/// Per-terminal memory of the last status agy reported, kept next to the event spool.
+const ANTIGRAVITY_STATUS_MEMORY_PREFIX: &str = "antigravity-status-";
+const ANTIGRAVITY_STATUS_MEMORY_EXTENSION: &str = "json";
+
 const TERMEXO_CODEX_EVENT_FILE: &str = "TERMEXO_CODEX_EVENT_FILE";
 const TERMEXO_CODEX_TERMINAL_ID: &str = "TERMEXO_CODEX_TERMINAL_ID";
-const CODEX_HOOK_EVENTS: [&str; 11] = [
+const CODEX_HOOK_EVENTS: [&str; 12] = [
     "SessionStart",
     "UserPromptSubmit",
     "PreToolUse",
@@ -53,8 +77,35 @@ const CODEX_HOOK_EVENTS: [&str; 11] = [
     "SubagentStart",
     "SubagentStop",
     "Stop",
+    "Interrupt",
     "SessionEnd",
 ];
+
+/// Separates `codex-notify`'s own options from the user's notify program that follows them.
+///
+/// A `-c notify=[…]` override replaces whatever `notify` the user configured, so the program they
+/// set up would never run inside a Termexo terminal. It is passed along after this flag instead and
+/// started once the event is recorded.
+const CODEX_NOTIFY_FORWARD_FLAG: &str = "--forward";
+const EVENT_FILE_FLAG: &str = "--event-file";
+const TERMINAL_ID_FLAG: &str = "--terminal-id";
+
+/// The tool Claude Code puts a question to the user with; its permission prompt is the question.
+const CLAUDE_QUESTION_TOOL: &str = "AskUserQuestion";
+/// `SessionStart` source for a session resumed after compacting its context mid-task.
+const SESSION_START_COMPACT_SOURCE: &str = "compact";
+/// `SessionEnd` reason for `/clear`, which is immediately followed by a fresh `SessionStart`.
+const SESSION_END_CLEAR_REASON: &str = "clear";
+
+/// Structured `StopFailure` error codes and HTTP statuses that mean the provider is refusing for
+/// load rather than for the request, so the same prompt can succeed once it is retried.
+const RATE_LIMIT_ERROR_MARKERS: [&str; 3] = ["rate_limit", "overloaded", "too_many_requests"];
+const RATE_LIMIT_STATUS_CODES: [&str; 2] = ["429", "529"];
+const TIMEOUT_ERROR_MARKERS: [&str; 2] = ["timeout", "timed_out"];
+/// Fields of a `StopFailure` payload that describe the error itself. `last_assistant_message` is
+/// deliberately absent: it is what the model said, and a reply that mentions a timeout or quotes a
+/// 429 is not one.
+const STOP_FAILURE_DETAIL_FIELDS: [&str; 2] = ["error_details", "message"];
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -192,16 +243,36 @@ impl HookEventStore {
         })
     }
 
-    pub fn codex_notify_config(&self, terminal_id: &str) -> Result<String, HookError> {
+    /// The `notify` override that records a terminal's turn notices and then runs `forward_to`,
+    /// the notify program the user's own Codex config sets (empty when it sets none).
+    pub fn codex_notify_config(
+        &self,
+        terminal_id: &str,
+        forward_to: &[String],
+    ) -> Result<String, HookError> {
         let executable = std::env::current_exe()?;
-        let command = vec![
+        let mut command = vec![
             executable.to_string_lossy().into_owned(),
             "codex-notify".into(),
-            "--event-file".into(),
+            EVENT_FILE_FLAG.into(),
             self.event_file.to_string_lossy().into_owned(),
-            "--terminal-id".into(),
+            TERMINAL_ID_FLAG.into(),
             terminal_id.into(),
         ];
+        if forward_to.iter().all(|value| toml_literal(value).is_ok()) {
+            if !forward_to.is_empty() {
+                command.push(CODEX_NOTIFY_FORWARD_FLAG.into());
+                command.extend(forward_to.iter().cloned());
+            }
+        } else {
+            // The user's program is a courtesy; one that cannot be written into the override is
+            // dropped rather than costing the terminal its launch.
+            tracing::warn!(
+                target: "termexo::hooks",
+                terminal_id,
+                "Codex notify 程序包含无法写入覆盖配置的字符，Termexo 终端内将不会转发给它"
+            );
+        }
         // Literal TOML strings survive the Windows npm `.cmd` shim; JSON-style
         // double quotes are stripped before Codex receives the override.
         let values = command
@@ -377,9 +448,9 @@ impl HookEventStore {
 pub fn capture_hook_event_from_cli() -> Result<(), HookError> {
     let arguments = std::env::args().skip(2).collect::<Vec<_>>();
     let event_file =
-        argument_value(&arguments, "--event-file").ok_or(HookError::InvalidArguments)?;
+        argument_value(&arguments, EVENT_FILE_FLAG).ok_or(HookError::InvalidArguments)?;
     let terminal_id =
-        argument_value(&arguments, "--terminal-id").ok_or(HookError::InvalidArguments)?;
+        argument_value(&arguments, TERMINAL_ID_FLAG).ok_or(HookError::InvalidArguments)?;
     let mut input = String::new();
     std::io::stdin().read_to_string(&mut input)?;
     let payload = serde_json::from_str(&input).unwrap_or_else(|_| json!({ "raw": input }));
@@ -422,11 +493,151 @@ pub fn capture_antigravity_status_from_cli() -> Result<(), HookError> {
     // Printed first: a failure to record the event must not also cost the user their status line.
     println!("{}", antigravity_status_line(&payload));
     if let Some((event_file, terminal_id)) = terminal {
-        if let Err(error) = append_stored_event(&event_file, terminal_id, "antigravity", payload) {
+        if let Err(error) = record_antigravity_status(&event_file, terminal_id, payload) {
             eprintln!("{error}");
         }
     }
     Ok(())
+}
+
+/// What the status CLI remembers about a terminal between two of its runs.
+#[derive(Debug, Default, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct AntigravityStatusMemory {
+    state: String,
+    tool_confirmation_pending: bool,
+    conversation_id: Option<String>,
+    /// Whether the agent worked since it was last idle, which is what makes the next `idle` the
+    /// end of a turn rather than the prompt it reached at launch.
+    worked_since_idle: bool,
+}
+
+impl AntigravityStatusMemory {
+    /// The memory after `payload`, given what was remembered before it.
+    fn after(previous: Option<&Self>, payload: &Value) -> Self {
+        let state = antigravity_state(payload);
+        let worked_since_idle = if is_antigravity_working_state(state) {
+            true
+        } else if state == ANTIGRAVITY_IDLE_STATE || is_antigravity_starting_state(state) {
+            // A launch starts from nothing, even when this terminal's last run ended mid-turn.
+            false
+        } else {
+            previous.is_some_and(|memory| memory.worked_since_idle)
+        };
+        Self {
+            state: state.into(),
+            tool_confirmation_pending: antigravity_confirmation_pending(payload),
+            conversation_id: antigravity_conversation_id(payload).map(str::to_owned),
+            worked_since_idle,
+        }
+    }
+
+    /// Whether two memories describe the same status, which is all the terminal can show.
+    fn reports_same_status(&self, other: &Self) -> bool {
+        self.state == other.state
+            && self.tool_confirmation_pending == other.tool_confirmation_pending
+            && self.conversation_id == other.conversation_id
+    }
+}
+
+/// Records a status update unless it repeats the last one, marking an `idle` that ends a turn.
+///
+/// agy runs the status script every few hundred milliseconds while it streams, each time with the
+/// same state: a seven-second turn once put 23 identical events in the spool and pushed the ones
+/// that mattered out of the window the interface reads. The memory is best effort — a missing or
+/// unreadable file only costs a repeated event — and it is saved after the event is appended, so
+/// a failed append is retried by the next update instead of being taken for already recorded.
+fn record_antigravity_status(
+    event_file: &str,
+    terminal_id: String,
+    mut payload: Value,
+) -> Result<(), HookError> {
+    let memory_file = antigravity_status_memory_file(event_file, &terminal_id);
+    let previous = fs::read(&memory_file)
+        .ok()
+        .and_then(|content| serde_json::from_slice::<AntigravityStatusMemory>(&content).ok());
+    let current = AntigravityStatusMemory::after(previous.as_ref(), &payload);
+    if previous.as_ref() == Some(&current) {
+        return Ok(());
+    }
+    if !previous
+        .as_ref()
+        .is_some_and(|memory| memory.reports_same_status(&current))
+    {
+        if current.state == ANTIGRAVITY_IDLE_STATE {
+            let turn_completed = previous
+                .as_ref()
+                .is_some_and(|memory| memory.worked_since_idle);
+            let approval_declined = previous
+                .as_ref()
+                .is_some_and(|memory| memory.tool_confirmation_pending);
+            if let Some(object) = payload.as_object_mut() {
+                object.insert(
+                    ANTIGRAVITY_TURN_COMPLETED_FIELD.into(),
+                    turn_completed.into(),
+                );
+                object.insert(
+                    ANTIGRAVITY_APPROVAL_DECLINED_FIELD.into(),
+                    approval_declined.into(),
+                );
+            }
+        }
+        append_stored_event(event_file, terminal_id, "antigravity", payload)?;
+    }
+    fs::write(&memory_file, serde_json::to_vec(&current)?)?;
+    Ok(())
+}
+
+/// The memory file for a terminal, beside the spool; the id is reduced to characters that are safe
+/// in a file name, since it arrives through the environment of a process Termexo does not control.
+fn antigravity_status_memory_file(event_file: &str, terminal_id: &str) -> PathBuf {
+    let safe_id = terminal_id
+        .chars()
+        .map(|character| {
+            if character.is_ascii_alphanumeric() || matches!(character, '-' | '_') {
+                character
+            } else {
+                '_'
+            }
+        })
+        .collect::<String>();
+    Path::new(event_file)
+        .parent()
+        .unwrap_or_else(|| Path::new(""))
+        .join(format!(
+            "{ANTIGRAVITY_STATUS_MEMORY_PREFIX}{safe_id}.{ANTIGRAVITY_STATUS_MEMORY_EXTENSION}"
+        ))
+}
+
+fn antigravity_state(payload: &Value) -> &str {
+    payload
+        .get("agent_state")
+        .and_then(Value::as_str)
+        .unwrap_or_default()
+}
+
+fn antigravity_confirmation_pending(payload: &Value) -> bool {
+    payload
+        .get("tool_confirmation_pending")
+        .and_then(Value::as_bool)
+        .unwrap_or(false)
+}
+
+/// The conversation a status belongs to. agy reports an empty string until the first prompt, which
+/// is no conversation at all — taken as an id, it replaced the terminal's known session.
+fn antigravity_conversation_id(payload: &Value) -> Option<&str> {
+    ["conversation_id", "session_id"]
+        .iter()
+        .filter_map(|field| payload.get(field).and_then(Value::as_str))
+        .find(|value| !value.trim().is_empty())
+}
+
+fn is_antigravity_working_state(state: &str) -> bool {
+    matches!(state, "working" | "tool_use" | "thinking")
+}
+
+fn is_antigravity_starting_state(state: &str) -> bool {
+    matches!(state, "initializing" | "authenticating")
 }
 
 /// The status line shown in the CLI, built from the state it just reported.
@@ -452,34 +663,36 @@ fn antigravity_status_line(payload: &Value) -> String {
 /// waiting for an answer is the one thing the user has to be told about.
 fn map_antigravity_event(stored: StoredHookEvent) -> AgentEvent {
     let payload = &stored.payload;
-    let awaiting = payload
-        .get("tool_confirmation_pending")
-        .and_then(Value::as_bool)
-        .unwrap_or(false);
-    let state = payload
-        .get("agent_state")
-        .and_then(Value::as_str)
-        .unwrap_or_default();
+    let awaiting = antigravity_confirmation_pending(payload);
+    let state = antigravity_state(payload);
+    let marked = |field: &str| payload.get(field).and_then(Value::as_bool).unwrap_or(false);
     let event_type = if awaiting {
         "approval.required"
+    } else if state == ANTIGRAVITY_IDLE_STATE {
+        // Only an `idle` the status CLI saw end a turn is a completion; the first one after launch
+        // is the agent reaching its prompt, and one right after an approval prompt is a refusal.
+        if marked(ANTIGRAVITY_APPROVAL_DECLINED_FIELD) {
+            "agent.interrupted"
+        } else if marked(ANTIGRAVITY_TURN_COMPLETED_FIELD) {
+            "task.completed"
+        } else {
+            "session.ready"
+        }
+    } else if is_antigravity_starting_state(state) {
+        "session.starting"
     } else {
         match state {
             "thinking" => "agent.thinking",
             "working" | "tool_use" => "tool.started",
-            "initializing" => "session.started",
-            // `idle` is the only state that means the turn is over.
-            _ => "task.completed",
+            // A state this version does not know says nothing about whether the turn is over.
+            _ => "agent.event",
         }
     };
 
     AgentEvent {
         event_key: stored.event_key,
         agent_type: "antigravity".into(),
-        native_session_id: payload
-            .get("conversation_id")
-            .or_else(|| payload.get("session_id"))
-            .and_then(Value::as_str)
-            .map(str::to_owned),
+        native_session_id: antigravity_conversation_id(payload).map(str::to_owned),
         terminal_id: stored.terminal_id,
         event_type: event_type.into(),
         detail: json!({
@@ -493,15 +706,73 @@ fn map_antigravity_event(stored: StoredHookEvent) -> AgentEvent {
 
 pub fn capture_codex_notification_from_cli() -> Result<(), HookError> {
     let arguments = std::env::args().skip(2).collect::<Vec<_>>();
-    let event_file =
-        argument_value(&arguments, "--event-file").ok_or(HookError::InvalidArguments)?;
-    let terminal_id =
-        argument_value(&arguments, "--terminal-id").ok_or(HookError::InvalidArguments)?;
-    let payload = arguments
-        .last()
-        .ok_or(HookError::InvalidArguments)
-        .and_then(|value| serde_json::from_str(value).map_err(HookError::from))?;
-    append_stored_event(&event_file, terminal_id, "codex", payload)
+    let invocation = CodexNotifyInvocation::parse(&arguments)?;
+    let recorded = serde_json::from_str(&invocation.payload)
+        .map_err(HookError::from)
+        .and_then(|payload| {
+            append_stored_event(
+                &invocation.event_file,
+                invocation.terminal_id.clone(),
+                "codex",
+                payload,
+            )
+        });
+    // Forwarded whether or not the recording worked: the user's program has no stake in it.
+    forward_codex_notification(&invocation.forward_to, &invocation.payload);
+    recorded
+}
+
+/// The arguments Codex runs `codex-notify` with: Termexo's options, the user's own notify program
+/// after [`CODEX_NOTIFY_FORWARD_FLAG`], and the JSON payload Codex appends last.
+#[derive(Debug, PartialEq)]
+struct CodexNotifyInvocation {
+    event_file: String,
+    terminal_id: String,
+    forward_to: Vec<String>,
+    payload: String,
+}
+
+impl CodexNotifyInvocation {
+    fn parse(arguments: &[String]) -> Result<Self, HookError> {
+        let (payload, options) = arguments.split_last().ok_or(HookError::InvalidArguments)?;
+        let (own_options, forward_to) = match options
+            .iter()
+            .position(|argument| argument == CODEX_NOTIFY_FORWARD_FLAG)
+        {
+            Some(index) => (&options[..index], options[index + 1..].to_vec()),
+            None => (options, Vec::new()),
+        };
+        Ok(Self {
+            event_file: argument_value(own_options, EVENT_FILE_FLAG)
+                .ok_or(HookError::InvalidArguments)?,
+            terminal_id: argument_value(own_options, TERMINAL_ID_FLAG)
+                .ok_or(HookError::InvalidArguments)?,
+            forward_to,
+            payload: payload.clone(),
+        })
+    }
+}
+
+/// Starts the user's notify program the way Codex would have: its own arguments, then the payload.
+///
+/// Not waited on and with no handle inherited, so a slow or hung program never holds up the hook or
+/// the pipes Codex reads it through; a program that cannot start is reported and otherwise ignored.
+fn forward_codex_notification(forward_to: &[String], payload: &str) -> Option<std::process::Child> {
+    let (program, arguments) = forward_to.split_first()?;
+    let spawned = hidden_command(program)
+        .args(arguments)
+        .arg(payload)
+        .stdin(Stdio::null())
+        .stdout(Stdio::null())
+        .stderr(Stdio::null())
+        .spawn();
+    match spawned {
+        Ok(child) => Some(child),
+        Err(error) => {
+            eprintln!("无法转发 Codex 通知到 {program}：{error}");
+            None
+        }
+    }
 }
 
 fn append_stored_event(
@@ -549,24 +820,20 @@ fn map_hook_event(stored: StoredHookEvent) -> AgentEvent {
         .and_then(Value::as_str)
         .unwrap_or("Unknown");
     let event_type = match hook_name {
-        "SessionStart" => "session.started",
+        "SessionStart" => session_start_event_type(&stored.payload),
         "UserPromptSubmit" => "agent.thinking",
         "PreToolUse" => "tool.started",
         "PostToolUse" => "tool.completed",
         "PostToolUseFailure" => "tool.failed",
-        "PermissionRequest" => "approval.required",
-        "Notification" => match stored
-            .payload
-            .get("notification_type")
-            .and_then(Value::as_str)
-        {
-            Some("permission_prompt") => "approval.required",
-            Some("idle_prompt") => "user.input.required",
-            _ => "agent.notification",
-        },
+        "PermissionRequest" => claude_permission_event_type(&stored.payload),
+        // Never a status of its own. `permission_prompt` follows the `PermissionRequest` of the
+        // same prompt by seconds and names no tool, so it could only turn a question back into an
+        // approval; `idle_prompt` arrives a minute after `Stop`, when the completion has long been
+        // announced, and would announce the same finished turn a second time.
+        "Notification" => "agent.notification",
         "Stop" => "task.completed",
         "StopFailure" => stop_failure_event_type(&stored.payload),
-        "SessionEnd" => "session.ended",
+        "SessionEnd" => session_end_event_type(&stored.payload),
         _ => "agent.event",
     };
 
@@ -678,7 +945,7 @@ fn map_codex_event(stored: StoredHookEvent) -> AgentEvent {
             .get("hook_event_name")
             .and_then(Value::as_str)
         {
-            Some("SessionStart") => "session.started",
+            Some("SessionStart") => session_start_event_type(&stored.payload),
             Some("UserPromptSubmit" | "PreCompact" | "PostCompact" | "SubagentStart") => {
                 "agent.thinking"
             }
@@ -693,7 +960,10 @@ fn map_codex_event(stored: StoredHookEvent) -> AgentEvent {
             }
             Some("SubagentStop") => "agent.thinking",
             Some("Stop") => "task.completed",
-            Some("SessionEnd") => "session.ended",
+            // Raised on Esc and on a rejected approval: the turn is abandoned and the CLI is back
+            // at its prompt, which is neither a failure nor a finished task.
+            Some("Interrupt") => "agent.interrupted",
+            Some("SessionEnd") => session_end_event_type(&stored.payload),
             _ => "agent.notification",
         },
     };
@@ -740,24 +1010,61 @@ fn codex_tool_failed(payload: &Value) -> bool {
             .is_some_and(|status| matches!(status, "error" | "failed"))
 }
 
+/// `SessionStart` for a CLI that is at its prompt (`startup`, `resume`, `clear`) or, after a
+/// compaction, still in the middle of the task it was compacting for. Claude Code and Codex share
+/// the field and its values.
+fn session_start_event_type(payload: &Value) -> &'static str {
+    match payload.get("source").and_then(Value::as_str) {
+        Some(SESSION_START_COMPACT_SOURCE) => "agent.thinking",
+        _ => "session.ready",
+    }
+}
+
+/// `SessionEnd` for a session that is over, except the one `/clear` ends: that is replaced by a
+/// new session at once, and taking it for an exit flashed the terminal to stopped and recorded a
+/// failed task.
+fn session_end_event_type(payload: &Value) -> &'static str {
+    match payload.get("reason").and_then(Value::as_str) {
+        Some(SESSION_END_CLEAR_REASON) => "agent.notification",
+        _ => "session.ended",
+    }
+}
+
+/// A Claude Code permission prompt, which for `AskUserQuestion` is a question waiting for an
+/// answer rather than a tool waiting for approval.
+fn claude_permission_event_type(payload: &Value) -> &'static str {
+    match payload.get("tool_name").and_then(Value::as_str) {
+        Some(CLAUDE_QUESTION_TOOL) => "user.input.required",
+        _ => "approval.required",
+    }
+}
+
+/// Classifies a failed turn by its structured `error` code, falling back to the error's own
+/// description when the code does not say. What the model last wrote is never consulted.
 fn stop_failure_event_type(payload: &Value) -> &'static str {
-    let detail = ["error", "error_details", "last_assistant_message"]
+    let code = payload.get("error").and_then(Value::as_str);
+    let description = STOP_FAILURE_DETAIL_FIELDS
         .iter()
         .filter_map(|field| payload.get(field).and_then(Value::as_str))
         .collect::<Vec<_>>()
-        .join(" ")
-        .to_ascii_lowercase();
-    if detail.contains("rate_limit")
-        || detail.contains("rate limit")
-        || detail.contains("too many requests")
-        || detail.contains("429")
-    {
-        return "agent.rate_limited";
+        .join(" ");
+    code.and_then(classify_stop_failure)
+        .or_else(|| classify_stop_failure(&description))
+        .unwrap_or("agent.failed")
+}
+
+/// A retryable class for an error code or description, or `None` when it names neither.
+fn classify_stop_failure(text: &str) -> Option<&'static str> {
+    let normalized = text.to_ascii_lowercase().replace(['-', ' '], "_");
+    let contains_any = |markers: &[&str]| markers.iter().any(|marker| normalized.contains(marker));
+    // A status code only counts as a word of its own, never as digits inside a request id.
+    let names_status = normalized
+        .split(|character: char| !character.is_ascii_alphanumeric())
+        .any(|word| RATE_LIMIT_STATUS_CODES.contains(&word));
+    if contains_any(&RATE_LIMIT_ERROR_MARKERS) || names_status {
+        return Some("agent.rate_limited");
     }
-    if detail.contains("timeout") || detail.contains("timed out") {
-        return "agent.timeout";
-    }
-    "agent.failed"
+    contains_any(&TIMEOUT_ERROR_MARKERS).then_some("agent.timeout")
 }
 
 fn argument_value(arguments: &[String], name: &str) -> Option<String> {
@@ -837,24 +1144,125 @@ mod tests {
         std::env::temp_dir().join(format!("termexo-{name}-{unique}"))
     }
 
-    #[test]
-    fn maps_permission_notifications_to_approval_events() {
-        let stored = StoredHookEvent {
-            event_key: "event-1".into(),
-            agent_type: None,
+    /// A spooled event the way the hook CLIs write one, for tests that only care about the payload.
+    fn stored_event(agent_type: Option<&str>, payload: Value) -> StoredHookEvent {
+        StoredHookEvent {
+            event_key: "event-under-test".into(),
+            agent_type: agent_type.map(str::to_owned),
             terminal_id: "terminal-1".into(),
             received_at: 10,
-            payload: json!({
+            payload,
+        }
+    }
+
+    fn mapped_event_type(agent_type: Option<&str>, payload: Value) -> String {
+        map_hook_event(stored_event(agent_type, payload)).event_type
+    }
+
+    #[test]
+    fn records_claude_notifications_without_changing_the_status() {
+        // Recorded from Claude Code 2.1.270: the permission notice arrives about six seconds after
+        // the `PermissionRequest` of the same prompt and names no tool; the idle notice arrives a
+        // minute after `Stop`.
+        let permission = map_hook_event(stored_event(
+            None,
+            json!({
                 "hook_event_name": "Notification",
+                "message": "Claude needs your permission",
                 "notification_type": "permission_prompt",
-                "session_id": "session-1"
+                "prompt_id": "544a4ea5-939c-409a-ad93-8c558637c327",
+                "session_id": "695ab811-bf24-4f10-93c4-3a0b5a266478"
             }),
+        ));
+        let idle = mapped_event_type(
+            None,
+            json!({
+                "hook_event_name": "Notification",
+                "message": "Claude is waiting for your input",
+                "notification_type": "idle_prompt",
+                "session_id": "80545410-08b6-482a-a6ce-bbe8b2d7a155"
+            }),
+        );
+
+        assert_eq!(permission.event_type, "agent.notification");
+        assert_eq!(
+            permission.native_session_id.as_deref(),
+            Some("695ab811-bf24-4f10-93c4-3a0b5a266478")
+        );
+        assert_eq!(idle, "agent.notification");
+    }
+
+    #[test]
+    fn maps_a_claude_question_to_waiting_for_input_and_a_tool_prompt_to_approval() {
+        let permission_request = |tool_name: &str| {
+            json!({
+                "hook_event_name": "PermissionRequest",
+                "permission_mode": "default",
+                "session_id": "695ab811-bf24-4f10-93c4-3a0b5a266478",
+                "tool_input": {},
+                "tool_name": tool_name
+            })
         };
 
-        let event = map_hook_event(stored);
+        assert_eq!(
+            mapped_event_type(None, permission_request("AskUserQuestion")),
+            "user.input.required"
+        );
+        assert_eq!(
+            mapped_event_type(None, permission_request("PowerShell")),
+            "approval.required"
+        );
+    }
 
-        assert_eq!(event.event_type, "approval.required");
-        assert_eq!(event.native_session_id.as_deref(), Some("session-1"));
+    #[test]
+    fn keeps_a_session_cleared_with_the_clear_command_alive() {
+        let session_end = |reason: &str| {
+            json!({
+                "hook_event_name": "SessionEnd",
+                "reason": reason,
+                "session_id": "b8bc112c-7b5f-4e03-ba68-46ec52018783"
+            })
+        };
+
+        // `/clear` ends the session and starts the next one in the same breath.
+        assert_eq!(
+            mapped_event_type(None, session_end("clear")),
+            "agent.notification"
+        );
+        assert_eq!(
+            mapped_event_type(None, session_end("prompt_input_exit")),
+            "session.ended"
+        );
+    }
+
+    #[test]
+    fn maps_session_start_sources_to_a_ready_or_a_working_terminal() {
+        let cases = [
+            (Some("startup"), "session.ready"),
+            (Some("resume"), "session.ready"),
+            (Some("clear"), "session.ready"),
+            (None, "session.ready"),
+            (Some("compact"), "agent.thinking"),
+        ];
+
+        for agent_type in [None, Some("codex")] {
+            for (source, expected_event_type) in cases {
+                let mut payload = json!({
+                    "hook_event_name": "SessionStart",
+                    "model": "claude-opus-5",
+                    "session_id": "f61ad6cc-8d33-4135-9fec-30103c0c7e31"
+                });
+                if let Some(source) = source {
+                    payload["source"] = json!(source);
+                }
+
+                assert_eq!(
+                    mapped_event_type(agent_type, payload),
+                    expected_event_type,
+                    "{agent_type:?} {source:?}"
+                );
+            }
+        }
     }
 
     #[test]
@@ -896,6 +1304,72 @@ mod tests {
     }
 
     #[test]
+    fn classifies_stop_failures_by_the_error_rather_than_the_reply() {
+        let stop_failure = |error: Option<&str>, last_assistant_message: &str| {
+            let mut payload = json!({
+                "hook_event_name": "StopFailure",
+                "last_assistant_message": last_assistant_message,
+                "session_id": "feeeb4c6-f6f0-433d-ac4d-8f630f7d5a33"
+            });
+            if let Some(error) = error {
+                payload["error"] = json!(error);
+            }
+            payload
+        };
+
+        // Recorded: a missing model and a refused connection are failures, whatever the reply says.
+        assert_eq!(
+            mapped_event_type(
+                None,
+                stop_failure(
+                    Some("model_not_found"),
+                    "There's an issue with the selected model. Retry after the 429 timeout."
+                )
+            ),
+            "agent.failed"
+        );
+        assert_eq!(
+            mapped_event_type(
+                None,
+                stop_failure(
+                    Some("server_error"),
+                    "API Error: Connection refused — a firewall or proxy may be blocking it"
+                )
+            ),
+            "agent.failed"
+        );
+        assert_eq!(
+            mapped_event_type(
+                None,
+                stop_failure(None, "Request timed out after 429 retries")
+            ),
+            "agent.failed"
+        );
+        for code in ["rate_limit", "overloaded_error", "Too-Many-Requests", "429"] {
+            assert_eq!(
+                mapped_event_type(None, stop_failure(Some(code), "")),
+                "agent.rate_limited",
+                "{code}"
+            );
+        }
+        for code in ["timeout", "request_timed_out"] {
+            assert_eq!(
+                mapped_event_type(None, stop_failure(Some(code), "")),
+                "agent.timeout",
+                "{code}"
+            );
+        }
+
+        // A code that does not say defers to the error's own description, never to the reply.
+        let mut unknown = stop_failure(Some("unknown"), "");
+        unknown["error_details"] = json!("upstream returned 529 Overloaded");
+        assert_eq!(mapped_event_type(None, unknown), "agent.rate_limited");
+        let mut request_id = stop_failure(Some("server_error"), "");
+        request_id["error_details"] = json!("request req_14290 failed");
+        assert_eq!(mapped_event_type(None, request_id), "agent.failed");
+    }
+
+    #[test]
     fn writes_isolated_claude_hook_settings() {
         let directory = test_directory("hooks");
         let store = HookEventStore::new(&directory).unwrap();
@@ -912,17 +1386,114 @@ mod tests {
         fs::remove_dir_all(directory).unwrap();
     }
 
+    /// The argument list a `notify=[…]` override makes Codex run, read back the way Codex reads it.
+    fn notify_override_arguments(config: &str) -> Vec<String> {
+        #[derive(Deserialize)]
+        struct Override {
+            notify: Vec<String>,
+        }
+        toml::from_str::<Override>(config).unwrap().notify
+    }
+
     #[test]
     fn builds_a_codex_notify_override_for_the_terminal() {
         let directory = test_directory("codex-notify");
         let store = HookEventStore::new(&directory).unwrap();
 
-        let config = store.codex_notify_config("terminal-9").unwrap();
+        let config = store.codex_notify_config("terminal-9", &[]).unwrap();
+        let arguments = notify_override_arguments(&config);
 
         assert!(config.starts_with("notify=["));
         assert!(config.contains("'''"));
-        assert!(config.contains("codex-notify"));
-        assert!(config.contains("terminal-9"));
+        assert_eq!(arguments[1], "codex-notify");
+        assert!(arguments.contains(&"terminal-9".to_owned()));
+        assert!(!arguments.contains(&CODEX_NOTIFY_FORWARD_FLAG.to_owned()));
+
+        fs::remove_dir_all(directory).unwrap();
+    }
+
+    #[test]
+    fn carries_the_users_notify_program_through_the_override_and_back() {
+        let directory = test_directory("codex-notify-forward");
+        let store = HookEventStore::new(&directory).unwrap();
+        let forward_to = vec![
+            r"C:\Program Files\Codex Tools\codex-computer-use.exe".to_owned(),
+            "turn-ended".to_owned(),
+            "--terminal-id".to_owned(),
+        ];
+        let payload = r#"{"type":"agent-turn-complete","thread-id":"01a09ac5-93b1-7650-9dad-50ae3ec8a998","last-assistant-message":"C:\\Program Files done"}"#;
+
+        let config = store
+            .codex_notify_config("terminal-9", &forward_to)
+            .unwrap();
+        // Codex runs the array and appends the payload; the executable and the subcommand are what
+        // `main` consumes before the capture sees the rest.
+        let mut arguments = notify_override_arguments(&config);
+        arguments.push(payload.into());
+        let invocation = CodexNotifyInvocation::parse(&arguments[2..]).unwrap();
+
+        assert_eq!(
+            invocation,
+            CodexNotifyInvocation {
+                event_file: store.event_file.to_string_lossy().into_owned(),
+                terminal_id: "terminal-9".into(),
+                // An argument of the user's that looks like one of Termexo's own stays theirs.
+                forward_to: forward_to.clone(),
+                payload: payload.into(),
+            }
+        );
+
+        // Without a forwarded program the payload is still the last argument.
+        let mut arguments =
+            notify_override_arguments(&store.codex_notify_config("t", &[]).unwrap());
+        arguments.push(payload.into());
+        let invocation = CodexNotifyInvocation::parse(&arguments[2..]).unwrap();
+        assert!(invocation.forward_to.is_empty());
+        assert_eq!(invocation.payload, payload);
+
+        // A program that cannot be written as a TOML literal is dropped, not the launch.
+        let unwritable = vec!["C:\\odd'''name.exe".to_owned()];
+        let config = store
+            .codex_notify_config("terminal-9", &unwritable)
+            .unwrap();
+        assert!(!notify_override_arguments(&config).contains(&CODEX_NOTIFY_FORWARD_FLAG.to_owned()));
+
+        assert!(matches!(
+            CodexNotifyInvocation::parse(&[]),
+            Err(HookError::InvalidArguments)
+        ));
+
+        fs::remove_dir_all(directory).unwrap();
+    }
+
+    /// Runs the forwarding for real: a program in a directory with spaces in its name receives its
+    /// own arguments and then the payload, byte for byte.
+    #[test]
+    fn forwards_a_codex_notification_to_the_users_program() {
+        let Some(node) = pinned_node() else {
+            eprintln!("跳过 Codex notify 转发测试：未找到仓库固定的 Node，请先安装前端依赖。");
+            return;
+        };
+        let directory = test_directory("codex notify forward");
+        fs::create_dir_all(&directory).unwrap();
+        let output = directory.join("received payload.json");
+        let payload = r#"{"type":"agent-turn-complete","input-messages":["say \"hi\" in C:\\Program Files"]}"#;
+        let forward_to = vec![
+            node.to_string_lossy().into_owned(),
+            "-e".into(),
+            "require('fs').writeFileSync(process.argv[1], JSON.stringify(process.argv.slice(2)))"
+                .into(),
+            output.to_string_lossy().into_owned(),
+        ];
+
+        let mut child =
+            forward_codex_notification(&forward_to, payload).expect("node should start");
+        assert!(child.wait().unwrap().success());
+        let received =
+            serde_json::from_str::<Vec<String>>(&fs::read_to_string(&output).unwrap()).unwrap();
+
+        assert_eq!(received, vec![payload.to_owned()]);
+        assert!(forward_codex_notification(&[], payload).is_none());
 
         fs::remove_dir_all(directory).unwrap();
     }
@@ -942,6 +1513,9 @@ mod tests {
         assert!(configs
             .iter()
             .any(|config| config.starts_with("hooks.PermissionRequest=")));
+        assert!(configs
+            .iter()
+            .any(|config| config.starts_with("hooks.Interrupt=")));
         assert!(configs.iter().all(|config| config.contains("command=")));
         assert!(configs
             .iter()
@@ -1016,6 +1590,143 @@ mod tests {
         assert_eq!(event.detail["source"], "permission.asked");
     }
 
+    /// A status update in the shape agy 1.2.2 pipes to the status script.
+    fn antigravity_status(state: &str, conversation_id: &str, pending: bool) -> Value {
+        let mut payload = json!({
+            "agent_state": state,
+            "context_window": { "context_window_size": 1048576, "used_percentage": 0 },
+            "conversation_id": conversation_id,
+            "model": { "display_name": "Gemini 3.8 Flash (Low)", "id": "Gemini 3.8 Flash (Low)" },
+            "product": "antigravity",
+            "session_id": conversation_id,
+            "version": "1.2.2"
+        });
+        if pending {
+            payload["tool_confirmation_pending"] = json!(true);
+        }
+        payload
+    }
+
+    #[test]
+    fn maps_antigravity_startup_and_unknown_states_without_completing_anything() {
+        for state in ["authenticating", "initializing"] {
+            let event = map_hook_event(stored_event(
+                Some("antigravity"),
+                antigravity_status(state, "", false),
+            ));
+            assert_eq!(event.event_type, "session.starting", "{state}");
+            // An empty id is no conversation, and must not replace the one the terminal knows.
+            assert_eq!(event.native_session_id, None, "{state}");
+        }
+
+        let unknown = map_hook_event(stored_event(
+            Some("antigravity"),
+            antigravity_status("summarizing", "6a8bf1a3-120b-47df-8fd6-1e470eb4192e", false),
+        ));
+        assert_eq!(unknown.event_type, "agent.event");
+        assert_eq!(
+            unknown.native_session_id.as_deref(),
+            Some("6a8bf1a3-120b-47df-8fd6-1e470eb4192e")
+        );
+
+        // An `idle` the status CLI did not mark as ending a turn is the agent reaching its prompt.
+        assert_eq!(
+            mapped_event_type(Some("antigravity"), antigravity_status("idle", "", false)),
+            "session.ready"
+        );
+    }
+
+    #[test]
+    fn records_each_antigravity_status_once_and_completes_only_a_turn_that_worked() {
+        let directory = test_directory("antigravity-status");
+        let store = HookEventStore::new(&directory).unwrap();
+        let event_file = store.event_file.to_string_lossy().into_owned();
+        let conversation = "6a8bf1a3-120b-47df-8fd6-1e470eb4192e";
+        let report = |state: &str, conversation_id: &str, pending: bool| {
+            record_antigravity_status(
+                &event_file,
+                "terminal-agy".into(),
+                antigravity_status(state, conversation_id, pending),
+            )
+            .unwrap();
+        };
+        let mapped_types = || {
+            store
+                .read_new_events()
+                .unwrap()
+                .into_iter()
+                .map(|event| event.event_type)
+                .collect::<Vec<_>>()
+        };
+
+        // The approval run as agy reported it, with the repeats it sends every ~300 ms while it
+        // streams.
+        report("authenticating", "", false);
+        report("idle", "", false);
+        report("idle", "", false);
+        report("working", conversation, false);
+        report("working", conversation, false);
+        report("working", conversation, false);
+        report("tool_use", conversation, true);
+        report("tool_use", conversation, true);
+        report("working", conversation, false);
+        report("idle", conversation, false);
+        report("idle", conversation, false);
+        assert_eq!(
+            mapped_types(),
+            [
+                "session.starting",
+                "session.ready",
+                "tool.started",
+                "approval.required",
+                "tool.started",
+                "task.completed",
+            ]
+        );
+
+        // Idle again with nothing done since the last idle is not a second completion.
+        report("idle", "", false);
+        assert_eq!(mapped_types(), ["session.ready"]);
+
+        // A relaunch after a run that ended mid-turn starts from nothing.
+        report("working", conversation, false);
+        report("authenticating", "", false);
+        report("idle", "", false);
+        assert_eq!(
+            mapped_types(),
+            ["tool.started", "session.starting", "session.ready"]
+        );
+
+        // Declining the approval drops agy straight back to its prompt: interrupted, not finished.
+        report("working", conversation, false);
+        report("tool_use", conversation, true);
+        report("idle", conversation, false);
+        assert_eq!(
+            mapped_types(),
+            ["tool.started", "approval.required", "agent.interrupted"]
+        );
+
+        // Memory that cannot be read only costs a repeated event, never the event itself.
+        let memory = antigravity_status_memory_file(&event_file, "terminal-agy");
+        assert_eq!(memory.parent(), store.event_file.parent());
+        fs::write(&memory, b"{ not json").unwrap();
+        report("idle", "", false);
+        assert_eq!(mapped_types(), ["session.ready"]);
+
+        fs::remove_dir_all(directory).unwrap();
+    }
+
+    #[test]
+    fn keeps_the_antigravity_memory_file_inside_the_spool_directory() {
+        let memory =
+            antigravity_status_memory_file(r"C:\Termexo\claude-hook-events.jsonl", r"..\x:y");
+
+        assert_eq!(
+            memory,
+            Path::new(r"C:\Termexo").join("antigravity-status-___x_y.json")
+        );
+    }
+
     #[test]
     fn records_a_codex_thread_completion_without_completing_the_task() {
         let stored = StoredHookEvent {
@@ -1082,7 +1793,7 @@ mod tests {
     #[test]
     fn maps_codex_lifecycle_hooks_to_terminal_events() {
         let cases = [
-            ("SessionStart", "session.started"),
+            ("SessionStart", "session.ready"),
             ("UserPromptSubmit", "agent.thinking"),
             ("PreToolUse", "tool.started"),
             ("PermissionRequest", "approval.required"),
@@ -1092,8 +1803,11 @@ mod tests {
             ("SubagentStart", "agent.thinking"),
             ("SubagentStop", "agent.thinking"),
             ("Stop", "task.completed"),
+            ("Interrupt", "agent.interrupted"),
             ("SessionEnd", "session.ended"),
         ];
+        // Every hook Termexo registers has a mapping of its own rather than the fallback.
+        assert_eq!(cases.len(), CODEX_HOOK_EVENTS.len());
 
         for (hook_name, expected_event_type) in cases {
             let event = map_hook_event(StoredHookEvent {
@@ -1265,5 +1979,90 @@ mod tests {
         assert!(store.read_new_events().unwrap().is_empty());
 
         fs::remove_dir_all(directory).unwrap();
+    }
+
+    /// The scratch directory a manual hook-lab run works in, and the terminal id it reports as.
+    const HOOK_LAB_DIRECTORY_ENV: &str = "TERMEXO_HOOK_LAB";
+    const HOOK_LAB_EXECUTABLE_ENV: &str = "TERMEXO_HOOK_EXE";
+    const HOOK_LAB_TERMINAL_ID: &str = "hook-lab-terminal";
+
+    /// Manual verification aid rather than a regression test: writes the hook wiring a terminal
+    /// launch gets, pointed at a scratch spool, so a real CLI can be driven against it outside the
+    /// app. The generated commands name this test binary, so they are retargeted at the
+    /// `termexo.exe` given in `TERMEXO_HOOK_EXE`.
+    #[test]
+    #[ignore = "manual hook lab; needs TERMEXO_HOOK_LAB and TERMEXO_HOOK_EXE"]
+    fn hook_lab_writes_launch_wiring() {
+        let directory = PathBuf::from(env::var(HOOK_LAB_DIRECTORY_ENV).expect("TERMEXO_HOOK_LAB"));
+        let executable = env::var(HOOK_LAB_EXECUTABLE_ENV).expect("TERMEXO_HOOK_EXE");
+        let store = HookEventStore::new(&directory).unwrap();
+        let current = std::env::current_exe()
+            .unwrap()
+            .to_string_lossy()
+            .into_owned();
+        let retarget = |text: &str| {
+            text.replace(
+                &current.replace('\\', "\\\\"),
+                &executable.replace('\\', "\\\\"),
+            )
+            .replace(&current, &executable)
+        };
+
+        let claude = store.prepare_claude_runtime(HOOK_LAB_TERMINAL_ID).unwrap();
+        let settings = fs::read_to_string(&claude.settings_path).unwrap();
+        fs::write(&claude.settings_path, retarget(&settings)).unwrap();
+        let opencode = store
+            .prepare_opencode_runtime(HOOK_LAB_TERMINAL_ID, None, None)
+            .unwrap();
+
+        // Forwarding to the notify program the lab's Codex home configures, as a launch would.
+        let codex_notify = store
+            .codex_notify_config(
+                HOOK_LAB_TERMINAL_ID,
+                &crate::agent::CodexCliAdapter::new().configured_notify_command(),
+            )
+            .unwrap();
+
+        let wiring = json!({
+            "terminalId": HOOK_LAB_TERMINAL_ID,
+            "eventFile": store.event_file,
+            "claudeSettings": claude.settings_path,
+            "codexNotifyOverride": retarget(&codex_notify),
+            "codexHookOverrides": store
+                .codex_hook_configs()
+                .unwrap()
+                .iter()
+                .map(|value| retarget(value))
+                .collect::<Vec<_>>(),
+            "codexEnvironment": HashMap::<_, _>::from(store.codex_hook_environment(HOOK_LAB_TERMINAL_ID)),
+            "openCodeConfigContent": opencode.config_content,
+            "antigravityEnvironment": store.antigravity_environment(HOOK_LAB_TERMINAL_ID),
+        });
+        fs::write(
+            directory.join("wiring.json"),
+            serde_json::to_vec_pretty(&wiring).unwrap(),
+        )
+        .unwrap();
+    }
+
+    /// Manual verification aid: maps a scratch spool through the same reader the app uses and
+    /// writes the resulting agent events next to it. The cursor is dropped before and after, so
+    /// the same capture can be replayed as often as needed.
+    #[test]
+    #[ignore = "manual hook lab; needs TERMEXO_HOOK_LAB"]
+    fn hook_lab_replays_a_spool() {
+        let directory = PathBuf::from(env::var(HOOK_LAB_DIRECTORY_ENV).expect("TERMEXO_HOOK_LAB"));
+        let cursor = directory.join("claude-hook-events.cursor");
+        let _ = fs::remove_file(&cursor);
+        let events = HookEventStore::new(&directory)
+            .unwrap()
+            .read_new_events()
+            .unwrap();
+        fs::write(
+            directory.join("mapped-events.json"),
+            serde_json::to_vec_pretty(&events).unwrap(),
+        )
+        .unwrap();
+        let _ = fs::remove_file(&cursor);
     }
 }

@@ -21,9 +21,16 @@ import type { TerminalStatus, Workspace } from '../models/workspace.models';
 
 const STORAGE_KEY = 'termexo.todos.v1';
 const OUTPUT_TAIL_LIMIT = 1_200;
-const TERMINAL_ENDED_ERROR = 'Agent 终端已结束，请检查终端输出后重试。';
-const TERMINAL_MISSING_ERROR = '关联终端不存在或已关闭，可重试以恢复原会话。';
-const PROMPT_INTERRUPTED_ERROR = '任务指令未送达终端，请重新发送。';
+/*
+ * A task's `lastError` holds a key from `core/i18n/todo.i18n.ts` rather than a sentence, so the
+ * board shows it in the language active when it renders. That bundle is loaded lazily by `App`,
+ * which is why the keys are spelled out here instead of imported.
+ */
+const TERMINAL_ENDED_ERROR = 'taskFlow.error.terminalEnded';
+/** A failure the agent reported itself, with its terminal still open for another try. */
+const AGENT_FAILED_ERROR = 'taskFlow.error.agentFailed';
+const TERMINAL_MISSING_ERROR = 'taskFlow.error.terminalMissing';
+const PROMPT_INTERRUPTED_ERROR = 'taskFlow.error.promptInterrupted';
 /** Terminal states that end a run for good, which a stopped task still has to hear about. */
 const TERMINAL_GONE_STATUSES: readonly TerminalStatus[] = ['FAILED', 'STOPPED', 'DISCONNECTED'];
 
@@ -256,7 +263,7 @@ export class TodoService {
   }
 
   /**
-   * Returns a running task to 待办 so it can be started again later.
+   * Returns a running task to To do so it can be started again later.
    *
    * The terminal binding is dropped because a stopped task must stop reacting to that terminal:
    * while it is still bound, further status events and output would keep rewriting the run it no
@@ -267,7 +274,7 @@ export class TodoService {
    * Halts a run without throwing away what it was bound to.
    *
    * The terminal, its session and the captured output all stay, so the user can pick the same run
-   * up again or hand it back to 待办 afterwards. Stopping used to be the same act as discarding the
+   * up again or hand it back to To do afterwards. Stopping used to be the same act as discarding the
    * attempt, which left no way to interrupt an agent and then think about it.
    */
   stopExecution(taskId: string): TodoTask | null {
@@ -285,7 +292,7 @@ export class TodoService {
   }
 
   /**
-   * Drops the current run and puts the task back in 待办.
+   * Drops the current run and puts the task back in To do.
    *
    * Everything describing the attempt goes with it — terminal, output, timings — because the next
    * run starts the task from the beginning rather than continuing this one.
@@ -336,12 +343,12 @@ export class TodoService {
   }
 
   /**
-   * Hands a finished 常用任务 back to 待办 so it can be run again.
+   * Hands a finished routine task back to To do so it can be run again.
    *
    * The previous run is archived into {@link TodoTask.runCount} and everything that described it —
-   * terminal binding, output, session — is dropped: a repeatable chore (编译 / 打包 / 发布) has to
-   * start from a clean run, otherwise the next build would resume the transcript of the last one
-   * and report its result. The validation history stays, because it is the record of past runs.
+   * terminal binding, output, session — is dropped: a repeatable chore (build / package / release)
+   * has to start from a clean run, otherwise the next build would resume the transcript of the last
+   * one and report its result. The validation history stays, because it is the record of past runs.
    */
   restartTask(taskId: string): TodoTask | null {
     const located = this.findTask(taskId);
@@ -442,7 +449,7 @@ export class TodoService {
     });
   }
 
-  handleTerminalStatus(terminalId: string, status: TerminalStatus): void {
+  handleTerminalStatus(terminalId: string, status: TerminalStatus, failureMessage?: string): void {
     const located = this.findTaskByTerminal(terminalId);
     if (!located || located.task.stage === 'completed' || located.task.stage === 'verified') return;
     // A run the user stopped keeps that state. An interrupted agent usually prints a little more
@@ -454,7 +461,7 @@ export class TodoService {
     }
     this.replaceTask(
       located.snapshot,
-      this.taskWithTerminalStatus(located.task, status, Date.now()),
+      this.taskWithTerminalStatus(located.task, status, Date.now(), failureMessage),
     );
   }
 
@@ -474,7 +481,14 @@ export class TodoService {
         updatedAt: Date.now(),
       });
     }
-    if (status) this.handleTerminalStatus(event.terminalId, status);
+    if (status && !this.firedBeforePromptDelivery(located.task, event, status)) {
+      // A reported failure leaves the terminal running, unlike an exit that ends it.
+      this.handleTerminalStatus(
+        event.terminalId,
+        status,
+        status === 'FAILED' ? AGENT_FAILED_ERROR : undefined,
+      );
+    }
   }
 
   captureTerminalOutput(terminalId: string, data: string): void {
@@ -632,11 +646,11 @@ export class TodoService {
     failureMessage?: string,
   ): TodoTask {
     const completed = status === 'COMPLETED';
-    const failed = status === 'FAILED' || status === 'STOPPED' || status === 'DISCONNECTED';
+    const failed = TERMINAL_GONE_STATUSES.includes(status);
     return {
       ...task,
       stage: completed ? 'completed' : task.stage,
-      executionState: terminalStatusToExecutionState(status),
+      executionState: terminalStatusToExecutionState(status, task.promptDeliveryState),
       promptDeliveryState: completed
         ? 'delivered'
         : failed && task.promptDeliveryState !== 'delivered'
@@ -648,6 +662,25 @@ export class TodoService {
       completedAt: completed ? now : task.completedAt,
       updatedAt: now,
     };
+  }
+
+  /**
+   * Whether a hook reported the agent getting ready before this run's prompt reached it.
+   *
+   * Hooks are read on a poll, so the CLI's own start-up — at its prompt, idle — can arrive after
+   * the task was already handed over and would pass for an interrupted run. An ending status still
+   * counts whenever it fired, because the run cannot go on either way.
+   */
+  private firedBeforePromptDelivery(
+    task: TodoTask,
+    event: AgentEvent,
+    status: TerminalStatus,
+  ): boolean {
+    return (
+      task.promptDeliveredAt !== undefined &&
+      event.createdAt < task.promptDeliveredAt &&
+      !TERMINAL_GONE_STATUSES.includes(status)
+    );
   }
 
   /**

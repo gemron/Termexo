@@ -47,8 +47,20 @@ import {
   TerminalRow,
 } from './terminal-links';
 import { TerminalReplayGate } from './terminal-replay-gate';
+import {
+  type ApprovalOption,
+  isSubmission,
+  readApprovalOptions,
+  TerminalInputStatusTracker,
+} from './terminal-input-status';
 import { TerminalResizeCoordinator } from './terminal-resize-coordinator';
-import { detectTerminalRuntimeIssue, TerminalRuntimeIssue } from './terminal-runtime-diagnostics';
+import {
+  detectTerminalRuntimeIssue,
+  readsRuntimeIssuesFromOutput,
+  RUNTIME_ISSUE_OUTPUT_WINDOW,
+  RUNTIME_ISSUE_STATUS,
+  TerminalRuntimeIssue,
+} from './terminal-runtime-diagnostics';
 import {
   cursorScrollSequence,
   ScrollRowAccumulator,
@@ -80,6 +92,19 @@ function offersQuickKeys(): boolean {
  * in a native terminal. Anything above it visibly loosens dense output such as diffs and logs.
  */
 const TERMINAL_LINE_HEIGHT = 1;
+
+/**
+ * The notice each runtime issue raises over the terminal.
+ *
+ * A failure has none: the terminal's status already says it failed, and the agent's own error line
+ * sits right there on screen.
+ */
+const RUNTIME_ISSUE_NOTICE_KEYS: Readonly<
+  Partial<Record<Exclude<TerminalRuntimeIssue, null>, string>>
+> = {
+  'rate-limit': 'terminal.rateLimited',
+  timeout: 'terminal.timeout',
+};
 
 @Component({
   selector: 'app-terminal-panel',
@@ -133,6 +158,7 @@ export class TerminalPanelComponent implements AfterViewInit {
   private outputTail = '';
   private lastRuntimeIssue: TerminalRuntimeIssue = null;
   private readonly replayGate = new TerminalReplayGate();
+  private readonly inputStatus = new TerminalInputStatusTracker();
 
   /** The mark of the agent this terminal runs, drawn in its title. */
   protected readonly agentIcon = computed(() => AGENT_ICONS[this.session().agentType]);
@@ -224,9 +250,8 @@ export class TerminalPanelComponent implements AfterViewInit {
   private readonly runtimeIssue = signal<TerminalRuntimeIssue>(null);
   protected readonly runtimeNotice = computed(() => {
     const issue = this.runtimeIssue();
-    return issue
-      ? this.i18n.t(issue === 'rate-limit' ? 'terminal.rateLimited' : 'terminal.timeout')
-      : null;
+    const key = issue ? RUNTIME_ISSUE_NOTICE_KEYS[issue] : undefined;
+    return key ? this.i18n.t(key) : null;
   });
 
   constructor() {
@@ -349,22 +374,33 @@ export class TerminalPanelComponent implements AfterViewInit {
       if (this.replayGate.replaying) {
         return;
       }
-      this.inputCaptured.emit({ terminalId: this.session().id, data });
-      if (data.includes('\r')) {
+      const session = this.session();
+      this.inputCaptured.emit({ terminalId: session.id, data });
+      // Read before the key reaches the agent, while the screen still shows what it answers.
+      const status = this.inputStatus.statusAfterInput(data, {
+        agentType: session.agentType,
+        status: session.status,
+        readApprovalOptions: this.readScreenApprovalOptions,
+      });
+      const submitted = isSubmission(data);
+      if (submitted) {
         this.terminal.scrollToBottom();
         this.lastRuntimeIssue = null;
         this.outputTail = '';
-        // Submitting a prompt clears the runtime notice and moves the terminal's status, both of
+      }
+      if (submitted || status) {
+        // Submitting clears the runtime notice and a key can move the terminal's status, both of
         // which the workbench draws, so this part re-enters the zone.
         this.zone.run(() => {
-          this.runtimeIssue.set(null);
-          this.statusChanged.emit({
-            terminalId: this.session().id,
-            status: this.session().agentType === 'shell' ? 'RUNNING' : 'THINKING',
-          });
+          if (submitted) {
+            this.runtimeIssue.set(null);
+          }
+          if (status) {
+            this.statusChanged.emit({ terminalId: session.id, status });
+          }
         });
       }
-      void this.gateway.write(this.session(), data);
+      void this.gateway.write(session, data);
     });
     // xterm repositions its IME elements on every render. Registering after open means this runs
     // after xterm's own render listener, so it wins for both the caret captured at
@@ -1101,7 +1137,6 @@ export class TerminalPanelComponent implements AfterViewInit {
     } else {
       this.terminal.write(data);
     }
-    this.outputTail = `${this.outputTail}${data}`.slice(-2_000);
     // Replayed scrollback was already analysed when it first arrived. Feeding a whole terminal's
     // history back through the task, handoff and startup readers on every reconnect is what made
     // restoring terminals stall, and it would count the same output twice.
@@ -1109,18 +1144,47 @@ export class TerminalPanelComponent implements AfterViewInit {
       return;
     }
     this.outputCaptured.emit({ terminalId: this.session().id, data });
-    const issue = detectTerminalRuntimeIssue(this.outputTail);
+    this.diagnoseOutput(data);
+  }
+
+  /**
+   * Raises a rate limit, timeout or failure the agent printed but reported through no event.
+   *
+   * Agents whose failures arrive as events, and plain shells, are skipped before any output is
+   * kept, so their output costs nothing here.
+   */
+  private diagnoseOutput(data: string): void {
+    const { id, agentType } = this.session();
+    if (!readsRuntimeIssuesFromOutput(agentType)) {
+      return;
+    }
+    this.outputTail = `${this.outputTail}${data}`.slice(-RUNTIME_ISSUE_OUTPUT_WINDOW);
+    const issue = detectTerminalRuntimeIssue(this.outputTail, agentType);
     if (!issue || issue === this.lastRuntimeIssue) {
       return;
     }
     this.lastRuntimeIssue = issue;
-    if (issue === 'rate-limit') {
-      this.runtimeIssue.set('rate-limit');
-      this.statusChanged.emit({ terminalId: this.session().id, status: 'RATE_LIMITED' });
-      return;
+    this.runtimeIssue.set(issue);
+    this.statusChanged.emit({ terminalId: id, status: RUNTIME_ISSUE_STATUS[issue] });
+  }
+
+  /** The choice dialog on screen, for a key that may be answering one. */
+  private readonly readScreenApprovalOptions = (): ApprovalOption[] =>
+    readApprovalOptions(this.screenRows());
+
+  /**
+   * The rows of the live screen, top to bottom.
+   *
+   * Read from the bottom of the buffer rather than the viewport: an agent draws its dialog on the
+   * live screen, and the user may have scrolled up through the history above it.
+   */
+  private screenRows(): string[] {
+    const buffer = this.terminal.buffer.active;
+    const rows: string[] = [];
+    for (let row = 0; row < this.terminal.rows; row += 1) {
+      rows.push(buffer.getLine(buffer.baseY + row)?.translateToString(true) ?? '');
     }
-    this.runtimeIssue.set('timeout');
-    this.statusChanged.emit({ terminalId: this.session().id, status: 'WAITING_INPUT' });
+    return rows;
   }
 
   private errorMessage(error: unknown): string {

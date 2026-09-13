@@ -1,12 +1,15 @@
 import { TestBed } from '@angular/core/testing';
 
-import { Workspace } from '../models/workspace.models';
+import { AgentEvent, chronologicalAgentEvents } from '../models/agent.models';
+import { TerminalStatus, Workspace } from '../models/workspace.models';
 import { AppStateService } from './app-state.service';
 import { TerminalGatewayService } from './terminal-gateway.service';
 import { WorkspaceRepository } from './workspace.repository';
 
 describe('AppStateService', () => {
   let service: AppStateService;
+  /** Taken just before the service is created, so every earlier moment predates its load. */
+  let createdAfter: number;
   const repository = {
     list: vi.fn().mockResolvedValue([]),
     save: vi.fn().mockResolvedValue(undefined),
@@ -53,6 +56,7 @@ describe('AppStateService', () => {
         { provide: TerminalGatewayService, useValue: gateway },
       ],
     });
+    createdAfter = Date.now();
     service = TestBed.inject(AppStateService);
   });
 
@@ -712,5 +716,232 @@ describe('AppStateService', () => {
     await service.initialize();
 
     expect(repository.watchChanges).toHaveBeenCalledOnce();
+  });
+
+  describe('hook event ordering', () => {
+    const terminalId = 'terminal-claude';
+    /** A moment after the service loaded, from which each test lays out its own timeline. */
+    let base: number;
+
+    function hookEvent(
+      eventType: string,
+      createdAt: number,
+      eventTerminalId = terminalId,
+    ): AgentEvent {
+      return {
+        eventKey: `${eventTerminalId}:${eventType}:${createdAt}`,
+        agentType: 'claude',
+        terminalId: eventTerminalId,
+        eventType,
+        detail: {},
+        createdAt,
+      };
+    }
+
+    function statusOf(id = terminalId): TerminalStatus | undefined {
+      return service
+        .workspaces()
+        .flatMap((workspace) => workspace.terminals)
+        .find((terminal) => terminal.id === id)?.status;
+    }
+
+    /** Runs a local write, such as the user pressing Enter, at a chosen moment. */
+    function atTime(time: number, write: () => void): void {
+      vi.setSystemTime(time);
+      write();
+    }
+
+    beforeEach(async () => {
+      base = Date.now() + 1_000;
+      vi.useFakeTimers({ toFake: ['Date'] });
+      vi.setSystemTime(base);
+      await service.initialize();
+      service.createTerminal({ id: terminalId, agentType: 'claude' });
+    });
+
+    afterEach(() => {
+      vi.useRealTimers();
+      document.querySelectorAll('meta[name="termexo-remote"]').forEach((node) => node.remove());
+    });
+
+    it('applies a batch by when each hook fired, whatever order it arrived in', () => {
+      const batch = [
+        hookEvent('approval.required', base + 2_000),
+        hookEvent('tool.completed', base + 1_500),
+      ];
+
+      for (const event of chronologicalAgentEvents(batch)) {
+        service.applyAgentEvent(event);
+      }
+
+      expect(statusOf()).toBe('WAITING_APPROVAL');
+    });
+
+    it('ignores an event that fired before the status it would replace', () => {
+      service.applyAgentEvent(hookEvent('approval.required', base + 5_000));
+      const late = hookEvent('tool.completed', base + 4_000);
+
+      expect(service.isSupersededAgentEvent(late)).toBe(true);
+      service.applyAgentEvent(late);
+
+      expect(statusOf()).toBe('WAITING_APPROVAL');
+    });
+
+    it('keeps a local write over a hook that fired before it, and applies later ones at once', () => {
+      // The user answers the prompt; the permission request drained afterwards is already settled.
+      atTime(base + 3_000, () => service.updateTerminalStatus(terminalId, 'THINKING'));
+      service.applyAgentEvent(hookEvent('approval.required', base + 2_500));
+      expect(statusOf()).toBe('THINKING');
+
+      service.applyAgentEvent(hookEvent('approval.required', base + 3_500));
+      expect(statusOf()).toBe('WAITING_APPROVAL');
+    });
+
+    it('keeps a pending approval visible while another tool starts', () => {
+      service.applyAgentEvent(hookEvent('approval.required', base + 1_000));
+      // A parallel subagent's PreToolUse: the gated tool's own start fired before its request.
+      service.applyAgentEvent(hookEvent('tool.started', base + 1_400));
+      expect(statusOf()).toBe('WAITING_APPROVAL');
+
+      atTime(base + 2_000, () => service.updateTerminalStatus(terminalId, 'THINKING'));
+      service.applyAgentEvent(hookEvent('tool.started', base + 2_100));
+      expect(statusOf()).toBe('RUNNING');
+    });
+
+    it('ignores hooks that arrive after the process exited, until the terminal is relaunched', () => {
+      service.applyAgentEvent(hookEvent('agent.thinking', base + 500));
+      atTime(base + 1_000, () => service.markTerminalExited(terminalId, 'FAILED'));
+
+      // Antigravity reports idle twice after its PTY closed; Claude's Stop can also land late.
+      service.applyAgentEvent(hookEvent('task.completed', base + 1_400));
+      service.applyAgentEvent(hookEvent('task.completed', base + 2_500));
+      expect(statusOf()).toBe('FAILED');
+      expect(service.hasTerminalExited(terminalId)).toBe(true);
+
+      atTime(base + 3_000, () =>
+        service.restartTerminalWithProfile(terminalId, 'claude', { model: 'sonnet' }),
+      );
+      expect(service.hasTerminalExited(terminalId)).toBe(false);
+      service.applyAgentEvent(hookEvent('session.ready', base + 4_000));
+      expect(statusOf()).toBe('IDLE');
+    });
+
+    it('writes a hook status only when it changes the terminal', () => {
+      repository.save.mockClear();
+
+      service.applyAgentEvent(hookEvent('tool.started', base + 1_000));
+      service.applyAgentEvent(hookEvent('tool.started', base + 1_100));
+      expect(repository.save).toHaveBeenCalledOnce();
+
+      service.applyAgentEvent(hookEvent('tool.completed', base + 1_200));
+      expect(repository.save).toHaveBeenCalledTimes(2);
+      expect(statusOf()).toBe('THINKING');
+    });
+
+    it('keeps hook statuses in memory on a remote client, leaving the record to the desktop', () => {
+      const marker = document.createElement('meta');
+      marker.setAttribute('name', 'termexo-remote');
+      marker.setAttribute('content', JSON.stringify({ version: '0.0.0', secure: true }));
+      document.head.append(marker);
+      repository.save.mockClear();
+
+      service.applyAgentEvent(hookEvent('approval.required', base + 1_000));
+
+      expect(statusOf()).toBe('WAITING_APPROVAL');
+      expect(repository.save).not.toHaveBeenCalled();
+    });
+
+    it('does not let an older hook undo a status another client changed', () => {
+      service.applyAgentEvent(hookEvent('approval.required', base + 1_000));
+      const workspace = service
+        .workspaces()
+        .find((item) => item.terminals.some((terminal) => terminal.id === terminalId))!;
+
+      atTime(base + 5_000, () =>
+        service.applyExternalWorkspace({
+          ...workspace,
+          terminals: workspace.terminals.map((terminal) =>
+            terminal.id === terminalId ? { ...terminal, status: 'THINKING' } : terminal,
+          ),
+        }),
+      );
+      service.applyAgentEvent(hookEvent('approval.required', base + 3_000));
+
+      expect(statusOf()).toBe('THINKING');
+    });
+  });
+
+  describe('hook events around a reload', () => {
+    function persistedTerminal(id: string, status: TerminalStatus, runtimeRevision: number) {
+      return {
+        id,
+        name: id,
+        workingDirectory: 'D:\\dev\\persisted',
+        shell: 'powershell.exe',
+        agentType: 'claude' as const,
+        status,
+        model: 'Claude Sonnet',
+        branch: 'main',
+        runtimeRevision,
+      };
+    }
+
+    function reloadEvent(terminalId: string, eventType: string, createdAt: number): AgentEvent {
+      return {
+        eventKey: `${terminalId}:${eventType}:${createdAt}`,
+        agentType: 'claude',
+        terminalId,
+        eventType,
+        detail: {},
+        createdAt,
+      };
+    }
+
+    function statusOf(id: string): TerminalStatus | undefined {
+      return service
+        .workspaces()
+        .flatMap((workspace) => workspace.terminals)
+        .find((terminal) => terminal.id === id)?.status;
+    }
+
+    beforeEach(async () => {
+      repository.list.mockResolvedValueOnce([
+        {
+          id: 'workspace-1',
+          name: 'Persisted workspace',
+          projectPath: 'D:\\dev\\persisted',
+          projectType: 'Local project',
+          activeBranch: 'main',
+          favorite: false,
+          lastOpenedAt: Date.now(),
+          layout: 'single',
+          terminals: [
+            persistedTerminal('terminal-running', 'THINKING', 3),
+            persistedTerminal('terminal-restored', 'COMPLETED', 1),
+          ],
+        },
+      ]);
+      gateway.liveTerminals.mockResolvedValue(new Map([['terminal-running', 3]]));
+      await service.initialize();
+    });
+
+    it('drops what the previous process of a restarted terminal reported', () => {
+      service.applyAgentEvent(reloadEvent('terminal-restored', 'task.completed', createdAfter - 1));
+
+      expect(statusOf('terminal-restored')).toBe('STARTING');
+    });
+
+    it('still applies what a terminal that kept running reported while no window listened', () => {
+      // Long before the reload: already reflected in the status that was saved.
+      service.applyAgentEvent(
+        reloadEvent('terminal-running', 'task.completed', createdAfter - 60_000),
+      );
+      expect(statusOf('terminal-running')).toBe('THINKING');
+
+      service.applyAgentEvent(
+        reloadEvent('terminal-running', 'approval.required', createdAfter - 1_000),
+      );
+      expect(statusOf('terminal-running')).toBe('WAITING_APPROVAL');
+    });
   });
 });

@@ -8,12 +8,14 @@ use std::path::{Path, PathBuf};
 use std::process::Command;
 use std::time::{SystemTime, UNIX_EPOCH};
 
+use serde::Deserialize;
 use serde_json::Value;
 use thiserror::Error;
 
 use super::{AgentAdapter, AgentInstallation, AgentLaunchSpec, AgentSession, CodexLaunchOptions};
 
 const AGENT_TYPE: &str = "codex";
+const CONFIG_FILE_NAME: &str = "config.toml";
 const SESSION_STATUS: &str = "HISTORICAL";
 const MAX_TITLE_LENGTH: usize = 96;
 const CODEX_PATH_ENV: &str = "TERMEXO_CODEX_PATH";
@@ -202,6 +204,42 @@ impl CodexCliAdapter {
                 .is_some_and(|stem| stem.ends_with(session_id))
         })
     }
+
+    /// The `notify` program this Codex home's config sets, as the argument list Codex would run.
+    ///
+    /// Termexo's own `notify` override replaces it for the terminals it launches, so it is read here
+    /// to be run on the user's behalf. Empty when the config is missing, unreadable or sets none:
+    /// forwarding is a courtesy and never a reason to refuse a launch.
+    pub fn configured_notify_command(&self) -> Vec<String> {
+        let path = self.codex_home().join(CONFIG_FILE_NAME);
+        match fs::read_to_string(&path) {
+            Ok(config) => parse_notify_command(&config).unwrap_or_else(|error| {
+                tracing::warn!(
+                    target: "termexo::agent",
+                    path = %path.display(),
+                    %error,
+                    "无法读取 Codex 配置中的 notify 程序"
+                );
+                Vec::new()
+            }),
+            Err(_) => Vec::new(),
+        }
+    }
+}
+
+/// The part of a Codex `config.toml` the notify forwarding needs; every other key is ignored.
+#[derive(Deserialize)]
+struct NotifyConfig {
+    #[serde(default)]
+    notify: Vec<String>,
+}
+
+fn parse_notify_command(config: &str) -> Result<Vec<String>, toml::de::Error> {
+    let notify = toml::from_str::<NotifyConfig>(config)?.notify;
+    let names_program = notify
+        .first()
+        .is_some_and(|program| !program.trim().is_empty());
+    Ok(if names_program { notify } else { Vec::new() })
 }
 
 impl AgentAdapter for CodexCliAdapter {
@@ -632,6 +670,47 @@ mod tests {
         assert!(!adapter.session_exists("   "));
 
         fs::remove_dir_all(&directory).ok();
+    }
+
+    #[test]
+    fn reads_the_notify_program_the_codex_home_configures() {
+        let directory = test_directory("notify-config");
+        fs::create_dir_all(&directory).unwrap();
+        let adapter = CodexCliAdapter::with_home(directory.clone());
+
+        // No config at all.
+        assert!(adapter.configured_notify_command().is_empty());
+
+        // A config without `notify`, alongside the tables a real one carries.
+        fs::write(
+            directory.join(CONFIG_FILE_NAME),
+            "model = \"gpt-5.6-sol\"\n[projects.'D:\\devlop\\termexo']\ntrust_level = \"trusted\"\n",
+        )
+        .unwrap();
+        assert!(adapter.configured_notify_command().is_empty());
+
+        // The shape this user's config has: a basic-string path with escaped backslashes and
+        // spaces, spread over several lines, followed by other tables.
+        fs::write(
+            directory.join(CONFIG_FILE_NAME),
+            "model = \"gpt-5.6-sol\"\nnotify = [\n  \"C:\\\\Program Files\\\\Codex Tools\\\\codex-computer-use.exe\", # the program\n  'turn-ended',\n]\n[projects.'d:\\dev']\ntrust_level = \"trusted\"\n",
+        )
+        .unwrap();
+        assert_eq!(
+            adapter.configured_notify_command(),
+            vec![
+                r"C:\Program Files\Codex Tools\codex-computer-use.exe".to_owned(),
+                "turn-ended".to_owned(),
+            ]
+        );
+
+        // A config Codex itself could not read, and a `notify` that names no program.
+        fs::write(directory.join(CONFIG_FILE_NAME), "notify = [\"unterminated").unwrap();
+        assert!(adapter.configured_notify_command().is_empty());
+        fs::write(directory.join(CONFIG_FILE_NAME), "notify = []\n").unwrap();
+        assert!(adapter.configured_notify_command().is_empty());
+
+        fs::remove_dir_all(directory).unwrap();
     }
 
     #[test]

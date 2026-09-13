@@ -10,6 +10,14 @@ const sessionStates = new Map();
 /** Sessions stopped on a question or a permission, where the agent is waiting on a person. */
 const awaitingReply = new Set();
 /**
+ * How each session's current turn ended, for the turns that did not simply run to completion.
+ *
+ * OpenCode goes idle after a failure, an interrupt or a declined request exactly as it does after
+ * finished work. Reading that idle alone announced every one of those turns as completed two
+ * seconds after it had stopped.
+ */
+const turnEndings = new Map();
+/**
  * Sessions the agent spawned for itself.
  *
  * OpenCode's `task` tool runs subagents as sessions of their own, and each one opens by sending a
@@ -28,6 +36,18 @@ const idleTimers = new Map();
  * the agent was still working, several times per turn.
  */
 const IDLE_SETTLE_MS = 2000;
+
+const TurnEnding = Object.freeze({
+  /** A failure or an interrupt, written when it happened: the idle after it has nothing to add. */
+  REPORTED: 'reported',
+  /** The person turned down a permission or a question; if the agent stops there, it was halted. */
+  DECLINED: 'declined',
+});
+
+/** The error OpenCode ends a turn with when the user interrupts it. */
+const ABORTED_ERROR_NAME = 'MessageAbortedError';
+/** The permission reply that turns the request down. */
+const REJECTED_PERMISSION_REPLY = 'reject';
 
 function eventSessionID(event) {
   const properties = event?.properties ?? {};
@@ -90,17 +110,67 @@ function scheduleIdle(sessionID, sourceEventType) {
     idleTimers.delete(sessionID);
     // Waiting on a person is not finishing, however long the wait lasts.
     if (awaitingReply.has(sessionID)) return;
-    void writeEvent('task.completed', sessionID, sourceEventType);
+    const ending = turnEndings.get(sessionID);
+    if (ending === TurnEnding.REPORTED) return;
+    const eventType = ending === TurnEnding.DECLINED ? 'agent.interrupted' : 'task.completed';
+    void writeEvent(eventType, sessionID, sourceEventType);
   }, IDLE_SETTLE_MS);
   // The plugin must not keep the CLI alive just to answer a question nobody is waiting for.
   timer.unref?.();
   idleTimers.set(sessionID, timer);
 }
 
+/** The agent carries on working, so however its turn seemed to have ended no longer holds. */
+function continueTurn(sessionID) {
+  turnEndings.delete(sessionID);
+  cancelIdle(sessionID);
+}
+
 /** The agent is working again: any pending completion is wrong, and it is no longer waiting. */
 function resume(sessionID) {
   awaitingReply.delete(sessionID);
+  continueTurn(sessionID);
+}
+
+/** The turn is over and its ending already written; nothing arriving later may replace it. */
+function endTurn(sessionID) {
+  awaitingReply.delete(sessionID);
+  turnEndings.set(sessionID, TurnEnding.REPORTED);
   cancelIdle(sessionID);
+}
+
+/**
+ * Whether a report about the session's tools arrived after its turn was over.
+ *
+ * An interrupt marks the running tool as failed only once the session has gone idle. Taking that
+ * for new work withdrew the pending outcome and left the terminal showing the tool as running.
+ */
+function turnIsOver(sessionID) {
+  return (
+    sessionStates.get(sessionID) === 'idle' || turnEndings.get(sessionID) === TurnEnding.REPORTED
+  );
+}
+
+function isDeclined(source, properties) {
+  if (source === 'question.rejected') return true;
+  // `response` is the field's name in OpenCode releases older than the `permission.asked` event.
+  const reply = properties.reply ?? properties.response;
+  return source === 'permission.replied' && reply === REJECTED_PERMISSION_REPLY;
+}
+
+/**
+ * The person turned down what the agent asked for.
+ *
+ * OpenCode stops the turn right there unless it is configured to carry on, so the verdict waits for
+ * the idle: stopping is an interrupt, and a further step withdraws it.
+ */
+async function decline(sessionID, sourceEventType) {
+  awaitingReply.delete(sessionID);
+  // An interrupt withdraws the request it cut short, and has already said how the turn ended.
+  if (turnEndings.get(sessionID) === TurnEnding.REPORTED) return;
+  cancelIdle(sessionID);
+  turnEndings.set(sessionID, TurnEnding.DECLINED);
+  await writeEvent('agent.thinking', sessionID, sourceEventType);
 }
 
 async function activate(sessionID, sourceEventType, force = false) {
@@ -111,6 +181,7 @@ async function activate(sessionID, sourceEventType, force = false) {
       toolStates.clear();
       sessionStates.clear();
       awaitingReply.clear();
+      turnEndings.clear();
     }
   }
   if (activeSessionID !== sessionID) return false;
@@ -167,7 +238,7 @@ export const TermexoPlugin = async () => {
         sessionStates.set(sessionID, status);
         if (status === 'idle') scheduleIdle(sessionID, source);
         if (status === 'busy') {
-          cancelIdle(sessionID);
+          continueTurn(sessionID);
           await writeEvent('agent.thinking', sessionID, source);
         }
         if (status === 'retry') {
@@ -180,7 +251,12 @@ export const TermexoPlugin = async () => {
         return;
       }
       if (source === 'session.error') {
-        cancelIdle(sessionID);
+        endTurn(sessionID);
+        // Stopping the agent is the user's own decision, neither a failure nor finished work.
+        if (properties.error?.name === ABORTED_ERROR_NAME) {
+          await writeEvent('agent.interrupted', sessionID, source);
+          return;
+        }
         const message = errorMessage(properties.error);
         const eventType = retryEventType(message);
         await writeEvent(
@@ -208,21 +284,25 @@ export const TermexoPlugin = async () => {
         });
         return;
       }
-      if (['permission.replied', 'question.replied', 'question.rejected'].includes(source)) {
+      if (isDeclined(source, properties)) {
+        await decline(sessionID, source);
+        return;
+      }
+      if (source === 'permission.replied' || source === 'question.replied') {
         resume(sessionID);
         await writeEvent('agent.thinking', sessionID, source);
         return;
       }
-      if (source === 'message.updated') {
-        if (properties.info?.role === 'user') {
-          resume(sessionID);
-          await writeEvent('agent.thinking', sessionID, source);
-        }
-        return;
-      }
+      // `message.updated` is deliberately not a sign of work: OpenCode re-publishes the user's
+      // message after every step, the last one right after the final idle, which withdrew every
+      // completion. A new prompt always arrives through `chat.message` instead.
       if (source !== 'message.part.updated') return;
 
       const part = properties.part;
+      if (part?.type === 'step-start') {
+        continueTurn(sessionID);
+        return;
+      }
       if (part?.type === 'retry') {
         cancelIdle(sessionID);
         const message = errorMessage(part.error);
@@ -236,8 +316,9 @@ export const TermexoPlugin = async () => {
       if (!status || toolStates.get(part.id) === status) return;
       toolStates.set(part.id, status);
       // The tool that asks the question runs for as long as the person takes to answer it.
-      // Reporting it as work would replace "waiting for you" with "running" on screen.
-      if (awaitingReply.has(sessionID)) return;
+      // Reporting it as work would replace "waiting for you" with "running" on screen, and the
+      // same goes for a tool settling after its turn already ended.
+      if (awaitingReply.has(sessionID) || turnIsOver(sessionID)) return;
       cancelIdle(sessionID);
       const detail = { tool_name: part.tool, call_id: part.callID };
       if (status === 'running') await writeEvent('tool.started', sessionID, source, detail);

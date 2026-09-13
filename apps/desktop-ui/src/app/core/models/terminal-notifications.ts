@@ -1,6 +1,13 @@
 import { TerminalStatus, Workspace } from './workspace.models';
 
-export type GlobalTerminalNoticeStatus = 'WAITING_INPUT' | 'WAITING_APPROVAL' | 'COMPLETED';
+export type GlobalTerminalNoticeStatus =
+  'WAITING_INPUT' | 'WAITING_APPROVAL' | 'FAILED' | 'RATE_LIMITED' | 'COMPLETED';
+
+/**
+ * How a notice asks for the user: blocked on an answer, stopped by a problem, or simply done.
+ * Only a completion leaves nothing to act on.
+ */
+export type GlobalNoticeCategory = 'waiting' | 'issue' | 'completed';
 
 export interface GlobalTerminalNotice {
   workspaceId: string;
@@ -29,15 +36,37 @@ export interface AttentionBanner {
   extraCount: number;
 }
 
+/** Blocking prompts first, then problems, then completions. */
 const NOTICE_PRIORITY: Readonly<Record<GlobalTerminalNoticeStatus, number>> = {
   WAITING_APPROVAL: 0,
   WAITING_INPUT: 1,
-  COMPLETED: 2,
+  FAILED: 2,
+  RATE_LIMITED: 3,
+  COMPLETED: 4,
 };
 
+const NOTICE_CATEGORIES: Readonly<Record<GlobalTerminalNoticeStatus, GlobalNoticeCategory>> = {
+  WAITING_APPROVAL: 'waiting',
+  WAITING_INPUT: 'waiting',
+  FAILED: 'issue',
+  RATE_LIMITED: 'issue',
+  COMPLETED: 'completed',
+};
+
+const NOTICE_STATUS_LABEL_KEYS: Readonly<Record<GlobalTerminalNoticeStatus, string>> = {
+  WAITING_APPROVAL: 'notice.waitingApproval',
+  WAITING_INPUT: 'notice.waitingInput',
+  FAILED: 'notice.agentFailed',
+  RATE_LIMITED: 'notice.rateLimited',
+  COMPLETED: 'notice.taskCompleted',
+};
+
+/** Used when no translator is supplied. */
 const NOTICE_STATUS_LABELS: Readonly<Record<GlobalTerminalNoticeStatus, string>> = {
   WAITING_APPROVAL: '等待授权',
   WAITING_INPUT: '等待输入',
+  FAILED: '运行异常',
+  RATE_LIMITED: '触发限流',
   COMPLETED: '任务已完成',
 };
 
@@ -50,34 +79,48 @@ function noticeStatusLabel(
   status: GlobalTerminalNoticeStatus,
   translate?: NotificationTranslator,
 ): string {
-  const keys: Readonly<Record<GlobalTerminalNoticeStatus, string>> = {
-    WAITING_APPROVAL: 'notice.waitingApproval',
-    WAITING_INPUT: 'notice.waitingInput',
-    COMPLETED: 'notice.taskCompleted',
-  };
-  return translate?.(keys[status]) ?? NOTICE_STATUS_LABELS[status];
+  return translate?.(NOTICE_STATUS_LABEL_KEYS[status]) ?? NOTICE_STATUS_LABELS[status];
 }
 
 const isGlobalNoticeStatus = (status: TerminalStatus): status is GlobalTerminalNoticeStatus =>
-  status === 'WAITING_INPUT' || status === 'WAITING_APPROVAL' || status === 'COMPLETED';
+  Object.hasOwn(NOTICE_PRIORITY, status);
 
 /** Identifies one notice occurrence; a terminal re-entering the same state produces a new one. */
 export function globalNoticeKey(notice: GlobalTerminalNotice): string {
   return `${notice.terminalId}:${notice.status}`;
 }
 
-export function isWaitingNotice(notice: GlobalTerminalNotice): boolean {
-  return notice.status !== 'COMPLETED';
+/**
+ * The notices that appeared since the previous evaluation, whose keys are `previousKeys`.
+ *
+ * Without a previous evaluation every notice is one the client loaded with, already announced by
+ * whichever window recorded that status, so a reload or a newly opened remote page announces none.
+ */
+export function newGlobalNotices(
+  notices: readonly GlobalTerminalNotice[],
+  previousKeys: ReadonlySet<string> | null,
+): GlobalTerminalNotice[] {
+  return previousKeys ? notices.filter((notice) => !previousKeys.has(globalNoticeKey(notice))) : [];
+}
+
+export function globalNoticeCategory(notice: GlobalTerminalNotice): GlobalNoticeCategory {
+  return NOTICE_CATEGORIES[notice.status];
+}
+
+/** A notice the user still has to act on, which is every one except a completion. */
+export function isAttentionNotice(notice: GlobalTerminalNotice): boolean {
+  return globalNoticeCategory(notice) !== 'completed';
 }
 
 /**
  * The status a terminal falls back to once the user clears its notice.
  *
  * Clearing records that the notice has been dealt with, not that the terminal changed: one that
- * was blocking is still alive and running, while a completed one has nothing left in flight.
+ * was blocking is still alive and running, while a completed, failed or rate-limited one has
+ * nothing left in flight and sits at its prompt.
  */
 export function clearedNoticeStatus(status: GlobalTerminalNoticeStatus): TerminalStatus {
-  return status === 'COMPLETED' ? 'IDLE' : 'RUNNING';
+  return NOTICE_CATEGORIES[status] === 'waiting' ? 'RUNNING' : 'IDLE';
 }
 
 export function collectGlobalTerminalNotices(
@@ -103,15 +146,15 @@ export function collectGlobalTerminalNotices(
 }
 
 /**
- * Builds the persistent in-app banner from the waiting notices, highest priority first. The
- * banner is what makes a blocked agent visible while the window already has focus, where the
- * operating system suppresses the taskbar flash.
+ * Builds the persistent in-app banner from the notices that need the user, highest priority
+ * first. The banner is what makes a blocked or failed agent visible while the window already has
+ * focus, where the operating system suppresses the taskbar flash.
  */
 export function createAttentionBanner(
   notices: readonly GlobalTerminalNotice[],
   translate?: NotificationTranslator,
 ): AttentionBanner | null {
-  const waiting = notices.filter(isWaitingNotice);
+  const waiting = notices.filter(isAttentionNotice);
   const target = waiting[0];
   if (!target) {
     return null;
@@ -138,7 +181,7 @@ export function createDesktopNotification(
     return null;
   }
 
-  const requiresAttention = notices.some((notice) => notice.status !== 'COMPLETED');
+  const requiresAttention = notices.some(isAttentionNotice);
   if (notices.length === 1) {
     const notice = notices[0];
     return {

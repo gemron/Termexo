@@ -64,18 +64,22 @@
         </button>
       </div>
 
-      <div class="workspace-view-switch" role="tablist" aria-label="工作空间视图">
+      <div
+        class="workspace-view-switch"
+        role="tablist"
+        [attr.aria-label]="'workspace.viewSwitch' | t"
+      >
         <button
           type="button"
           role="tab"
           class="tool-button"
           [class.active]="workspaceView() === 'terminal'"
           [attr.aria-selected]="workspaceView() === 'terminal'"
-          aria-label="终端"
+          [attr.aria-label]="'terminal.groupTerminal' | t"
           (click)="workspaceView.set('terminal')"
         >
           <app-icon name="terminal" [size]="13" />
-          <span>终端</span>
+          <span>{{ 'terminal.groupTerminal' | t }}</span>
         </button>
         <button
           type="button"
@@ -84,11 +88,11 @@
           data-testid="task-board-toggle"
           [class.active]="workspaceView() === 'tasks'"
           [attr.aria-selected]="workspaceView() === 'tasks'"
-          aria-label="任务"
+          [attr.aria-label]="'workspace.viewTasks' | t"
           (click)="workspaceView.set('tasks')"
         >
           <app-icon name="layout" [size]="13" />
-          <span>任务</span>
+          <span>{{ 'workspace.viewTasks' | t }}</span>
           @if (activeTodoCount() > 0) {
             <b>{{ activeTodoCount() }}</b>
           }
@@ -145,7 +149,7 @@
               type="button"
               class="tool-button global-notice-trigger btn btn-ghost btn-sm join-item"
               [class.active]="globalNoticeOpen()"
-              [class.has-waiting]="globalWaitingNoticeCount() > 0"
+              [class.has-waiting]="hasAttentionNotices()"
               [attr.aria-expanded]="globalNoticeOpen()"
               aria-haspopup="dialog"
               [attr.aria-label]="'notice.global' | t"
@@ -610,7 +614,7 @@
       <span>
         {{
           workspaceView() === 'tasks'
-            ? activeTodoCount() + ' 个任务'
+            ? ('workspace.taskCount' | t: { count: activeTodoCount() })
             : workspaceView() === 'git'
               ? ('git.changeCount' | t: { count: git.overview()?.changes?.length ?? 0 })
               : ('inspector.agentActivity' | t: { count: state.runningAgentCount() })

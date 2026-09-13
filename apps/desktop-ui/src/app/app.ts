@@ -12,8 +12,10 @@ import {
 import {
   type AccountProfile,
   AccountProfileInput,
+  type AgentEvent,
   AgentProtocol,
   BackgroundSessionResolution,
+  chronologicalAgentEvents,
   ClaudeBackgroundSession,
   CliOperationPlan,
   CliOperationRequest,
@@ -61,9 +63,12 @@ import {
   clearedNoticeStatus,
   collectGlobalTerminalNotices,
   createAttentionBanner,
+  type GlobalNoticeCategory,
+  globalNoticeCategory,
   globalNoticeKey,
   GlobalTerminalNotice,
-  isWaitingNotice,
+  isAttentionNotice,
+  newGlobalNotices,
 } from './core/models/terminal-notifications';
 import { createAppThemePalette } from './core/models/theme-palette';
 import { AgentService } from './core/services/agent.service';
@@ -136,6 +141,7 @@ import {
   isTerminalFontAvailable,
   normalizeTerminalFontName,
 } from './terminal/terminal-font';
+import { TerminalInputStatusTracker } from './terminal/terminal-input-status';
 import { AGENT_INTERRUPT_SEQUENCE, workbenchShortcut } from './terminal/terminal-key-sequences';
 import {
   layoutTerminalCapacity,
@@ -203,6 +209,12 @@ const QUOTA_RECENT_ACTIVITY_WINDOW_MS = 90_000;
 const ACCOUNT_LOGIN_POLL_INTERVAL_MS = 4_000;
 const ACCOUNT_LOGIN_POLL_TIMEOUT_MS = 300_000;
 const TERMINAL_FONT_NAME_STORAGE_KEY = 'termexo.terminalFontName';
+/** The global notice button's summary, one count per kind of notice in this order. */
+const GLOBAL_NOTICE_SUMMARY_KEYS: ReadonlyArray<{ category: GlobalNoticeCategory; key: string }> = [
+  { category: 'waiting', key: 'notice.waitingCount' },
+  { category: 'issue', key: 'notice.issueCount' },
+  { category: 'completed', key: 'notice.completedCount' },
+];
 
 function readStoredBoolean(key: string, fallback: boolean): boolean {
   try {
@@ -306,13 +318,17 @@ export class App {
   protected readonly agentStartup = inject(AgentStartupService);
   private readonly handledEventKeys = new Set<string>();
   private readonly handledPlanAlertKeys = new Set<string>();
-  private readonly eventStatusCutoff = Date.now();
   private readonly preferredTerminalIds = signal<Record<string, string[]>>({});
   private readonly mountedWorkspaceIds = signal<string[]>([]);
-  private previousGlobalNoticeKeys = new Set<string>();
+  /** Set once the stored workspaces are in place, which is when notices start meaning anything. */
+  private readonly workspacesLoaded = signal(false);
+  /** Null until the notices this client loaded with have been taken as already announced. */
+  private previousGlobalNoticeKeys: ReadonlySet<string> | null = null;
   private resizeStartX = 0;
   private resizeStartWidth = 0;
   private previousViewportWidth = Number.POSITIVE_INFINITY;
+  /** Pending or settled load of the task-flow wording; see {@link loadTodoTranslations}. */
+  private todoTranslations?: Promise<void>;
 
   /** True while the window is phone width; kept in step by `adaptLayoutToViewport`. */
   protected readonly phoneLayout = signal(window.innerWidth <= PHONE_LAYOUT_MAX_WIDTH);
@@ -504,11 +520,8 @@ export class App {
   protected readonly globalTerminalNotices = computed(() =>
     collectGlobalTerminalNotices(this.state.workspaces()),
   );
-  protected readonly globalWaitingNoticeCount = computed(
-    () => this.globalTerminalNotices().filter((notice) => notice.status !== 'COMPLETED').length,
-  );
-  protected readonly globalCompletedNoticeCount = computed(
-    () => this.globalTerminalNotices().filter((notice) => notice.status === 'COMPLETED').length,
+  protected readonly hasAttentionNotices = computed(() =>
+    this.globalTerminalNotices().some(isAttentionNotice),
   );
   protected readonly attentionBanner = computed(() => {
     const dismissed = this.dismissedNoticeKeys();
@@ -518,13 +531,13 @@ export class App {
     );
   });
   protected readonly globalNoticeSummary = computed(() => {
-    const waiting = this.globalWaitingNoticeCount();
-    const completed = this.globalCompletedNoticeCount();
-    return [
-      waiting ? this.i18n.t('notice.waitingCount', { count: waiting }) : '',
-      completed ? this.i18n.t('notice.completedCount', { count: completed }) : '',
-    ]
-      .filter(Boolean)
+    const notices = this.globalTerminalNotices();
+    return GLOBAL_NOTICE_SUMMARY_KEYS.map(({ category, key }) => ({
+      key,
+      count: notices.filter((notice) => globalNoticeCategory(notice) === category).length,
+    }))
+      .filter(({ count }) => count > 0)
+      .map(({ key, count }) => this.i18n.t(key, { count }))
       .join(' · ');
   });
   protected readonly editingWorkspace = computed(
@@ -580,15 +593,16 @@ export class App {
     this.adaptLayoutToViewport();
     void this.initialize();
     effect(() => {
-      for (const event of [...this.agents.events()].reverse()) {
-        if (!this.handledEventKeys.has(event.eventKey)) {
+      const unhandled = this.agents
+        .events()
+        .filter((event) => !this.handledEventKeys.has(event.eventKey));
+      // Applying reads terminal state, which must not make this effect rerun on every change.
+      untracked(() => {
+        for (const event of chronologicalAgentEvents(unhandled)) {
           this.handledEventKeys.add(event.eventKey);
-          if (event.createdAt >= this.eventStatusCutoff) {
-            this.state.applyAgentEvent(event);
-            this.todos.applyAgentEvent(event);
-          }
+          this.applyAgentEvent(event);
         }
-      }
+      });
     });
     effect((onCleanup) => {
       const targetChanged = this.git.selectTarget(this.gitTarget());
@@ -616,20 +630,21 @@ export class App {
       }
     });
     effect(() => {
+      if (!this.workspacesLoaded()) {
+        return;
+      }
       const notices = this.globalTerminalNotices();
       const currentKeys = new Set(notices.map(globalNoticeKey));
-      const newNotices = notices.filter(
-        (notice) => !this.previousGlobalNoticeKeys.has(globalNoticeKey(notice)),
-      );
+      const newNotices = newGlobalNotices(notices, this.previousGlobalNoticeKeys);
       this.previousGlobalNoticeKeys = currentKeys;
       this.forgetResolvedDismissals(currentKeys);
       if (newNotices.length > 0) {
         void this.desktopNotifications.notify(newNotices);
       }
 
-      // Waiting terminals are surfaced by the persistent attention banner instead, so the
-      // transient toast only reports completions.
-      const completed = newNotices.filter((notice) => !isWaitingNotice(notice));
+      // Terminals that need the user are surfaced by the persistent attention banner instead, so
+      // the transient toast only reports completions.
+      const completed = newNotices.filter((notice) => !isAttentionNotice(notice));
       if (completed.length === 1) {
         const notice = completed[0];
         this.showToast(
@@ -694,12 +709,6 @@ export class App {
   }
 
   /**
-   * Marks a terminal whose process ended, and says so when it failed.
-   *
-   * An agent that never starts — a missing executable, a rejected credential, a CLI that exits
-   * immediately — otherwise leaves a tile sitting at "running" with nothing behind it.
-   */
-  /**
    * Reads the packaged version from the shell rather than from a duplicated constant — the
    * version already lives in several manifests and adding another copy would be one more thing
    * to forget on release. Browser preview has no package to ask, so the label stays hidden.
@@ -723,6 +732,25 @@ export class App {
     }
   }
 
+  /**
+   * Moves a terminal, and the task running in it, to the status a hook reported — unless the
+   * terminal has moved on since the hook fired.
+   */
+  private applyAgentEvent(event: AgentEvent): void {
+    if (this.state.isSupersededAgentEvent(event)) {
+      return;
+    }
+    this.state.applyAgentEvent(event);
+    this.todos.applyAgentEvent(event);
+  }
+
+  /**
+   * Marks a terminal whose process ended.
+   *
+   * An agent that never starts — a missing executable, a rejected credential, a CLI that exits
+   * immediately — otherwise leaves a tile sitting at "running" with nothing behind it. A failed
+   * exit raises the terminal's attention notice, which is what tells the user about it.
+   */
   private handleTerminalExit(event: TerminalExitEvent): void {
     // The login CLI writes its credentials before exiting, so its exit is a reliable moment for
     // the final read — and ends the poll early instead of letting it run to the timeout when the
@@ -746,19 +774,9 @@ export class App {
       return;
     }
     const status = event.success ? 'STOPPED' : 'FAILED';
-    this.state.updateTerminalStatus(event.terminalId, status);
+    this.state.markTerminalExited(event.terminalId, status);
     this.todos.handleTerminalStatus(event.terminalId, status);
     this.agentStartup.cancel(event.terminalId);
-    if (event.success) {
-      return;
-    }
-    this.showToast(
-      this.i18n.t('terminal.exitFailed', {
-        name: terminal.name,
-        code: event.exitCode,
-      }),
-      'attention',
-    );
   }
 
   /** `force` skips the backend's short-lived cache, for the panel's refresh button. */
@@ -863,7 +881,10 @@ export class App {
     }
     const installation = this.agents.antigravityInstallation();
     if (!installation?.healthy) {
-      this.showToast(installation?.diagnostic ?? '未检测到 Antigravity CLI。', 'attention');
+      this.showToast(
+        installation?.diagnostic ?? this.i18n.t('common.antigravityNotDetected'),
+        'attention',
+      );
       return;
     }
 
@@ -928,7 +949,10 @@ export class App {
     }
     const installation = this.agents.openCodeInstallation();
     if (!installation?.healthy) {
-      this.showToast(installation?.diagnostic ?? '未检测到 OpenCode。', 'attention');
+      this.showToast(
+        installation?.diagnostic ?? this.i18n.t('common.openCodeNotDetected'),
+        'attention',
+      );
       return;
     }
 
@@ -1273,6 +1297,7 @@ export class App {
   }
 
   protected async executeTodoTask(taskId: string): Promise<void> {
+    await this.loadTodoTranslations();
     const task = this.todos.task(taskId);
     if (!task || this.busyTodoTaskId()) return;
     const prompt = this.initialTodoPrompt(task);
@@ -1282,7 +1307,7 @@ export class App {
       const located = this.findTerminal(reusableTerminalId);
       if (!located) {
         if (task.attempts === 0) {
-          const message = '选择的已有终端已关闭，请编辑任务后重新选择执行终端。';
+          const message = this.i18n.t('taskFlow.error.selectedTerminalClosed');
           this.todos.setExecutionError(task.id, message);
           this.showToast(message, 'attention');
           return;
@@ -1305,6 +1330,7 @@ export class App {
   }
 
   protected async continueTodoTask(request: TodoContinuationRequest): Promise<void> {
+    await this.loadTodoTranslations();
     if (this.busyTodoTaskId()) return;
     const rejected = this.todos.rejectValidation(request);
     if (!rejected) return;
@@ -1330,7 +1356,7 @@ export class App {
         await this.submitTodoPrompt(rejected.id, located.terminal.id, prompt);
         this.state.updateTerminalStatus(located.terminal.id, 'THINKING');
         this.todos.handleTerminalStatus(located.terminal.id, 'THINKING');
-        this.showToast(`已把修改意见发回 ${located.terminal.name}`);
+        this.showToast(this.i18n.t('taskFlow.toast.feedbackSent', { name: located.terminal.name }));
       } catch (error) {
         const message = this.errorMessage(error);
         this.todos.setExecutionError(rejected.id, message, located.terminal.id);
@@ -1353,7 +1379,8 @@ export class App {
    * Stops a running task and interrupts the agent that was working on it.
    *
    * The board state is updated first and synchronously, so a caller that deletes the task right
-   * afterwards — "终止并删除" from the card — still hands this the terminal it has to interrupt.
+   * afterwards — "Stop and delete" from the card — still hands this the terminal it has to
+   * interrupt.
    */
   protected stopTodoTask(taskId: string): void {
     const task = this.todos.task(taskId);
@@ -1361,9 +1388,32 @@ export class App {
     if (!this.todos.stopExecution(taskId) || !task) return;
     if (terminalId) {
       this.agentStartup.cancel(terminalId);
-      void this.writeToTerminal(terminalId, AGENT_INTERRUPT_SEQUENCE).catch(() => undefined);
+      void this.writeToTerminal(terminalId, AGENT_INTERRUPT_SEQUENCE)
+        .then(() => this.recordInterruptStatus(terminalId))
+        .catch(() => undefined);
     }
-    this.showToast(`已中止「${task.title}」，可继续执行或放回待办`);
+    this.showToast(this.i18n.t('taskFlow.toast.stopped', { title: task.title }));
+  }
+
+  /**
+   * Moves a terminal to the status an Esc written straight to its PTY leads to.
+   *
+   * Claude and Codex report an interrupt late or not at all, so the terminal panel reads the key
+   * instead — but only for keys typed into it, which this one was not. The panel's own rule is
+   * applied here, so both ways of interrupting end in the same status.
+   */
+  private recordInterruptStatus(terminalId: string): void {
+    const terminal = this.findTerminal(terminalId)?.terminal;
+    if (!terminal) return;
+    const status = new TerminalInputStatusTracker().statusAfterInput(AGENT_INTERRUPT_SEQUENCE, {
+      agentType: terminal.agentType,
+      status: terminal.status,
+      // Esc is never read as an answer to a dialog, so the screen does not need reading.
+      readApprovalOptions: () => [],
+    });
+    if (status) {
+      this.handleTerminalStatus({ terminalId, status });
+    }
   }
 
   /**
@@ -1373,11 +1423,12 @@ export class App {
    * front of it — that is the whole point of stopping without discarding the run.
    */
   protected async resumeTodoTask(taskId: string): Promise<void> {
+    await this.loadTodoTranslations();
     const task = this.todos.task(taskId);
     if (!task || this.busyTodoTaskId()) return;
     const located = task.terminalId ? this.findTerminal(task.terminalId) : null;
     if (!located) {
-      const message = '原终端已关闭，请放回待办后重新执行。';
+      const message = this.i18n.t('taskFlow.error.originalTerminalClosed');
       this.todos.setExecutionError(task.id, message);
       this.showToast(message, 'attention');
       return;
@@ -1388,7 +1439,7 @@ export class App {
   protected returnTodoTaskToBacklog(taskId: string): void {
     const task = this.todos.task(taskId);
     if (!task || !this.todos.returnToBacklog(taskId)) return;
-    this.showToast(`已把「${task.title}」放回待办`);
+    this.showToast(this.i18n.t('taskFlow.toast.returnedToBacklog', { title: task.title }));
   }
 
   /**
@@ -1398,12 +1449,13 @@ export class App {
    * told at the start. This sends the change through the same terminal, so both sides agree.
    */
   protected async amendTodoTask(request: TodoContinuationRequest): Promise<void> {
+    await this.loadTodoTranslations();
     if (this.busyTodoTaskId()) return;
     const amended = this.todos.amendExecution(request);
     if (!amended) return;
     const located = amended.terminalId ? this.findTerminal(amended.terminalId) : null;
     if (!located) {
-      const message = '关联终端已关闭，补充指令未能送达。';
+      const message = this.i18n.t('taskFlow.error.amendmentUndelivered');
       this.todos.setExecutionError(amended.id, message);
       this.showToast(message, 'attention');
       return;
@@ -1417,7 +1469,7 @@ export class App {
       );
       this.state.updateTerminalStatus(located.terminal.id, 'THINKING');
       this.todos.handleTerminalStatus(located.terminal.id, 'THINKING');
-      this.showToast(`已把补充指令发送到 ${located.terminal.name}`);
+      this.showToast(this.i18n.t('taskFlow.toast.amendmentSent', { name: located.terminal.name }));
     } catch (error) {
       const message = this.errorMessage(error);
       this.todos.setExecutionError(amended.id, message, located.terminal.id);
@@ -1430,7 +1482,7 @@ export class App {
   protected openTodoTerminal(terminalId: string): void {
     const located = this.findTerminal(terminalId);
     if (!located) {
-      this.showToast('关联终端已关闭，可从任务卡片继续执行以恢复会话。', 'attention');
+      this.showToast(this.i18n.t('taskFlow.toast.linkedTerminalClosed'), 'attention');
       return;
     }
     if (this.state.activeWorkspace()?.id !== located.workspace.id) {
@@ -1443,14 +1495,14 @@ export class App {
   /**
    * Closes the terminal an accepted task was running in.
    *
-   * The task keeps its native session id, so a 常用任务 that runs again still resumes the same
+   * The task keeps its native session id, so a routine task that runs again still resumes the same
    * agent session in a fresh terminal.
    */
   protected closeTodoTerminal(terminalId: string): void {
     const located = this.findTerminal(terminalId);
     if (!located) return;
     this.closeTerminal(terminalId);
-    this.showToast(`已关闭 ${located.terminal.name}`);
+    this.showToast(this.i18n.t('taskFlow.toast.terminalClosed', { name: located.terminal.name }));
   }
 
   protected openPromptLibrary(): void {
@@ -2171,7 +2223,14 @@ export class App {
    * the terminal itself.
    */
   protected clearTerminalNotice(notice: GlobalTerminalNotice): void {
-    this.state.updateTerminalStatus(notice.terminalId, clearedNoticeStatus(notice.status));
+    // A terminal whose process exited has no prompt to sit at; calling it idle would offer it to
+    // the task board as a terminal that can take work.
+    this.state.updateTerminalStatus(
+      notice.terminalId,
+      this.state.hasTerminalExited(notice.terminalId)
+        ? 'STOPPED'
+        : clearedNoticeStatus(notice.status),
+    );
   }
 
   /** Clears every notice at once, for a batch that has already been dealt with. */
@@ -2184,7 +2243,7 @@ export class App {
 
   protected dismissAttentionBanner(): void {
     this.dismissNoticeKeys(
-      this.globalTerminalNotices().filter(isWaitingNotice).map(globalNoticeKey),
+      this.globalTerminalNotices().filter(isAttentionNotice).map(globalNoticeKey),
     );
   }
 
@@ -2929,18 +2988,23 @@ export class App {
     const isOpenCode = task.agentType === 'opencode';
     const profile = this.agents.modelProfiles().find((item) => item.id === task.profileId);
     if (!workspace || workspace.id !== task.workspaceId || !workingDirectory) {
-      this.todos.setExecutionError(task.id, '任务缺少可用的工作目录，请先在待办中选择目录。');
-      this.showToast('任务缺少可用的工作目录，请先在待办中选择目录。', 'attention');
+      const message = this.i18n.t('taskFlow.error.workingDirectoryMissing');
+      this.todos.setExecutionError(task.id, message);
+      this.showToast(message, 'attention');
       return;
     }
     if (!isOpenCode && !profile) {
-      this.todos.setExecutionError(task.id, '模型配置已不存在，请编辑待办后重新选择模型。');
-      this.showToast('模型配置已不存在，请编辑待办后重新选择模型。', 'attention');
+      const message = this.i18n.t('taskFlow.error.modelProfileMissing');
+      this.todos.setExecutionError(task.id, message);
+      this.showToast(message, 'attention');
       return;
     }
     if (profile && !isOpenCode && needsCredential(profile, task.agentType as AgentProtocol)) {
       this.openModelCredentialSettings(profile.id, profile.name);
-      this.todos.setExecutionError(task.id, `模型配置 ${profile.name} 缺少凭据。`);
+      this.todos.setExecutionError(
+        task.id,
+        this.i18n.t('taskFlow.error.credentialMissing', { name: profile.name }),
+      );
       return;
     }
 
@@ -2996,7 +3060,7 @@ export class App {
         {
           id: terminalId,
           agentType: task.agentType,
-          name: `任务 · ${task.title}`,
+          name: this.i18n.t('taskFlow.terminalName', { title: task.title }),
           command: launch.command,
           model: isOpenCode
             ? task.modelName || OPENCODE_DEFAULT_MODEL
@@ -3009,7 +3073,7 @@ export class App {
         workspace.id,
       );
       if (!terminal) {
-        throw new Error('任务所属工作空间已关闭，无法创建任务终端。');
+        throw new Error(this.i18n.t('taskFlow.error.workspaceClosed'));
       }
       const started = this.todos.beginExecution(
         task.id,
@@ -3017,14 +3081,14 @@ export class App {
         continuation,
       );
       if (!started) {
-        throw new Error('任务已不存在，已取消终端投递。');
+        throw new Error(this.i18n.t('taskFlow.error.taskMissing'));
       }
       this.armTodoPrompt(terminalId, task.id, prompt);
       this.mountWorkspace(workspace.id);
       this.showToast(
         sessionId
-          ? `终端已创建，正在恢复会话，Agent 就绪后自动发送：${task.title}`
-          : `终端已创建，Agent 就绪后自动发送任务到 ${terminal.name}`,
+          ? this.i18n.t('taskFlow.toast.terminalCreatedResuming', { title: task.title })
+          : this.i18n.t('taskFlow.toast.terminalCreated', { name: terminal.name }),
       );
     } catch (error) {
       this.agentStartup.cancel(terminalId);
@@ -3051,21 +3115,22 @@ export class App {
           candidate.stage === 'executing' &&
           candidate.terminalId === terminal.id,
       );
-    let unavailableReason = '';
+    let unavailableReasonKey = '';
     if (located.workspace.id !== task.workspaceId) {
-      unavailableReason = '选择的已有终端不在当前任务的工作空间。';
+      unavailableReasonKey = 'taskFlow.error.terminalOutsideWorkspace';
     } else if (!isReusableTodoTerminal(terminal)) {
-      unavailableReason = '选择的已有终端尚未就绪或已不可用，请重新选择。';
+      unavailableReasonKey = 'taskFlow.error.terminalUnavailable';
     } else if (this.agentStartup.awaitingTerminalIds().includes(terminal.id)) {
-      unavailableReason = '选择的已有终端仍在启动，请稍后重试。';
+      unavailableReasonKey = 'taskFlow.error.terminalStarting';
     } else if (terminal.agentType !== task.agentType) {
-      unavailableReason = '已有终端的 Agent 类型与任务配置不一致，请编辑待办后重新选择。';
+      unavailableReasonKey = 'taskFlow.error.agentTypeMismatch';
     } else if (terminalIsOccupied) {
-      unavailableReason = '选择的已有终端正在执行另一项看板任务。';
+      unavailableReasonKey = 'taskFlow.error.terminalBusy';
     }
-    if (unavailableReason) {
-      this.todos.setExecutionError(task.id, unavailableReason);
-      this.showToast(unavailableReason, 'attention');
+    if (unavailableReasonKey) {
+      const message = this.i18n.t(unavailableReasonKey);
+      this.todos.setExecutionError(task.id, message);
+      this.showToast(message, 'attention');
       return;
     }
 
@@ -3083,7 +3148,7 @@ export class App {
       await this.submitTodoPrompt(task.id, terminal.id, prompt);
       this.state.updateTerminalStatus(terminal.id, 'THINKING');
       this.todos.handleTerminalStatus(terminal.id, 'THINKING');
-      this.showToast(`已把任务发送到 ${terminal.name}`);
+      this.showToast(this.i18n.t('taskFlow.toast.taskSent', { name: terminal.name }));
     } catch (error) {
       const message = this.errorMessage(error);
       this.todos.setExecutionError(task.id, message, terminal.id);
@@ -3099,7 +3164,7 @@ export class App {
       if (!this.agents.installation()) await this.agents.detectClaude();
       const installation = this.agents.installation();
       if (!installation?.healthy) {
-        throw new Error(installation?.diagnostic ?? '未检测到可用的 Claude Code。');
+        throw new Error(installation?.diagnostic ?? this.i18n.t('common.claudeNotDetected'));
       }
       return;
     }
@@ -3107,7 +3172,7 @@ export class App {
       if (!this.agents.openCodeInstallation()) await this.agents.detectOpenCode();
       const installation = this.agents.openCodeInstallation();
       if (!installation?.healthy) {
-        throw new Error(installation?.diagnostic ?? '未检测到可用的 OpenCode。');
+        throw new Error(installation?.diagnostic ?? this.i18n.t('common.openCodeNotDetected'));
       }
       return;
     }
@@ -3115,14 +3180,14 @@ export class App {
       if (!this.agents.antigravityInstallation()) await this.agents.detectAntigravity();
       const installation = this.agents.antigravityInstallation();
       if (!installation?.healthy) {
-        throw new Error(installation?.diagnostic ?? '未检测到可用的 Antigravity CLI。');
+        throw new Error(installation?.diagnostic ?? this.i18n.t('common.antigravityNotDetected'));
       }
       return;
     }
     if (!this.agents.codexInstallation()) await this.agents.detectCodex();
     const installation = this.agents.codexInstallation();
     if (!installation?.healthy) {
-      throw new Error(installation?.diagnostic ?? '未检测到可用的 Codex CLI。');
+      throw new Error(installation?.diagnostic ?? this.i18n.t('common.codexNotDetected'));
     }
   }
 
@@ -3158,7 +3223,7 @@ export class App {
       submit: () => this.submitTodoPrompt(taskId, terminalId, prompt),
       onFailed: (message) => {
         this.todos.setExecutionError(taskId, message, terminalId);
-        this.showToast(`任务发送失败：${message}`, 'attention');
+        this.showToast(this.i18n.t('taskFlow.toast.sendFailed', { error: message }), 'attention');
       },
     });
     // The PTY is normally still spawning here, and its RUNNING event starts the clocks. A terminal
@@ -3174,17 +3239,17 @@ export class App {
     prompt: string,
   ): Promise<void> {
     if (!this.todos.markPromptSending(taskId, terminalId)) {
-      throw new Error('任务已切换到其他终端，已取消本次发送。');
+      throw new Error(this.i18n.t('taskFlow.error.taskReassigned'));
     }
     const located = this.findTerminal(terminalId);
     if (!located) {
-      throw new Error('目标终端在发送指令前已关闭。');
+      throw new Error(this.i18n.t('taskFlow.error.terminalClosedBeforeSend'));
     }
     this.rememberPromptDraft(located.workspace, located.terminal, prompt);
     await this.deliverTerminalPrompt(terminalId, prompt, true);
     this.promptAssets.captureInput(located.workspace, located.terminal, '\r');
     if (!this.todos.markPromptDelivered(taskId, terminalId)) {
-      throw new Error('任务已切换到其他终端，无法确认本次发送。');
+      throw new Error(this.i18n.t('taskFlow.error.deliveryUnconfirmed'));
     }
   }
 
@@ -3228,7 +3293,7 @@ export class App {
   private async writeToTerminal(terminalId: string, data: string): Promise<void> {
     const located = this.findTerminal(terminalId);
     if (!located) {
-      throw new Error('目标终端在发送指令前已关闭。');
+      throw new Error(this.i18n.t('taskFlow.error.terminalClosedBeforeSend'));
     }
     await this.terminalGateway.write(located.terminal, data);
   }
@@ -3236,15 +3301,23 @@ export class App {
   private initialTodoPrompt(task: TodoTask): string {
     const project = this.todos.project(task.projectId);
     return [
-      '你正在执行 Termexo 任务看板中的一项任务。请直接在当前项目中完成实现。',
+      this.i18n.t('taskFlow.prompt.initialIntro'),
       '',
-      `任务：${task.title}`,
-      `项目：${project?.name ?? '当前项目'}`,
-      `工作目录：${todoWorkingDirectory(task, project)}`,
-      task.description ? `任务说明：\n${task.description}` : '',
-      task.acceptanceCriteria ? `验收标准：\n${task.acceptanceCriteria}` : '',
+      this.i18n.t('taskFlow.prompt.task', { title: task.title }),
+      this.i18n.t('taskFlow.prompt.project', {
+        name: project?.name ?? this.i18n.t('taskFlow.prompt.currentProject'),
+      }),
+      this.i18n.t('taskFlow.prompt.workingDirectory', {
+        path: todoWorkingDirectory(task, project),
+      }),
+      task.description
+        ? this.i18n.t('taskFlow.prompt.description', { description: task.description })
+        : '',
+      task.acceptanceCriteria
+        ? this.i18n.t('taskFlow.prompt.acceptanceCriteria', { criteria: task.acceptanceCriteria })
+        : '',
       '',
-      '请先检查现有实现，再完成所需修改并运行与风险相匹配的验证。完成后请总结改动、验证结果和仍需注意的问题。',
+      this.i18n.t('taskFlow.prompt.initialClosing'),
     ]
       .filter((line) => line !== '')
       .join('\n');
@@ -3253,13 +3326,17 @@ export class App {
   /** What a run that was stopped by hand is told when the user picks it back up. */
   private resumeTodoPrompt(task: TodoTask): string {
     return [
-      '刚才的执行被手动中止。请在当前会话上下文中继续完成这项任务，不要从头开始。',
+      this.i18n.t('taskFlow.prompt.resumeIntro'),
       '',
-      `任务：${task.title}`,
-      task.description ? `任务说明：\n${task.description}` : '',
-      task.acceptanceCriteria ? `验收标准：\n${task.acceptanceCriteria}` : '',
+      this.i18n.t('taskFlow.prompt.task', { title: task.title }),
+      task.description
+        ? this.i18n.t('taskFlow.prompt.description', { description: task.description })
+        : '',
+      task.acceptanceCriteria
+        ? this.i18n.t('taskFlow.prompt.acceptanceCriteria', { criteria: task.acceptanceCriteria })
+        : '',
       '',
-      '请先说明已经完成到哪一步，再继续剩余工作并运行与风险相匹配的验证。',
+      this.i18n.t('taskFlow.prompt.resumeClosing'),
     ]
       .filter((line) => line !== '')
       .join('\n');
@@ -3268,14 +3345,20 @@ export class App {
   /** What the agent hears when the task it is working on gains new requirements. */
   private amendmentTodoPrompt(task: TodoTask, instruction: string): string {
     return [
-      '这项任务的要求有更新。请在当前会话上下文中继续，不要丢弃已经完成的工作。',
+      this.i18n.t('taskFlow.prompt.amendmentIntro'),
       '',
-      `任务：${task.title}`,
-      `补充要求：\n${instruction.trim()}`,
-      task.description ? `更新后的任务说明：\n${task.description}` : '',
-      task.acceptanceCriteria ? `更新后的验收标准：\n${task.acceptanceCriteria}` : '',
+      this.i18n.t('taskFlow.prompt.task', { title: task.title }),
+      this.i18n.t('taskFlow.prompt.instruction', { instruction: instruction.trim() }),
+      task.description
+        ? this.i18n.t('taskFlow.prompt.updatedDescription', { description: task.description })
+        : '',
+      task.acceptanceCriteria
+        ? this.i18n.t('taskFlow.prompt.updatedAcceptanceCriteria', {
+            criteria: task.acceptanceCriteria,
+          })
+        : '',
       '',
-      '请先说明这条补充要求对已完成部分的影响，再完成相应修改并运行匹配的验证。',
+      this.i18n.t('taskFlow.prompt.amendmentClosing'),
     ]
       .filter((line) => line !== '')
       .join('\n');
@@ -3283,14 +3366,20 @@ export class App {
 
   private continuationTodoPrompt(task: TodoTask, feedback: string): string {
     return [
-      '这项任务的人工验收没有通过。请在当前会话上下文中继续修改，不要丢弃已经完成的工作。',
+      this.i18n.t('taskFlow.prompt.rejectionIntro'),
       '',
-      `任务：${task.title}`,
-      `未通过原因：\n${feedback.trim()}`,
-      task.description ? `更新后的任务说明：\n${task.description}` : '',
-      task.acceptanceCriteria ? `更新后的验收标准：\n${task.acceptanceCriteria}` : '',
+      this.i18n.t('taskFlow.prompt.task', { title: task.title }),
+      this.i18n.t('taskFlow.prompt.feedback', { feedback: feedback.trim() }),
+      task.description
+        ? this.i18n.t('taskFlow.prompt.updatedDescription', { description: task.description })
+        : '',
+      task.acceptanceCriteria
+        ? this.i18n.t('taskFlow.prompt.updatedAcceptanceCriteria', {
+            criteria: task.acceptanceCriteria,
+          })
+        : '',
       '',
-      '请定位原因、完成修复并重新运行相关验证，然后清楚说明这次针对验收意见做了哪些修改。',
+      this.i18n.t('taskFlow.prompt.rejectionClosing'),
     ]
       .filter((line) => line !== '')
       .join('\n');
@@ -3336,6 +3425,23 @@ export class App {
     this.showToast(this.i18n.t('profile.credentialRequired', { name: profileName }), 'attention');
   }
 
+  /**
+   * Registers the task-flow wording, loading it on demand to keep it out of the initial bundle.
+   *
+   * The load is shared by every caller. A failed load is forgotten so the next task action retries
+   * it instead of failing forever on a chunk that could not be fetched once.
+   */
+  private loadTodoTranslations(): Promise<void> {
+    this.todoTranslations ??= import('./core/i18n/todo.i18n').then(
+      ({ registerTodoTranslations }) => registerTodoTranslations(),
+      (error: unknown) => {
+        this.todoTranslations = undefined;
+        throw error;
+      },
+    );
+    return this.todoTranslations;
+  }
+
   private async initialize(): Promise<void> {
     // Remote views render the desktop's terminal grid, which their own window may be too narrow
     // for, so styling needs to know which kind of client this is.
@@ -3347,7 +3453,11 @@ export class App {
         trackVisualViewport(document.documentElement),
       );
     }
+    // Started now so the task-flow wording is in place before anyone opens the board; the task
+    // actions still await it, because a prompt must never reach an agent as raw keys.
+    void this.loadTodoTranslations();
     await this.state.initialize();
+    this.workspacesLoaded.set(true);
     this.todos.initialize(this.state.workspaces());
     this.todos.reconcileTerminals(this.state.workspaces());
     await Promise.all([
@@ -3703,7 +3813,7 @@ export class App {
     );
     const failed = results.filter((result) => result.status === 'rejected').length;
     if (failed > 0) {
-      this.showToast(`有 ${failed} 个 OpenCode 终端恢复失败。`, 'attention');
+      this.showToast(this.i18n.t('restore.openCodeFailed', { count: failed }), 'attention');
     }
   }
 

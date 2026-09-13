@@ -4,7 +4,10 @@ import {
   collectGlobalTerminalNotices,
   createAttentionBanner,
   createDesktopNotification,
+  globalNoticeCategory,
+  globalNoticeKey,
   GlobalTerminalNotice,
+  newGlobalNotices,
 } from './terminal-notifications';
 
 const workspace = (
@@ -41,10 +44,15 @@ describe('clearedNoticeStatus', () => {
     expect(clearedNoticeStatus('COMPLETED')).toBe('IDLE');
   });
 
+  it('parks a failed or rate-limited terminal as idle, since it is no longer working', () => {
+    expect(clearedNoticeStatus('FAILED')).toBe('IDLE');
+    expect(clearedNoticeStatus('RATE_LIMITED')).toBe('IDLE');
+  });
+
   it('produces statuses that no longer raise a notice', () => {
-    const cleared = (['WAITING_INPUT', 'WAITING_APPROVAL', 'COMPLETED'] as const).map(
-      clearedNoticeStatus,
-    );
+    const cleared = (
+      ['WAITING_INPUT', 'WAITING_APPROVAL', 'FAILED', 'RATE_LIMITED', 'COMPLETED'] as const
+    ).map(clearedNoticeStatus);
 
     expect(collectGlobalTerminalNotices([workspace('one', cleared)])).toEqual([]);
   });
@@ -63,6 +71,56 @@ describe('collectGlobalTerminalNotices', () => {
       'COMPLETED',
     ]);
     expect(new Set(notices.map((notice) => notice.workspaceId))).toEqual(new Set(['one', 'two']));
+  });
+
+  it('ranks failures after the waiting states and before completions', () => {
+    const notices = collectGlobalTerminalNotices([
+      workspace('one', ['COMPLETED', 'RATE_LIMITED', 'FAILED', 'WAITING_INPUT']),
+    ]);
+
+    expect(notices.map((notice) => notice.status)).toEqual([
+      'WAITING_INPUT',
+      'FAILED',
+      'RATE_LIMITED',
+      'COMPLETED',
+    ]);
+    expect(notices.map(globalNoticeCategory)).toEqual(['waiting', 'issue', 'issue', 'completed']);
+  });
+
+  it('never raises a notice for a terminal that is idle, starting or simply working', () => {
+    expect(
+      collectGlobalTerminalNotices([
+        workspace('one', ['IDLE', 'STARTING', 'RUNNING', 'THINKING', 'STOPPED', 'DISCONNECTED']),
+      ]),
+    ).toEqual([]);
+  });
+});
+
+describe('newGlobalNotices', () => {
+  const keysOf = (notices: readonly GlobalTerminalNotice[]) =>
+    new Set(notices.map(globalNoticeKey));
+
+  it('announces nothing the client loaded with, however many statuses were persisted', () => {
+    const loaded = collectGlobalTerminalNotices([
+      workspace('one', ['WAITING_APPROVAL', 'COMPLETED', 'FAILED']),
+    ]);
+
+    expect(newGlobalNotices(loaded, null)).toEqual([]);
+  });
+
+  it('announces a notice once it appears after that, and again when a terminal re-enters it', () => {
+    const working = collectGlobalTerminalNotices([workspace('one', ['COMPLETED', 'RUNNING'])]);
+    const blocked = collectGlobalTerminalNotices([
+      workspace('one', ['COMPLETED', 'WAITING_INPUT']),
+    ]);
+    const answered = collectGlobalTerminalNotices([workspace('one', ['COMPLETED', 'THINKING'])]);
+
+    expect(newGlobalNotices(blocked, keysOf(working)).map((notice) => notice.status)).toEqual([
+      'WAITING_INPUT',
+    ]);
+    expect(newGlobalNotices(blocked, keysOf(blocked))).toEqual([]);
+    expect(newGlobalNotices(answered, keysOf(blocked))).toEqual([]);
+    expect(newGlobalNotices(blocked, keysOf(answered))).toHaveLength(1);
   });
 });
 
@@ -105,6 +163,23 @@ describe('createAttentionBanner', () => {
     });
     expect(banner?.target.status).toBe('WAITING_APPROVAL');
   });
+
+  it('keeps a failed Agent on the banner, behind any that are waiting', () => {
+    const failedOnly = createAttentionBanner(
+      collectGlobalTerminalNotices([workspace('one', ['FAILED'])]),
+    );
+    expect(failedOnly).toMatchObject({
+      title: '运行异常',
+      detail: 'Workspace one · Terminal 1：运行异常',
+      extraCount: 0,
+    });
+
+    const mixed = createAttentionBanner(
+      collectGlobalTerminalNotices([workspace('one', ['RATE_LIMITED', 'WAITING_INPUT'])]),
+    );
+    expect(mixed).toMatchObject({ title: '2 个 Agent 等待处理', extraCount: 1 });
+    expect(mixed?.target.status).toBe('WAITING_INPUT');
+  });
 });
 
 describe('createDesktopNotification', () => {
@@ -133,6 +208,30 @@ describe('createDesktopNotification', () => {
       body: 'Workspace one · Terminal 1',
       attention: 'critical',
     });
+  });
+
+  it('creates a critical notification for a failed or rate-limited Agent', () => {
+    expect(createDesktopNotification([notice('FAILED')])).toEqual({
+      title: 'Termexo · 运行异常',
+      body: 'Workspace one · Terminal 1',
+      attention: 'critical',
+    });
+    expect(createDesktopNotification([notice('RATE_LIMITED')])).toEqual({
+      title: 'Termexo · 触发限流',
+      body: 'Workspace one · Terminal 1',
+      attention: 'critical',
+    });
+  });
+
+  it('labels failures with the translator when one is supplied', () => {
+    const translate = (key: string) => `[${key}]`;
+
+    expect(createDesktopNotification([notice('FAILED')], translate)?.title).toBe(
+      'Termexo · [notice.agentFailed]',
+    );
+    expect(createDesktopNotification([notice('RATE_LIMITED')], translate)?.title).toBe(
+      'Termexo · [notice.rateLimited]',
+    );
   });
 
   it('creates an informational notification for a completed Agent', () => {

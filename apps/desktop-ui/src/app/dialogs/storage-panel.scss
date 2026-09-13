@@ -1,0 +1,218 @@
+.storage-total-chip {
+  flex: 0 0 auto;
+  padding: 4px 8px;
+  border-radius: var(--radius-selector);
+  color: var(--text-secondary);
+  background: var(--surface-2);
+  font: 11px/1 var(--mono);
+}
+
+// Paths are what people copy or compare here, so they sit in an inset well that reads as a value
+// rather than as another line of description.
+.storage-path {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 4px 4px 12px;
+  border-radius: var(--radius-field);
+  background: var(--surface-inset);
+
+  code {
+    flex: 1 1 auto;
+    min-width: 0;
+    padding: 4px 0;
+    overflow-wrap: anywhere;
+    color: var(--text);
+    font: 11px/1.5 var(--mono);
+  }
+
+  + .field-hint {
+    margin-top: 8px;
+  }
+}
+
+.storage-icon-button {
+  display: inline-grid;
+  width: 28px;
+  height: 28px;
+  flex: 0 0 auto;
+  place-items: center;
+  border-radius: var(--radius-field);
+  color: var(--text-muted);
+  background: transparent;
+  transition:
+    color 150ms ease,
+    background-color 150ms ease;
+
+  &:hover:not(:disabled) {
+    color: var(--text);
+    background: var(--surface-2);
+  }
+
+  &:disabled {
+    cursor: not-allowed;
+    opacity: 0.4;
+  }
+}
+
+// The move sits under the directory it changes, apart from the application details below, so it
+// cannot be read as moving the program.
+.storage-move {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-top: 12px;
+
+  .field-hint {
+    flex: 1 1 auto;
+    min-width: 0;
+    margin: 0;
+  }
+}
+
+.storage-move-actions {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 8px;
+}
+
+.storage-notice {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin: 12px 0 0;
+  padding: 8px 12px;
+  border-radius: var(--radius-field);
+  color: var(--text);
+  background: var(--success-soft);
+  font-size: 11px;
+  line-height: 1.5;
+
+  app-icon {
+    flex: 0 0 auto;
+    margin-top: 2px;
+    color: var(--color-success);
+  }
+
+  > span {
+    min-width: 0;
+    overflow-wrap: anywhere;
+  }
+
+  &.error {
+    background: var(--error-soft);
+
+    app-icon {
+      color: var(--danger);
+    }
+  }
+}
+
+.storage-entries {
+  display: grid;
+  gap: 2px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+
+  li {
+    display: grid;
+    min-height: 36px;
+    grid-template-columns: minmax(0, 1fr) auto 28px;
+    align-items: center;
+    gap: 12px;
+    padding: 4px 4px 4px 12px;
+    background: var(--surface-inset);
+
+    &:first-child {
+      border-radius: var(--radius-field) var(--radius-field) 0 0;
+    }
+
+    &:last-child {
+      border-radius: 0 0 var(--radius-field) var(--radius-field);
+    }
+  }
+
+  // A file that was never written is listed so its absence is visible, not hidden.
+  li.missing {
+    .storage-entry-name,
+    .storage-entry-size {
+      color: var(--text-muted);
+    }
+  }
+
+  li.storage-total {
+    background: var(--surface-2);
+    font-weight: 600;
+
+    .storage-entry-size {
+      color: var(--text);
+    }
+  }
+}
+
+.storage-entry-name {
+  overflow-wrap: anywhere;
+  color: var(--text);
+  font-family: var(--mono);
+  font-size: 11px;
+  line-height: 1.4;
+}
+
+.storage-entry-size {
+  color: var(--text-secondary);
+  font-family: var(--mono);
+  font-size: 11px;
+  line-height: 1.4;
+  text-align: right;
+  white-space: nowrap;
+}
+
+.storage-application {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+
+  > div {
+    display: grid;
+    grid-template-columns: 96px minmax(0, 1fr);
+    align-items: baseline;
+    gap: 12px;
+  }
+
+  dt {
+    color: var(--text-muted);
+    font-size: 11px;
+  }
+
+  dd {
+    margin: 0;
+    overflow-wrap: anywhere;
+    color: var(--text-secondary);
+    font: 11px/1.5 var(--mono);
+  }
+}
+
+@media (max-width: 640px) {
+  .storage-move {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  // Translated labels run long; each button keeps its label on one line and takes a row if needed.
+  .storage-move-actions {
+    flex-wrap: wrap;
+
+    button {
+      flex: 1 1 auto;
+      white-space: nowrap;
+    }
+  }
+
+  .storage-application > div {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 4px;
+  }
+}

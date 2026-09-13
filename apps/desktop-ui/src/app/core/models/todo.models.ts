@@ -69,11 +69,11 @@ export interface TodoTask {
   outputTail?: string;
   lastError?: string;
   attempts: number;
-  /** 常用任务：完成后可以放回待办反复执行，例如编译、打包、发布。 */
+  /** A routine task, such as a build: once finished it can return to the to-do column and rerun. */
   recurring: boolean;
-  /** Finished runs already archived by {@link canRestartTodoTask}; only 常用任务 go past zero. */
+  /** Finished runs already archived by {@link canRestartTodoTask}; only routine tasks exceed zero. */
   runCount: number;
-  /** When the previous run of a 常用任务 finished, kept after the run itself is cleared. */
+  /** When the previous run of a routine task finished, kept after the run itself is cleared. */
   lastRunAt?: number;
   validations: TodoValidationRecord[];
   createdAt: number;
@@ -117,54 +117,77 @@ export interface TodoContinuationRequest {
   acceptanceCriteria: string;
 }
 
+/**
+ * The board's columns, in board order.
+ *
+ * Text fields hold translation keys only: the wording lives in the board's lazy translation bundle,
+ * which this file must not import or it would be pulled into the initial bundle.
+ */
 export const TODO_COLUMNS: ReadonlyArray<{
   stage: TodoStage;
-  title: string;
-  description: string;
+  titleKey: string;
+  descriptionKey: string;
 }> = [
-  { stage: 'todo', title: '待办', description: '整理需求并分配模型' },
-  { stage: 'executing', title: '执行中', description: 'Agent 正在处理任务' },
-  { stage: 'completed', title: '已完成', description: '等待人工验收' },
-  { stage: 'verified', title: '已验证', description: '验收通过并归档' },
+  {
+    stage: 'todo',
+    titleKey: 'taskBoard.column.todo.title',
+    descriptionKey: 'taskBoard.column.todo.description',
+  },
+  {
+    stage: 'executing',
+    titleKey: 'taskBoard.column.executing.title',
+    descriptionKey: 'taskBoard.column.executing.description',
+  },
+  {
+    stage: 'completed',
+    titleKey: 'taskBoard.column.completed.title',
+    descriptionKey: 'taskBoard.column.completed.description',
+  },
+  {
+    stage: 'verified',
+    titleKey: 'taskBoard.column.verified.title',
+    descriptionKey: 'taskBoard.column.verified.description',
+  },
 ];
 
-/** Ordered highest first, which is the order the board offers them in. */
-export const TODO_PRIORITIES: ReadonlyArray<{ value: TodoPriority; label: string }> = [
-  { value: 'high', label: '高' },
-  { value: 'medium', label: '中' },
-  { value: 'low', label: '低' },
+/** Ordered highest first, the order the board offers them in; labels are translation keys. */
+export const TODO_PRIORITIES: ReadonlyArray<{ value: TodoPriority; labelKey: string }> = [
+  { value: 'high', labelKey: 'taskBoard.priority.high' },
+  { value: 'medium', labelKey: 'taskBoard.priority.medium' },
+  { value: 'low', labelKey: 'taskBoard.priority.low' },
 ];
 
+/** A routine task template whose text fields are translation keys, resolved when it is applied. */
 export interface TodoRoutinePreset {
   id: string;
-  title: string;
-  description: string;
-  acceptanceCriteria: string;
+  titleKey: string;
+  descriptionKey: string;
+  acceptanceCriteriaKey: string;
 }
 
 /**
- * Ready-made 常用任务 for the chores every project repeats.
+ * Ready-made routine tasks for the chores every project repeats.
  *
  * They only fill the task form, so each project still points them at its own directory and model.
  */
 export const TODO_ROUTINE_PRESETS: readonly TodoRoutinePreset[] = [
   {
     id: 'build',
-    title: '编译',
-    description: '在项目工作目录执行编译命令，确认当前代码可以正常构建。',
-    acceptanceCriteria: '编译命令执行成功，没有编译错误或类型错误。',
+    titleKey: 'taskBoard.preset.build.title',
+    descriptionKey: 'taskBoard.preset.build.description',
+    acceptanceCriteriaKey: 'taskBoard.preset.build.acceptanceCriteria',
   },
   {
     id: 'package',
-    title: '打包',
-    description: '执行打包流程，产出可分发的构建产物。',
-    acceptanceCriteria: '打包成功，产物齐全且版本号与项目配置一致。',
+    titleKey: 'taskBoard.preset.package.title',
+    descriptionKey: 'taskBoard.preset.package.description',
+    acceptanceCriteriaKey: 'taskBoard.preset.package.acceptanceCriteria',
   },
   {
     id: 'release',
-    title: '发布',
-    description: '核对版本号与变更说明，执行发布流程并确认发布结果。',
-    acceptanceCriteria: '发布流程执行成功，并说明发布的版本与内容。',
+    titleKey: 'taskBoard.preset.release.title',
+    descriptionKey: 'taskBoard.preset.release.description',
+    acceptanceCriteriaKey: 'taskBoard.preset.release.acceptanceCriteria',
   },
 ];
 
@@ -189,10 +212,10 @@ export function defaultTodoProject(workspace: Workspace, now = Date.now()): Todo
 }
 
 /**
- * Whether a finished run can be handed back to 待办 for another go.
+ * Whether a finished run can be handed back to the to-do column for another go.
  *
- * Only 常用任务 repeat: an ordinary task is done once it is verified, while 编译 / 打包 / 发布 are
- * expected to run again on the next change.
+ * Only routine tasks repeat: an ordinary task is done once it is verified, while build, package and
+ * release chores are expected to run again on the next change.
  */
 export function canRestartTodoTask(task: TodoTask): boolean {
   return task.recurring && (task.stage === 'completed' || task.stage === 'verified');
@@ -272,7 +295,18 @@ export function isReusableTodoTerminal(
   );
 }
 
-export function terminalStatusToExecutionState(status: TerminalStatus): TodoExecutionState {
+/**
+ * The execution state a task reports for its terminal's status.
+ *
+ * A rate-limited agent is waiting rather than failed: its process is alive and resumes once the
+ * limit lifts or the user switches model. An idle one is at its prompt without having finished —
+ * before the task reached it that is just the CLI starting up, but once the prompt was delivered
+ * the turn was interrupted and the run needs the user to go on.
+ */
+export function terminalStatusToExecutionState(
+  status: TerminalStatus,
+  promptDelivery: TodoPromptDeliveryState,
+): TodoExecutionState {
   switch (status) {
     case 'STARTING':
       return 'starting';
@@ -290,6 +324,6 @@ export function terminalStatusToExecutionState(status: TerminalStatus): TodoExec
     case 'DISCONNECTED':
       return 'failed';
     case 'IDLE':
-      return 'idle';
+      return promptDelivery === 'delivered' ? 'waiting' : 'idle';
   }
 }

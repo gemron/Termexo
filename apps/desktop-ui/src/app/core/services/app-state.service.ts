@@ -1,6 +1,6 @@
 import { computed, inject, Injectable, signal } from '@angular/core';
 
-import { AgentEvent, EVENT_STATUS } from '../models/agent.models';
+import { AgentEvent, EVENT_STATUS, TOOL_STARTED_EVENT_TYPE } from '../models/agent.models';
 import { createId } from '../models/identifiers';
 import {
   AGENT_LABELS,
@@ -23,6 +23,16 @@ import { hasBackend, runtimeMode } from './tauri-runtime';
 import { WorkspaceRepository } from './workspace.repository';
 
 const DEFAULT_SHELL = 'powershell.exe';
+
+/**
+ * How long before this client loaded an adopted terminal's hook events still count.
+ *
+ * A terminal that kept running across a reload went on reporting while no window was listening,
+ * and those events must still reach it. Older ones were already applied by the window that saved
+ * the status this client loaded; replaying them would undo whatever the user did since, such as a
+ * notice they cleared. The window covers a reload or a remote page opening with room to spare.
+ */
+const ADOPTED_TERMINAL_EVENT_GRACE_MS = 30_000;
 
 /**
  * What a restart changes about a terminal. `model` and `profileId` always describe the terminal
@@ -68,6 +78,15 @@ export class AppStateService {
   private readonly activeWorkspaceId = signal<string | null>(null);
   private readonly activeTerminalId = signal<string | null>(null);
   private unwatchWorkspaces?: UnlistenFn;
+  /** Events created before this describe a process this client never saw start. */
+  private readonly loadedAt = Date.now();
+  /**
+   * When each terminal's status last changed, so an event describing an earlier moment cannot
+   * overwrite it. Local writes are stamped with the clock, hook events with when they fired.
+   */
+  private readonly statusChangedAt = new Map<string, number>();
+  /** The runtime revision each terminal's process exited at; a relaunch moves past it. */
+  private readonly exitedRevisions = new Map<string, number>();
 
   readonly workspaces = this.workspaceItems.asReadonly();
   readonly activeWorkspace = computed(
@@ -176,6 +195,10 @@ export class AppStateService {
    */
   applyExternalWorkspace(workspace: Workspace): void {
     const workspaces = this.workspaceItems();
+    this.recordExternalStatusChanges(
+      workspaces.find((item) => item.id === workspace.id),
+      workspace,
+    );
     const merged = workspaces.some((item) => item.id === workspace.id)
       ? workspaces.map((item) => (item.id === workspace.id ? workspace : item))
       : [...workspaces, workspace];
@@ -499,7 +522,30 @@ export class AppStateService {
   }
 
   updateTerminalStatus(terminalId: string, status: TerminalStatus): void {
+    this.recordStatusChange(terminalId, Date.now());
     this.updateTerminal(terminalId, (terminal) => ({ ...terminal, status }));
+  }
+
+  /**
+   * Records that a terminal's process ended, with the status its exit reported.
+   *
+   * Hooks keep arriving after the PTY has closed — Antigravity reports idle twice more, Claude's
+   * Stop can land late — and none of them may bring a terminal that is gone back to life. They are
+   * ignored until the terminal is relaunched, which moves it to a new runtime revision.
+   */
+  markTerminalExited(terminalId: string, status: 'STOPPED' | 'FAILED'): void {
+    const terminal = this.findTerminal(terminalId);
+    if (!terminal) {
+      return;
+    }
+    this.exitedRevisions.set(terminalId, terminal.runtimeRevision ?? 0);
+    this.updateTerminalStatus(terminalId, status);
+  }
+
+  /** Whether the terminal's current launch has exited and has not been relaunched since. */
+  hasTerminalExited(terminalId: string): boolean {
+    const terminal = this.findTerminal(terminalId);
+    return terminal !== undefined && this.isExitedLaunch(terminal);
   }
 
   /** Renames a terminal, ignoring a blank name so a tab can never lose its label. */
@@ -536,6 +582,7 @@ export class AppStateService {
           : terminal,
       ),
     };
+    this.recordStatusChange(terminalId, Date.now());
     this.replaceWorkspace(updatedWorkspace);
     void this.repository.save(updatedWorkspace);
     return true;
@@ -566,30 +613,61 @@ export class AppStateService {
     };
   }
 
+  /**
+   * Whether a hook event no longer describes its terminal and must be ignored by everything that
+   * follows terminal state, not just this service.
+   *
+   * That is the case once the terminal's process has exited, when its status has changed since
+   * the event fired, and for a tool starting while an approval is pending: the gated tool's own
+   * start fires before its permission request, so a later one belongs to another tool — typically
+   * a parallel subagent — and would hide a dialog that is still waiting for the user.
+   */
+  isSupersededAgentEvent(event: AgentEvent): boolean {
+    if (event.createdAt < this.lastStatusChangeAt(event.terminalId)) {
+      return true;
+    }
+    const terminal = this.findTerminal(event.terminalId);
+    return (
+      terminal !== undefined &&
+      (this.isExitedLaunch(terminal) ||
+        (terminal.status === 'WAITING_APPROVAL' && event.eventType === TOOL_STARTED_EVENT_TYPE))
+    );
+  }
+
   applyAgentEvent(event: AgentEvent): void {
     const status = EVENT_STATUS[event.eventType];
     const workspace = this.workspaceItems().find((item) =>
       item.terminals.some((terminal) => terminal.id === event.terminalId),
     );
     const terminal = workspace?.terminals.find((item) => item.id === event.terminalId);
-    if (!workspace || !terminal || terminal.agentType !== event.agentType || !status) {
+    if (
+      !workspace ||
+      !terminal ||
+      terminal.agentType !== event.agentType ||
+      !status ||
+      this.isSupersededAgentEvent(event)
+    ) {
       return;
     }
 
+    this.recordStatusChange(terminal.id, event.createdAt);
+    const nativeSessionId = event.nativeSessionId ?? terminal.nativeSessionId;
+    if (status === terminal.status && nativeSessionId === terminal.nativeSessionId) {
+      return;
+    }
     const updatedWorkspace = {
       ...workspace,
-      terminals: workspace.terminals.map((terminal) =>
-        terminal.id === event.terminalId
-          ? {
-              ...terminal,
-              status,
-              nativeSessionId: event.nativeSessionId ?? terminal.nativeSessionId,
-            }
-          : terminal,
+      terminals: workspace.terminals.map((item) =>
+        item.id === event.terminalId ? { ...item, status, nativeSessionId } : item,
       ),
     };
     this.replaceWorkspace(updatedWorkspace);
-    void this.repository.save(updatedWorkspace);
+    // Every client receives the same events, so only the one that owns the workspaces records
+    // them. A remote client saving too sent each change back to the desktop as a workspace edit,
+    // which replaced newer state there and raised the same notice a second time.
+    if (!this.isAttachedRuntime()) {
+      void this.repository.save(updatedWorkspace);
+    }
   }
 
   restartTerminalWithProfile(
@@ -621,9 +699,57 @@ export class AppStateService {
             runtimeRevision: (terminal.runtimeRevision ?? 0) + 1,
           },
     );
+    this.recordStatusChange(terminalId, Date.now());
     this.replaceWorkspace({ ...workspace, terminals });
     void this.repository.save({ ...workspace, terminals });
     return true;
+  }
+
+  private findTerminal(terminalId: string): TerminalSession | undefined {
+    return this.workspaceItems()
+      .flatMap((workspace) => workspace.terminals)
+      .find((terminal) => terminal.id === terminalId);
+  }
+
+  private isExitedLaunch(terminal: TerminalSession): boolean {
+    return this.exitedRevisions.get(terminal.id) === (terminal.runtimeRevision ?? 0);
+  }
+
+  /**
+   * When the terminal's status last changed, or — before this client has seen it change — the
+   * moment from which its events describe the process it is showing. For a terminal restarted on
+   * load that is the load itself; one adopted while still running keeps a short grace period.
+   */
+  private lastStatusChangeAt(terminalId: string): number {
+    return (
+      this.statusChangedAt.get(terminalId) ??
+      (this.isAdoptedTerminal(terminalId)
+        ? this.loadedAt - ADOPTED_TERMINAL_EVENT_GRACE_MS
+        : this.loadedAt)
+    );
+  }
+
+  private recordStatusChange(terminalId: string, changedAt: number): void {
+    this.statusChangedAt.set(
+      terminalId,
+      Math.max(changedAt, this.statusChangedAt.get(terminalId) ?? changedAt),
+    );
+  }
+
+  /**
+   * Stamps the statuses another client changed with the moment they arrived.
+   *
+   * Those changes are the other client's local writes — a submitted prompt, a cleared notice — and
+   * an event that fired before them must not undo them here either.
+   */
+  private recordExternalStatusChanges(current: Workspace | undefined, incoming: Workspace): void {
+    const receivedAt = Date.now();
+    for (const terminal of incoming.terminals) {
+      const known = current?.terminals.find((item) => item.id === terminal.id);
+      if (known && known.status !== terminal.status) {
+        this.recordStatusChange(terminal.id, receivedAt);
+      }
+    }
   }
 
   private updateTerminal(

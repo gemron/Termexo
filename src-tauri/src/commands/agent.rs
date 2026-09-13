@@ -427,8 +427,15 @@ pub fn prepare_codex_launch(
         request.workspace_id.as_deref(),
     )?);
     environment.extend(hooks.codex_hook_environment(&request.terminal_id));
+    // The account decides which home the CLI reads its config and sessions from, so the same one
+    // has to name the notify program Termexo's override stands in for, and answer whether the
+    // session being resumed is still there.
+    let adapter = match environment.get("CODEX_HOME") {
+        Some(home) => CodexCliAdapter::with_home(home.into()),
+        None => CodexCliAdapter::new(),
+    };
     let notify_config = hooks
-        .codex_notify_config(&request.terminal_id)
+        .codex_notify_config(&request.terminal_id, &adapter.configured_notify_command())
         .map_err(|error| error.to_string())?;
     let hook_configs = hooks
         .codex_hook_configs()
@@ -465,12 +472,6 @@ pub fn prepare_codex_launch(
         ));
     }
     log_proxy_environment(&environment);
-    // The account decides which home the CLI reads its sessions from, so the same one has to
-    // answer whether the session being resumed is still there.
-    let adapter = match environment.get("CODEX_HOME") {
-        Some(home) => CodexCliAdapter::with_home(home.into()),
-        None => CodexCliAdapter::new(),
-    };
     launch_environment
         .put(request.terminal_id.clone(), environment)
         .map_err(|error| error.to_string())?;

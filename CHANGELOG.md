@@ -2,6 +2,39 @@
 
 Release notes for every Termexo version, newest first. The current release is summarised in [README.md](README.md).
 
+## V0.10.2
+
+- **Terminal status you can trust for all four agents.** Every state — running, waiting for approval,
+  waiting for input, failed and completed — was checked end to end against real Claude Code 2.1.270,
+  Codex CLI 0.154, OpenCode 1.18.30 and Antigravity 1.2.2 sessions, and the defects found are fixed.
+  A state change reaches the interface in about a second.
+- OpenCode terminals report completion again: every turn used to end stuck on "thinking". A turn that
+  errored stays failed instead of turning into "completed" two seconds later, and interrupting, declining
+  an approval or dismissing a question returns the terminal to idle.
+- **Failures and rate limits now notify** — attention banner, global notice panel and desktop
+  notification — and a failed terminal shows the error colour in the tab strip and inspector. The task
+  board card now says the agent reported an error rather than that its terminal ended.
+- Claude Code: a question it asks shows "waiting for input" instead of "waiting for approval"; `/clear`
+  no longer flashes "stopped" or marks the task failed; a finished turn is no longer followed by a
+  second "waiting for input" notice a minute later; failures are classified from the error code rather
+  than from words in the reply.
+- Codex CLI: interrupting a turn or declining an approval returns the terminal to idle; your own
+  `notify` program (for example Computer Use) keeps running inside Termexo terminals; an API error Codex
+  prints marks the terminal failed.
+- Antigravity: opening a terminal no longer notifies "task completed"; a turn completes exactly once;
+  declining an approval returns to idle; status updates are no longer written several times a second.
+- A freshly launched agent shows idle rather than running. Pressing Esc to interrupt, or answering an
+  approval with a number or letter, updates the status at once.
+- Status follows the order events happened in: an older event no longer overrides a newer state,
+  events that arrive after a terminal exited are ignored, and remote clients or a page reload no longer
+  repeat notifications.
+- Plain shells and quoted code are no longer mistaken for a rate limit or a timeout.
+- The task board is available in all seven languages, including the instructions it sends to the agent.
+- Settings → Storage is reorganised: changing or restoring the data directory now sits in the data
+  directory section, apart from the program's own path and version, so it no longer reads as moving
+  the application. Copying a path confirms it was copied, errors are shown in red, and the page is
+  translated into all seven languages.
+
 ## V0.10.1
 
 - **Phone remote access got the keys a phone keyboard lacks.** The active terminal carries a

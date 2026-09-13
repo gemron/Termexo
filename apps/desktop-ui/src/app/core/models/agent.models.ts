@@ -655,10 +655,16 @@ export interface ImportSummary {
   skipped: string[];
 }
 
+/** A tool call is about to run; for a gated tool this fires before its permission request. */
+export const TOOL_STARTED_EVENT_TYPE = 'tool.started';
+
 export const EVENT_STATUS: Readonly<Record<string, TerminalStatus>> = {
+  'session.starting': 'STARTING',
   'session.started': 'RUNNING',
+  // The CLI is up at its prompt and has not done any work yet, so there is nothing to report.
+  'session.ready': 'IDLE',
   'agent.thinking': 'THINKING',
-  'tool.started': 'RUNNING',
+  [TOOL_STARTED_EVENT_TYPE]: 'RUNNING',
   'tool.completed': 'THINKING',
   'tool.failed': 'RUNNING',
   'approval.required': 'WAITING_APPROVAL',
@@ -667,5 +673,18 @@ export const EVENT_STATUS: Readonly<Record<string, TerminalStatus>> = {
   'agent.timeout': 'WAITING_INPUT',
   'task.completed': 'COMPLETED',
   'agent.failed': 'FAILED',
+  // The user interrupted the turn or rejected an approval: back at the prompt, neither failed nor
+  // finished.
+  'agent.interrupted': 'IDLE',
   'session.ended': 'STOPPED',
 };
+
+/**
+ * Orders events oldest first by when their hook fired.
+ *
+ * The spool is appended by independent hook processes, so the order a batch arrives in is not the
+ * order the agent went through those states; applying it as received lets an older state win.
+ */
+export function chronologicalAgentEvents(events: readonly AgentEvent[]): AgentEvent[] {
+  return [...events].sort((left, right) => left.createdAt - right.createdAt);
+}

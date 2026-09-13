@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 
+import { TODO_TRANSLATIONS } from '../i18n/todo.i18n';
 import type { AgentEvent } from '../models/agent.models';
 import type { TodoTaskDraft } from '../models/todo.models';
 import {
@@ -9,6 +10,11 @@ import {
 } from '../models/todo.models';
 import type { TerminalSession, Workspace } from '../models/workspace.models';
 import { TodoService } from './todo.service';
+
+/** Execution errors are stored as task-flow translation keys, not as sentences. */
+const TERMINAL_ENDED_ERROR = 'taskFlow.error.terminalEnded';
+const TERMINAL_MISSING_ERROR = 'taskFlow.error.terminalMissing';
+const PROMPT_INTERRUPTED_ERROR = 'taskFlow.error.promptInterrupted';
 
 const workspace: Workspace = {
   id: 'workspace-1',
@@ -174,6 +180,85 @@ describe('TodoService', () => {
     });
   });
 
+  describe('agent status events', () => {
+    function startedTask(service: TodoService) {
+      service.initialize([workspace]);
+      const task = service.createTask(
+        workspace.id,
+        draft(service.projectsFor(workspace.id)[0].id),
+      )!;
+      service.beginExecution(task.id, { terminalId: 'terminal-1' });
+      return task;
+    }
+
+    function codexEvent(eventType: string, createdAt: number): AgentEvent {
+      return {
+        eventKey: `${eventType}:${createdAt}`,
+        agentType: 'codex',
+        terminalId: 'terminal-1',
+        eventType,
+        detail: {},
+        createdAt,
+      };
+    }
+
+    it('treats an interrupted turn as waiting on the user, neither failed nor finished', () => {
+      const service = new TodoService();
+      const task = startedTask(service);
+      service.markPromptDelivered(task.id, 'terminal-1');
+      service.handleTerminalStatus('terminal-1', 'RUNNING');
+
+      service.applyAgentEvent(codexEvent('agent.interrupted', Date.now() + 1_000));
+
+      expect(service.task(task.id)).toMatchObject({
+        stage: 'executing',
+        executionState: 'waiting',
+        lastTerminalStatus: 'IDLE',
+        lastError: undefined,
+        completedAt: undefined,
+      });
+    });
+
+    it('does not mistake the CLI starting up for an interrupted run', () => {
+      const service = new TodoService();
+      const task = startedTask(service);
+
+      service.applyAgentEvent(codexEvent('session.starting', Date.now()));
+      expect(service.task(task.id)?.executionState).toBe('starting');
+      service.applyAgentEvent(codexEvent('session.ready', Date.now()));
+      expect(service.task(task.id)).toMatchObject({ executionState: 'idle', lastError: undefined });
+
+      // The prompt is handed over; a ready event polled after that still predates the run.
+      service.markPromptDelivered(task.id, 'terminal-1');
+      service.handleTerminalStatus('terminal-1', 'THINKING');
+      service.applyAgentEvent(codexEvent('session.ready', Date.now() - 1_000));
+      expect(service.task(task.id)).toMatchObject({
+        executionState: 'running',
+        lastTerminalStatus: 'THINKING',
+      });
+    });
+
+    it('asks for the user on a rate limit and records a failure the agent reports', () => {
+      const service = new TodoService();
+      const task = startedTask(service);
+      service.markPromptDelivered(task.id, 'terminal-1');
+
+      service.applyAgentEvent(codexEvent('agent.rate_limited', Date.now() + 1_000));
+      expect(service.task(task.id)).toMatchObject({
+        executionState: 'waiting',
+        stage: 'executing',
+      });
+
+      service.applyAgentEvent(codexEvent('agent.failed', Date.now() + 2_000));
+      expect(service.task(task.id)).toMatchObject({
+        executionState: 'failed',
+        stage: 'executing',
+        promptDeliveryState: 'delivered',
+        lastError: 'taskFlow.error.agentFailed',
+      });
+    });
+  });
+
   it('keeps a stopped run and everything it was bound to, so it can go on', () => {
     const service = new TodoService();
     service.initialize([workspace]);
@@ -220,7 +305,7 @@ describe('TodoService', () => {
     });
   });
 
-  it('returns a task to 待办 and stops it from tracking the terminal it left', () => {
+  it('returns a task to To do and stops it from tracking the terminal it left', () => {
     const service = new TodoService();
     service.initialize([workspace]);
     const task = service.createTask(workspace.id, draft(service.projectsFor(workspace.id)[0].id))!;
@@ -355,7 +440,7 @@ describe('TodoService', () => {
       stage: 'executing',
       executionState: 'failed',
       lastTerminalStatus: 'DISCONNECTED',
-      lastError: '关联终端不存在或已关闭，可重试以恢复原会话。',
+      lastError: TERMINAL_MISSING_ERROR,
     });
 
     service.beginExecution(
@@ -367,7 +452,7 @@ describe('TodoService', () => {
     expect(service.task(task.id)).toMatchObject({
       executionState: 'failed',
       lastTerminalStatus: 'STOPPED',
-      lastError: 'Agent 终端已结束，请检查终端输出后重试。',
+      lastError: TERMINAL_ENDED_ERROR,
     });
   });
 
@@ -403,8 +488,15 @@ describe('TodoService', () => {
       stage: 'executing',
       executionState: 'failed',
       promptDeliveryState: 'failed',
-      lastError: '任务指令未送达终端，请重新发送。',
+      lastError: PROMPT_INTERRUPTED_ERROR,
     });
+  });
+
+  it('stores only execution errors the task-flow wording can translate', () => {
+    for (const key of [TERMINAL_ENDED_ERROR, TERMINAL_MISSING_ERROR, PROMPT_INTERRUPTED_ERROR]) {
+      expect(TODO_TRANSLATIONS.en[key]).toBeTruthy();
+      expect(TODO_TRANSLATIONS['zh-CN']?.[key]).toBeTruthy();
+    }
   });
 
   it('persists an existing-terminal preference and routes reused terminal output to the active task', () => {
@@ -554,7 +646,7 @@ describe('TodoService', () => {
     ]);
   });
 
-  it('runs a 常用任务 again from a clean run and keeps its history', () => {
+  it('runs a routine task again from a clean run and keeps its history', () => {
     const service = new TodoService();
     service.initialize([workspace]);
     const projectId = service.projectsFor(workspace.id)[0].id;
@@ -586,7 +678,7 @@ describe('TodoService', () => {
     expect(service.restartTask(task.id)?.runCount).toBe(2);
   });
 
-  it('only repeats tasks marked 常用 and only once their run is over', () => {
+  it('only repeats tasks marked routine and only once their run is over', () => {
     const service = new TodoService();
     service.initialize([workspace]);
     const projectId = service.projectsFor(workspace.id)[0].id;
@@ -596,13 +688,13 @@ describe('TodoService', () => {
     service.markCompleted(plain.id);
     expect(service.restartTask(plain.id)).toBeNull();
 
-    // A 常用任务 that has not finished its current run stays where it is.
+    // A routine task that has not finished its current run stays where it is.
     service.beginExecution(routine.id, { terminalId: 'terminal-release' });
     expect(service.restartTask(routine.id)).toBeNull();
     expect(service.task(routine.id)).toMatchObject({ stage: 'executing' });
   });
 
-  it('keeps tasks stored before 常用任务 existed out of the repeatable set', () => {
+  it('keeps tasks stored before routine tasks existed out of the repeatable set', () => {
     const service = new TodoService();
     service.initialize([workspace]);
     const stored = JSON.parse(window.localStorage.getItem('termexo.todos.v1')!);

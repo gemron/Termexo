@@ -317,6 +317,12 @@ button.stat {
     box-shadow: inset 2px 0 0 var(--color-error);
   }
 
+  &[data-status='FAILED'] {
+    border-color: color-mix(in srgb, var(--color-error) 52%, var(--border));
+    background: color-mix(in srgb, var(--color-error) 8%, var(--surface-raised));
+    box-shadow: inset 2px 0 0 var(--color-error);
+  }
+
   &[data-status='COMPLETED'] {
     border-color: color-mix(in srgb, var(--color-success) 44%, var(--border));
     background: color-mix(in srgb, var(--color-success) 9%, var(--surface-raised));
@@ -409,6 +415,7 @@ button.stat {
   &[data-status='WAITING_INPUT'],
   &[data-status='WAITING_APPROVAL'],
   &[data-status='RATE_LIMITED'],
+  &[data-status='FAILED'],
   &[data-status='COMPLETED'] {
     padding-inline: 7px;
     border: 1px solid color-mix(in srgb, currentColor 34%, var(--border));
@@ -423,7 +430,8 @@ button.stat {
     }
   }
 
-  &[data-status='RATE_LIMITED'] {
+  &[data-status='RATE_LIMITED'],
+  &[data-status='FAILED'] {
     color: var(--color-error);
 
     i {

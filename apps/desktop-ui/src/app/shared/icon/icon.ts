@@ -142,6 +142,7 @@ const ICONS: Record<string, IconNode> = {
   'chevron-down': ChevronDown,
   columns: Columns2,
   command: Command,
+  copy: Copy,
   cloud: Cloud,
   gauge: CircleGauge,
   download: Download,

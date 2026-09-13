@@ -2,6 +2,9 @@ import { Component, computed, effect, inject, input, output, signal } from '@ang
 import { ModalFocusDirective } from '../shared/modal-focus.directive';
 import { FormsModule } from '@angular/forms';
 
+import { I18nService } from '../core/i18n/i18n.service';
+import { registerTodoBoardTranslations } from '../core/i18n/todo-board.i18n';
+import { TranslatePipe } from '../core/i18n/translate.pipe';
 import type { ModelProfile } from '../core/models/agent.models';
 import { profileModel } from '../core/models/agent.models';
 import {
@@ -32,6 +35,8 @@ import { DirectoryPickerService } from '../core/services/directory-picker.servic
 import { TodoService } from '../core/services/todo.service';
 import { IconComponent } from '../shared/icon/icon';
 
+registerTodoBoardTranslations();
+
 interface ModelOption {
   key: string;
   agentType: TodoTask['agentType'];
@@ -56,18 +61,39 @@ const NEW_TERMINAL_OPTION = 'new';
 const ALL_PROJECTS_OPTION = 'all';
 const DEFAULT_TASK_PRIORITY: TodoPriority = 'medium';
 
+/** Translation keys for the shared feedback dialog, one set per job it serves. */
+const FEEDBACK_DIALOG_COPY = {
+  reject: {
+    heading: 'taskBoard.feedback.rejectHeading',
+    hint: 'taskBoard.feedback.rejectHint',
+    feedbackLabel: 'taskBoard.feedback.rejectLabel',
+    feedbackPlaceholder: 'taskBoard.feedback.rejectPlaceholder',
+    submit: 'taskBoard.feedback.rejectSubmit',
+  },
+  amend: {
+    heading: 'taskBoard.amend',
+    hint: 'taskBoard.feedback.amendHint',
+    feedbackLabel: 'taskBoard.feedback.amendLabel',
+    feedbackPlaceholder: 'taskBoard.feedback.amendPlaceholder',
+    submit: 'taskBoard.feedback.amendSubmit',
+  },
+} as const;
+
 /** How long a run is shown in: the unit that is actually still moving. */
-function formatRunDuration(elapsedMs: number): string {
+function formatRunDuration(elapsedMs: number, i18n: I18nService): string {
   const seconds = Math.floor(Math.max(0, elapsedMs) / 1000);
-  if (seconds < 60) return `${seconds} 秒`;
+  if (seconds < 60) return i18n.t('taskBoard.duration.seconds', { seconds });
   const minutes = Math.floor(seconds / 60);
-  if (minutes < 60) return `${minutes} 分`;
-  return `${Math.floor(minutes / 60)} 小时 ${minutes % 60} 分`;
+  if (minutes < 60) return i18n.t('taskBoard.duration.minutes', { minutes });
+  return i18n.t('taskBoard.duration.hoursMinutes', {
+    hours: Math.floor(minutes / 60),
+    minutes: minutes % 60,
+  });
 }
 
 @Component({
   selector: 'app-todo-board',
-  imports: [ModalFocusDirective, FormsModule, IconComponent],
+  imports: [ModalFocusDirective, FormsModule, IconComponent, TranslatePipe],
   templateUrl: './todo-board.html',
   styleUrl: './todo-board.scss',
 })
@@ -78,6 +104,7 @@ export class TodoBoardComponent {
 
   protected readonly todos = inject(TodoService);
   private readonly directoryPicker = inject(DirectoryPickerService);
+  private readonly i18n = inject(I18nService);
 
   readonly workspace = input<Workspace | null>(null);
   readonly terminals = input<readonly TerminalSession[]>([]);
@@ -169,7 +196,7 @@ export class TodoBoardComponent {
       ? tasks
       : tasks.filter((task) => task.projectId === selectedProjectId);
   });
-  /** The 常用任务 of the current filter, in creation order so the strip never reshuffles. */
+  /** The routine tasks of the current filter, in creation order so the strip never reshuffles. */
   protected readonly routineTasks = computed(() =>
     this.visibleTasks()
       .filter((task) => task.recurring)
@@ -251,7 +278,7 @@ export class TodoBoardComponent {
             agentType: 'opencode' as const,
             profileId: '',
             modelName: '',
-            label: 'OpenCode · 自有模型配置',
+            label: this.i18n.t('taskBoard.taskDialog.openCodeModelOption'),
           },
         ]
       : profileOptions;
@@ -279,21 +306,10 @@ export class TodoBoardComponent {
       task.stage === 'executing' && task.executionState !== 'failed' && !canResumeTodoTask(task)
     );
   });
-  /** Wording for the shared feedback dialog, so the template carries no branching of its own. */
-  protected readonly validationDialogCopy = computed(() => {
-    const amending = this.validationMode() === 'amend';
-    return {
-      heading: amending ? '补充指令' : '验收不通过',
-      hint: amending
-        ? '会发送给正在执行的 Agent，任务继续跑，不会重新开始。'
-        : '将回到执行中，并继续原来的 Agent 会话。',
-      feedbackLabel: amending ? '补充要求 *' : '需要修改的问题 *',
-      feedbackPlaceholder: amending
-        ? '说明要补充或调整的要求'
-        : '说明未通过的现象、复现方式和期望结果',
-      submit: amending ? '发送给 Agent' : '继续原会话修改',
-    };
-  });
+  /** Wording keys for the shared feedback dialog, so the template carries no branching of its own. */
+  protected readonly validationDialogCopy = computed(
+    () => FEEDBACK_DIALOG_COPY[this.validationMode()],
+  );
   protected readonly validationTask = computed(() => {
     const taskId = this.validationTaskId();
     return taskId ? this.todos.task(taskId) : null;
@@ -340,8 +356,12 @@ export class TodoBoardComponent {
   /** Proof that an unattended agent is still moving, and how long it has been at it. */
   protected elapsedLabel(task: TodoTask): string {
     if (!task.startedAt) return '';
-    if (task.stage === 'executing') return formatRunDuration(this.now() - task.startedAt);
-    return `耗时 ${formatRunDuration((task.completedAt ?? this.now()) - task.startedAt)}`;
+    if (task.stage === 'executing') {
+      return formatRunDuration(this.now() - task.startedAt, this.i18n);
+    }
+    return this.i18n.t('taskBoard.card.elapsed', {
+      duration: formatRunDuration((task.completedAt ?? this.now()) - task.startedAt, this.i18n),
+    });
   }
 
   protected tasksFor(stage: TodoStage): TodoTask[] {
@@ -542,7 +562,7 @@ export class TodoBoardComponent {
     const target = terminal
       ? terminal.name
       : (this.modelOptions().find((option) => option.key === this.taskModelKey())?.label ??
-        '未选择模型');
+        this.i18n.t('taskBoard.taskDialog.noModelSelected'));
     const projectName = this.projects().find(
       (project) => project.id === this.taskProjectId(),
     )?.name;
@@ -648,9 +668,9 @@ export class TodoBoardComponent {
   }
 
   protected applyRoutinePreset(preset: TodoRoutinePreset): void {
-    this.taskTitle.set(preset.title);
-    this.taskDescription.set(preset.description);
-    this.taskAcceptance.set(preset.acceptanceCriteria);
+    this.taskTitle.set(this.i18n.t(preset.titleKey));
+    this.taskDescription.set(this.i18n.t(preset.descriptionKey));
+    this.taskAcceptance.set(this.i18n.t(preset.acceptanceCriteriaKey));
     this.taskRecurring.set(true);
   }
 
@@ -658,15 +678,15 @@ export class TodoBoardComponent {
     return canRestartTodoTask(task);
   }
 
-  /** Whether the quick strip can start this 常用任务 right now. */
+  /** Whether the quick strip can start this routine task right now. */
   protected canRunRoutine(task: TodoTask): boolean {
     return !this.busyTaskId() && (task.stage === 'todo' || canRestartTodoTask(task));
   }
 
   /**
-   * Runs a 常用任务, archiving the previous run first when there is one.
+   * Runs a routine task, archiving the previous run first when there is one.
    *
-   * Both the quick strip and the "再次执行" card action land here, so a repeat run always goes
+   * Both the quick strip and the "run again" card action land here, so a repeat run always goes
    * through the same reset and reaches the shell as an ordinary execution request.
    */
   protected runRoutine(task: TodoTask): void {
@@ -677,23 +697,34 @@ export class TodoBoardComponent {
 
   /** Explains what the click does, and why it is refused while another run is starting. */
   protected routineHint(task: TodoTask): string {
-    if (task.stage === 'executing') return `${task.title} 正在执行，完成后可再次执行`;
-    if (this.busyTaskId()) return '正在启动其他任务，请稍候再执行';
-    return `执行 ${task.title} · ${this.taskDirectory(task)}`;
+    if (task.stage === 'executing') {
+      return this.i18n.t('taskBoard.routine.runningHint', { title: task.title });
+    }
+    if (this.busyTaskId()) return this.i18n.t('taskBoard.routine.busyHint');
+    return this.i18n.t('taskBoard.routine.runHint', {
+      title: task.title,
+      directory: this.taskDirectory(task),
+    });
   }
 
-  /** What the quick strip reports about a 常用任务 without opening its card. */
+  /** What the quick strip reports about a routine task without opening its card. */
   protected routineStateLabel(task: TodoTask): string {
-    if (task.stage === 'executing') return '执行中';
-    if (task.stage === 'completed') return '待验收';
-    if (task.stage === 'verified') return '可再次执行';
-    return task.runCount > 0 ? `已完成 ${task.runCount} 次` : '未执行';
+    if (task.stage === 'executing') return this.i18n.t('taskBoard.routine.executing');
+    if (task.stage === 'completed') return this.i18n.t('taskBoard.routine.awaitingReview');
+    if (task.stage === 'verified') return this.i18n.t('taskBoard.routine.runAgain');
+    return task.runCount > 0
+      ? this.i18n.t('taskBoard.routine.completedRuns', { count: task.runCount })
+      : this.i18n.t('taskBoard.routine.neverRun');
   }
 
-  /** A 待办 card that has already run is one that was stopped; say so instead of looking new. */
+  /** A to-do card that has already run is one that was stopped; say so instead of looking new. */
   protected stoppedRunLabel(task: TodoTask): string {
     if (task.stage !== 'todo' || task.attempts === 0) return '';
-    return task.nativeSessionId ? '已终止 · 再次执行将继续原会话' : '已终止 · 可重新执行';
+    return this.i18n.t(
+      task.nativeSessionId
+        ? 'taskBoard.card.stoppedResumable'
+        : 'taskBoard.card.stoppedRestartable',
+    );
   }
 
   protected hasUnsavedTaskChanges(): boolean {
@@ -719,20 +750,20 @@ export class TodoBoardComponent {
   }
 
   protected terminalStatusLabel(status: TerminalSession['status']): string {
-    const labels: Record<TerminalSession['status'], string> = {
-      STARTING: '启动中',
-      RUNNING: '运行中',
-      THINKING: '处理中',
-      WAITING_INPUT: '等待输入',
-      WAITING_APPROVAL: '等待确认',
-      RATE_LIMITED: '速率受限',
-      IDLE: '空闲',
-      COMPLETED: '已完成',
-      FAILED: '失败',
-      STOPPED: '已停止',
-      DISCONNECTED: '已断开',
+    const labelKeys: Record<TerminalSession['status'], string> = {
+      STARTING: 'taskBoard.terminalStatus.starting',
+      RUNNING: 'taskBoard.terminalStatus.running',
+      THINKING: 'taskBoard.terminalStatus.thinking',
+      WAITING_INPUT: 'taskBoard.terminalStatus.waitingInput',
+      WAITING_APPROVAL: 'taskBoard.terminalStatus.waitingApproval',
+      RATE_LIMITED: 'taskBoard.terminalStatus.rateLimited',
+      IDLE: 'taskBoard.terminalStatus.idle',
+      COMPLETED: 'taskBoard.terminalStatus.completed',
+      FAILED: 'taskBoard.terminalStatus.failed',
+      STOPPED: 'taskBoard.terminalStatus.stopped',
+      DISCONNECTED: 'taskBoard.terminalStatus.disconnected',
     };
-    return labels[status];
+    return this.i18n.t(labelKeys[status]);
   }
 
   private modelOptionForTerminal(terminal: AgentTerminal): ModelOption | undefined {
@@ -783,9 +814,11 @@ export class TodoBoardComponent {
   protected projectDeleteBlockedReason(): string {
     const projectId = this.editingProjectId();
     if (!projectId || this.canDeleteEditingProject()) return '';
-    return this.totalForProject(projectId) > 0
-      ? '该项目下仍有任务，请先删除或改派这些任务。'
-      : '看板至少需要保留一个项目。';
+    return this.i18n.t(
+      this.totalForProject(projectId) > 0
+        ? 'taskBoard.projectDialog.deleteBlockedByTasks'
+        : 'taskBoard.projectDialog.deleteBlockedLastProject',
+    );
   }
 
   protected deleteEditingProject(): void {
@@ -830,7 +863,9 @@ export class TodoBoardComponent {
       return await this.directoryPicker.select(current.trim() || this.workspace()?.projectPath);
     } catch (error) {
       this.directoryError.set(
-        `无法打开目录选择器：${error instanceof Error ? error.message : String(error)}`,
+        this.i18n.t('taskBoard.directoryPickerFailed', {
+          error: error instanceof Error ? error.message : String(error),
+        }),
       );
       return null;
     } finally {
@@ -901,13 +936,16 @@ export class TodoBoardComponent {
   protected dropActionLabel(stage: TodoStage): string {
     const taskId = this.draggedTaskId();
     const task = taskId ? this.todos.task(taskId) : null;
-    if (task?.stage === 'completed' && stage === 'executing') return '退回并继续修改';
-    return {
-      todo: '放下后放回待办，可再次执行',
-      executing: '放下后开始执行',
-      completed: '放下后送交验收',
-      verified: '放下后验收通过',
-    }[stage];
+    if (task?.stage === 'completed' && stage === 'executing') {
+      return this.i18n.t('taskBoard.drop.reject');
+    }
+    const labelKeys: Record<TodoStage, string> = {
+      todo: 'taskBoard.drop.todo',
+      executing: 'taskBoard.drop.executing',
+      completed: 'taskBoard.drop.completed',
+      verified: 'taskBoard.drop.verified',
+    };
+    return this.i18n.t(labelKeys[stage]);
   }
 
   private canTransition(task: TodoTask, stage: TodoStage): boolean {
@@ -930,8 +968,9 @@ export class TodoBoardComponent {
   /**
    * Accepts a finished run, optionally releasing the terminal it ran in.
    *
-   * The terminal is resolved before the task moves on, because 验收 is what ends the board's claim
-   * on it — and only then, so a task that was already accepted elsewhere never closes a terminal.
+   * The terminal is resolved before the task moves on, because verification is what ends the
+   * board's claim on it — and only then, so a task already accepted elsewhere never closes a
+   * terminal.
    */
   protected verify(task: TodoTask, closeTerminal = false): void {
     const terminalId = closeTerminal ? this.closableTerminalFor(task)?.id : undefined;
@@ -988,40 +1027,44 @@ export class TodoBoardComponent {
   }
 
   protected priorityLabel(priority: TodoPriority): string {
-    return TODO_PRIORITIES.find((item) => item.value === priority)?.label ?? '';
+    const labelKey = TODO_PRIORITIES.find((item) => item.value === priority)?.labelKey;
+    return labelKey ? this.i18n.t(labelKey) : '';
   }
 
   protected emptyColumnLabel(stage: TodoStage): string {
-    return {
-      todo: '添加第一个任务',
-      executing: '开始任务后会显示在这里',
-      completed: 'Agent 完成后会等待你验收',
-      verified: '验收通过的任务会归档在这里',
-    }[stage];
+    const labelKeys: Record<TodoStage, string> = {
+      todo: 'taskBoard.empty.todo',
+      executing: 'taskBoard.empty.executing',
+      completed: 'taskBoard.empty.completed',
+      verified: 'taskBoard.empty.verified',
+    };
+    return this.i18n.t(labelKeys[stage]);
   }
 
   protected executionLabel(task: TodoTask): string {
     if (task.promptDeliveryState === 'pending') {
-      return task.terminalId && this.awaitingTerminalIds().includes(task.terminalId)
-        ? '等待终端就绪，随后自动发送'
-        : '终端已绑定，等待发送';
+      return this.i18n.t(
+        task.terminalId && this.awaitingTerminalIds().includes(task.terminalId)
+          ? 'taskBoard.execution.awaitingTerminal'
+          : 'taskBoard.execution.pendingDelivery',
+      );
     }
     if (task.promptDeliveryState === 'sending') {
-      return '正在发送任务到终端';
+      return this.i18n.t('taskBoard.execution.sending');
     }
     if (task.promptDeliveryState === 'failed') {
-      return '任务未送达终端';
+      return this.i18n.t('taskBoard.execution.deliveryFailed');
     }
-    const labels = {
-      idle: '等待开始',
-      starting: '任务已发送，等待 Agent 响应',
-      running: 'Agent 执行中',
-      waiting: '等待人工处理',
-      failed: '执行异常',
-      completed: '执行完成',
-      stopped: '已中止，可继续或放回待办',
-    } as const;
-    return labels[task.executionState];
+    const labelKeys: Record<TodoTask['executionState'], string> = {
+      idle: 'taskBoard.execution.idle',
+      starting: 'taskBoard.execution.starting',
+      running: 'taskBoard.execution.running',
+      waiting: 'taskBoard.execution.waiting',
+      failed: 'taskBoard.execution.failed',
+      completed: 'taskBoard.execution.completed',
+      stopped: 'taskBoard.execution.stopped',
+    };
+    return this.i18n.t(labelKeys[task.executionState]);
   }
 
   /** The last lines the agent printed, kept apart so each truncates like a terminal row. */
