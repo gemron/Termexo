@@ -2,15 +2,18 @@ import { Component, input, output } from '@angular/core';
 
 import { TranslatePipe } from '../core/i18n/translate.pipe';
 import { Workspace } from '../core/models/workspace.models';
+import { ModalFocusDirective } from '../shared/modal-focus.directive';
 import { IconComponent } from '../shared/icon/icon';
 
 @Component({
   selector: 'app-delete-workspace-dialog',
-  imports: [IconComponent, TranslatePipe],
+  imports: [ModalFocusDirective, IconComponent, TranslatePipe],
   template: `
     <div class="backdrop modal modal-open" (mousedown)="cancelled.emit()">
       <section
         class="dialog modal-box"
+        appModal
+        (dismissModal)="cancelled.emit()"
         role="dialog"
         aria-modal="true"
         aria-labelledby="delete-workspace-dialog-title"

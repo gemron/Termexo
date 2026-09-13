@@ -2,6 +2,7 @@ import { Component, effect, input, output, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 
 import { TranslatePipe } from '../core/i18n/translate.pipe';
+import { ModalFocusDirective } from '../shared/modal-focus.directive';
 import { IconComponent } from '../shared/icon/icon';
 
 /**
@@ -13,11 +14,13 @@ import { IconComponent } from '../shared/icon/icon';
  */
 @Component({
   selector: 'app-directory-prompt-dialog',
-  imports: [FormsModule, IconComponent, TranslatePipe],
+  imports: [ModalFocusDirective, FormsModule, IconComponent, TranslatePipe],
   template: `
     <div class="backdrop modal modal-open" (mousedown)="cancelled.emit()">
       <section
         class="dialog modal-box"
+        appModal
+        (dismissModal)="cancelled.emit()"
         role="dialog"
         aria-modal="true"
         aria-labelledby="directory-prompt-title"
@@ -74,6 +77,8 @@ import { IconComponent } from '../shared/icon/icon';
     </div>
   `,
   styleUrl: './dialog.scss',
+  // This prompt can be opened from settings or a launch form which stays mounted beneath it.
+  styles: ['.backdrop.modal { z-index: 1400; }'],
 })
 export class DirectoryPromptDialogComponent {
   readonly title = input.required<string>();

@@ -6,6 +6,7 @@ import {
   handoffToMarkdown,
   hasSubstantiveContext,
   parseHandoffDocument,
+  updateHandoffInstructions,
 } from './handoff';
 import type { TerminalSession, Workspace } from './workspace.models';
 
@@ -47,6 +48,45 @@ const prompt: PromptAsset = {
 };
 
 describe('handoff package', () => {
+  it('edits instructions without mutating history, redacts new secrets and keeps the budget', () => {
+    const handoff = buildHandoffPackage({
+      workspace,
+      terminals: [terminal],
+      scope: 'workspace',
+      promptAssets: [],
+      agentSessions: [],
+      outputByTerminal: new Map(),
+      tokenBudget: 512,
+      git: {
+        available: false,
+        branch: '',
+        status: '',
+        changedFiles: [],
+        diff: '',
+        recentCommits: [],
+        truncated: false,
+        diagnostic: '',
+      },
+    });
+    const original = JSON.stringify(handoff);
+    const edited = updateHandoffInstructions(
+      handoff,
+      'Fix layout api_key=abcdefghijklmnop',
+      'Run tests',
+    );
+    expect(edited.task).toContain('Fix layout');
+    expect(edited.nextAction).toBe('Run tests');
+    expect(JSON.stringify(edited)).not.toContain('abcdefghijklmnop');
+    expect(edited.redactions).toBeGreaterThan(0);
+    expect(JSON.stringify(handoff)).toBe(original);
+    const large = updateHandoffInstructions(
+      handoff,
+      'long task '.repeat(2000),
+      'next step '.repeat(2000),
+    );
+    expect(large.estimatedTokens).toBeLessThanOrEqual(512);
+  });
+
   it('contains the required task state and redacts credentials', () => {
     const handoff = buildHandoffPackage({
       workspace,

@@ -69,7 +69,9 @@ interface AddressOption {
   imports: [FormsModule, IconComponent, TranslatePipe],
   template: `
     <div class="profile-editor remote-panel">
-      @if (loading()) {
+      @if (previewMode) {
+        <p class="remote-notice" role="status">{{ 'preview.desktopOnly' | t }}</p>
+      } @else if (loading()) {
         <p class="remote-loading">{{ 'remote.loading' | t }}</p>
       } @else if (loadError()) {
         <div class="remote-alert error" role="alert">
@@ -571,6 +573,7 @@ export class RemoteAccessPanelComponent implements OnDestroy {
 
   /** The backend refuses these commands from a remote client, so the panel only reports. */
   protected readonly readOnly = runtimeMode() === 'remote';
+  protected readonly previewMode = runtimeMode() === 'preview';
   protected readonly minPort = MIN_PORT;
   protected readonly maxPort = MAX_PORT;
   protected readonly unknownValue = UNKNOWN_VALUE;
@@ -767,7 +770,7 @@ export class RemoteAccessPanelComponent implements OnDestroy {
   );
 
   constructor() {
-    void this.reload();
+    if (!this.previewMode) void this.reload();
     // The QR code is rendered by the backend, so it must be re-requested whenever the link moves.
     effect(() => {
       const url = this.accessUrl();

@@ -327,11 +327,36 @@ button:disabled {
   font-size: 9px;
 }
 
+.stage-navigation {
+  display: none;
+}
+
+@media (max-width: 1100px) {
+  .stage-navigation {
+    display: flex;
+    gap: 6px;
+    overflow-x: auto;
+    button {
+      min-height: 32px;
+      flex-shrink: 0;
+      padding: 0 10px;
+      border: 1px solid var(--border);
+      border-radius: var(--radius-field);
+      color: var(--text-secondary);
+      background: var(--surface-2);
+      &:focus-visible,
+      &:hover {
+        color: var(--accent);
+      }
+    }
+  }
+}
+
 .kanban {
   display: grid;
   min-width: 640px;
   min-height: 0;
-  grid-template-columns: repeat(4, minmax(150px, 1fr));
+  grid-template-columns: repeat(4, minmax(220px, 1fr));
   gap: 9px;
   padding: 10px;
   overflow: auto;
@@ -1276,8 +1301,8 @@ button:disabled {
     padding: 0 8px;
   }
   .kanban {
-    min-width: 620px;
-    grid-template-columns: repeat(4, minmax(145px, 1fr));
+    min-width: 0;
+    grid-template-columns: repeat(4, minmax(220px, 1fr));
   }
 }
 

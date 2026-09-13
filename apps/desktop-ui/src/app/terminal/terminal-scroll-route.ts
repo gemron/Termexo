@@ -9,6 +9,8 @@
  * leave a phone dragging four rows to move one.
  */
 
+import { cursorKeySequences } from './terminal-key-sequences';
+
 /** Mouse protocol names xterm reports through `Terminal.modes.mouseTrackingMode`. */
 export type MouseTrackingMode = 'none' | 'x10' | 'vt200' | 'drag' | 'any';
 
@@ -37,12 +39,6 @@ export function terminalScrollRoute(
   return bufferType === 'alternate' ? 'cursorKeys' : 'viewport';
 }
 
-/** Cursor up and down in both forms, the application one selected by DECCKM. */
-const CURSOR_KEYS = {
-  normal: { up: '\x1b[A', down: '\x1b[B' },
-  application: { up: '\x1bOA', down: '\x1bOB' },
-} as const;
-
 /**
  * The arrow keys that scroll a full-screen program by `rows`.
  *
@@ -51,7 +47,7 @@ const CURSOR_KEYS = {
  * the count has to come from us — xterm sends a single key however far the wheel turned.
  */
 export function cursorScrollSequence(rows: number, applicationCursorKeys: boolean): string {
-  const keys = applicationCursorKeys ? CURSOR_KEYS.application : CURSOR_KEYS.normal;
+  const keys = cursorKeySequences(applicationCursorKeys);
   return (rows < 0 ? keys.up : keys.down).repeat(Math.abs(Math.trunc(rows)));
 }
 

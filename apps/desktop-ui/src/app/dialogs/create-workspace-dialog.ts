@@ -4,15 +4,18 @@ import { FormsModule } from '@angular/forms';
 import { I18nService } from '../core/i18n/i18n.service';
 import { TranslatePipe } from '../core/i18n/translate.pipe';
 import { DirectoryPickerService } from '../core/services/directory-picker.service';
+import { ModalFocusDirective } from '../shared/modal-focus.directive';
 import { IconComponent } from '../shared/icon/icon';
 
 @Component({
   selector: 'app-create-workspace-dialog',
-  imports: [FormsModule, IconComponent, TranslatePipe],
+  imports: [ModalFocusDirective, FormsModule, IconComponent, TranslatePipe],
   template: `
     <div class="backdrop modal modal-open" (mousedown)="cancelled.emit()">
       <section
         class="dialog modal-box"
+        appModal
+        (dismissModal)="cancelled.emit()"
         role="dialog"
         aria-modal="true"
         aria-labelledby="workspace-dialog-title"
@@ -45,7 +48,7 @@ import { IconComponent } from '../shared/icon/icon';
           />
         </label>
         <label>
-          <span>{{ 'dialog.projectDirectory' | t }}</span>
+          <span>{{ 'dialog.workspaceDefaultDirectory' | t }}</span>
           <div class="directory-field">
             <input
               type="text"
@@ -65,6 +68,7 @@ import { IconComponent } from '../shared/icon/icon';
               {{ selectingDirectory() ? ('common.selecting' | t) : ('common.selectDirectory' | t) }}
             </button>
           </div>
+          <small>{{ 'dialog.workspaceDirectoryHelp' | t }}</small>
           @if (directoryError(); as error) {
             <small class="field-error">{{ error }}</small>
           }

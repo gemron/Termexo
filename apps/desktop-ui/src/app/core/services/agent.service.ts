@@ -420,7 +420,10 @@ export class AgentService {
       const { apiKey, clearCredential, ...profile } = input;
       this.upsertModelProfile({
         ...profile,
-        hasCredential: clearCredential ? false : Boolean(apiKey),
+        hasCredential: clearCredential
+          ? false
+          : Boolean(apiKey) ||
+            (this.modelProfileItems().find((item) => item.id === input.id)?.hasCredential ?? false),
       });
       return;
     }
@@ -645,6 +648,7 @@ export class AgentService {
     this.installationState.set(this.browserInstallation('claude'));
     this.codexInstallationState.set(this.browserInstallation('codex'));
     this.openCodeInstallationState.set(this.browserInstallation('opencode'));
+    this.antigravityInstallationState.set(this.browserInstallation('antigravity'));
     if (this.modelProfileItems().length === 0) {
       this.modelProfileItems.set([
         {

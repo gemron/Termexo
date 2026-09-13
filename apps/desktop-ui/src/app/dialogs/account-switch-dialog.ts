@@ -3,15 +3,18 @@ import { Component, computed, inject, input, output, signal } from '@angular/cor
 import { I18nService } from '../core/i18n/i18n.service';
 import { TranslatePipe } from '../core/i18n/translate.pipe';
 import { AccountProfile, AgentProtocol } from '../core/models/agent.models';
+import { ModalFocusDirective } from '../shared/modal-focus.directive';
 import { IconComponent } from '../shared/icon/icon';
 
 @Component({
   selector: 'app-account-switch-dialog',
-  imports: [IconComponent, TranslatePipe],
+  imports: [ModalFocusDirective, IconComponent, TranslatePipe],
   template: `
     <div class="backdrop modal modal-open" (mousedown)="cancelled.emit()">
       <section
         class="dialog model-dialog modal-box"
+        appModal
+        (dismissModal)="!busy() && cancelled.emit()"
         role="dialog"
         aria-modal="true"
         aria-labelledby="account-dialog-title"
@@ -98,6 +101,14 @@ import { IconComponent } from '../shared/icon/icon';
             ><span>{{ 'accountSwitch.newSessionHelp' | t }}</span>
           </div>
         </div>
+        <button
+          type="button"
+          class="secondary btn btn-sm manage-profile"
+          [disabled]="busy()"
+          (click)="settingsRequested.emit()"
+        >
+          {{ 'settings.manageAccounts' | t }}
+        </button>
         <footer>
           <button type="button" class="secondary btn btn-ghost btn-sm" (click)="cancelled.emit()">
             {{ 'common.cancel' | t }}
@@ -127,6 +138,7 @@ export class AccountSwitchDialogComponent {
   readonly busy = input(false);
   readonly confirmed = output<string>();
   readonly cancelled = output<void>();
+  readonly settingsRequested = output<void>();
 
   protected readonly selectedAccountId = signal('');
   protected readonly agentAccounts = computed(() =>

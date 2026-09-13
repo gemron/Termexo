@@ -35,6 +35,7 @@ export interface AntigravityLaunchDialogValue {
       (launched)="submit()"
       (cancelled)="cancelled.emit()"
       (installRequested)="installRequested.emit()"
+      (directoryChangeRequested)="directoryChangeRequested.emit()"
     >
       <div class="form-grid">
         <label class="wide session-name-field">
@@ -104,6 +105,7 @@ export interface AntigravityLaunchDialogValue {
 export class AntigravityLaunchDialogComponent implements OnInit {
   /** Passed through to the workbench, which owns the settings window. */
   readonly installRequested = output<void>();
+  readonly directoryChangeRequested = output<void>();
 
   /** The agent's own mark, which the heading shows. */
   protected readonly agentIcon = AGENT_ICONS.antigravity;

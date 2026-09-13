@@ -1,18 +1,19 @@
-<div class="backdrop modal modal-open" (mousedown)="cancelled.emit()">
+<div class="backdrop modal modal-open" (mousedown)="requestClose()">
   <section
     class="handoff-dialog modal-box"
+    appModal
+    (dismissModal)="requestClose()"
     role="dialog"
     aria-modal="true"
     aria-labelledby="handoff-title"
     (mousedown)="$event.stopPropagation()"
-    (keydown)="handleKeydown($event)"
   >
     <header>
       <div class="dialog-heading">
         <span><app-icon name="merge" [size]="17" /></span>
         <div>
           <h2 id="handoff-title">{{ 'handoff.title' | t }}</h2>
-          <p>{{ 'handoff.subtitle' | t }}</p>
+          <p>{{ (previewMode ? 'preview.notice' : 'handoff.subtitle') | t }}</p>
         </div>
       </div>
       <button
@@ -20,13 +21,42 @@
         class="btn btn-square btn-ghost btn-sm"
         [title]="'common.close' | t"
         [attr.aria-label]="'common.close' | t"
-        (click)="cancelled.emit()"
+        [disabled]="busy()"
+        (click)="requestClose()"
       >
         <app-icon name="x" [size]="15" />
       </button>
     </header>
 
-    <div class="handoff-body">
+    @if (confirmDiscard()) {
+      <div class="handoff-unsaved" role="alert">
+        <span>{{ 'handoff.unsavedPrompt' | t }}</span>
+        <button type="button" class="btn btn-sm" [disabled]="busy()" (click)="keepEditing()">
+          {{ 'settings.keepEditing' | t }}
+        </button>
+        <button type="button" class="btn btn-sm" [disabled]="busy()" (click)="discardChanges()">
+          {{ 'handoff.discardContinue' | t }}
+        </button>
+      </div>
+    }
+
+    <nav class="handoff-pane-tabs" [attr.aria-label]="'handoff.title' | t">
+      <button
+        type="button"
+        [attr.aria-pressed]="mobilePane() === 'build'"
+        (click)="mobilePane.set('build')"
+      >
+        {{ 'handoff.history' | t }} / {{ 'handoff.generate' | t }}
+      </button>
+      <button
+        type="button"
+        [attr.aria-pressed]="mobilePane() === 'preview'"
+        (click)="mobilePane.set('preview')"
+      >
+        {{ 'handoff.previewTab' | t }}
+      </button>
+    </nav>
+    <div class="handoff-body" [class.show-preview]="mobilePane() === 'preview'">
       <aside>
         <section class="build-card">
           <h3>{{ 'handoff.generate' | t }}</h3>
@@ -66,7 +96,7 @@
               type="button"
               [disabled]="busy()"
               [title]="'handoff.import' | t"
-              (click)="imported.emit()"
+              (click)="requestImport()"
             >
               <app-icon name="upload" [size]="13" />
             </button>
@@ -74,7 +104,12 @@
           <div class="record-list">
             @for (record of records(); track record.id) {
               <article [class.active]="preview()?.id === record.id">
-                <button type="button" class="record-main" (click)="recordSelected.emit(record)">
+                <button
+                  type="button"
+                  class="record-main"
+                  [disabled]="busy()"
+                  (click)="selectRecord(record)"
+                >
                   <strong>{{ record.title }}</strong>
                   <time>{{ record.updatedAt | date: 'MM-dd HH:mm' }}</time>
                 </button>
@@ -82,7 +117,8 @@
                   type="button"
                   class="record-delete"
                   [title]="'common.delete' | t"
-                  (click)="recordDeleted.emit(record)"
+                  [disabled]="busy()"
+                  (click)="deleteRecord(record)"
                 >
                   <app-icon name="trash" [size]="12" />
                 </button>
@@ -102,7 +138,7 @@
           </div>
         }
 
-        @if (preview(); as handoff) {
+        @if (editedPreview(); as handoff) {
           <div class="preview-heading">
             <div>
               <h3>{{ handoff.title }}</h3>
@@ -111,6 +147,9 @@
                   handoff.tokenBudget
                 }}
                 tokens
+                @if (dirty()) {
+                  · {{ 'settings.unsaved' | t }}
+                }
                 @if (handoff.redactions) {
                   · {{ 'handoff.redactionCount' | t: { count: handoff.redactions } }}
                 }
@@ -119,7 +158,16 @@
             <div class="preview-actions">
               <button
                 type="button"
+                class="save-changes"
+                [disabled]="busy() || !dirty() || !taskDraft().trim() || !nextDraft().trim()"
+                (click)="saveChanges()"
+              >
+                {{ 'handoff.saveChanges' | t }}
+              </button>
+              <button
+                type="button"
                 [title]="'handoff.exportMarkdown' | t"
+                [disabled]="busy()"
                 (click)="exported.emit({ handoff, format: 'md' })"
               >
                 <app-icon name="download" [size]="13" /> MD
@@ -127,6 +175,7 @@
               <button
                 type="button"
                 [title]="'handoff.exportJson' | t"
+                [disabled]="busy()"
                 (click)="exported.emit({ handoff, format: 'json' })"
               >
                 <app-icon name="download" [size]="13" /> JSON
@@ -145,9 +194,15 @@
           }
 
           <div class="package-preview">
+            <p class="edit-help">{{ 'handoff.editHelp' | t }}</p>
             <section>
               <h4>{{ 'handoff.task' | t }}</h4>
-              <p>{{ handoff.task }}</p>
+              <textarea
+                [attr.aria-label]="'handoff.editTask' | t"
+                [disabled]="busy()"
+                [ngModel]="taskDraft()"
+                (ngModelChange)="taskDraft.set($event)"
+              ></textarea>
             </section>
             <section>
               <h4>{{ 'handoff.summary' | t }}</h4>
@@ -183,7 +238,12 @@
             </section>
             <section>
               <h4>{{ 'handoff.nextAction' | t }}</h4>
-              <p>{{ handoff.nextAction }}</p>
+              <textarea
+                [attr.aria-label]="'handoff.editNext' | t"
+                [disabled]="busy()"
+                [ngModel]="nextDraft()"
+                (ngModelChange)="nextDraft.set($event)"
+              ></textarea>
             </section>
           </div>
 
@@ -201,7 +261,9 @@
             <button
               type="button"
               class="btn btn-primary btn-sm"
-              [disabled]="busy() || !targetTerminalId()"
+              [disabled]="
+                busy() || !targetTerminalId() || !taskDraft().trim() || !nextDraft().trim()
+              "
               (click)="sent.emit({ terminalId: targetTerminalId(), handoff })"
             >
               <app-icon name="play" [size]="13" />

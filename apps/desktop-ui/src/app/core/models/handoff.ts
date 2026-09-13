@@ -273,6 +273,15 @@ export function parseHandoffDocument(value: string): HandoffPackage {
   return sanitizeImportedHandoff(parsed);
 }
 
+/** Edits obey the same redaction and token budget rules as imported packages. */
+export function updateHandoffInstructions(
+  handoff: HandoffPackage,
+  task: string,
+  nextAction: string,
+): HandoffPackage {
+  return sanitizeImportedHandoff({ ...handoff, task: task.trim(), nextAction: nextAction.trim() });
+}
+
 export function continuationPrompt(handoff: HandoffPackage): string {
   return [
     'Continue this task from the Termexo handoff below.',

@@ -25,12 +25,19 @@ import {
   TerminalSession,
   TerminalStatus,
 } from '../core/models/workspace.models';
+import { primaryPointerIsTouch } from '../core/services/input-device';
 import { PtyBackendService } from '../core/services/pty-backend.service';
+import { runtimeMode } from '../core/services/tauri-runtime';
 import { TerminalGatewayService } from '../core/services/terminal-gateway.service';
 import { IconComponent } from '../shared/icon/icon';
 import { TerminalCompositionAnchor } from './terminal-composition-anchor';
 import { DEFAULT_TERMINAL_FONT_NAME, terminalFontFamily } from './terminal-font';
-import { terminalKeySequence, workbenchShortcut } from './terminal-key-sequences';
+import {
+  type QuickKey,
+  quickKeySequence,
+  terminalKeySequence,
+  workbenchShortcut,
+} from './terminal-key-sequences';
 import {
   detectTerminalLinks,
   readLogicalLine,
@@ -49,11 +56,22 @@ import {
   terminalScrollRoute,
   wheelScrollRows,
 } from './terminal-scroll-route';
+import { TerminalQuickKeysComponent } from './terminal-quick-keys';
 import { createTerminalTheme } from './terminal-theme';
 import { decayInertia, TerminalTouchScroller } from './terminal-touch-scroll';
 
 /** `MouseEvent.button` value for the right button. */
 const RIGHT_MOUSE_BUTTON = 2;
+
+/**
+ * Whether terminals get the floating keypad.
+ *
+ * The desktop app always has a physical keyboard, so only a browser — the remote client, or the
+ * preview that stands in for it during development — on a touch device qualifies.
+ */
+function offersQuickKeys(): boolean {
+  return runtimeMode() !== 'desktop' && primaryPointerIsTouch();
+}
 
 /**
  * Row spacing, as a multiple of the font's own line height.
@@ -65,7 +83,7 @@ const TERMINAL_LINE_HEIGHT = 1;
 
 @Component({
   selector: 'app-terminal-panel',
-  imports: [IconComponent, TranslatePipe],
+  imports: [IconComponent, TerminalQuickKeysComponent, TranslatePipe],
   templateUrl: './terminal-panel.html',
   styleUrl: './terminal-panel.scss',
 })
@@ -166,6 +184,18 @@ export class TerminalPanelComponent implements AfterViewInit {
   readonly openFailed = output<string>();
 
   protected readonly renaming = signal(false);
+  protected readonly quickKeysEnabled = offersQuickKeys();
+
+  /**
+   * Types a keypad key as if it came from a keyboard.
+   *
+   * Going through xterm's own input path rather than straight to the PTY keeps a keypad Enter
+   * doing what a typed one does — scrolling to the bottom, recording the prompt and moving the
+   * status — and lets the arrows follow the cursor-key mode the agent asked for.
+   */
+  protected sendQuickKey(key: QuickKey): void {
+    this.terminal.input(quickKeySequence(key, this.terminal.modes.applicationCursorKeysMode));
+  }
 
   protected startRename(): void {
     this.renaming.set(true);

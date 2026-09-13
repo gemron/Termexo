@@ -1,3 +1,4 @@
+import { ProfileDrafts, type ProfileSaveCompleted } from './profile-drafts';
 import {
   Component,
   computed,
@@ -41,6 +42,7 @@ import {
 } from '../core/models/agent.models';
 import { createId } from '../core/models/identifiers';
 import { UpdateCheck } from '../core/services/update.service';
+import { ModalFocusDirective } from '../shared/modal-focus.directive';
 import { IconComponent } from '../shared/icon/icon';
 import { RemoteAccessPanelComponent } from './remote-access-panel';
 import { AntigravityStatusToggleComponent } from './antigravity-status-toggle';
@@ -50,12 +52,31 @@ import { AGENT_ICONS } from '../core/models/workspace.models';
 export type SettingsTab =
   'diagnostics' | 'cli' | 'accounts' | 'models' | 'mcp' | 'network' | 'remote' | 'storage';
 
+interface ModelEditorDraft {
+  modelName: string;
+  modelProvider: string;
+  claudeEnabled: boolean;
+  claudeModel: string;
+  claudeBaseUrl: string;
+  codexEnabled: boolean;
+  codexModel: string;
+  codexBaseUrl: string;
+  claudeContext1m: boolean;
+  claudeEffort: string;
+  codexReasoningEffort: string;
+  apiKey: string;
+  isDefault: boolean;
+  clearCredential: boolean;
+  modelPlanAlertThreshold: number;
+}
+
 /** Matches the backend default for a profile that has never had a threshold set. */
 const DEFAULT_ALERT_THRESHOLD = 80;
 
 @Component({
   selector: 'app-agent-settings-dialog',
   imports: [
+    ModalFocusDirective,
     FormsModule,
     IconComponent,
     AntigravityStatusToggleComponent,
@@ -64,9 +85,11 @@ const DEFAULT_ALERT_THRESHOLD = 80;
     TranslatePipe,
   ],
   template: `
-    <div class="backdrop modal modal-open" (mousedown)="cancelled.emit()">
+    <div class="backdrop modal modal-open" (mousedown)="requestClose()">
       <section
         class="agent-dialog settings-dialog modal-box"
+        appModal
+        (dismissModal)="requestClose()"
         role="dialog"
         aria-modal="true"
         aria-labelledby="agent-settings-title"
@@ -85,79 +108,46 @@ const DEFAULT_ALERT_THRESHOLD = 80;
             class="btn btn-square btn-ghost btn-sm"
             [title]="'common.close' | t"
             [attr.aria-label]="'common.close' | t"
-            (click)="cancelled.emit()"
+            (click)="requestClose()"
           >
             <app-icon name="x" [size]="15" />
           </button>
         </header>
 
         <nav class="settings-tabs tabs tabs-border" [attr.aria-label]="'settings.categories' | t">
-          <button
-            type="button"
-            class="tab"
-            [class.active]="tab() === 'diagnostics'"
-            (click)="selectTab('diagnostics')"
-          >
-            {{ 'settings.tabDiagnostics' | t }}
-          </button>
-          <button
-            type="button"
-            class="tab"
-            [class.active]="tab() === 'cli'"
-            (click)="selectTab('cli')"
-          >
-            {{ 'settings.tabCli' | t }}
-          </button>
-          <button
-            type="button"
-            class="tab"
-            [class.active]="tab() === 'accounts'"
-            (click)="selectTab('accounts')"
-          >
-            {{ 'settings.tabAccounts' | t }}
-          </button>
-          <button
-            type="button"
-            class="tab"
-            [class.active]="tab() === 'models'"
-            (click)="selectTab('models')"
-          >
-            {{ 'settings.tabModels' | t }}
-          </button>
-          <button
-            type="button"
-            class="tab"
-            [class.active]="tab() === 'mcp'"
-            (click)="selectTab('mcp')"
-          >
-            {{ 'settings.tabMcp' | t }}
-          </button>
-          <button
-            type="button"
-            class="tab"
-            [class.active]="tab() === 'network'"
-            (click)="selectTab('network')"
-          >
-            {{ 'settings.tabNetwork' | t }}
-          </button>
-          <button
-            type="button"
-            class="tab"
-            [class.active]="tab() === 'remote'"
-            (click)="selectTab('remote')"
-          >
-            {{ 'settings.tabRemote' | t }}
-          </button>
-          <button
-            type="button"
-            class="tab"
-            [class.active]="tab() === 'storage'"
-            (click)="selectTab('storage')"
-          >
-            {{ 'settings.tabStorage' | t }}
-          </button>
+          @for (category of categories; track category.id) {
+            <button
+              type="button"
+              class="tab"
+              [class.active]="tab() === category.id"
+              [attr.aria-current]="tab() === category.id ? 'page' : null"
+              (click)="selectTab(category.id)"
+            >
+              {{ category.label | t }}
+            </button>
+          }
         </nav>
-
+        <select
+          class="settings-category-select"
+          [attr.aria-label]="'settings.categories' | t"
+          [ngModel]="tab()"
+          (ngModelChange)="selectTab($event)"
+        >
+          @for (category of categories; track category.id) {
+            <option [value]="category.id">{{ category.label | t }}</option>
+          }
+        </select>
+        @if (confirmClose()) {
+          <div class="unsaved-notice" role="alert">
+            <span>{{ 'settings.unsavedClose' | t }}</span>
+            <button type="button" class="secondary" (click)="confirmClose.set(false)">
+              {{ 'settings.keepEditing' | t }}
+            </button>
+            <button type="button" class="danger" (click)="discardChanges()" [disabled]="saving()">
+              {{ 'settings.discardClose' | t }}
+            </button>
+          </div>
+        }
         <div class="settings-body">
           @switch (tab()) {
             @case ('diagnostics') {
@@ -230,30 +220,35 @@ const DEFAULT_ALERT_THRESHOLD = 80;
                   }}</code>
                 </div>
                 <app-antigravity-status-toggle />
-                <dl>
-                  <div>
-                    <dt>Claude</dt>
-                    <dd>{{ installation()?.executablePath ?? ('settings.notFound' | t) }}</dd>
-                  </div>
-                  <div>
-                    <dt>Codex</dt>
-                    <dd>{{ codexInstallation()?.executablePath ?? ('settings.notFound' | t) }}</dd>
-                  </div>
-                  <div>
-                    <dt>OpenCode</dt>
-                    <dd>
-                      {{ openCodeInstallation()?.executablePath ?? ('settings.notFound' | t) }}
-                    </dd>
-                  </div>
-                  <div>
-                    <dt>{{ 'settings.credentialStorage' | t }}</dt>
-                    <dd>Windows Credential Manager</dd>
-                  </div>
-                  <div>
-                    <dt>{{ 'settings.sessionPolicy' | t }}</dt>
-                    <dd>{{ 'settings.sessionPolicyValue' | t }}</dd>
-                  </div>
-                </dl>
+                <details class="diagnostic-details">
+                  <summary>{{ 'settings.diagnosticDetails' | t }}</summary>
+                  <dl>
+                    <div>
+                      <dt>Claude</dt>
+                      <dd>{{ installation()?.executablePath ?? ('settings.notFound' | t) }}</dd>
+                    </div>
+                    <div>
+                      <dt>Codex</dt>
+                      <dd>
+                        {{ codexInstallation()?.executablePath ?? ('settings.notFound' | t) }}
+                      </dd>
+                    </div>
+                    <div>
+                      <dt>OpenCode</dt>
+                      <dd>
+                        {{ openCodeInstallation()?.executablePath ?? ('settings.notFound' | t) }}
+                      </dd>
+                    </div>
+                    <div>
+                      <dt>{{ 'settings.credentialStorage' | t }}</dt>
+                      <dd>Windows Credential Manager</dd>
+                    </div>
+                    <div>
+                      <dt>{{ 'settings.sessionPolicy' | t }}</dt>
+                      <dd>{{ 'settings.sessionPolicyValue' | t }}</dd>
+                    </div>
+                  </dl>
+                </details>
                 <button
                   type="button"
                   class="secondary inline-command btn btn-outline btn-sm"
@@ -616,97 +611,104 @@ const DEFAULT_ALERT_THRESHOLD = 80;
                   </button>
                 </div>
                 <div class="profile-editor account-editor">
-                  <div class="network-intro">
-                    <div>
-                      <strong>{{ 'settings.accountIsolation' | t }}</strong>
-                      <span>{{ 'settings.accountIsolationHelp' | t }}</span>
+                  <div class="profile-fields">
+                    <div class="network-intro">
+                      <div>
+                        <strong>{{ 'settings.accountIsolation' | t }}</strong>
+                        <span>{{ 'settings.accountIsolationHelp' | t }}</span>
+                      </div>
+                      <span class="scope-chip">{{
+                        accountAgentType === 'claude' ? 'CLAUDE' : 'CHATGPT'
+                      }}</span>
                     </div>
-                    <span class="scope-chip">{{
-                      accountAgentType === 'claude' ? 'CLAUDE' : 'CHATGPT'
-                    }}</span>
-                  </div>
 
-                  <div class="two-columns">
-                    <label
-                      ><span>{{ 'settings.accountName' | t }}</span
-                      ><input [(ngModel)]="accountName"
-                    /></label>
-                    <label>
-                      <span>{{ 'settings.cliType' | t }}</span>
-                      <select [(ngModel)]="accountAgentType" [disabled]="accountSystem()">
-                        <option value="claude">Claude Code</option>
-                        <option value="codex">ChatGPT / Codex</option>
-                      </select>
-                    </label>
-                  </div>
-
-                  @if (selectedAccount(); as profile) {
-                    <div class="account-status alert" [class.unavailable]="!profile.authenticated">
-                      <app-icon [name]="profile.authenticated ? 'check' : 'shield'" [size]="16" />
-                      <span>
-                        <strong>{{
-                          profile.authenticated
-                            ? ('settings.accountSignedIn' | t)
-                            : ('settings.accountNotSignedIn' | t)
-                        }}</strong>
-                        <small>{{ profile.diagnostic }}</small>
-                      </span>
-                    </div>
-                    <label>
-                      <span>{{ 'settings.isolatedConfig' | t }}</span>
-                      <input
-                        readonly
-                        [value]="profile.configDir ?? ('settings.systemAccountFolder' | t)"
-                      />
-                    </label>
-                  } @else {
-                    <div class="account-status alert">
-                      <app-icon name="shield" [size]="16" />
-                      <span>
-                        <strong>{{ 'settings.loginAfterSave' | t }}</strong>
-                        <small>{{ 'settings.loginAfterSaveHelp' | t }}</small>
-                      </span>
-                    </div>
-                  }
-
-                  <label class="checkbox-control editor-checkbox">
-                    <input type="checkbox" [(ngModel)]="accountDefault" />
-                    <span>{{ 'settings.defaultAccount' | t }}</span>
-                  </label>
-
-                  @if (accountId() && copySourceCandidates().length > 0) {
-                    <div class="account-copy">
+                    <div class="two-columns">
+                      <label
+                        ><span>{{ 'settings.accountName' | t }}</span
+                        ><input [(ngModel)]="accountName"
+                      /></label>
                       <label>
-                        <span>{{ 'settings.copyConfig' | t }}</span>
-                        <select
-                          [ngModel]="copySourceId()"
-                          (ngModelChange)="copySourceId.set($event)"
-                        >
-                          <option value="">{{ 'settings.copyConfigPick' | t }}</option>
-                          @for (candidate of copySourceCandidates(); track candidate.id) {
-                            <option [value]="candidate.id">{{ candidate.name }}</option>
-                          }
+                        <span>{{ 'settings.cliType' | t }}</span>
+                        <select [(ngModel)]="accountAgentType" [disabled]="accountSystem()">
+                          <option value="claude">Claude Code</option>
+                          <option value="codex">ChatGPT / Codex</option>
                         </select>
                       </label>
-                      <button
-                        type="button"
-                        class="secondary"
-                        [disabled]="busy() || !copySourceId()"
-                        (click)="requestConfigCopy()"
-                      >
-                        <app-icon name="download" [size]="13" />{{
-                          'settings.copyConfigAction' | t
-                        }}
-                      </button>
-                      <small>{{ 'settings.copyConfigHelp' | t }}</small>
                     </div>
-                  }
 
-                  <p class="workspace-binding">
-                    {{ 'settings.accountSafety' | t }}
-                  </p>
+                    @if (selectedAccount(); as profile) {
+                      <div
+                        class="account-status alert"
+                        [class.unavailable]="!profile.authenticated"
+                      >
+                        <app-icon [name]="profile.authenticated ? 'check' : 'shield'" [size]="16" />
+                        <span>
+                          <strong>{{
+                            profile.authenticated
+                              ? ('settings.accountSignedIn' | t)
+                              : ('settings.accountNotSignedIn' | t)
+                          }}</strong>
+                          <small>{{ profile.diagnostic }}</small>
+                        </span>
+                      </div>
+                      <label>
+                        <span>{{ 'settings.isolatedConfig' | t }}</span>
+                        <input
+                          readonly
+                          [value]="profile.configDir ?? ('settings.systemAccountFolder' | t)"
+                        />
+                      </label>
+                    } @else {
+                      <div class="account-status alert">
+                        <app-icon name="shield" [size]="16" />
+                        <span>
+                          <strong>{{ 'settings.loginAfterSave' | t }}</strong>
+                          <small>{{ 'settings.loginAfterSaveHelp' | t }}</small>
+                        </span>
+                      </div>
+                    }
 
+                    <label class="checkbox-control editor-checkbox">
+                      <input type="checkbox" [(ngModel)]="accountDefault" />
+                      <span>{{ 'settings.defaultAccount' | t }}</span>
+                    </label>
+
+                    @if (accountId() && copySourceCandidates().length > 0) {
+                      <div class="account-copy">
+                        <label>
+                          <span>{{ 'settings.copyConfig' | t }}</span>
+                          <select
+                            [ngModel]="copySourceId()"
+                            (ngModelChange)="copySourceId.set($event)"
+                          >
+                            <option value="">{{ 'settings.copyConfigPick' | t }}</option>
+                            @for (candidate of copySourceCandidates(); track candidate.id) {
+                              <option [value]="candidate.id">{{ candidate.name }}</option>
+                            }
+                          </select>
+                        </label>
+                        <button
+                          type="button"
+                          class="secondary"
+                          [disabled]="busy() || !copySourceId()"
+                          (click)="requestConfigCopy()"
+                        >
+                          <app-icon name="download" [size]="13" />{{
+                            'settings.copyConfigAction' | t
+                          }}
+                        </button>
+                        <small>{{ 'settings.copyConfigHelp' | t }}</small>
+                      </div>
+                    }
+
+                    <p class="workspace-binding">
+                      {{ 'settings.accountSafety' | t }}
+                    </p>
+                  </div>
                   <div class="editor-actions account-actions">
+                    @if (accountDirty()) {
+                      <small class="draft-status" role="status">{{ 'settings.unsaved' | t }}</small>
+                    }
                     @if (accountId() && !accountSystem()) {
                       <button
                         type="button"
@@ -786,140 +788,149 @@ const DEFAULT_ALERT_THRESHOLD = 80;
                   </button>
                 </div>
                 <div class="profile-editor">
-                  <div class="two-columns">
-                    <label
-                      ><span>{{ 'settings.name' | t }}</span
-                      ><input [(ngModel)]="modelName"
-                    /></label>
-                    <label>
-                      <span>{{ 'settings.modelProvider' | t }}</span>
-                      <select [ngModel]="modelProvider" (ngModelChange)="selectProvider($event)">
-                        @for (preset of allPresets; track preset.provider) {
-                          <option [value]="preset.provider">{{ preset.label }}</option>
-                        }
-                        @if (!isPresetProvider(modelProvider)) {
-                          <option [value]="modelProvider">{{ modelProvider }}</option>
-                        }
-                      </select>
-                    </label>
-                  </div>
-                  @if (presetDocsUrl()) {
-                    <small class="preset-source">{{
-                      'settings.presetSource' | t: { url: presetDocsUrl() }
-                    }}</small>
-                  }
+                  <div class="profile-fields">
+                    <div class="two-columns">
+                      <label
+                        ><span>{{ 'settings.name' | t }}</span
+                        ><input [(ngModel)]="modelName"
+                      /></label>
+                      <label>
+                        <span>{{ 'settings.modelProvider' | t }}</span>
+                        <select [ngModel]="modelProvider" (ngModelChange)="selectProvider($event)">
+                          @for (preset of allPresets; track preset.provider) {
+                            <option [value]="preset.provider">{{ preset.label }}</option>
+                          }
+                          @if (!isPresetProvider(modelProvider)) {
+                            <option [value]="modelProvider">{{ modelProvider }}</option>
+                          }
+                        </select>
+                      </label>
+                    </div>
+                    @if (presetDocsUrl()) {
+                      <small class="preset-source">{{
+                        'settings.presetSource' | t: { url: presetDocsUrl() }
+                      }}</small>
+                    }
 
-                  <!-- One provider, two protocols: each agent gets its own endpoint and switch. -->
-                  <fieldset class="agent-endpoint" [class.disabled]="!claudeEnabled">
-                    <label class="checkbox-control">
-                      <input type="checkbox" [(ngModel)]="claudeEnabled" />
-                      <span>{{ 'settings.enableForClaude' | t }}</span>
-                    </label>
-                    <div class="two-columns">
-                      <label
-                        ><span>{{ 'settings.model' | t }}</span
-                        ><input [disabled]="!claudeEnabled" [(ngModel)]="claudeModel"
-                      /></label>
-                      <label
-                        ><span>{{ 'settings.endpointAnthropic' | t }}</span
-                        ><input
-                          [disabled]="!claudeEnabled"
-                          [placeholder]="'settings.endpointPlaceholder' | t"
-                          [(ngModel)]="claudeBaseUrl"
-                      /></label>
-                    </div>
-                    <div class="two-columns">
-                      <label
-                        ><span>{{ 'settings.effortLevel' | t }}</span
-                        ><select [disabled]="!claudeEnabled" [(ngModel)]="claudeEffort">
-                          <option value="">{{ 'settings.effortDefault' | t }}</option>
-                          @for (level of claudeEffortLevels; track level) {
-                            <option [value]="level">{{ level }}</option>
-                          }
-                        </select>
+                    <!-- One provider, two protocols: each agent gets its own endpoint and switch. -->
+                    <fieldset class="agent-endpoint" [class.disabled]="!claudeEnabled">
+                      <label class="checkbox-control">
+                        <input type="checkbox" [(ngModel)]="claudeEnabled" />
+                        <span>{{ 'settings.enableForClaude' | t }}</span>
                       </label>
-                      <label class="checkbox-control" [title]="'settings.context1mHelp' | t"
-                        ><input
-                          type="checkbox"
-                          [disabled]="!claudeEnabled"
-                          [(ngModel)]="claudeContext1m"
-                        /><span>{{ 'settings.context1m' | t }}</span></label
-                      >
-                    </div>
-                  </fieldset>
-                  <fieldset class="agent-endpoint" [class.disabled]="!codexEnabled">
-                    <label class="checkbox-control">
-                      <input type="checkbox" [(ngModel)]="codexEnabled" />
-                      <span>{{ 'settings.enableForCodex' | t }}</span>
-                    </label>
-                    <div class="two-columns">
-                      <label
-                        ><span>{{ 'settings.model' | t }}</span
-                        ><input [disabled]="!codexEnabled" [(ngModel)]="codexModel"
-                      /></label>
-                      <label
-                        ><span>{{ 'settings.endpointOpenAI' | t }}</span
-                        ><input
-                          [disabled]="!codexEnabled"
-                          [placeholder]="'settings.endpointPlaceholder' | t"
-                          [(ngModel)]="codexBaseUrl"
-                      /></label>
-                    </div>
-                    <div class="two-columns">
-                      <label
-                        ><span>{{ 'settings.effortLevel' | t }}</span
-                        ><select [disabled]="!codexEnabled" [(ngModel)]="codexReasoningEffort">
-                          <option value="">{{ 'settings.effortDefault' | t }}</option>
-                          @for (level of codexEffortLevels; track level) {
-                            <option [value]="level">{{ level }}</option>
-                          }
-                        </select>
-                      </label>
-                    </div>
-                  </fieldset>
-                  <label>
-                    <span>API Key</span>
-                    <input
-                      type="password"
-                      [disabled]="clearCredential"
-                      [placeholder]="
-                        hasCredential()
-                          ? ('settings.keySavedPlaceholder' | t)
-                          : usesEndpoint()
-                            ? ('settings.keyThirdPartyRequired' | t)
-                            : ('settings.keyOfficialOptional' | t)
-                      "
-                      [(ngModel)]="apiKey"
-                    />
-                  </label>
-                  @if (modelCredentialMissing()) {
-                    <div class="credential-warning" role="alert">
-                      <app-icon name="triangle-alert" [size]="15" />
-                      <div>
-                        <strong>{{ 'settings.profileKeyMissing' | t }}</strong>
-                        <span>{{ 'settings.profileKeyHelp' | t }}</span>
+                      <div class="two-columns">
+                        <label
+                          ><span>{{ 'settings.model' | t }}</span
+                          ><input [disabled]="!claudeEnabled" [(ngModel)]="claudeModel"
+                        /></label>
+                        <label
+                          ><span>{{ 'settings.endpointAnthropic' | t }}</span
+                          ><input
+                            [disabled]="!claudeEnabled"
+                            [placeholder]="'settings.endpointPlaceholder' | t"
+                            [(ngModel)]="claudeBaseUrl"
+                        /></label>
                       </div>
-                    </div>
-                  }
-                  <fieldset class="agent-endpoint">
-                    <legend>{{ 'settings.planMonitoring' | t }}</legend>
-                    <label
-                      ><span>{{ 'settings.planAlertThreshold' | t }}</span
-                      ><input type="number" min="1" max="100" [(ngModel)]="modelPlanAlertThreshold"
-                    /></label>
-                    <small class="preset-source">{{ 'settings.planQuotaHelp' | t }}</small>
-                  </fieldset>
-                  <label class="checkbox-control editor-checkbox">
-                    <input type="checkbox" [(ngModel)]="isDefault" />
-                    <span>{{ 'settings.defaultProfile' | t }}</span>
-                  </label>
-                  @if (hasCredential()) {
-                    <label class="checkbox-control editor-checkbox">
-                      <input type="checkbox" [(ngModel)]="clearCredential" />
-                      <span>{{ 'settings.clearKey' | t }}</span>
+                      <div class="two-columns">
+                        <label
+                          ><span>{{ 'settings.effortLevel' | t }}</span
+                          ><select [disabled]="!claudeEnabled" [(ngModel)]="claudeEffort">
+                            <option value="">{{ 'settings.effortDefault' | t }}</option>
+                            @for (level of claudeEffortLevels; track level) {
+                              <option [value]="level">{{ level }}</option>
+                            }
+                          </select>
+                        </label>
+                        <label class="checkbox-control" [title]="'settings.context1mHelp' | t"
+                          ><input
+                            type="checkbox"
+                            [disabled]="!claudeEnabled"
+                            [(ngModel)]="claudeContext1m"
+                          /><span>{{ 'settings.context1m' | t }}</span></label
+                        >
+                      </div>
+                    </fieldset>
+                    <fieldset class="agent-endpoint" [class.disabled]="!codexEnabled">
+                      <label class="checkbox-control">
+                        <input type="checkbox" [(ngModel)]="codexEnabled" />
+                        <span>{{ 'settings.enableForCodex' | t }}</span>
+                      </label>
+                      <div class="two-columns">
+                        <label
+                          ><span>{{ 'settings.model' | t }}</span
+                          ><input [disabled]="!codexEnabled" [(ngModel)]="codexModel"
+                        /></label>
+                        <label
+                          ><span>{{ 'settings.endpointOpenAI' | t }}</span
+                          ><input
+                            [disabled]="!codexEnabled"
+                            [placeholder]="'settings.endpointPlaceholder' | t"
+                            [(ngModel)]="codexBaseUrl"
+                        /></label>
+                      </div>
+                      <div class="two-columns">
+                        <label
+                          ><span>{{ 'settings.effortLevel' | t }}</span
+                          ><select [disabled]="!codexEnabled" [(ngModel)]="codexReasoningEffort">
+                            <option value="">{{ 'settings.effortDefault' | t }}</option>
+                            @for (level of codexEffortLevels; track level) {
+                              <option [value]="level">{{ level }}</option>
+                            }
+                          </select>
+                        </label>
+                      </div>
+                    </fieldset>
+                    <label>
+                      <span>API Key</span>
+                      <input
+                        type="password"
+                        [disabled]="clearCredential"
+                        [placeholder]="
+                          hasCredential()
+                            ? ('settings.keySavedPlaceholder' | t)
+                            : usesEndpoint()
+                              ? ('settings.keyThirdPartyRequired' | t)
+                              : ('settings.keyOfficialOptional' | t)
+                        "
+                        [(ngModel)]="apiKey"
+                      />
                     </label>
-                  }
+                    @if (modelCredentialMissing()) {
+                      <div class="credential-warning" role="alert">
+                        <app-icon name="triangle-alert" [size]="15" />
+                        <div>
+                          <strong>{{ 'settings.profileKeyMissing' | t }}</strong>
+                          <span>{{ 'settings.profileKeyHelp' | t }}</span>
+                        </div>
+                      </div>
+                    }
+                    <fieldset class="agent-endpoint">
+                      <legend>{{ 'settings.planMonitoring' | t }}</legend>
+                      <label
+                        ><span>{{ 'settings.planAlertThreshold' | t }}</span
+                        ><input
+                          type="number"
+                          min="1"
+                          max="100"
+                          [(ngModel)]="modelPlanAlertThreshold"
+                      /></label>
+                      <small class="preset-source">{{ 'settings.planQuotaHelp' | t }}</small>
+                    </fieldset>
+                    <label class="checkbox-control editor-checkbox">
+                      <input type="checkbox" [(ngModel)]="isDefault" />
+                      <span>{{ 'settings.defaultProfile' | t }}</span>
+                    </label>
+                    @if (hasCredential()) {
+                      <label class="checkbox-control editor-checkbox">
+                        <input type="checkbox" [(ngModel)]="clearCredential" />
+                        <span>{{ 'settings.clearKey' | t }}</span>
+                      </label>
+                    }
+                  </div>
                   <div class="editor-actions">
+                    @if (modelDirty()) {
+                      <small class="draft-status" role="status">{{ 'settings.unsaved' | t }}</small>
+                    }
                     @if (modelId() && modelId() !== 'claude-default') {
                       <button
                         type="button"
@@ -960,15 +971,28 @@ const DEFAULT_ALERT_THRESHOLD = 80;
                   </button>
                 </div>
                 <div class="profile-editor">
-                  <label
-                    ><span>{{ 'settings.name' | t }}</span
-                    ><input [(ngModel)]="mcpName"
-                  /></label>
-                  <label class="json-field">
-                    <span>{{ 'settings.configJson' | t }}</span>
-                    <textarea spellcheck="false" [(ngModel)]="mcpConfig"></textarea>
-                  </label>
+                  <div class="profile-fields">
+                    <label
+                      ><span>{{ 'settings.name' | t }}</span
+                      ><input [(ngModel)]="mcpName"
+                    /></label>
+                    <label class="json-field">
+                      <span>{{ 'settings.configJson' | t }}</span>
+                      <textarea
+                        spellcheck="false"
+                        [(ngModel)]="mcpConfig"
+                        [attr.aria-invalid]="mcpError() ? true : null"
+                        [attr.aria-describedby]="mcpError() ? 'mcp-error' : null"
+                      ></textarea>
+                      @if (mcpError(); as error) {
+                        <small id="mcp-error" class="field-error" role="alert">{{ error }}</small>
+                      }
+                    </label>
+                  </div>
                   <div class="editor-actions">
+                    @if (mcpDirty()) {
+                      <small class="draft-status" role="status">{{ 'settings.unsaved' | t }}</small>
+                    }
                     @if (mcpId()) {
                       <button
                         type="button"
@@ -982,7 +1006,7 @@ const DEFAULT_ALERT_THRESHOLD = 80;
                     <button
                       type="button"
                       class="primary"
-                      [disabled]="!mcpName.trim() || !mcpConfig.trim()"
+                      [disabled]="busy() || !mcpName.trim() || !!mcpError()"
                       (click)="saveMcp()"
                     >
                       {{ 'settings.saveMcp' | t }}
@@ -1013,147 +1037,157 @@ const DEFAULT_ALERT_THRESHOLD = 80;
                   </button>
                 </div>
                 <div class="profile-editor network-editor">
-                  <div class="network-intro">
-                    <div>
-                      <strong>{{ 'settings.devNetwork' | t }}</strong>
-                      <span>{{ 'settings.devNetworkHelp' | t }}</span>
+                  <div class="profile-fields">
+                    <div class="network-intro">
+                      <div>
+                        <strong>{{ 'settings.devNetwork' | t }}</strong>
+                        <span>{{ 'settings.devNetworkHelp' | t }}</span>
+                      </div>
+                      <span class="scope-chip">{{
+                        networkScope === 'global' ? 'GLOBAL' : 'WORKSPACE'
+                      }}</span>
                     </div>
-                    <span class="scope-chip">{{
-                      networkScope === 'global' ? 'GLOBAL' : 'WORKSPACE'
-                    }}</span>
-                  </div>
 
-                  <div class="two-columns">
-                    <label
-                      ><span>{{ 'settings.name' | t }}</span
-                      ><input [(ngModel)]="networkName"
-                    /></label>
-                    <label>
-                      <span>{{ 'settings.scope' | t }}</span>
-                      <select [(ngModel)]="networkScope" (ngModelChange)="changeNetworkScope()">
-                        <option value="workspace">{{ 'settings.currentWorkspace' | t }}</option>
-                        <option value="global">{{ 'settings.globalDefault' | t }}</option>
-                      </select>
-                    </label>
-                  </div>
-                  @if (networkScope === 'workspace') {
-                    <p class="workspace-binding">
-                      {{ 'settings.boundTo' | t: { name: networkWorkspaceLabel() } }}
-                    </p>
-                  }
-
-                  <div class="network-section">
-                    <h3>{{ 'settings.systemAgentProxy' | t }}</h3>
-                    <div class="two-columns">
-                      <label>
-                        <span>HTTP_PROXY</span>
-                        <input placeholder="http://proxy.internal:8080" [(ngModel)]="httpProxy" />
-                      </label>
-                      <label>
-                        <span>HTTPS_PROXY</span>
-                        <input placeholder="http://proxy.internal:8080" [(ngModel)]="httpsProxy" />
-                        <small class="field-hint">{{ 'settings.httpsProxyHint' | t }}</small>
-                      </label>
-                      <label>
-                        <span>ALL_PROXY / SOCKS</span>
-                        <input placeholder="socks5://127.0.0.1:1080" [(ngModel)]="allProxy" />
-                      </label>
-                      <label>
-                        <span>NO_PROXY</span>
-                        <input placeholder="localhost,.internal.example" [(ngModel)]="noProxy" />
-                        <small class="field-hint">{{ 'settings.noProxyHint' | t }}</small>
-                      </label>
-                    </div>
-                  </div>
-
-                  <div class="network-section">
-                    <h3>npm</h3>
-                    <label>
-                      <span>registry</span>
-                      <input placeholder="https://registry.npmjs.org/" [(ngModel)]="npmRegistry" />
-                    </label>
-                    <div class="two-columns">
-                      <label>
-                        <span>proxy</span>
-                        <input placeholder="http://proxy.internal:8080" [(ngModel)]="npmProxy" />
-                      </label>
-                      <label>
-                        <span>https-proxy</span>
-                        <input
-                          placeholder="http://proxy.internal:8080"
-                          [(ngModel)]="npmHttpsProxy"
-                        />
-                      </label>
-                    </div>
-                    <label>
-                      <span>{{ 'settings.enterpriseCa' | t }}</span>
-                      <input placeholder="C:\\certs\\internal-ca.pem" [(ngModel)]="npmCaPath" />
-                    </label>
-                  </div>
-
-                  <div class="network-section">
-                    <h3>{{ 'settings.proxyCredentials' | t }}</h3>
                     <div class="two-columns">
                       <label
-                        ><span>{{ 'settings.username' | t }}</span
-                        ><input [(ngModel)]="proxyUsername"
+                        ><span>{{ 'settings.name' | t }}</span
+                        ><input [(ngModel)]="networkName"
                       /></label>
                       <label>
-                        <span>{{ 'settings.password' | t }}</span>
+                        <span>{{ 'settings.scope' | t }}</span>
+                        <select [(ngModel)]="networkScope" (ngModelChange)="changeNetworkScope()">
+                          <option value="workspace">{{ 'settings.currentWorkspace' | t }}</option>
+                          <option value="global">{{ 'settings.globalDefault' | t }}</option>
+                        </select>
+                      </label>
+                    </div>
+                    @if (networkScope === 'workspace') {
+                      <p class="workspace-binding">
+                        {{ 'settings.boundTo' | t: { name: networkWorkspaceLabel() } }}
+                      </p>
+                    }
+
+                    <div class="network-section">
+                      <h3>{{ 'settings.systemAgentProxy' | t }}</h3>
+                      <div class="two-columns">
+                        <label>
+                          <span>HTTP_PROXY</span>
+                          <input placeholder="http://proxy.internal:8080" [(ngModel)]="httpProxy" />
+                        </label>
+                        <label>
+                          <span>HTTPS_PROXY</span>
+                          <input
+                            placeholder="http://proxy.internal:8080"
+                            [(ngModel)]="httpsProxy"
+                          />
+                          <small class="field-hint">{{ 'settings.httpsProxyHint' | t }}</small>
+                        </label>
+                        <label>
+                          <span>ALL_PROXY / SOCKS</span>
+                          <input placeholder="socks5://127.0.0.1:1080" [(ngModel)]="allProxy" />
+                        </label>
+                        <label>
+                          <span>NO_PROXY</span>
+                          <input placeholder="localhost,.internal.example" [(ngModel)]="noProxy" />
+                          <small class="field-hint">{{ 'settings.noProxyHint' | t }}</small>
+                        </label>
+                      </div>
+                    </div>
+
+                    <div class="network-section">
+                      <h3>npm</h3>
+                      <label>
+                        <span>registry</span>
                         <input
-                          type="password"
-                          [placeholder]="
-                            hasNetworkCredential()
-                              ? ('settings.keySavedPlaceholder' | t)
-                              : ('settings.passwordOptional' | t)
-                          "
-                          [(ngModel)]="proxyPassword"
+                          placeholder="https://registry.npmjs.org/"
+                          [(ngModel)]="npmRegistry"
                         />
                       </label>
-                    </div>
-                    @if (hasNetworkCredential()) {
-                      <label class="checkbox-control editor-checkbox">
-                        <input type="checkbox" [(ngModel)]="clearNetworkCredential" />
-                        <span>{{ 'settings.clearProxyPassword' | t }}</span>
+                      <div class="two-columns">
+                        <label>
+                          <span>proxy</span>
+                          <input placeholder="http://proxy.internal:8080" [(ngModel)]="npmProxy" />
+                        </label>
+                        <label>
+                          <span>https-proxy</span>
+                          <input
+                            placeholder="http://proxy.internal:8080"
+                            [(ngModel)]="npmHttpsProxy"
+                          />
+                        </label>
+                      </div>
+                      <label>
+                        <span>{{ 'settings.enterpriseCa' | t }}</span>
+                        <input placeholder="C:\\certs\\internal-ca.pem" [(ngModel)]="npmCaPath" />
                       </label>
+                    </div>
+
+                    <div class="network-section">
+                      <h3>{{ 'settings.proxyCredentials' | t }}</h3>
+                      <div class="two-columns">
+                        <label
+                          ><span>{{ 'settings.username' | t }}</span
+                          ><input [(ngModel)]="proxyUsername"
+                        /></label>
+                        <label>
+                          <span>{{ 'settings.password' | t }}</span>
+                          <input
+                            type="password"
+                            [placeholder]="
+                              hasNetworkCredential()
+                                ? ('settings.keySavedPlaceholder' | t)
+                                : ('settings.passwordOptional' | t)
+                            "
+                            [(ngModel)]="proxyPassword"
+                          />
+                        </label>
+                      </div>
+                      @if (hasNetworkCredential()) {
+                        <label class="checkbox-control editor-checkbox">
+                          <input type="checkbox" [(ngModel)]="clearNetworkCredential" />
+                          <span>{{ 'settings.clearProxyPassword' | t }}</span>
+                        </label>
+                      }
+                    </div>
+
+                    <div class="network-options">
+                      <label class="checkbox-control">
+                        <input type="checkbox" [(ngModel)]="networkEnabled" />
+                        <span>{{ 'settings.enableProfile' | t }}</span>
+                      </label>
+                      <label class="checkbox-control">
+                        <input type="checkbox" [(ngModel)]="networkDefault" />
+                        <span>{{ 'settings.defaultForScope' | t }}</span>
+                      </label>
+                      <label class="checkbox-control">
+                        <input type="checkbox" [(ngModel)]="npmStrictSsl" />
+                        <span>npm strict-ssl</span>
+                      </label>
+                    </div>
+
+                    @if (networkTestResult() && networkTestResult()?.profileId === networkId()) {
+                      <div
+                        class="network-test-result"
+                        [class.unavailable]="!networkTestResult()?.healthy"
+                      >
+                        <app-icon
+                          [name]="networkTestResult()?.healthy ? 'check' : 'shield'"
+                          [size]="14"
+                        />
+                        <span>
+                          <strong>{{ networkTestResult()?.message }}</strong>
+                          <small>
+                            {{ networkTestResult()?.target }} ·
+                            {{ networkTestResult()?.latencyMs }} ms
+                          </small>
+                        </span>
+                      </div>
                     }
                   </div>
-
-                  <div class="network-options">
-                    <label class="checkbox-control">
-                      <input type="checkbox" [(ngModel)]="networkEnabled" />
-                      <span>{{ 'settings.enableProfile' | t }}</span>
-                    </label>
-                    <label class="checkbox-control">
-                      <input type="checkbox" [(ngModel)]="networkDefault" />
-                      <span>{{ 'settings.defaultForScope' | t }}</span>
-                    </label>
-                    <label class="checkbox-control">
-                      <input type="checkbox" [(ngModel)]="npmStrictSsl" />
-                      <span>npm strict-ssl</span>
-                    </label>
-                  </div>
-
-                  @if (networkTestResult() && networkTestResult()?.profileId === networkId()) {
-                    <div
-                      class="network-test-result"
-                      [class.unavailable]="!networkTestResult()?.healthy"
-                    >
-                      <app-icon
-                        [name]="networkTestResult()?.healthy ? 'check' : 'shield'"
-                        [size]="14"
-                      />
-                      <span>
-                        <strong>{{ networkTestResult()?.message }}</strong>
-                        <small>
-                          {{ networkTestResult()?.target }} ·
-                          {{ networkTestResult()?.latencyMs }} ms
-                        </small>
-                      </span>
-                    </div>
-                  }
-
                   <div class="editor-actions network-actions">
+                    @if (networkDirty()) {
+                      <small class="draft-status" role="status">{{ 'settings.unsaved' | t }}</small>
+                    }
                     @if (networkId()) {
                       <button
                         type="button"
@@ -1195,7 +1229,8 @@ const DEFAULT_ALERT_THRESHOLD = 80;
                     <button
                       type="button"
                       class="secondary"
-                      [disabled]="busy() || !networkId()"
+                      [disabled]="busy() || !networkId() || networkDirty()"
+                      [title]="networkDirty() ? ('settings.saveBeforeTest' | t) : ''"
                       (click)="networkTestRequested.emit(networkId())"
                     >
                       <app-icon name="radio" [size]="13" />{{ 'settings.testConnection' | t }}
@@ -1233,7 +1268,7 @@ const DEFAULT_ALERT_THRESHOLD = 80;
       </section>
     </div>
   `,
-  styleUrl: './agent-dialog.scss',
+  styleUrls: ['./agent-dialog.scss', './settings-layout.scss'],
 })
 export class AgentSettingsDialogComponent {
   private readonly i18n = inject(I18nService);
@@ -1244,6 +1279,7 @@ export class AgentSettingsDialogComponent {
   /** The agents' own marks, for the template. */
   protected readonly agentIcons = AGENT_ICONS;
   readonly modelProfiles = input<ModelProfile[]>([]);
+  readonly profileSaveCompleted = input<ProfileSaveCompleted | null>(null);
   readonly mcpProfiles = input<McpProfile[]>([]);
   readonly networkProfiles = input<NetworkProfile[]>([]);
   readonly accountProfiles = input<AccountProfile[]>([]);
@@ -1257,6 +1293,8 @@ export class AgentSettingsDialogComponent {
   readonly cliPlan = input<CliOperationPlan | null>(null);
   readonly cliResult = input<CliOperationResult | null>(null);
   readonly busy = input(false);
+  /** A profile save is in flight; its result lands in this dialog, so it cannot close meanwhile. */
+  readonly saving = input(false);
   readonly updateResult = input<UpdateCheck | null>(null);
   readonly updateChecking = input(false);
   readonly updateInstalling = input(false);
@@ -1286,6 +1324,21 @@ export class AgentSettingsDialogComponent {
   readonly accountRefreshRequested = output<string>();
   readonly accountConfigCopyRequested = output<{ sourceId: string; targetId: string }>();
 
+  protected readonly confirmClose = signal(false);
+  protected readonly categories: readonly { id: SettingsTab; label: string }[] = [
+    { id: 'diagnostics', label: 'settings.tabDiagnostics' },
+    { id: 'cli', label: 'settings.tabCli' },
+    { id: 'accounts', label: 'settings.tabAccounts' },
+    { id: 'models', label: 'settings.tabModels' },
+    { id: 'mcp', label: 'settings.tabMcp' },
+    { id: 'network', label: 'settings.tabNetwork' },
+    { id: 'remote', label: 'settings.tabRemote' },
+    { id: 'storage', label: 'settings.tabStorage' },
+  ];
+  private readonly modelDrafts = new ProfileDrafts<ModelEditorDraft>();
+  private readonly accountDrafts = new ProfileDrafts<ReturnType<typeof this.captureAccountDraft>>();
+  private readonly mcpDrafts = new ProfileDrafts<ReturnType<typeof this.captureMcpDraft>>();
+  private readonly networkDrafts = new ProfileDrafts<ReturnType<typeof this.captureNetworkDraft>>();
   protected readonly tab = signal<SettingsTab>('diagnostics');
   protected readonly modelId = signal('claude-default');
   protected readonly hasCredential = signal(false);
@@ -1355,13 +1408,13 @@ export class AgentSettingsDialogComponent {
   protected accountName = '';
   protected accountAgentType: AccountAgentType = 'claude';
   protected accountDefault = false;
-  private modelProfilesInitialized = false;
-  private mcpProfilesInitialized = false;
-  private networkProfilesInitialized = false;
-  private accountProfilesInitialized = false;
   private initialSelectionApplied = false;
 
   constructor() {
+    effect(() => {
+      const saved = this.profileSaveCompleted();
+      if (saved) untracked(() => this.acknowledgeProfileSave(saved));
+    });
     effect(() => {
       if (this.initialSelectionApplied) {
         return;
@@ -1385,10 +1438,22 @@ export class AgentSettingsDialogComponent {
         this.editModel(requestedProfile);
       }
     });
-    effect(() => this.syncModelProfileEditor(this.modelProfiles()));
-    effect(() => this.syncMcpProfileEditor(this.mcpProfiles()));
-    effect(() => this.syncNetworkProfileEditor(this.networkProfiles()));
-    effect(() => this.syncAccountProfileEditor(this.accountProfiles()));
+    effect(() => {
+      const profiles = this.modelProfiles();
+      untracked(() => this.syncModelProfileEditor(profiles));
+    });
+    effect(() => {
+      const profiles = this.mcpProfiles();
+      untracked(() => this.syncMcpProfileEditor(profiles));
+    });
+    effect(() => {
+      const profiles = this.networkProfiles();
+      untracked(() => this.syncNetworkProfileEditor(profiles));
+    });
+    effect(() => {
+      const profiles = this.accountProfiles();
+      untracked(() => this.syncAccountProfileEditor(profiles));
+    });
   }
 
   protected selectTab(tab: SettingsTab): void {
@@ -1426,6 +1491,7 @@ export class AgentSettingsDialogComponent {
   }
 
   protected editAccount(profile: AccountProfile): void {
+    this.accountDrafts.remember(this.accountId(), this.captureAccountDraft());
     this.accountId.set(profile.id);
     this.accountName = profile.name;
     this.accountAgentType = profile.agentType;
@@ -1433,6 +1499,7 @@ export class AgentSettingsDialogComponent {
     this.accountSystem.set(profile.isSystem);
     // The previous pick belongs to the account being left, not this one.
     this.copySourceId.set('');
+    Object.assign(this, this.accountDrafts.restore(this.accountId(), this.captureAccountDraft()));
   }
 
   protected requestConfigCopy(): void {
@@ -1445,15 +1512,19 @@ export class AgentSettingsDialogComponent {
   }
 
   protected newAccount(): void {
+    this.accountDrafts.remember(this.accountId(), this.captureAccountDraft());
     this.accountId.set('');
     this.accountName = '';
     this.accountAgentType = 'claude';
     this.accountDefault = false;
     this.accountSystem.set(false);
+    Object.assign(this, this.accountDrafts.restore(this.accountId(), this.captureAccountDraft()));
   }
 
   protected saveAccount(): void {
+    if (this.busy() || !this.accountName.trim()) return;
     const profileId = this.accountId() || createId();
+    this.accountDrafts.beginSave(this.accountId(), profileId, this.captureAccountDraft());
     this.accountId.set(profileId);
     this.accountSaved.emit({
       id: profileId,
@@ -1524,7 +1595,161 @@ export class AgentSettingsDialogComponent {
     };
   }
 
+  private captureModelDraft(): ModelEditorDraft {
+    return {
+      modelName: this.modelName,
+      modelProvider: this.modelProvider,
+      claudeEnabled: this.claudeEnabled,
+      claudeModel: this.claudeModel,
+      claudeBaseUrl: this.claudeBaseUrl,
+      codexEnabled: this.codexEnabled,
+      codexModel: this.codexModel,
+      codexBaseUrl: this.codexBaseUrl,
+      claudeContext1m: this.claudeContext1m,
+      claudeEffort: this.claudeEffort,
+      codexReasoningEffort: this.codexReasoningEffort,
+      apiKey: this.apiKey,
+      isDefault: this.isDefault,
+      clearCredential: this.clearCredential,
+      modelPlanAlertThreshold: this.modelPlanAlertThreshold,
+    };
+  }
+
+  private captureAccountDraft() {
+    return {
+      accountName: this.accountName,
+      accountAgentType: this.accountAgentType,
+      accountDefault: this.accountDefault,
+    };
+  }
+
+  protected accountDirty(): boolean {
+    return this.accountDrafts.dirty(this.accountId(), this.captureAccountDraft());
+  }
+
+  private captureMcpDraft() {
+    return {
+      mcpName: this.mcpName,
+      mcpConfig: this.mcpConfig,
+    };
+  }
+
+  protected mcpDirty(): boolean {
+    return this.mcpDrafts.dirty(this.mcpId(), this.captureMcpDraft());
+  }
+
+  private captureNetworkDraft() {
+    return {
+      networkName: this.networkName,
+      networkScope: this.networkScope,
+      networkWorkspaceId: this.networkWorkspaceId,
+      networkEnabled: this.networkEnabled,
+      networkDefault: this.networkDefault,
+      httpProxy: this.httpProxy,
+      httpsProxy: this.httpsProxy,
+      allProxy: this.allProxy,
+      noProxy: this.noProxy,
+      npmRegistry: this.npmRegistry,
+      npmProxy: this.npmProxy,
+      npmHttpsProxy: this.npmHttpsProxy,
+      npmStrictSsl: this.npmStrictSsl,
+      npmCaPath: this.npmCaPath,
+      proxyUsername: this.proxyUsername,
+      proxyPassword: this.proxyPassword,
+      clearNetworkCredential: this.clearNetworkCredential,
+    };
+  }
+
+  protected networkDirty(): boolean {
+    return this.networkDrafts.dirty(this.networkId(), this.captureNetworkDraft());
+  }
+
+  private rememberModelDraft(): void {
+    this.modelDrafts.remember(this.modelId(), this.captureModelDraft());
+  }
+
+  private restoreModelDraft(): void {
+    Object.assign(this, this.modelDrafts.restore(this.modelId(), this.captureModelDraft()));
+  }
+
+  protected modelDirty(): boolean {
+    return this.modelDrafts.dirty(this.modelId(), this.captureModelDraft());
+  }
+
+  private acknowledgeProfileSave(saved: ProfileSaveCompleted): void {
+    this.rememberAllDrafts();
+    switch (saved.kind) {
+      case 'models': {
+        const draft = this.modelDrafts.acknowledge(saved.id, (value) => ({
+          ...value,
+          apiKey: '',
+          clearCredential: false,
+        }));
+        if (draft && this.modelId() === saved.id) {
+          Object.assign(this, draft);
+          this.hasCredential.set(
+            this.modelProfiles().find((profile) => profile.id === saved.id)?.hasCredential ?? false,
+          );
+        }
+        break;
+      }
+      case 'accounts': {
+        const draft = this.accountDrafts.acknowledge(saved.id, (value) => value);
+        if (draft && this.accountId() === saved.id) Object.assign(this, draft);
+        break;
+      }
+      case 'mcp': {
+        const draft = this.mcpDrafts.acknowledge(saved.id, (value) => value);
+        if (draft && this.mcpId() === saved.id) Object.assign(this, draft);
+        break;
+      }
+      case 'network': {
+        const draft = this.networkDrafts.acknowledge(saved.id, (value) => ({
+          ...value,
+          proxyPassword: '',
+          clearNetworkCredential: false,
+        }));
+        if (draft && this.networkId() === saved.id) {
+          Object.assign(this, draft);
+          this.hasNetworkCredential.set(
+            this.networkProfiles().find((profile) => profile.id === saved.id)?.hasCredential ??
+              false,
+          );
+        }
+        break;
+      }
+    }
+  }
+
+  private rememberAllDrafts(): void {
+    this.rememberModelDraft();
+    this.accountDrafts.remember(this.accountId(), this.captureAccountDraft());
+    this.mcpDrafts.remember(this.mcpId(), this.captureMcpDraft());
+    this.networkDrafts.remember(this.networkId(), this.captureNetworkDraft());
+  }
+
+  protected requestClose(): void {
+    // Only a profile save holds the dialog open, since its result updates the drafts shown here.
+    // Detection and CLI installs run on in the background, so they must not trap the user inside.
+    if (this.saving()) return;
+    this.rememberAllDrafts();
+    if (
+      [this.modelDrafts, this.accountDrafts, this.mcpDrafts, this.networkDrafts].some((drafts) =>
+        drafts.hasChanges(),
+      )
+    ) {
+      this.confirmClose.set(true);
+      return;
+    }
+    this.cancelled.emit();
+  }
+
+  protected discardChanges(): void {
+    if (!this.saving()) this.cancelled.emit();
+  }
+
   protected editModel(profile: ModelProfile): void {
+    this.rememberModelDraft();
     this.modelId.set(profile.id);
     this.modelName = profile.name;
     this.modelProvider = profile.provider;
@@ -1542,9 +1767,11 @@ export class AgentSettingsDialogComponent {
     this.clearCredential = false;
     this.hasCredential.set(profile.hasCredential);
     this.modelPlanAlertThreshold = profile.planAlertThreshold || DEFAULT_ALERT_THRESHOLD;
+    this.restoreModelDraft();
   }
 
   protected newModel(): void {
+    this.rememberModelDraft();
     this.modelId.set('');
     this.selectProvider(PROVIDER_PRESETS[0].provider);
     this.apiKey = '';
@@ -1555,13 +1782,15 @@ export class AgentSettingsDialogComponent {
     this.claudeContext1m = false;
     this.claudeEffort = '';
     this.codexReasoningEffort = '';
+    this.restoreModelDraft();
   }
 
   protected saveModel(): void {
-    if (!this.canSaveModel()) {
+    if (this.busy() || !this.canSaveModel()) {
       return;
     }
     const profileId = this.modelId() || createId();
+    this.modelDrafts.beginSave(this.modelId(), profileId, this.captureModelDraft());
     this.modelId.set(profileId);
     this.modelSaved.emit({
       id: profileId,
@@ -1659,19 +1888,37 @@ export class AgentSettingsDialogComponent {
   }
 
   protected editMcp(profile: McpProfile): void {
+    this.mcpDrafts.remember(this.mcpId(), this.captureMcpDraft());
     this.mcpId.set(profile.id);
     this.mcpName = profile.name;
     this.mcpConfig = profile.configJson;
+    Object.assign(this, this.mcpDrafts.restore(this.mcpId(), this.captureMcpDraft()));
   }
 
   protected newMcp(): void {
+    this.mcpDrafts.remember(this.mcpId(), this.captureMcpDraft());
     this.mcpId.set('');
     this.mcpName = '';
     this.mcpConfig = '{\n  "mcpServers": {}\n}';
+    Object.assign(this, this.mcpDrafts.restore(this.mcpId(), this.captureMcpDraft()));
+  }
+
+  protected mcpError(): string {
+    try {
+      const config: unknown = JSON.parse(this.mcpConfig);
+      if (!config || typeof config !== 'object' || Array.isArray(config)) {
+        return this.i18n.t('settings.mcpObjectRequired');
+      }
+      return '';
+    } catch {
+      return this.i18n.t('settings.mcpInvalidJson');
+    }
   }
 
   protected saveMcp(): void {
+    if (!this.mcpName.trim() || this.mcpError() || this.busy()) return;
     const profileId = this.mcpId() || createId();
+    this.mcpDrafts.beginSave(this.mcpId(), profileId, this.captureMcpDraft());
     this.mcpId.set(profileId);
     this.mcpSaved.emit({
       id: profileId,
@@ -1681,6 +1928,7 @@ export class AgentSettingsDialogComponent {
   }
 
   protected editNetwork(profile: NetworkProfile): void {
+    this.networkDrafts.remember(this.networkId(), this.captureNetworkDraft());
     this.networkId.set(profile.id);
     this.networkName = profile.name;
     this.networkScope = profile.scope;
@@ -1700,9 +1948,11 @@ export class AgentSettingsDialogComponent {
     this.proxyPassword = '';
     this.clearNetworkCredential = false;
     this.hasNetworkCredential.set(profile.hasCredential);
+    Object.assign(this, this.networkDrafts.restore(this.networkId(), this.captureNetworkDraft()));
   }
 
   protected newNetwork(): void {
+    this.networkDrafts.remember(this.networkId(), this.captureNetworkDraft());
     this.networkId.set('');
     this.networkName = this.i18n.t(
       this.activeWorkspaceId() ? 'settings.workspaceProxy' : 'settings.globalProxy',
@@ -1724,6 +1974,7 @@ export class AgentSettingsDialogComponent {
     this.proxyPassword = '';
     this.clearNetworkCredential = false;
     this.hasNetworkCredential.set(false);
+    Object.assign(this, this.networkDrafts.restore(this.networkId(), this.captureNetworkDraft()));
   }
 
   protected changeNetworkScope(): void {
@@ -1751,13 +2002,10 @@ export class AgentSettingsDialogComponent {
   }
 
   protected saveNetwork(): void {
+    if (this.busy() || !this.canSaveNetwork()) return;
     const profileId = this.networkId() || createId();
+    this.networkDrafts.beginSave(this.networkId(), profileId, this.captureNetworkDraft());
     this.networkId.set(profileId);
-    if (this.proxyPassword && !this.clearNetworkCredential) {
-      this.hasNetworkCredential.set(true);
-    } else if (this.clearNetworkCredential || !this.proxyUsername.trim()) {
-      this.hasNetworkCredential.set(false);
-    }
     this.networkSaved.emit({
       id: profileId,
       name: this.networkName.trim(),
@@ -1787,14 +2035,15 @@ export class AgentSettingsDialogComponent {
     const selectedId = untracked(this.modelId);
     const selectedProfile = profiles.find((profile) => profile.id === selectedId);
     if (
-      !this.modelProfilesInitialized ||
-      (!selectedId && profiles.length > 0) ||
-      (selectedId && !selectedProfile)
+      this.modelDrafts.reconcile(
+        profiles.map((profile) => profile.id),
+        selectedId,
+        this.captureModelDraft(),
+      )
     ) {
       const fallback =
         selectedProfile ?? profiles.find((profile) => profile.isDefault) ?? profiles[0];
       fallback ? this.editModel(fallback) : this.newModel();
-      this.modelProfilesInitialized = true;
     }
   }
 
@@ -1802,13 +2051,14 @@ export class AgentSettingsDialogComponent {
     const selectedId = untracked(this.mcpId);
     const selectedProfile = profiles.find((profile) => profile.id === selectedId);
     if (
-      !this.mcpProfilesInitialized ||
-      (!selectedId && profiles.length > 0) ||
-      (selectedId && !selectedProfile)
+      this.mcpDrafts.reconcile(
+        profiles.map((profile) => profile.id),
+        selectedId,
+        this.captureMcpDraft(),
+      )
     ) {
       const fallback = selectedProfile ?? profiles[0];
       fallback ? this.editMcp(fallback) : this.newMcp();
-      this.mcpProfilesInitialized = true;
     }
   }
 
@@ -1816,9 +2066,11 @@ export class AgentSettingsDialogComponent {
     const selectedId = untracked(this.networkId);
     const selectedProfile = profiles.find((profile) => profile.id === selectedId);
     if (
-      !this.networkProfilesInitialized ||
-      (!selectedId && profiles.length > 0) ||
-      (selectedId && !selectedProfile)
+      this.networkDrafts.reconcile(
+        profiles.map((profile) => profile.id),
+        selectedId,
+        this.captureNetworkDraft(),
+      )
     ) {
       const fallback =
         selectedProfile ??
@@ -1831,7 +2083,6 @@ export class AgentSettingsDialogComponent {
         profiles.find((profile) => profile.scope === 'global' && profile.isDefault) ??
         profiles[0];
       fallback ? this.editNetwork(fallback) : this.newNetwork();
-      this.networkProfilesInitialized = true;
     }
   }
 
@@ -1839,14 +2090,15 @@ export class AgentSettingsDialogComponent {
     const selectedId = untracked(this.accountId);
     const selectedProfile = profiles.find((profile) => profile.id === selectedId);
     if (
-      !this.accountProfilesInitialized ||
-      (!selectedId && profiles.length > 0) ||
-      (selectedId && !selectedProfile)
+      this.accountDrafts.reconcile(
+        profiles.map((profile) => profile.id),
+        selectedId,
+        this.captureAccountDraft(),
+      )
     ) {
       const fallback =
         selectedProfile ?? profiles.find((profile) => profile.isDefault) ?? profiles[0];
       fallback ? this.editAccount(fallback) : this.newAccount();
-      this.accountProfilesInitialized = true;
     }
   }
 }

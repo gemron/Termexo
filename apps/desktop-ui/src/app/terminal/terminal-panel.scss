@@ -334,6 +334,8 @@ header {
  * space, proposing one row more than fits, and the last line was drawn behind the footer.
  */
 .terminal-frame {
+  /* Anchors the touch keypad, which floats over the output rather than taking rows from it. */
+  position: relative;
   display: grid;
   grid-template-rows: minmax(0, 1fr);
   min-width: 0;

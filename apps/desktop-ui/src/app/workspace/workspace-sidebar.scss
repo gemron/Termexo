@@ -109,8 +109,6 @@ nav {
 
 .workspace-entry {
   --workspace-color: var(--accent);
-  /* Must clear every row action, or the name keeps a clickable strip underneath them. */
-  --workspace-actions-lane: 100px;
 
   position: relative;
   min-width: 0;
@@ -126,7 +124,7 @@ nav {
   align-items: center;
   justify-content: stretch;
   gap: 8px;
-  padding: 6px 8px;
+  padding: 6px 34px 6px 8px;
   border: 0;
   border-radius: var(--radius-field);
   color: var(--text-secondary);
@@ -145,13 +143,6 @@ nav {
       color: var(--workspace-color);
     }
   }
-}
-
-// A workspace name gets the sidebar's full width in the state it is read in — at rest — and
-// yields the trailing lane only while the row actions are up, so no action ever covers the name.
-.workspace-entry:hover .workspace-item,
-.workspace-entry:focus-within .workspace-item {
-  padding-right: var(--workspace-actions-lane);
 }
 
 .workspace-entry:hover .workspace-item:not(.active) {
@@ -191,24 +182,33 @@ nav {
 }
 
 .workspace-actions {
-  position: absolute;
-  z-index: 2;
-  top: 0;
-  right: 0;
-  bottom: 0;
   display: flex;
   align-items: center;
-  gap: 1px;
-  padding: 0 6px;
-  opacity: 0;
-  pointer-events: none;
-  transition: opacity 140ms ease;
+  justify-content: space-around;
+  padding: 6px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-field);
+  background: var(--surface-2);
 }
 
-.workspace-entry:hover .workspace-actions,
-.workspace-entry:focus-within .workspace-actions {
-  opacity: 1;
-  pointer-events: auto;
+.workspace-more {
+  position: absolute;
+  right: 4px;
+  top: 8px;
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 28px;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-field);
+  color: var(--text-muted);
+  background: transparent;
+  &:hover,
+  &[aria-expanded='true'] {
+    color: var(--text);
+    background: var(--surface-2);
+  }
 }
 
 .workspace-order-actions {

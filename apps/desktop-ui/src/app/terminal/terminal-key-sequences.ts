@@ -11,6 +11,50 @@ export const REVERSE_TAB_SEQUENCE = '\x1b[Z';
  */
 export const AGENT_INTERRUPT_SEQUENCE = '\x1b';
 
+/** The four arrow keys in both forms; the application form is the one DECCKM selects. */
+const CURSOR_KEY_SEQUENCES = {
+  normal: { up: '\x1b[A', down: '\x1b[B', right: '\x1b[C', left: '\x1b[D' },
+  application: { up: '\x1bOA', down: '\x1bOB', right: '\x1bOC', left: '\x1bOD' },
+} as const;
+
+export type CursorDirection = keyof typeof CURSOR_KEY_SEQUENCES.normal;
+
+/**
+ * The arrow keys as the program in the terminal currently expects them.
+ *
+ * A full-screen agent switches to application cursor keys, and an arrow sent in the other form
+ * reaches it as a stray escape followed by letters instead of a move through its menu.
+ */
+export function cursorKeySequences(
+  applicationCursorKeys: boolean,
+): Readonly<Record<CursorDirection, string>> {
+  return applicationCursorKeys ? CURSOR_KEY_SEQUENCES.application : CURSOR_KEY_SEQUENCES.normal;
+}
+
+/** A key on the touch keypad, which stands in for the keys a phone keyboard does not have. */
+export type QuickKey = 'escape' | 'tab' | 'shiftTab' | 'enter' | 'ctrlC' | CursorDirection;
+
+/** Every keypad key whose sequence does not depend on the terminal's modes. */
+const FIXED_QUICK_KEY_SEQUENCES: Readonly<Record<Exclude<QuickKey, CursorDirection>, string>> = {
+  escape: AGENT_INTERRUPT_SEQUENCE,
+  tab: '\t',
+  shiftTab: REVERSE_TAB_SEQUENCE,
+  enter: '\r',
+  // End of text: cancels the current input, and a second press quits an agent CLI.
+  ctrlC: '\x03',
+};
+
+function isCursorDirection(key: QuickKey): key is CursorDirection {
+  return key in CURSOR_KEY_SEQUENCES.normal;
+}
+
+/** The bytes a keypad key writes, matching what the same key on a real keyboard would send. */
+export function quickKeySequence(key: QuickKey, applicationCursorKeys: boolean): string {
+  return isCursorDirection(key)
+    ? cursorKeySequences(applicationCursorKeys)[key]
+    : FIXED_QUICK_KEY_SEQUENCES[key];
+}
+
 interface KeyLike {
   readonly type: string;
   readonly key: string;

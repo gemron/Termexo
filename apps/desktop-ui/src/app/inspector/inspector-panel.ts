@@ -103,6 +103,7 @@ export class InspectorPanelComponent {
   readonly repository = input<RepositoryOverview | null>(null);
   readonly refreshQuotas = output<void>();
   readonly gitRequested = output<void>();
+  readonly terminalSelected = output<string>();
   readonly collapseRequested = output<void>();
   protected readonly showAllQuotas = signal(false);
   /** Empty for a plain shell or OpenCode, which run on no account of their own. */

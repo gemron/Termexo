@@ -157,7 +157,10 @@ impl AgentAdapter for OpenCodeAdapter {
     }
 
     fn list_sessions(&self, project_path: Option<&str>) -> Result<Vec<AgentSession>, Self::Error> {
-        let output = self.run(&["session", "list", "--format", "json"], SESSION_LIST_TIMEOUT)?;
+        let output = self.run(
+            &["session", "list", "--format", "json"],
+            SESSION_LIST_TIMEOUT,
+        )?;
         if !output.status.success() {
             return Err(OpenCodeError::SessionCommand(
                 String::from_utf8_lossy(&output.stderr).trim().to_owned(),
@@ -358,7 +361,11 @@ mod tests {
                 auto_confirm: true,
             })
             .unwrap();
-        assert!(automatic.command.ends_with(" --auto"), "{}", automatic.command);
+        assert!(
+            automatic.command.ends_with(" --auto"),
+            "{}",
+            automatic.command
+        );
         let manual = adapter
             .build_launch_command(&OpenCodeLaunchOptions {
                 session_id: None,

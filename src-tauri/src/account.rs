@@ -285,8 +285,7 @@ pub fn copy_configuration(
     }
     prepare_managed_directory(target)?;
     let target_dir = resolve_config_dir(target)?;
-    fs::create_dir_all(&target_dir)
-        .map_err(|error| format!("无法创建目标账号目录：{error}"))?;
+    fs::create_dir_all(&target_dir).map_err(|error| format!("无法创建目标账号目录：{error}"))?;
 
     let entries = if source.agent_type == "claude" {
         CLAUDE_PORTABLE_ENTRIES
@@ -307,8 +306,7 @@ pub fn copy_configuration(
                 fs::create_dir_all(parent)
                     .map_err(|error| format!("无法创建 {}：{error}", parent.to_string_lossy()))?;
             }
-            fs::copy(&from, &to)
-                .map_err(|error| format!("无法复制 {entry}：{error}"))?;
+            fs::copy(&from, &to).map_err(|error| format!("无法复制 {entry}：{error}"))?;
         }
         copied.push((*entry).to_owned());
     }
@@ -324,8 +322,8 @@ pub fn copy_configuration(
 fn copy_directory(from: &Path, to: &Path) -> Result<(), String> {
     fs::create_dir_all(to)
         .map_err(|error| format!("无法创建 {}：{error}", to.to_string_lossy()))?;
-    let listing =
-        fs::read_dir(from).map_err(|error| format!("无法读取 {}：{error}", from.to_string_lossy()))?;
+    let listing = fs::read_dir(from)
+        .map_err(|error| format!("无法读取 {}：{error}", from.to_string_lossy()))?;
     for entry in listing {
         let entry = entry.map_err(|error| format!("无法读取目录项：{error}"))?;
         let name = entry.file_name();
@@ -337,9 +335,8 @@ fn copy_directory(from: &Path, to: &Path) -> Result<(), String> {
         if source_path.is_dir() {
             copy_directory(&source_path, &target_path)?;
         } else {
-            fs::copy(&source_path, &target_path).map_err(|error| {
-                format!("无法复制 {}：{error}", source_path.to_string_lossy())
-            })?;
+            fs::copy(&source_path, &target_path)
+                .map_err(|error| format!("无法复制 {}：{error}", source_path.to_string_lossy()))?;
         }
     }
     Ok(())
@@ -561,10 +558,22 @@ mod tests {
         fs::create_dir_all(source_dir.join("plugins").join("hud")).unwrap();
         fs::write(source_dir.join("settings.json"), "{\"theme\":\"dark\"}").unwrap();
         fs::write(source_dir.join("CLAUDE.md"), "# instructions").unwrap();
-        fs::write(source_dir.join("plugins").join("hud").join("index.js"), "//").unwrap();
+        fs::write(
+            source_dir.join("plugins").join("hud").join("index.js"),
+            "//",
+        )
+        .unwrap();
         // Identity and credentials sit beside the portable files and must not travel.
-        fs::write(source_dir.join(".credentials.json"), "{\"token\":\"secret\"}").unwrap();
-        fs::write(source_dir.join(".claude.json"), "{\"userID\":\"source-user\"}").unwrap();
+        fs::write(
+            source_dir.join(".credentials.json"),
+            "{\"token\":\"secret\"}",
+        )
+        .unwrap();
+        fs::write(
+            source_dir.join(".claude.json"),
+            "{\"userID\":\"source-user\"}",
+        )
+        .unwrap();
         // A token hidden inside an otherwise portable directory is filtered too.
         fs::write(
             source_dir.join("plugins").join(".credentials.json"),
@@ -596,10 +605,17 @@ mod tests {
         assert!(copied.contains(&"settings.json".to_owned()));
         assert!(copied.contains(&"CLAUDE.md".to_owned()));
         assert!(copied.contains(&"plugins".to_owned()));
-        assert!(target_dir.join("plugins").join("hud").join("index.js").is_file());
+        assert!(target_dir
+            .join("plugins")
+            .join("hud")
+            .join("index.js")
+            .is_file());
         assert!(!target_dir.join(".credentials.json").exists());
         assert!(!target_dir.join(".claude.json").exists());
-        assert!(!target_dir.join("plugins").join(".credentials.json").exists());
+        assert!(!target_dir
+            .join("plugins")
+            .join(".credentials.json")
+            .exists());
         assert!(!target_dir.join("sessions").exists());
 
         fs::remove_dir_all(&root).ok();

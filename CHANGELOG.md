@@ -2,6 +2,49 @@
 
 Release notes for every Termexo version, newest first. The current release is summarised in [README.md](README.md).
 
+## V0.10.1
+
+- **Phone remote access got the keys a phone keyboard lacks.** The active terminal carries a
+  translucent floating button that opens a keypad with Esc, the arrow keys, Shift+Tab, Tab, Enter
+  and Ctrl+C. It types exactly what a keyboard would — arrows included in the form a full-screen
+  agent asks for — stays open between presses, and never pulls focus, so an open on-screen keyboard
+  stays up and a closed one stays down. Only touch devices on a remote page see it.
+- The on-screen keyboard no longer covers the agent's input line. A remote page now shrinks to the
+  space above the keyboard — Android through the viewport's `interactive-widget`, iOS by following
+  the visual viewport — and the terminal refits, so the input line is redrawn right above the keys.
+- The phone menu (⋯) can take the page full screen on Android and iPad, hiding the browser's address
+  bar and navigation bar. Safari on iPhone cannot do that for a page; *Add to Home Screen* now opens
+  Termexo without the browser's bars instead.
+- In the phone menu the language picker opens again, instead of closing the menu under the tap, and
+  the terminal font list no longer shuts the instant it opens. It also no longer raises the keyboard
+  on its own.
+- **Settings keeps what you typed.** Model, account, MCP and network profiles remember their edits
+  across profile and tab switches, show *Unsaved changes*, and ask before closing with edits. A
+  profile counts as saved only once the save succeeds, and a typed API key or proxy password is
+  cleared only then. Invalid MCP JSON is flagged inline and blocks saving, and *Test connection*
+  waits until network edits are saved. The editor's actions stay pinned while its fields scroll; on a
+  phone the tabs become a dropdown. Settings still closes while agents are being detected or a CLI
+  installs.
+- Launching Claude Code, Codex CLI, OpenCode or Antigravity goes straight to its launch dialog in the
+  workspace folder, with a *Change directory* button, instead of opening a folder picker first.
+- Every dialog handles the keyboard the same way: it focuses its first field, keeps Tab inside, closes
+  only the top dialog on Esc, and returns focus to the button that opened it.
+- A handoff's task and next step can be edited, saved back to its history entry, and are saved before
+  sending; leaving with unsaved edits asks first. Reopening the handoff dialog after switching
+  workspaces no longer shows the previous workspace's handoff.
+- The model and account switch dialogs link to their settings tab. The workspace sidebar search now
+  filters by name, path and branch — it did nothing before — and each row's actions sit behind a ⋯
+  button instead of a hover overlay over the name. The inspector lists every terminal in the
+  workspace, shells included, and switches to one when clicked. Task board columns are wider, with a
+  stage bar to jump between them on narrow windows, and the prompt library's filter tabs show their
+  names instead of translation keys.
+- Fixed a console window flashing up a few seconds after Termexo started. A restored Antigravity
+  terminal launched without Termexo's environment, so the CLI's self-updater ran — on Windows in a
+  console window of its own. Restored Antigravity terminals now also report their status and use the
+  workspace's proxy again. Building a handoff no longer flashes a window for each Git command it runs.
+- Settings tabs without a profile list are no longer flush against the dialog edge, and the
+  Antigravity launch dialog's *Continue the last conversation* checkbox is laid out like the others.
+
 ## V0.10.0
 
 - Remote access is no longer confined to one local network. The desktop can dial out to a **relay**,

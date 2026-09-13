@@ -276,6 +276,11 @@ button.stat {
 
 .agent-row {
   display: grid;
+  width: 100%;
+  color: var(--text);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
   min-width: 0;
   grid-template-columns: 24px minmax(0, 1fr) auto;
   align-items: center;
@@ -291,6 +296,12 @@ button.stat {
   &.selected {
     border-color: color-mix(in oklab, var(--color-primary) 40%, var(--border));
     background: var(--primary-soft);
+  }
+
+  &:hover,
+  &:focus-visible {
+    outline: 2px solid var(--color-primary);
+    outline-offset: 1px;
   }
 
   &[data-status='WAITING_INPUT'],

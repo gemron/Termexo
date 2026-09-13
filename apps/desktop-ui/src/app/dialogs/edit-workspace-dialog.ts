@@ -8,6 +8,7 @@ import {
   Workspace,
   WORKSPACE_THEME_PRESETS,
 } from '../core/models/workspace.models';
+import { ModalFocusDirective } from '../shared/modal-focus.directive';
 import { IconComponent } from '../shared/icon/icon';
 
 export interface WorkspaceAppearanceValue {
@@ -18,11 +19,13 @@ export interface WorkspaceAppearanceValue {
 
 @Component({
   selector: 'app-edit-workspace-dialog',
-  imports: [FormsModule, IconComponent, TranslatePipe],
+  imports: [ModalFocusDirective, FormsModule, IconComponent, TranslatePipe],
   template: `
     <div class="backdrop modal modal-open" (mousedown)="cancelled.emit()">
       <section
         class="dialog workspace-dialog modal-box"
+        appModal
+        (dismissModal)="cancelled.emit()"
         role="dialog"
         aria-modal="true"
         aria-labelledby="edit-workspace-dialog-title"
@@ -57,7 +60,7 @@ export interface WorkspaceAppearanceValue {
         </label>
 
         <div class="project-path">
-          <span>{{ 'dialog.projectDirectory' | t }}</span>
+          <span>{{ 'dialog.workspaceDefaultDirectory' | t }}</span>
           <code>{{ workspace().projectPath }}</code>
         </div>
 

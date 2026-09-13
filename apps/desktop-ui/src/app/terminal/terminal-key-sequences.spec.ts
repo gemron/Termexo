@@ -1,8 +1,39 @@
 import {
+  AGENT_INTERRUPT_SEQUENCE,
+  quickKeySequence,
   REVERSE_TAB_SEQUENCE,
   terminalKeySequence,
   workbenchShortcut,
 } from './terminal-key-sequences';
+
+describe('quickKeySequence', () => {
+  it('sends the same bytes a keyboard would for the keys a phone lacks', () => {
+    expect(quickKeySequence('escape', false)).toBe(AGENT_INTERRUPT_SEQUENCE);
+    expect(quickKeySequence('shiftTab', false)).toBe(REVERSE_TAB_SEQUENCE);
+    expect(quickKeySequence('tab', false)).toBe('\t');
+    expect(quickKeySequence('enter', false)).toBe('\r');
+    expect(quickKeySequence('ctrlC', false)).toBe('\x03');
+  });
+
+  it('sends arrows in the normal cursor-key form by default', () => {
+    expect(quickKeySequence('up', false)).toBe('\x1b[A');
+    expect(quickKeySequence('down', false)).toBe('\x1b[B');
+    expect(quickKeySequence('right', false)).toBe('\x1b[C');
+    expect(quickKeySequence('left', false)).toBe('\x1b[D');
+  });
+
+  it('switches arrows to the application form a full-screen agent asks for', () => {
+    expect(quickKeySequence('up', true)).toBe('\x1bOA');
+    expect(quickKeySequence('down', true)).toBe('\x1bOB');
+    expect(quickKeySequence('right', true)).toBe('\x1bOC');
+    expect(quickKeySequence('left', true)).toBe('\x1bOD');
+  });
+
+  it('keeps keys that have no application form unchanged under DECCKM', () => {
+    expect(quickKeySequence('escape', true)).toBe(AGENT_INTERRUPT_SEQUENCE);
+    expect(quickKeySequence('enter', true)).toBe('\r');
+  });
+});
 
 function keyEvent(overrides: Partial<Parameters<typeof terminalKeySequence>[0]> = {}) {
   return {

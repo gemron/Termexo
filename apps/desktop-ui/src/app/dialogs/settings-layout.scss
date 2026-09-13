@@ -1,0 +1,181 @@
+/* The title and save controls stay visible while only the profile fields scroll. */
+.settings-dialog {
+  display: flex;
+  flex-direction: column;
+  height: min(760px, calc(100dvh - 36px));
+  max-height: calc(100dvh - 36px);
+  padding: 0;
+
+  > header {
+    flex: 0 0 68px;
+  }
+  > .settings-tabs {
+    flex: 0 0 42px;
+  }
+}
+
+.settings-category-select {
+  display: none;
+}
+
+.settings-body {
+  min-height: 0;
+  flex: 1;
+  &:has(> .settings-split) {
+    overflow: hidden;
+  }
+}
+
+.settings-split {
+  height: 100%;
+  min-height: 0;
+}
+
+/*
+ * Every tab without a profile list is one column placed straight into the body, so it takes the
+ * same inset the profile editor gives its fields; without it the content ran into the dialog edge.
+ */
+.settings-body > :not(.settings-split) {
+  padding: 16px;
+}
+
+/* Panel components render inline by default, which would leave the inset only on their text. */
+.settings-body > app-storage-panel,
+.settings-body > app-remote-access-panel {
+  display: block;
+}
+
+.profile-nav {
+  min-height: 0;
+  overflow: auto;
+}
+
+.profile-editor {
+  display: flex;
+  min-height: 0;
+  min-width: 0;
+  padding: 0;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.profile-fields {
+  min-height: 0;
+  flex: 1;
+  overflow: auto;
+  padding: 16px;
+  > label {
+    margin-top: 13px;
+  }
+  input,
+  select,
+  textarea {
+    min-width: 0;
+    max-width: 100%;
+  }
+}
+
+.editor-actions {
+  flex: 0 0 auto;
+  margin: 0;
+  padding: 10px 16px;
+  border-top: 1px solid var(--border);
+  background: var(--surface-raised);
+}
+
+.agent-endpoint.disabled {
+  .two-columns {
+    display: none;
+  }
+  > .checkbox-control {
+    margin-bottom: 0;
+  }
+}
+
+.draft-status {
+  color: var(--color-warning);
+  font-size: 11px;
+}
+.field-error {
+  color: var(--color-error);
+  font-size: 11px;
+}
+.unsaved-notice {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  flex: 0 0 auto;
+  gap: 8px;
+  padding: 10px 16px;
+  color: var(--color-warning);
+  background: var(--surface-1);
+  font-size: 12px;
+  span {
+    flex: 1 1 180px;
+  }
+  button {
+    padding: 7px 10px;
+    border-radius: var(--radius-field);
+  }
+}
+
+@media (max-width: 600px) {
+  .settings-dialog {
+    > header {
+      flex-basis: 60px;
+      padding: 0 12px;
+    }
+    > .settings-tabs {
+      display: none;
+    }
+  }
+  .settings-category-select {
+    display: block;
+    flex: 0 0 38px;
+    margin: 4px 12px 10px;
+    padding: 0 10px;
+    border: 1px solid var(--border-strong);
+    border-radius: var(--radius-field);
+    color: var(--text);
+    background: var(--surface-inset);
+  }
+  .settings-split {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: auto minmax(0, 1fr);
+  }
+  .profile-nav {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    max-height: 96px;
+    padding: 8px;
+    border-right: 0;
+    border-bottom: 1px solid var(--border);
+    .provider-group {
+      display: none;
+    }
+    button {
+      width: auto;
+      flex: 0 0 auto;
+      max-width: 200px;
+    }
+    .new-profile {
+      margin: 0;
+      border: 0;
+    }
+  }
+  .profile-fields,
+  .settings-body > :not(.settings-split) {
+    padding: 12px;
+  }
+  .editor-actions {
+    gap: 6px;
+    padding: 10px 12px;
+  }
+  .editor-actions button {
+    min-height: 36px;
+  }
+  .account-copy {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}

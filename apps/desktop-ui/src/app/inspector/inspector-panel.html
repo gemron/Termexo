@@ -51,7 +51,7 @@
             (click)="gitRequested.emit()"
           >
             <small>{{ 'inspector.statChanges' | t }}</small>
-            <b>{{ changeCount() }}</b>
+            <b>{{ repository()?.available ? changeCount() : '—' }}</b>
           </button>
           <div class="stat">
             <small>{{ 'inspector.statBranch' | t }}</small>
@@ -77,14 +77,17 @@
         (click)="toggleSection('agents')"
       >
         <app-icon name="chevron-down" [size]="14" class="chevron" [class.open]="isOpen('agents')" />
-        <span class="section-title">{{ 'inspector.activeAgents' | t }}</span>
+        <span class="section-title">{{ 'inspector.workspaceTerminals' | t }}</span>
         <span class="section-count">{{ workspace()?.terminals?.length ?? 0 }}</span>
       </button>
       @if (isOpen('agents')) {
         <div class="section-body">
           <div class="agent-list">
             @for (terminal of workspace()?.terminals ?? []; track terminal.id) {
-              <article
+              <button
+                type="button"
+                (click)="terminalSelected.emit(terminal.id)"
+                [attr.aria-pressed]="terminal.id === activeTerminal()?.id"
                 class="agent-row card"
                 [class.selected]="terminal.id === activeTerminal()?.id"
                 [attr.data-status]="terminal.status"
@@ -99,7 +102,7 @@
                 <span class="state badge badge-sm" [attr.data-status]="terminal.status">
                   <i></i>{{ statusLabel(terminal.status) }}
                 </span>
-              </article>
+              </button>
             } @empty {
               <p class="inline-empty">{{ 'inspector.noActiveAgents' | t }}</p>
             }

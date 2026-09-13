@@ -4,17 +4,20 @@ import { FormsModule } from '@angular/forms';
 
 import { promptAssetMatches, type PromptAsset } from '../core/models/prompt-assets';
 import { TranslatePipe } from '../core/i18n/translate.pipe';
+import { ModalFocusDirective } from '../shared/modal-focus.directive';
 import { IconComponent } from '../shared/icon/icon';
 
 type AssetFilter = 'all' | 'draft' | 'history' | 'favorite' | 'pinned';
 
 @Component({
   selector: 'app-prompt-library-dialog',
-  imports: [DatePipe, FormsModule, IconComponent, TranslatePipe],
+  imports: [ModalFocusDirective, DatePipe, FormsModule, IconComponent, TranslatePipe],
   template: `
     <div class="backdrop modal modal-open" (mousedown)="cancelled.emit()">
       <section
         class="prompt-library modal-box"
+        appModal
+        (dismissModal)="cancelled.emit()"
         role="dialog"
         aria-modal="true"
         aria-labelledby="prompt-library-title"

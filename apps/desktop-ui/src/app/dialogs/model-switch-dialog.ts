@@ -8,6 +8,7 @@ import {
   profileModel,
   profileServes,
 } from '../core/models/agent.models';
+import { ModalFocusDirective } from '../shared/modal-focus.directive';
 import { IconComponent } from '../shared/icon/icon';
 
 export interface ModelSwitchValue {
@@ -17,11 +18,13 @@ export interface ModelSwitchValue {
 
 @Component({
   selector: 'app-model-switch-dialog',
-  imports: [IconComponent, TranslatePipe],
+  imports: [ModalFocusDirective, IconComponent, TranslatePipe],
   template: `
     <div class="backdrop modal modal-open" (mousedown)="cancelled.emit()">
       <section
         class="dialog model-dialog modal-box"
+        appModal
+        (dismissModal)="!busy() && cancelled.emit()"
         role="dialog"
         aria-modal="true"
         aria-labelledby="model-dialog-title"
@@ -118,6 +121,14 @@ export interface ModelSwitchValue {
             ><span>{{ 'modelSwitch.newSessionHelp' | t }}</span>
           </div>
         </div>
+        <button
+          type="button"
+          class="secondary btn btn-sm manage-profile"
+          [disabled]="busy()"
+          (click)="settingsRequested.emit()"
+        >
+          {{ 'settings.manageModels' | t }}
+        </button>
         <footer>
           <button type="button" class="secondary btn btn-ghost btn-sm" (click)="cancelled.emit()">
             {{ 'common.cancel' | t }}
@@ -151,6 +162,7 @@ export class ModelSwitchDialogComponent {
   readonly currentProfileId = input('');
   readonly confirmed = output<ModelSwitchValue>();
   readonly cancelled = output<void>();
+  readonly settingsRequested = output<void>();
   readonly selectedProfileId = signal('');
   protected readonly agentTypeValue = signal<AgentProtocol>('claude');
   readonly agentType = computed(() => this.lockedAgentType() ?? this.agentTypeValue());

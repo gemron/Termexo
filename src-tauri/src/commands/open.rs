@@ -136,10 +136,22 @@ mod tests {
 
     #[test]
     fn treats_the_things_windows_would_run_as_executables() {
-        for name in ["setup.exe", "run.BAT", "task.ps1", "installer.msi", "shortcut.lnk"] {
+        for name in [
+            "setup.exe",
+            "run.BAT",
+            "task.ps1",
+            "installer.msi",
+            "shortcut.lnk",
+        ] {
             assert!(is_executable_extension(Path::new(name)), "{name}");
         }
-        for name in ["main.rs", "readme.md", "notes.txt", "chart.png", "data.json"] {
+        for name in [
+            "main.rs",
+            "readme.md",
+            "notes.txt",
+            "chart.png",
+            "data.json",
+        ] {
             assert!(!is_executable_extension(Path::new(name)), "{name}");
         }
     }

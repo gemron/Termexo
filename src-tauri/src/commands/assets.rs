@@ -1,11 +1,11 @@
 use std::fs;
 use std::path::{Path, PathBuf};
-use std::process::Command;
 
 use serde::{Deserialize, Serialize};
 use tauri::State;
 
 use crate::database::{HandoffRecord, PromptAsset, WorkspaceDatabase};
+use crate::process::hidden_command;
 
 const MAX_HANDOFF_DOCUMENT_BYTES: usize = 2 * 1024 * 1024;
 const DEFAULT_MAX_GIT_DIFF_BYTES: usize = 96 * 1024;
@@ -223,7 +223,9 @@ pub fn read_handoff_document(path: String) -> Result<String, String> {
 }
 
 fn run_git(directory: &Path, arguments: &[&str]) -> Result<String, String> {
-    let output = Command::new("git")
+    // Hidden like every other Git call: the release app has no console, so a plain spawn would
+    // flash a window for each of the several commands one handoff runs.
+    let output = hidden_command("git")
         .args(arguments)
         .current_dir(directory)
         .output()

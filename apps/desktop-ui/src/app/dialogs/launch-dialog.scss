@@ -8,8 +8,35 @@
 
 /* Header, installation banner, form, footer. */
 .agent-dialog.compact {
+  display: flex;
+  flex-direction: column;
+  padding: 0;
   width: min(560px, 100%);
-  grid-template-rows: 68px auto auto auto;
+  > header {
+    flex: 0 0 68px;
+  }
+  > footer {
+    flex-shrink: 0;
+  }
+}
+
+.launch-directory {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 17px;
+  border-bottom: 1px solid var(--border);
+  span {
+    min-width: 0;
+    flex: 1;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: 11px;
+  }
+  button {
+    flex-shrink: 0;
+  }
 }
 
 .installation-line {
@@ -62,6 +89,8 @@
 }
 
 .form-grid {
+  min-height: 0;
+  overflow: auto;
   display: grid;
   grid-template-columns: 1fr 1fr;
   align-items: start;
@@ -112,8 +141,10 @@
     background: color-mix(in oklab, var(--surface-inset) 90%, var(--surface-raised));
   }
 
-  /* A checkbox and its wording belong on one line; the rules above stack labelled fields. */
-  > label.auto-confirm-control {
+  /* A checkbox and its wording belong on one line; the rules above stack labelled fields. Keyed on
+     every checkbox row rather than one of them, so a new option cannot fall back to a field's
+     full-width input and render its box as a large square with the wording run together. */
+  > label.checkbox-control {
     display: flex;
     align-items: start;
 

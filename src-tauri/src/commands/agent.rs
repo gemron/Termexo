@@ -648,12 +648,13 @@ pub fn prepare_antigravity_launch(
     launch_environment: State<'_, LaunchEnvironmentStore>,
     hooks: State<'_, HookEventStore>,
 ) -> Result<AgentLaunchSpec, String> {
-    let mut environment =
-        network_environment(&database, &credentials, request.workspace_id.as_deref())?;
-    // The status script is a child of this terminal, so it reads which terminal it belongs to out
-    // of its own environment — the payload the CLI sends it names the conversation, not the
-    // terminal, and one workspace can have several.
-    environment.extend(hooks.antigravity_environment(&request.terminal_id));
+    let environment = antigravity_launch_environment(
+        &database,
+        &credentials,
+        &hooks,
+        &request.terminal_id,
+        request.workspace_id.as_deref(),
+    )?;
     ensure_antigravity_status_feed(&database);
     // The CLI stops to ask about an unfamiliar workspace on first launch, which in a terminal
     // opened to do something else is the last thing the user expects to deal with.
@@ -854,18 +855,63 @@ fn select_profile(
 pub(crate) fn relaunch_environment(
     database: &WorkspaceDatabase,
     credentials: &CredentialStore,
-    agent_type: &str,
-    account_profile_id: Option<&str>,
-    model_profile_id: Option<&str>,
+    hooks: &HookEventStore,
+    request: &RelaunchRequest<'_>,
+) -> Result<HashMap<String, String>, String> {
+    match request.agent_type {
+        "claude" | "codex" => model_agent_relaunch_environment(database, credentials, request),
+        "antigravity" => antigravity_launch_environment(
+            database,
+            credentials,
+            hooks,
+            request.terminal_id,
+            request.workspace_id,
+        ),
+        // Anything else keeps the environment it inherits.
+        _ => Ok(HashMap::new()),
+    }
+}
+
+/// What a reconnecting terminal knows about the launch whose stashed environment it lost.
+pub(crate) struct RelaunchRequest<'a> {
+    pub terminal_id: &'a str,
+    pub agent_type: &'a str,
+    pub account_profile_id: Option<&'a str>,
+    pub model_profile_id: Option<&'a str>,
+    pub workspace_id: Option<&'a str>,
+}
+
+/// Everything agy is told about a terminal, which it can only learn from its environment.
+///
+/// A fresh launch and a restored terminal both build it here, because a restored one that missed
+/// it went wrong twice over: its status script could not say which terminal it reported for, and
+/// with the update switch gone the CLI's self-updater ran — on Windows as a background process in a
+/// console window of its own, which flashed up every time Termexo reopened an Antigravity terminal.
+/// The status script needs the terminal id because the payload the CLI sends it names the
+/// conversation, not the terminal, and one workspace can have several.
+fn antigravity_launch_environment(
+    database: &WorkspaceDatabase,
+    credentials: &CredentialStore,
+    hooks: &HookEventStore,
+    terminal_id: &str,
     workspace_id: Option<&str>,
 ) -> Result<HashMap<String, String>, String> {
-    // A plain shell carries no agent identity, so it keeps the inherited environment.
-    if agent_type != "claude" && agent_type != "codex" {
-        return Ok(HashMap::new());
-    }
-    let mut environment = account_profile_environment(database, account_profile_id, agent_type)?;
+    let mut environment = network_environment(database, credentials, workspace_id)?;
+    environment.extend(hooks.antigravity_environment(terminal_id));
+    Ok(environment)
+}
 
-    let profile = match model_profile_id {
+/// Claude and Codex take their account home, provider and key from the environment.
+fn model_agent_relaunch_environment(
+    database: &WorkspaceDatabase,
+    credentials: &CredentialStore,
+    request: &RelaunchRequest<'_>,
+) -> Result<HashMap<String, String>, String> {
+    let agent_type = request.agent_type;
+    let mut environment =
+        account_profile_environment(database, request.account_profile_id, agent_type)?;
+
+    let profile = match request.model_profile_id {
         Some(profile_id) => database
             .list_model_profiles()
             .map_err(|error| error.to_string())?
@@ -895,7 +941,11 @@ pub(crate) fn relaunch_environment(
             }
         }
     }
-    environment.extend(network_environment(database, credentials, workspace_id)?);
+    environment.extend(network_environment(
+        database,
+        credentials,
+        request.workspace_id,
+    )?);
     Ok(environment)
 }
 
@@ -1492,5 +1542,52 @@ mod tests {
         let chosen = select_profile(&profiles, None, |profile| profile.claude_enabled);
 
         assert_eq!(chosen.map(|profile| profile.id), Some("glm".into()));
+    }
+
+    /// A restored Antigravity terminal once started with none of this, which let the CLI's
+    /// self-updater run and flash a console window on every Termexo start.
+    #[test]
+    fn rebuilds_the_antigravity_environment_for_a_restored_terminal() {
+        let directory = std::env::temp_dir().join(format!(
+            "termexo-antigravity-relaunch-{}",
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        std::fs::create_dir_all(&directory).unwrap();
+        let database = WorkspaceDatabase::open(directory.join("agentdock.db")).unwrap();
+        let hooks = HookEventStore::new(&directory).unwrap();
+
+        let environment = relaunch_environment(
+            &database,
+            &CredentialStore,
+            &hooks,
+            &RelaunchRequest {
+                terminal_id: "terminal-1",
+                agent_type: "antigravity",
+                account_profile_id: None,
+                model_profile_id: None,
+                workspace_id: None,
+            },
+        )
+        .unwrap();
+
+        assert_eq!(
+            environment
+                .get("AGY_CLI_DISABLE_AUTO_UPDATE")
+                .map(String::as_str),
+            Some("true")
+        );
+        assert_eq!(
+            environment
+                .get("TERMEXO_ANTIGRAVITY_TERMINAL_ID")
+                .map(String::as_str),
+            Some("terminal-1")
+        );
+        assert!(environment.contains_key("TERMEXO_ANTIGRAVITY_EVENT_FILE"));
+
+        drop(database);
+        std::fs::remove_dir_all(&directory).ok();
     }
 }

@@ -1,10 +1,12 @@
 use serde::{Deserialize, Serialize};
 use tauri::{AppHandle, State};
 
+use crate::commands::agent::{relaunch_environment, RelaunchRequest};
 use crate::config::{CredentialStore, LaunchEnvironmentStore};
 use crate::database::WorkspaceDatabase;
 use crate::git::watch::RepositoryWatcher;
 use crate::git::RepositoryManager;
+use crate::hooks::HookEventStore;
 use crate::pty::backend::{self, PtyBackendInfo};
 use crate::pty::{LiveTerminal, PtyManager, TerminalScrollback};
 
@@ -49,6 +51,8 @@ pub struct TerminalStartResult {
     pub rows: u16,
 }
 
+// Tauri injects each managed state as its own argument, so the count follows what the command reads.
+#[allow(clippy::too_many_arguments)]
 #[tauri::command(async)]
 pub fn create_terminal(
     request: TerminalStartRequest,
@@ -57,6 +61,7 @@ pub fn create_terminal(
     launch_environment: State<'_, LaunchEnvironmentStore>,
     database: State<'_, WorkspaceDatabase>,
     credentials: State<'_, CredentialStore>,
+    hooks: State<'_, HookEventStore>,
     repositories: State<'_, RepositoryManager>,
 ) -> Result<TerminalStartResult, String> {
     match manager
@@ -100,13 +105,17 @@ pub fn create_terminal(
     // default home and read as a different account than the one the terminal was created with.
     if environment.is_empty() {
         if let Some(agent_type) = request.agent_type.as_deref() {
-            environment = crate::commands::agent::relaunch_environment(
+            environment = relaunch_environment(
                 &database,
                 &credentials,
-                agent_type,
-                request.account_profile_id.as_deref(),
-                request.profile_id.as_deref(),
-                request.workspace_id.as_deref(),
+                &hooks,
+                &RelaunchRequest {
+                    terminal_id: &request.terminal_id,
+                    agent_type,
+                    account_profile_id: request.account_profile_id.as_deref(),
+                    model_profile_id: request.profile_id.as_deref(),
+                    workspace_id: request.workspace_id.as_deref(),
+                },
             )?;
         }
     }

@@ -1,5 +1,7 @@
 .handoff-dialog {
-  width: min(1040px, calc(100vw - 30px));
+  display: flex;
+  flex-direction: column;
+  width: min(1040px, 100%);
   height: min(760px, calc(100vh - 30px));
   max-width: none;
   padding: 0;
@@ -11,6 +13,7 @@
   box-shadow: 0 24px 80px rgb(0 0 0 / 55%);
 
   > header {
+    flex: 0 0 65px;
     display: flex;
     min-height: 65px;
     align-items: center;
@@ -53,7 +56,8 @@
 
 .handoff-body {
   display: grid;
-  height: calc(100% - 65px);
+  flex: 1;
+  min-height: 0;
   grid-template-columns: 270px minmax(0, 1fr);
 
   > aside {
@@ -125,6 +129,7 @@
 
 .section-title,
 .preview-heading {
+  flex-wrap: wrap;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -208,6 +213,7 @@
 }
 
 .handoff-error {
+  flex-shrink: 0;
   display: flex;
   align-items: center;
   gap: 7px;
@@ -219,6 +225,7 @@
 
 /* A warning, not an error: the package is valid and sendable, just empty of evidence. */
 .handoff-thin {
+  flex-shrink: 0;
   display: flex;
   align-items: flex-start;
   gap: 8px;
@@ -243,6 +250,7 @@
 }
 
 .preview-heading {
+  flex-shrink: 0;
   gap: 12px;
   padding: 13px 16px;
   border-bottom: 1px solid var(--border);
@@ -266,6 +274,7 @@
 
 .preview-actions {
   display: flex;
+  flex-wrap: wrap;
   gap: 5px;
 
   button {
@@ -279,6 +288,27 @@
     color: var(--text-secondary);
     background: var(--surface-2);
     font-size: 9px;
+
+    &.save-changes:not(:disabled) {
+      color: var(--color-primary);
+      border-color: var(--color-primary);
+      background: var(--primary-soft);
+    }
+  }
+}
+
+.handoff-unsaved {
+  display: flex;
+  flex-shrink: 0;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--border);
+  background: var(--primary-soft);
+  font-size: 12px;
+  span {
+    flex: 1 1 180px;
   }
 }
 
@@ -287,6 +317,11 @@
   flex: 1;
   padding: 14px 16px;
   overflow: auto;
+
+  .edit-help {
+    margin-bottom: 10px;
+    color: var(--text-muted);
+  }
 
   section {
     margin-bottom: 13px;
@@ -300,6 +335,18 @@
   p,
   ul {
     margin: 0;
+  }
+
+  textarea {
+    width: 100%;
+    min-height: 72px;
+    padding: 8px;
+    resize: vertical;
+    border: 1px solid var(--border-strong);
+    border-radius: var(--radius-field);
+    color: var(--text);
+    background: var(--surface-inset);
+    font: 12px/1.5 var(--sans);
   }
 
   h4 {
@@ -335,6 +382,7 @@
 }
 
 .send-bar {
+  flex-shrink: 0;
   display: flex;
   align-items: end;
   gap: 10px;
@@ -362,6 +410,75 @@
       background: var(--surface-inset);
       font-size: 10px;
     }
+  }
+}
+
+.handoff-pane-tabs {
+  display: none;
+}
+
+@media (max-width: 600px) {
+  .handoff-unsaved span {
+    flex-basis: 100%;
+  }
+  .preview-actions button {
+    min-height: 32px;
+  }
+  .handoff-pane-tabs {
+    display: flex;
+    gap: 6px;
+    padding: 8px 12px;
+    border-bottom: 1px solid var(--border);
+    button {
+      flex: 1;
+      min-height: 36px;
+      border: 1px solid var(--border);
+      border-radius: var(--radius-field);
+      color: var(--text);
+      background: var(--surface-1);
+      &[aria-pressed='true'] {
+        background: var(--primary-soft);
+        border-color: var(--accent);
+      }
+    }
+  }
+  .handoff-dialog {
+    width: 100%;
+    height: calc(100dvh - 36px);
+    max-height: calc(100dvh - 36px);
+    > header {
+      padding: 0 12px;
+    }
+  }
+  .handoff-dialog .handoff-body {
+    grid-template-columns: minmax(0, 1fr);
+    > main {
+      display: none;
+    }
+    &.show-preview > main {
+      display: flex;
+    }
+    &.show-preview > aside {
+      display: none;
+    }
+  }
+  .send-bar {
+    flex-wrap: wrap;
+    padding: 10px 12px;
+  }
+  .send-bar label {
+    flex-basis: 100%;
+  }
+  .send-bar select {
+    width: 100%;
+  }
+  .send-bar > button {
+    width: 100%;
+    min-height: 36px;
+  }
+  .preview-heading,
+  .package-preview {
+    padding: 12px;
   }
 }
 

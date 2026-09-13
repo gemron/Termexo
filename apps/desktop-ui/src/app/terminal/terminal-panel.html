@@ -114,6 +114,16 @@
   -->
   <div class="terminal-frame">
     <div #terminal class="terminal-host" [attr.aria-label]="'terminal.aria' | t"></div>
+    <!--
+      Outside the host, so it neither scrolls with a grid wider than the phone nor catches the
+      touch handlers that turn a drag into scrolling. Only the active terminal gets one: that is
+      the one a press is meant for.
+    -->
+    @if (quickKeysEnabled && active()) {
+      @defer (on immediate) {
+        <app-terminal-quick-keys (keyPressed)="sendQuickKey($event)" />
+      }
+    }
   </div>
   <footer>
     <span>{{ session().workingDirectory }}</span>

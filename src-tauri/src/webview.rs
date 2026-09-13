@@ -63,7 +63,7 @@ pub fn warn_runtime_missing() {
 
     use windows::core::PCWSTR;
     use windows::Win32::UI::WindowsAndMessaging::{
-        MessageBoxW, IDYES, MB_ICONERROR, MB_YESNO, MB_SYSTEMMODAL,
+        MessageBoxW, IDYES, MB_ICONERROR, MB_SYSTEMMODAL, MB_YESNO,
     };
 
     fn wide(value: &str) -> Vec<u16> {

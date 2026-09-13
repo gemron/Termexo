@@ -81,6 +81,18 @@ export class HandoffService {
     return parseHandoffDocument(record.packageJson);
   }
 
+  /** Updates the selected history entry without moving an imported package to its source workspace. */
+  async updatePackage(handoff: HandoffPackage): Promise<HandoffPackage> {
+    return this.run(async () => {
+      const existing = this.recordItems().find((record) => record.id === handoff.id);
+      if (!existing) throw new Error('This handoff is no longer in history.');
+      const { parseHandoffDocument } = await import('../models/handoff');
+      const sanitized = parseHandoffDocument(JSON.stringify(handoff));
+      await this.savePackage(sanitized, existing.workspaceId);
+      return sanitized;
+    });
+  }
+
   async delete(recordId: string): Promise<void> {
     await this.run(async () => {
       if (hasBackend()) {
@@ -195,10 +207,13 @@ export class HandoffService {
     const saved = hasBackend()
       ? await invoke<HandoffRecord>('save_handoff_package', { input: record })
       : record;
-    this.recordItems.update((records) =>
-      this.sort([saved, ...records.filter((candidate) => candidate.id !== saved.id)]),
-    );
-    this.persistLocalRecords();
+    const records = this.sort([
+      saved,
+      ...this.recordItems().filter((candidate) => candidate.id !== saved.id),
+    ]);
+    // A storage failure must not acknowledge an edit as saved. Keep the previous record intact.
+    if (!hasBackend()) window.localStorage.setItem(STORAGE_KEY, JSON.stringify(records));
+    this.recordItems.set(records);
   }
 
   private async run<T>(operation: () => Promise<T>): Promise<T> {

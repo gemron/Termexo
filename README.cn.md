@@ -11,7 +11,7 @@
 </p>
 
 <p align="center">
-  <img alt="Version 0.10.0" src="https://img.shields.io/badge/version-0.10.0-58c7a0">
+  <img alt="Version 0.10.1" src="https://img.shields.io/badge/version-0.10.1-58c7a0">
   <img alt="Windows" src="https://img.shields.io/badge/platform-Windows-0078D4?logo=windows">
   <img alt="Tauri 2" src="https://img.shields.io/badge/Tauri-2-24C8DB?logo=tauri&logoColor=white">
   <img alt="Angular 22" src="https://img.shields.io/badge/Angular-22-DD0031?logo=angular">
@@ -71,7 +71,7 @@ npx termexo@latest
 
 ## 最新版本
 
-**[v0.10.0](https://github.com/gemron/Termexo/releases/tag/v0.10.0)** 新增自建中继、注册码或账号登记、级联访问地址与 v2 加密会话，让工作台跨网络延续到浏览器。
+**[v0.10.1](https://github.com/gemron/Termexo/releases/tag/v0.10.1)** 让手机上也能顺手用工作台：Esc、方向键、Shift+Tab 等浮动快捷键，不再被输入法遮挡的输入行，以及全屏显示。设置会保留未保存的修改，启动 Agent 直接进入启动弹窗，启动时也不再闪出黑色命令行窗口。
 [完整更新记录](CHANGELOG.cn.md)。
 
 如果 Termexo 帮到了你，欢迎 **给仓库点一个 Star**，帮助更多开发者发现它。
@@ -334,7 +334,8 @@ flowchart LR
 | V0.8.7 | 不会让终端卡死的屏幕解析器 | 已发布 |
 | V0.8.8 | 存储面板与可迁移的数据目录 | 已发布 |
 | V0.9.0 | 第四个 agent Antigravity 与厂商安装脚本 | 已发布 |
-| V0.10.0 | 自建中继与端到端加密的远程访问 | 当前版本 |
+| V0.10.0 | 自建中继与端到端加密的远程访问 | 已发布 |
+| V0.10.1 | 手机快捷键、适配输入法的远程页面与保留未保存修改的设置 | 当前版本 |
 | V1.0 | 稳定性、安全加固与恢复体验 | 规划中 |
 
 进行中的工作见 [Issues](https://github.com/gemron/Termexo/issues)，实际交付内容见

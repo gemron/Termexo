@@ -52,6 +52,7 @@ const CONTEXT_1M_OFF = 'off';
       (launched)="submit()"
       (cancelled)="cancelled.emit()"
       (installRequested)="installRequested.emit()"
+      (directoryChangeRequested)="directoryChangeRequested.emit()"
     >
       <div class="form-grid">
         <label class="wide session-name-field">
@@ -173,6 +174,7 @@ const CONTEXT_1M_OFF = 'off';
 export class ClaudeLaunchDialogComponent {
   /** Passed through to the workbench, which owns the settings window. */
   readonly installRequested = output<void>();
+  readonly directoryChangeRequested = output<void>();
 
   /** The agent's own mark, which the heading shows. */
   protected readonly agentIcon = AGENT_ICONS.claude;

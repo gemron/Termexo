@@ -710,7 +710,8 @@ mod tests {
 
     #[test]
     fn treats_a_working_state_as_busy_without_a_busy_status() {
-        let payload = r#"[{"id":"a1","kind":"background","sessionId":"a1-full","state":"working"}]"#;
+        let payload =
+            r#"[{"id":"a1","kind":"background","sessionId":"a1-full","state":"working"}]"#;
 
         assert!(parse_background_sessions(payload)[0].busy);
     }
@@ -734,7 +735,11 @@ mod tests {
             return;
         };
 
-        assert!(spec.command.ends_with(" attach '04cd7760'"), "{}", spec.command);
+        assert!(
+            spec.command.ends_with(" attach '04cd7760'"),
+            "{}",
+            spec.command
+        );
         assert!(!spec.command.contains("--model"), "{}", spec.command);
         assert!(!spec.command.contains("--settings"), "{}", spec.command);
         assert!(!spec.command.contains("--resume"), "{}", spec.command);

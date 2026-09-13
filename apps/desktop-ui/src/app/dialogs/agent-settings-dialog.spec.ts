@@ -1,7 +1,8 @@
-import { ComponentFixture, TestBed } from '@angular/core/testing';
+﻿import { ComponentFixture, TestBed } from '@angular/core/testing';
 
 import {
   type CliOperationRequest,
+  type AccountProfile,
   ModelProfile,
   ModelProfileInput,
   NetworkProfile,
@@ -81,6 +82,13 @@ describe('AgentSettingsDialogComponent', () => {
 
     clickButton('模型 Profile');
     clickButton('新建 Profile');
+    await fixture.whenStable();
+    expect(component['modelId']()).toBe('');
+    component['selectTab']('diagnostics');
+    component['selectTab']('models');
+    fixture.detectChanges();
+    await fixture.whenStable();
+    expect(component['modelId']()).toBe('');
     setEditorInputValue(0, 'New Profile');
     setEditorInputValue(1, 'sonnet');
 
@@ -91,6 +99,7 @@ describe('AgentSettingsDialogComponent', () => {
 
     expect(savedIds).toHaveLength(2);
     expect(savedIds[0]).toBeTruthy();
+    expect(savedIds[0]).not.toBe(CUSTOM_PROFILE.id);
     expect(savedIds[1]).toBe(savedIds[0]);
   });
 
@@ -327,6 +336,237 @@ describe('AgentSettingsDialogComponent', () => {
     clickButton('确认并升级');
 
     expect(requests).toEqual([expect.objectContaining({ confirmed: true })]);
+  });
+
+  it('retains separate drafts across profiles and categories, including a new profile', async () => {
+    const second = { ...CUSTOM_PROFILE, id: 'second', name: 'Second', isDefault: false };
+    fixture.componentRef.setInput('modelProfiles', [CUSTOM_PROFILE, second]);
+    fixture.detectChanges();
+    await fixture.whenStable();
+    component['editModel'](CUSTOM_PROFILE);
+    component['modelName'] = 'Unsaved first';
+    component['editModel'](second);
+    component['modelName'] = 'Unsaved second';
+    component['editModel'](CUSTOM_PROFILE);
+    expect(component['modelName']).toBe('Unsaved first');
+    component['editModel'](second);
+    expect(component['modelName']).toBe('Unsaved second');
+    component['newModel']();
+    component['modelName'] = 'New draft';
+    component['selectTab']('diagnostics');
+    component['selectTab']('models');
+    expect(component['modelName']).toBe('New draft');
+    component['requestClose']();
+    expect(component['confirmClose']()).toBe(true);
+  });
+
+  it('keeps an unacknowledged save dirty and clears it only after a successful save', async () => {
+    fixture.componentRef.setInput('modelProfiles', [CUSTOM_PROFILE]);
+    fixture.detectChanges();
+    await fixture.whenStable();
+    component['modelName'] = 'Saved name';
+    component['apiKey'] = 'test-credential';
+    component['saveModel']();
+    expect(component['modelDirty']()).toBe(true);
+    expect(component['apiKey']).toBe('test-credential');
+    fixture.componentRef.setInput('profileSaveCompleted', {
+      kind: 'models',
+      id: CUSTOM_PROFILE.id,
+    });
+    fixture.detectChanges();
+    await fixture.whenStable();
+    expect(component['modelDirty']()).toBe(false);
+    expect(component['apiKey']).toBe('');
+    component['editModel'](CUSTOM_PROFILE);
+    expect(component['modelName']).toBe('Saved name');
+    let closed = false;
+    component.cancelled.subscribe(() => (closed = true));
+    component['requestClose']();
+    expect(closed).toBe(true);
+  });
+
+  it('does not overwrite edits made while a save is awaiting acknowledgement', async () => {
+    fixture.componentRef.setInput('modelProfiles', [CUSTOM_PROFILE]);
+    fixture.detectChanges();
+    await fixture.whenStable();
+    component['modelName'] = 'Submitted';
+    component['saveModel']();
+    component['modelName'] = 'Typed later';
+    fixture.componentRef.setInput('profileSaveCompleted', {
+      kind: 'models',
+      id: CUSTOM_PROFILE.id,
+    });
+    fixture.detectChanges();
+    await fixture.whenStable();
+    expect(component['modelName']).toBe('Typed later');
+    expect(component['modelDirty']()).toBe(true);
+  });
+
+  it('rejects malformed MCP JSON and a non-object root before emitting a save', async () => {
+    fixture.detectChanges();
+    await fixture.whenStable();
+    const saves: unknown[] = [];
+    component.mcpSaved.subscribe((value) => saves.push(value));
+    component['mcpName'] = 'MCP';
+    for (const json of ['{broken', 'null', '[]']) {
+      component['mcpConfig'] = json;
+      component['saveMcp']();
+      expect(component['mcpError']()).toBeTruthy();
+    }
+    expect(saves).toHaveLength(0);
+    component['mcpConfig'] = '{"mcpServers":{}}';
+    component['saveMcp']();
+    expect(saves).toHaveLength(1);
+  });
+
+  it('retains account and MCP drafts across records, refreshes and category changes', async () => {
+    const accounts: AccountProfile[] = ['a', 'b'].map((id) => ({
+      id,
+      name: id,
+      agentType: 'claude',
+      isDefault: id === 'a',
+      isSystem: false,
+      authenticated: false,
+      diagnostic: '',
+    }));
+    const mcps = ['a', 'b'].map((id) => ({ id, name: id, configJson: '{}' }));
+    fixture.componentRef.setInput('accountProfiles', accounts);
+    fixture.componentRef.setInput('mcpProfiles', mcps);
+    fixture.detectChanges();
+    await fixture.whenStable();
+    component['accountName'] = 'Account draft';
+    component['editAccount'](accounts[1]);
+    component['editAccount'](accounts[0]);
+    expect(component['accountName']).toBe('Account draft');
+    component['mcpConfig'] = '{unfinished';
+    component['editMcp'](mcps[1]);
+    component['editMcp'](mcps[0]);
+    expect(component['mcpConfig']).toBe('{unfinished');
+    fixture.componentRef.setInput(
+      'accountProfiles',
+      accounts.map((a) => ({ ...a, diagnostic: 'Refreshed' })),
+    );
+    fixture.detectChanges();
+    await fixture.whenStable();
+    expect(component['accountName']).toBe('Account draft');
+    component['newMcp']();
+    component['mcpName'] = 'New draft';
+    component['selectTab']('diagnostics');
+    component['selectTab']('mcp');
+    fixture.detectChanges();
+    await fixture.whenStable();
+    expect(component['mcpId']()).toBe('');
+    expect(component['mcpName']).toBe('New draft');
+    component['requestClose']();
+    expect(component['confirmClose']()).toBe(true);
+  });
+
+  it('acknowledges account and MCP saves independently without discarding later edits', async () => {
+    fixture.detectChanges();
+    await fixture.whenStable();
+    component['accountName'] = 'Submitted account';
+    component['saveAccount']();
+    const accountId = component['accountId']();
+    component['mcpName'] = 'Submitted MCP';
+    component['saveMcp']();
+    const mcpId = component['mcpId']();
+    expect(component['accountDirty']()).toBe(true);
+    expect(component['mcpDirty']()).toBe(true);
+    component['mcpName'] = 'Typed after save';
+    fixture.componentRef.setInput('profileSaveCompleted', { kind: 'accounts', id: accountId });
+    fixture.detectChanges();
+    await fixture.whenStable();
+    expect(component['accountDirty']()).toBe(false);
+    expect(component['mcpDirty']()).toBe(true);
+    fixture.componentRef.setInput('profileSaveCompleted', { kind: 'mcp', id: mcpId });
+    fixture.detectChanges();
+    await fixture.whenStable();
+    expect(component['mcpName']).toBe('Typed after save');
+    expect(component['mcpDirty']()).toBe(true);
+  });
+
+  it('keeps network passwords and drafts until successful persistence and clears only submitted credentials', async () => {
+    fixture.componentRef.setInput('networkProfiles', [
+      { ...NETWORK_PROFILE, hasCredential: false },
+    ]);
+    fixture.detectChanges();
+    await fixture.whenStable();
+    component['proxyPassword'] = 'test-only-password';
+    component['saveNetwork']();
+    expect(component['hasNetworkCredential']()).toBe(false);
+    expect(component['proxyPassword']).toBe('test-only-password');
+    expect(component['networkDirty']()).toBe(true);
+    component['networkName'] = 'Typed while saving';
+    fixture.componentRef.setInput('networkProfiles', [NETWORK_PROFILE]);
+    fixture.componentRef.setInput('profileSaveCompleted', {
+      kind: 'network',
+      id: NETWORK_PROFILE.id,
+    });
+    fixture.detectChanges();
+    await fixture.whenStable();
+    expect(component['proxyPassword']).toBe('');
+    expect(component['hasNetworkCredential']()).toBe(true);
+    expect(component['networkName']).toBe('Typed while saving');
+    expect(component['networkDirty']()).toBe(true);
+  });
+
+  it('does not test stale saved network settings while the form contains edits', async () => {
+    fixture.componentRef.setInput('networkProfiles', [NETWORK_PROFILE]);
+    fixture.detectChanges();
+    await fixture.whenStable();
+    clickButton('网络与 npm');
+    setLabeledInputValue('HTTPS_PROXY', 'http://changed.example:8080');
+    const tested: string[] = [];
+    component.networkTestRequested.subscribe((id) => tested.push(id));
+    clickButton('测试连接');
+    expect(tested).toEqual([]);
+    clickButton('保存代理 Profile');
+    fixture.componentRef.setInput('profileSaveCompleted', {
+      kind: 'network',
+      id: NETWORK_PROFILE.id,
+    });
+    fixture.detectChanges();
+    await fixture.whenStable();
+    clickButton('测试连接');
+    expect(tested).toEqual([NETWORK_PROFILE.id]);
+  });
+
+  it('protects an unedited new default after a failed creation, and forgets drafts of deleted profiles', async () => {
+    fixture.componentRef.setInput('networkProfiles', [NETWORK_PROFILE]);
+    fixture.detectChanges();
+    await fixture.whenStable();
+    component['networkName'] = 'About to be deleted';
+    component['editNetwork']({ ...NETWORK_PROFILE, id: 'second', name: 'Second' });
+    fixture.componentRef.setInput('networkProfiles', [
+      { ...NETWORK_PROFILE, id: 'second', name: 'Second' },
+    ]);
+    fixture.detectChanges();
+    await fixture.whenStable();
+    let closed = false;
+    component.cancelled.subscribe(() => (closed = true));
+    component['requestClose']();
+    expect(closed).toBe(true);
+    component['newNetwork']();
+    component['saveNetwork']();
+    expect(component['networkDirty']()).toBe(true);
+    component['requestClose']();
+    expect(component['confirmClose']()).toBe(true);
+  });
+
+  it('closes while agents are being detected, but not while a profile save is in flight', () => {
+    let closed = false;
+    component.cancelled.subscribe(() => (closed = true));
+
+    fixture.componentRef.setInput('busy', true);
+    fixture.componentRef.setInput('saving', true);
+    fixture.detectChanges();
+    component['requestClose']();
+    expect(closed).toBe(false);
+
+    fixture.componentRef.setInput('saving', false);
+    fixture.detectChanges();
+    component['requestClose']();
+    expect(closed).toBe(true);
   });
 
   function clickButton(label: string): void {

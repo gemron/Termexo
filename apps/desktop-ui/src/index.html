@@ -4,7 +4,20 @@
     <meta charset="utf-8" />
     <title>Termexo</title>
     <base href="/" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <!--
+      resizes-content makes Android shrink the page for the on-screen keyboard instead of covering
+      it; Safari ignores it, which visual-viewport.ts covers. The web-app tags let a phone's
+      "Add to Home Screen" open the remote page without the browser's address bar and toolbar,
+      the only way to get the page full screen on an iPhone.
+    -->
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1, interactive-widget=resizes-content"
+    />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black" />
+    <meta name="apple-mobile-web-app-title" content="Termexo" />
     <meta name="color-scheme" content="dark" />
     <meta name="theme-color" content="#0b120f" />
     <link rel="icon" type="image/svg+xml" href="termexo-mark.svg" />

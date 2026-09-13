@@ -1,4 +1,4 @@
-import { Component, input, output } from '@angular/core';
+import { Component, computed, input, output, signal } from '@angular/core';
 
 import { normalizeWorkspaceThemeColor, Workspace } from '../core/models/workspace.models';
 import { TranslatePipe } from '../core/i18n/translate.pipe';
@@ -23,6 +23,17 @@ export class WorkspaceSidebarComponent {
   readonly deleteRequested = output<string>();
   readonly moveRequested = output<{ workspaceId: string; direction: -1 | 1 }>();
   readonly createRequested = output<void>();
+
+  protected readonly openActions = signal<string | null>(null);
+  protected readonly search = signal('');
+  protected readonly visibleWorkspaces = computed(() => {
+    const query = this.search().trim().toLocaleLowerCase();
+    return this.workspaces().filter((workspace) =>
+      `${workspace.name} ${workspace.projectPath} ${workspace.activeBranch}`
+        .toLocaleLowerCase()
+        .includes(query),
+    );
+  });
 
   protected workspaceColor(workspace: Workspace): string {
     return normalizeWorkspaceThemeColor(workspace.themeColor);

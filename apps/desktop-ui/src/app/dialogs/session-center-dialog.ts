@@ -1,3 +1,4 @@
+import { runtimeMode } from '../core/services/tauri-runtime';
 import { DatePipe } from '@angular/common';
 import {
   afterNextRender,
@@ -28,6 +29,7 @@ import {
 import { AGENT_ICONS } from '../core/models/workspace.models';
 import { I18nService } from '../core/i18n/i18n.service';
 import { TranslatePipe } from '../core/i18n/translate.pipe';
+import { ModalFocusDirective } from '../shared/modal-focus.directive';
 import { IconComponent } from '../shared/icon/icon';
 
 export interface ResumeSessionValue {
@@ -101,11 +103,13 @@ function presentationOf(agentType: NativeAgentType): AgentPresentation {
 
 @Component({
   selector: 'app-session-center-dialog',
-  imports: [DatePipe, FormsModule, IconComponent, TranslatePipe],
+  imports: [ModalFocusDirective, DatePipe, FormsModule, IconComponent, TranslatePipe],
   template: `
     <div class="backdrop modal modal-open" (mousedown)="cancelled.emit()">
       <section
         class="agent-dialog session-center modal-box"
+        appModal
+        (dismissModal)="cancelled.emit()"
         role="dialog"
         aria-modal="true"
         aria-labelledby="session-center-title"
@@ -652,11 +656,13 @@ export class SessionCenterDialogComponent {
     return this.i18n.t(this.onlyWorkspace() ? 'session.noWorkspace' : 'session.noLocal');
   });
   protected readonly emptyDescription = computed(() =>
-    this.search().trim()
-      ? this.i18n.t('session.tryFilters')
-      : this.onlyWorkspace()
-        ? this.i18n.t('session.showOtherProjects')
-        : this.i18n.t('session.verifyCli'),
+    runtimeMode() === 'preview'
+      ? this.i18n.t('preview.notice')
+      : this.search().trim()
+        ? this.i18n.t('session.tryFilters')
+        : this.onlyWorkspace()
+          ? this.i18n.t('session.showOtherProjects')
+          : this.i18n.t('session.verifyCli'),
   );
 
   constructor() {

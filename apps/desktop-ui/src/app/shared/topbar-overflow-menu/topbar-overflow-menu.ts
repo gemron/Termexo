@@ -1,8 +1,19 @@
-import { Component, HostListener, input, output, signal } from '@angular/core';
+import { Component, DestroyRef, HostListener, inject, input, output, signal } from '@angular/core';
 
+import { registerFullscreenTranslations } from '../../core/i18n/fullscreen.i18n';
+import { I18nService } from '../../core/i18n/i18n.service';
 import { TranslatePipe } from '../../core/i18n/translate.pipe';
+import {
+  isPageFullscreen,
+  pageFullscreenSupported,
+  togglePageFullscreen,
+  watchPageFullscreen,
+} from '../../core/services/page-fullscreen';
+import { runtimeMode } from '../../core/services/tauri-runtime';
 import { IconComponent } from '../icon/icon';
 import { LanguageSelectorComponent } from '../language-selector/language-selector';
+
+registerFullscreenTranslations();
 
 /**
  * Stands in for the tools at the right of the topbar while the window is phone width.
@@ -61,12 +72,25 @@ import { LanguageSelectorComponent } from '../language-selector/language-selecto
             <span><app-icon name="settings" [size]="14" /></span>
             <strong>{{ 'workspace.settings' | t }}</strong>
           </button>
+          @if (fullscreenAvailable) {
+            <button
+              type="button"
+              role="menuitem"
+              data-testid="fullscreen-toggle"
+              (click)="toggleFullscreen()"
+            >
+              <span><app-icon [name]="fullscreen() ? 'minimize' : 'maximize'" [size]="14" /></span>
+              <strong>{{ (fullscreen() ? 'fullscreen.exit' : 'fullscreen.enter') | t }}</strong>
+            </button>
+          }
           <!--
             A native select, so it takes the row shape without borrowing the button rule, and it
             brings its own icon — hence no chip of its own, only the indent that lines the label
-            up with the ones above.
+            up with the ones above. It is kept from the container's close-on-click: the tap that
+            opens the native picker would otherwise remove the menu, and the picker with it, before
+            a language could be chosen.
           -->
-          <label class="menu-row">
+          <label class="menu-row" (click)="$event.stopPropagation()">
             <strong>{{ 'language.label' | t }}</strong>
             <app-language-selector />
           </label>
@@ -187,8 +211,32 @@ export class TopbarOverflowMenuComponent {
   readonly inspectorToggled = output<void>();
   readonly sessionCenterOpened = output<void>();
   readonly settingsOpened = output<void>();
+  /** The browser refused full screen; carries the message the shell shows. */
+  readonly fullscreenFailed = output<string>();
 
+  private readonly i18n = inject(I18nService);
   protected readonly open = signal(false);
+  /**
+   * A phone browser loses a strip of its height to the address bar and toolbar, which the terminal
+   * needs. The desktop app is already a window of its own, and Safari on iPhone cannot take a page
+   * full screen, so neither is offered the switch.
+   */
+  protected readonly fullscreenAvailable = runtimeMode() !== 'desktop' && pageFullscreenSupported();
+  protected readonly fullscreen = signal(isPageFullscreen());
+
+  constructor() {
+    // Also catches leaving full screen by the system back gesture, which never passes through here.
+    inject(DestroyRef).onDestroy(watchPageFullscreen(() => this.fullscreen.set(isPageFullscreen())));
+  }
+
+  protected async toggleFullscreen(): Promise<void> {
+    try {
+      await togglePageFullscreen();
+    } catch (error) {
+      const reason = error instanceof Error ? error.message : String(error);
+      this.fullscreenFailed.emit(this.i18n.t('fullscreen.failed', { error: reason }));
+    }
+  }
 
   /**
    * Closes on a click outside the menu.

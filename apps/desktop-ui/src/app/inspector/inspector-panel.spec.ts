@@ -166,6 +166,33 @@ describe('InspectorPanelComponent provider allowances', () => {
     expect(root.textContent).not.toContain('DeepSeek Chat');
   });
 
+  it('shows unavailable Git changes as unknown instead of zero', () => {
+    const changes = root.querySelectorAll<HTMLButtonElement>('.overview-stats .stat')[1];
+    expect(changes.disabled).toBe(true);
+    expect(changes.querySelector('b')?.textContent?.trim()).toBe('—');
+  });
+
+  it('lets the workspace terminal list select a shell as well as an Agent', () => {
+    const selected = vi.fn();
+    fixture.componentInstance.terminalSelected.subscribe(selected);
+    fixture.componentRef.setInput('workspace', {
+      id: 'workspace-1',
+      name: 'Project',
+      projectPath: 'D:/project',
+      terminals: [
+        TERMINAL,
+        { ...TERMINAL, id: 'shell-1', name: 'Shell', agentType: 'shell', status: 'STOPPED' },
+      ],
+    });
+    openSection(root, 'agents');
+    fixture.detectChanges();
+    const rows = root.querySelectorAll<HTMLButtonElement>('.agent-row');
+    expect(rows).toHaveLength(2);
+    expect(rows[0].getAttribute('aria-pressed')).toBe('true');
+    rows[1].click();
+    expect(selected).toHaveBeenCalledWith('shell-1');
+  });
+
   it('uses only the selected login account allowance for an official model', async () => {
     fixture.componentRef.setInput('activeTerminal', {
       ...TERMINAL,

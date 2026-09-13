@@ -1,3 +1,4 @@
+import { Injectable } from '@angular/core';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 
 import type {
@@ -53,6 +54,7 @@ function accessStatus(overrides: Partial<RemoteAccessStatus> = {}): RemoteAccess
  * The panel's job is to turn a status into a link and a form into one command, so the builders
  * have to be the production ones for the assertions below to mean anything.
  */
+@Injectable()
 class FakeRemoteAccessService extends RemoteAccessService {
   status = accessStatus();
   readonly saved: RemoteAccessSettings[] = [];
@@ -108,6 +110,10 @@ describe('RemoteAccessPanelComponent', () => {
     fixture.detectChanges();
   }
 
+  beforeEach(() =>
+    Object.defineProperty(window, '__TAURI_INTERNALS__', { value: {}, configurable: true }),
+  );
+
   async function mount(status?: RemoteAccessStatus): Promise<void> {
     await TestBed.configureTestingModule({
       imports: [RemoteAccessPanelComponent],
@@ -125,7 +131,16 @@ describe('RemoteAccessPanelComponent', () => {
   }
 
   afterEach(() => {
+    Reflect.deleteProperty(window, '__TAURI_INTERNALS__');
     TestBed.resetTestingModule();
+  });
+
+  it('explains the preview limitation without loading native controls', async () => {
+    Reflect.deleteProperty(window, '__TAURI_INTERNALS__');
+    await mount();
+    expect(root.querySelector('.remote-notice')?.textContent).toBeTruthy();
+    expect(joinButton()).toBeNull();
+    expect(service.enrolled).toEqual([]);
   });
 
   it('keeps the join button out of reach until the relay, name and code are all filled in', async () => {

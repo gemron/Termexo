@@ -908,12 +908,27 @@ app-inspector-panel {
   background: color-mix(in srgb, var(--surface-1) 92%, transparent);
   font: 9px/1 var(--mono);
 
+  > span,
+  .connection > span {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
   .connection {
+    &.preview {
+      min-width: 0;
+      max-width: 44%;
+      line-height: 1.3;
+      color: var(--warning, #b88b46);
+    }
     display: flex;
     align-items: center;
     gap: 6px;
 
     i {
+      flex-shrink: 0;
       width: 5px;
       height: 5px;
       border-radius: 50%;
@@ -1157,4 +1172,10 @@ app-inspector-panel {
   .statusbar {
     display: none;
   }
+}
+
+.preview-badge {
+  flex-shrink: 0;
+  color: var(--color-warning);
+  font-size: 9px;
 }

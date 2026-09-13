@@ -34,7 +34,10 @@ describe('LaunchDialogShellComponent', () => {
     fixture.detectChanges();
   }
 
+  afterEach(() => Reflect.deleteProperty(window, '__TAURI_INTERNALS__'));
+
   beforeEach(async () => {
+    Object.defineProperty(window, '__TAURI_INTERNALS__', { value: {}, configurable: true });
     launches.length = 0;
     cancels = 0;
     await TestBed.configureTestingModule({
@@ -126,6 +129,17 @@ describe('LaunchDialogShellComponent', () => {
   });
 
   /** Detection has not answered yet, and it is about to say the CLI is there. */
+  it('does not offer native installation in a browser preview', () => {
+    Reflect.deleteProperty(window, '__TAURI_INTERNALS__');
+    fixture.componentRef.setInput('installation', {
+      ...INSTALLATION,
+      installed: false,
+      healthy: false,
+    });
+    fixture.detectChanges();
+    expect(root.querySelector('.install-link')).toBeNull();
+  });
+
   it('offers nothing while detection is still running', () => {
     fixture.componentRef.setInput('installation', null);
     fixture.detectChanges();

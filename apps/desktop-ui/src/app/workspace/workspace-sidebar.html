@@ -5,6 +5,8 @@
       <app-icon name="search" [size]="14" />
       <input
         type="search"
+        [value]="search()"
+        (input)="search.set($any($event.target).value)"
         [attr.aria-label]="'workspace.search' | t"
         [placeholder]="'workspace.search' | t"
       />
@@ -33,13 +35,13 @@
   <nav [attr.aria-label]="'workspace.section' | t">
     <p class="section-label">{{ 'workspace.section' | t }}</p>
     <ul class="workspace-list menu menu-sm">
-      @for (workspace of workspaces(); track workspace.id) {
+      @for (workspace of visibleWorkspaces(); track workspace.id) {
         <li class="workspace-entry" [style.--workspace-color]="workspaceColor(workspace)">
           <button
             type="button"
             class="workspace-item"
             [class.active]="workspace.id === activeWorkspaceId()"
-            (click)="workspaceSelected.emit(workspace.id)"
+            (click)="openActions.set(null); workspaceSelected.emit(workspace.id)"
           >
             <span class="workspace-glyph">
               <app-icon name="folder" [size]="15" />
@@ -49,59 +51,70 @@
               <small>{{ workspace.activeBranch }}</small>
             </span>
           </button>
-          <span class="workspace-actions">
-            <span class="workspace-order-actions" [attr.aria-label]="'workspace.reorder' | t">
+          <button
+            class="workspace-more"
+            type="button"
+            [attr.aria-label]="'workspace.more' | t"
+            [attr.aria-expanded]="openActions() === workspace.id"
+            (click)="openActions.set(openActions() === workspace.id ? null : workspace.id)"
+          >
+            <app-icon name="more" [size]="16" />
+          </button>
+          @if (openActions() === workspace.id) {
+            <span class="workspace-actions" (click)="openActions.set(null)">
+              <span class="workspace-order-actions" [attr.aria-label]="'workspace.reorder' | t">
+                <button
+                  type="button"
+                  class="workspace-order-action"
+                  [disabled]="workspace.id === workspaces()[0]?.id"
+                  [title]="'workspace.moveUp' | t"
+                  [attr.aria-label]="'workspace.moveUp' | t"
+                  (click)="moveRequested.emit({ workspaceId: workspace.id, direction: -1 })"
+                >
+                  <app-icon name="arrow-up" [size]="10" />
+                </button>
+                <button
+                  type="button"
+                  class="workspace-order-action"
+                  [disabled]="workspace.id === workspaces().at(-1)?.id"
+                  [title]="'workspace.moveDown' | t"
+                  [attr.aria-label]="'workspace.moveDown' | t"
+                  (click)="moveRequested.emit({ workspaceId: workspace.id, direction: 1 })"
+                >
+                  <app-icon name="arrow-down" [size]="10" />
+                </button>
+              </span>
               <button
                 type="button"
-                class="workspace-order-action"
-                [disabled]="$first"
-                [title]="'workspace.moveUp' | t"
-                [attr.aria-label]="'workspace.moveUp' | t"
-                (click)="moveRequested.emit({ workspaceId: workspace.id, direction: -1 })"
+                class="workspace-action edit"
+                [title]="'workspace.edit' | t"
+                [attr.aria-label]="'workspace.edit' | t"
+                (click)="editRequested.emit(workspace.id)"
               >
-                <app-icon name="arrow-up" [size]="10" />
+                <app-icon name="edit" [size]="12" />
               </button>
               <button
                 type="button"
-                class="workspace-order-action"
-                [disabled]="$last"
-                [title]="'workspace.moveDown' | t"
-                [attr.aria-label]="'workspace.moveDown' | t"
-                (click)="moveRequested.emit({ workspaceId: workspace.id, direction: 1 })"
+                class="workspace-action delete"
+                [title]="'workspace.delete' | t"
+                [attr.aria-label]="'workspace.delete' | t"
+                (click)="deleteRequested.emit(workspace.id)"
               >
-                <app-icon name="arrow-down" [size]="10" />
+                <app-icon name="trash" [size]="12" />
+              </button>
+              <button
+                type="button"
+                class="workspace-action favorite"
+                [class.selected]="workspace.favorite"
+                [attr.aria-label]="
+                  workspace.favorite ? ('workspace.unfavorite' | t) : ('workspace.favorite' | t)
+                "
+                (click)="favoriteToggled.emit(workspace.id)"
+              >
+                <app-icon name="star" [size]="13" />
               </button>
             </span>
-            <button
-              type="button"
-              class="workspace-action edit"
-              [title]="'workspace.edit' | t"
-              [attr.aria-label]="'workspace.edit' | t"
-              (click)="editRequested.emit(workspace.id)"
-            >
-              <app-icon name="edit" [size]="12" />
-            </button>
-            <button
-              type="button"
-              class="workspace-action delete"
-              [title]="'workspace.delete' | t"
-              [attr.aria-label]="'workspace.delete' | t"
-              (click)="deleteRequested.emit(workspace.id)"
-            >
-              <app-icon name="trash" [size]="12" />
-            </button>
-            <button
-              type="button"
-              class="workspace-action favorite"
-              [class.selected]="workspace.favorite"
-              [attr.aria-label]="
-                workspace.favorite ? ('workspace.unfavorite' | t) : ('workspace.favorite' | t)
-              "
-              (click)="favoriteToggled.emit(workspace.id)"
-            >
-              <app-icon name="star" [size]="13" />
-            </button>
-          </span>
+          }
         </li>
       }
     </ul>

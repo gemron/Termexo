@@ -517,7 +517,9 @@
 html,
 body {
   width: 100%;
-  height: 100%;
+  // A browser page follows the visual viewport (visual-viewport.ts), so a phone's on-screen
+  // keyboard shrinks it instead of covering the terminal's input line. Unset in the desktop app.
+  height: var(--visual-viewport-height, 100%);
   margin: 0;
   overflow: hidden;
   color: #dee7e2;
@@ -531,6 +533,12 @@ body {
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+}
+
+// iOS pans the page up to reveal a focused field; moving with it keeps the page on screen. Only
+// while tracking runs, since a transform also changes what fixed-position children are placed by.
+:root[data-visual-viewport] body {
+  transform: translateY(var(--visual-viewport-offset, 0px));
 }
 
 button,

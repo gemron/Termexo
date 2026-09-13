@@ -69,9 +69,7 @@ fn windows_build_number() -> Option<u32> {
     use std::os::windows::ffi::OsStrExt;
 
     use windows::core::PCWSTR;
-    use windows::Win32::System::Registry::{
-        RegGetValueW, HKEY_LOCAL_MACHINE, RRF_RT_REG_SZ,
-    };
+    use windows::Win32::System::Registry::{RegGetValueW, HKEY_LOCAL_MACHINE, RRF_RT_REG_SZ};
 
     /// Where Windows records its own build, as a REG_SZ of decimal digits.
     const VERSION_KEY: &str = r"SOFTWARE\Microsoft\Windows NT\CurrentVersion";

@@ -19,6 +19,11 @@
           <img src="termexo-mark.svg" alt="" />
         </span>
         <strong>Termexo</strong>
+        @if (previewMode) {
+          <small class="preview-badge" [title]="'preview.notice' | t">{{
+            'preview.label' | t
+          }}</small>
+        }
       </div>
       <!-- A first run has no workspace to name, and "loading" would sit there for good. -->
       @if (state.activeWorkspace(); as workspace) {
@@ -66,6 +71,7 @@
           class="tool-button"
           [class.active]="workspaceView() === 'terminal'"
           [attr.aria-selected]="workspaceView() === 'terminal'"
+          aria-label="终端"
           (click)="workspaceView.set('terminal')"
         >
           <app-icon name="terminal" [size]="13" />
@@ -78,6 +84,7 @@
           data-testid="task-board-toggle"
           [class.active]="workspaceView() === 'tasks'"
           [attr.aria-selected]="workspaceView() === 'tasks'"
+          aria-label="任务"
           (click)="workspaceView.set('tasks')"
         >
           <app-icon name="layout" [size]="13" />
@@ -93,15 +100,18 @@
           data-testid="git-view-toggle"
           [class.active]="workspaceView() === 'git'"
           [attr.aria-selected]="workspaceView() === 'git'"
+          aria-label="Git"
           [disabled]="!git.overview()?.available"
           [title]="
-            git.overview()?.available
-              ? ('git.open' | t)
-              : git.error()
-                ? ('git.overviewFailed' | t) + ': ' + git.error()
-                : git.loading() || !git.overview()
-                  ? ('git.detecting' | t)
-                  : ('git.unavailable' | t)
+            previewMode
+              ? ('preview.desktopOnly' | t)
+              : git.overview()?.available
+                ? ('git.open' | t)
+                : git.error()
+                  ? ('git.overviewFailed' | t) + ': ' + git.error()
+                  : git.loading() || !git.overview()
+                    ? ('git.detecting' | t)
+                    : ('git.unavailable' | t)
           "
           (click)="workspaceView.set('git')"
         >
@@ -240,6 +250,7 @@
             (inspectorToggled)="toggleInspector()"
             (sessionCenterOpened)="openSessionCenter()"
             (settingsOpened)="openSettings()"
+            (fullscreenFailed)="reportFailure($event)"
           />
         }
       } @else {
@@ -568,7 +579,7 @@
             (launchRequested)="launchAgent($event)"
             (terminalStatusChanged)="handleTerminalStatus($event)"
             (terminalRenamed)="state.renameTerminal($event.terminalId, $event.name)"
-            (linkOpenFailed)="reportLinkOpenFailure($event)"
+            (linkOpenFailed)="reportFailure($event)"
             (terminalModelSwitchRequested)="openSingleModelSwitch($event)"
             (terminalAccountSwitchRequested)="openAccountSwitch($event)"
             (terminalInput)="handleTerminalInput($event)"
@@ -587,7 +598,15 @@
     </section>
 
     <footer class="statusbar">
-      <span class="connection"><i></i> Desktop Core</span>
+      <span
+        class="connection"
+        [class.preview]="previewMode"
+        [title]="previewMode ? ('preview.notice' | t) : ''"
+        ><i></i
+        ><span>{{
+          previewMode ? ('preview.notice' | t) : remoteMode ? 'Remote Core' : 'Desktop Core'
+        }}</span></span
+      >
       <span>
         {{
           workspaceView() === 'tasks'
@@ -624,6 +643,7 @@
       [repository]="git.overview()"
       (refreshQuotas)="refreshProviderQuotas(true)"
       (gitRequested)="workspaceView.set('git')"
+      (terminalSelected)="selectTerminal($event)"
       (collapseRequested)="toggleInspector()"
     />
   }
@@ -707,6 +727,7 @@
     (launched)="launchClaude($event)"
     (cancelled)="closeClaudeLaunch()"
     (installRequested)="installAgent('claude')"
+    (directoryChangeRequested)="changeLaunchDirectory()"
   />
 }
 
@@ -720,6 +741,7 @@
     (launched)="launchCodex($event)"
     (cancelled)="closeCodexLaunch()"
     (installRequested)="installAgent('codex')"
+    (directoryChangeRequested)="changeLaunchDirectory()"
   />
 }
 
@@ -732,6 +754,7 @@
       (launched)="launchAntigravity($event)"
       (cancelled)="closeAntigravityLaunch()"
       (installRequested)="installAgent('antigravity')"
+      (directoryChangeRequested)="changeLaunchDirectory()"
     />
   }
 }
@@ -745,6 +768,7 @@
       (launched)="launchOpenCode($event)"
       (cancelled)="closeOpenCodeLaunch()"
       (installRequested)="installAgent('opencode')"
+      (directoryChangeRequested)="changeLaunchDirectory()"
     />
   }
 }
@@ -789,7 +813,8 @@
       [preview]="handoffPreview()"
       [terminals]="activeAgentTerminals()"
       [activeTerminalId]="handoffSourceTerminalId()"
-      [busy]="handoffs.busy()"
+      [busy]="handoffs.busy() || handoffSending()"
+      (saved)="saveHandoffChanges($event)"
       [error]="handoffs.error()"
       (generated)="generateHandoff($event)"
       (recordSelected)="selectHandoffRecord($event)"
@@ -805,6 +830,7 @@
 @defer (when settingsOpen()) {
   @if (settingsOpen()) {
     <app-agent-settings-dialog
+      [profileSaveCompleted]="profileSaveCompleted()"
       [installation]="agents.installation()"
       [codexInstallation]="agents.codexInstallation()"
       [openCodeInstallation]="agents.openCodeInstallation()"
@@ -821,7 +847,8 @@
       [networkTestResult]="networkTestResult()"
       [cliPlan]="cliOperationPlan()"
       [cliResult]="cliOperationResult()"
-      [busy]="agents.busy()"
+      [busy]="agents.busy() || profileSaving()"
+      [saving]="profileSaving()"
       [updateResult]="updates.result()"
       [updateChecking]="updates.checking()"
       [updateInstalling]="updateInstalling()"
@@ -869,6 +896,7 @@
     [singleTerminalName]="modelSwitchTerminalName()"
     [lockedAgentType]="modelSwitchAgentType()"
     [currentProfileId]="modelSwitchCurrentProfileId()"
+    (settingsRequested)="openSettings('models')"
     (confirmed)="switchModels($event)"
     (cancelled)="closeModelSwitch()"
   />
@@ -882,6 +910,7 @@
     [terminalModel]="accountSwitchTerminal()?.model ?? ''"
     [currentAccountProfileId]="accountSwitchCurrentId()"
     [busy]="launchingClaude() || launchingCodex()"
+    (settingsRequested)="openSettings('accounts')"
     (confirmed)="switchAccount($event)"
     (cancelled)="closeAccountSwitch()"
   />

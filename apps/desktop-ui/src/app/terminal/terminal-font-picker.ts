@@ -11,6 +11,7 @@ import {
 } from '@angular/core';
 
 import { TranslatePipe } from '../core/i18n/translate.pipe';
+import { primaryPointerIsTouch } from '../core/services/input-device';
 import { IconComponent } from '../shared/icon/icon';
 import { TerminalFontService } from './terminal-font.service';
 import { filterTerminalFonts, SystemFont, terminalFontFamily } from './terminal-font';
@@ -45,8 +46,9 @@ interface FontOption extends SystemFont {
     '[class.open]': 'open()',
     '(document:pointerdown)': 'closeOnOutsidePointer($event)',
     '(document:keydown.escape)': 'close()',
-    // A fixed popover cannot follow its trigger, so it is dismissed rather than left detached.
-    '(window:resize)': 'close()',
+    // A fixed popover cannot follow its trigger on its own, so every resize places it again.
+    // Closing instead dismissed it the moment a phone raised its keyboard for the search box.
+    '(window:resize)': 'reposition()',
   },
   template: `
     <button
@@ -72,7 +74,7 @@ interface FontOption extends SystemFont {
         [style.left.px]="popoverLeft()"
         [style.top.px]="popoverTop()"
         [style.width.px]="popoverWidth"
-        [style.maxHeight.px]="popoverMaxHeight"
+        [style.maxHeight.px]="popoverMaxHeight()"
         [attr.aria-label]="'terminal.font' | t"
         role="dialog"
       >
@@ -360,7 +362,7 @@ export class TerminalFontPickerComponent {
   protected readonly fonts = inject(TerminalFontService);
   protected readonly sample = PREVIEW_SAMPLE;
   protected readonly popoverWidth = POPOVER_WIDTH;
-  protected readonly popoverMaxHeight = POPOVER_MAX_HEIGHT;
+  protected readonly popoverMaxHeight = signal(POPOVER_MAX_HEIGHT);
   protected readonly open = signal(false);
   protected readonly query = signal('');
   protected readonly highlighted = signal(0);
@@ -435,8 +437,11 @@ export class TerminalFontPickerComponent {
     this.query.set('');
     this.positionPopover();
     this.open.set(true);
-    // The search box renders on the next frame, so focus waits for it.
-    requestAnimationFrame(() => this.searchInput()?.nativeElement.focus());
+    // The search box renders on the next frame, so focus waits for it. A touch device is left to
+    // tap it: focusing would raise the on-screen keyboard over the list the user came to browse.
+    if (!primaryPointerIsTouch()) {
+      requestAnimationFrame(() => this.searchInput()?.nativeElement.focus());
+    }
 
     // On the desktop the families arrive over IPC, so the starting highlight has to wait for
     // them or it would settle on the first row of an empty list. Anything the user has already
@@ -451,6 +456,12 @@ export class TerminalFontPickerComponent {
   protected close(): void {
     if (this.open()) {
       this.open.set(false);
+    }
+  }
+
+  protected reposition(): void {
+    if (this.open()) {
+      this.positionPopover();
     }
   }
 
@@ -538,8 +549,15 @@ export class TerminalFontPickerComponent {
 
     // Below the trigger normally, above it when the window is too short for the full list.
     const below = anchor.bottom + ANCHOR_GAP;
-    const overflowsBottom = below + POPOVER_MAX_HEIGHT > window.innerHeight - VIEWPORT_MARGIN;
+    const bottomLimit = window.innerHeight - VIEWPORT_MARGIN;
+    const overflowsBottom = below + POPOVER_MAX_HEIGHT > bottomLimit;
     const above = anchor.top - POPOVER_MAX_HEIGHT - ANCHOR_GAP;
-    this.popoverTop.set(overflowsBottom && above > VIEWPORT_MARGIN ? above : below);
+    const opensAbove = overflowsBottom && above > VIEWPORT_MARGIN;
+    this.popoverTop.set(opensAbove ? above : below);
+    // Opening below in a short window — a phone with its keyboard up — keeps the list on screen by
+    // shortening it rather than letting it run behind the keyboard.
+    this.popoverMaxHeight.set(
+      opensAbove ? POPOVER_MAX_HEIGHT : Math.min(POPOVER_MAX_HEIGHT, bottomLimit - below),
+    );
   }
 }

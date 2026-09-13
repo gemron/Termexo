@@ -1,4 +1,5 @@
 import { Component, computed, effect, inject, input, output, signal } from '@angular/core';
+import { ModalFocusDirective } from '../shared/modal-focus.directive';
 import { FormsModule } from '@angular/forms';
 
 import type { ModelProfile } from '../core/models/agent.models';
@@ -66,7 +67,7 @@ function formatRunDuration(elapsedMs: number): string {
 
 @Component({
   selector: 'app-todo-board',
-  imports: [FormsModule, IconComponent],
+  imports: [ModalFocusDirective, FormsModule, IconComponent],
   templateUrl: './todo-board.html',
   styleUrl: './todo-board.scss',
 })
@@ -100,6 +101,11 @@ export class TodoBoardComponent {
   readonly terminalCloseRequested = output<string>();
 
   protected readonly columns = TODO_COLUMNS;
+  protected scrollToStage(stage: TodoStage, board: HTMLElement): void {
+    board
+      .querySelector<HTMLElement>(`[data-stage="${stage}"]`)
+      ?.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'start' });
+  }
   protected readonly priorities = TODO_PRIORITIES;
   protected readonly routinePresets = TODO_ROUTINE_PRESETS;
   protected readonly newTerminalOption = NEW_TERMINAL_OPTION;

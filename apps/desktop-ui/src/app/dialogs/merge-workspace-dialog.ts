@@ -3,15 +3,18 @@ import { FormsModule } from '@angular/forms';
 
 import { TranslatePipe } from '../core/i18n/translate.pipe';
 import { Workspace } from '../core/models/workspace.models';
+import { ModalFocusDirective } from '../shared/modal-focus.directive';
 import { IconComponent } from '../shared/icon/icon';
 
 @Component({
   selector: 'app-merge-workspace-dialog',
-  imports: [FormsModule, IconComponent, TranslatePipe],
+  imports: [ModalFocusDirective, FormsModule, IconComponent, TranslatePipe],
   template: `
     <div class="backdrop modal modal-open" (mousedown)="cancel()">
       <section
         class="dialog merge-workspace-dialog modal-box"
+        appModal
+        (dismissModal)="cancel()"
         role="dialog"
         aria-modal="true"
         aria-labelledby="merge-workspace-dialog-title"

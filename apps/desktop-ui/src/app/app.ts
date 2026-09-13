@@ -1,3 +1,4 @@
+import type { ProfileSaveCompleted, SettingsProfileKind } from './dialogs/profile-drafts';
 import {
   Component,
   computed,
@@ -290,6 +291,8 @@ export class App {
   protected readonly updates = inject(UpdateService);
   protected readonly windowControls = inject(WindowControlsService);
   protected readonly remoteConnection = inject(RemoteConnectionService);
+  protected readonly previewMode = runtimeMode() === 'preview';
+  protected readonly profileSaving = signal(false);
   /** True only in the browser client served by the desktop app's remote access server. */
   protected readonly remoteMode = this.remoteConnection.mode === 'remote';
   protected readonly directoryPicker = inject(DirectoryPickerService);
@@ -330,9 +333,11 @@ export class App {
   private readonly pendingAccountLogins = new Map<string, string>();
   protected readonly handoffOpen = signal(false);
   protected readonly handoffPreview = signal<HandoffPackage | null>(null);
+  protected readonly handoffSending = signal(false);
   protected readonly settingsOpen = signal(false);
   protected readonly settingsInitialTab = signal<SettingsTab>('diagnostics');
   protected readonly settingsInitialModelProfileId = signal('');
+  protected readonly profileSaveCompleted = signal<ProfileSaveCompleted | null>(null);
   /** The agent the settings window opens on when a launch dialog sent the user to install it. */
   protected readonly settingsInitialCliAgent = signal<ManagedAgentType | ''>('');
   protected readonly modelSwitchOpen = signal(false);
@@ -801,7 +806,7 @@ export class App {
 
   protected async openClaudeLaunch(): Promise<void> {
     this.agentMenuOpen.set(false);
-    const workingDirectory = await this.selectTerminalDirectory();
+    const workingDirectory = this.state.activeWorkspace()?.projectPath;
     if (!workingDirectory) {
       return;
     }
@@ -828,7 +833,7 @@ export class App {
 
   protected async openCodexLaunch(): Promise<void> {
     this.agentMenuOpen.set(false);
-    const workingDirectory = await this.selectTerminalDirectory();
+    const workingDirectory = this.state.activeWorkspace()?.projectPath;
     if (!workingDirectory) {
       return;
     }
@@ -839,7 +844,7 @@ export class App {
 
   protected async openAntigravityLaunch(): Promise<void> {
     this.agentMenuOpen.set(false);
-    const workingDirectory = await this.selectTerminalDirectory();
+    const workingDirectory = this.state.activeWorkspace()?.projectPath;
     if (!workingDirectory) {
       return;
     }
@@ -904,7 +909,7 @@ export class App {
 
   protected async openOpenCodeLaunch(): Promise<void> {
     this.agentMenuOpen.set(false);
-    const workingDirectory = await this.selectTerminalDirectory();
+    const workingDirectory = this.state.activeWorkspace()?.projectPath;
     if (!workingDirectory) {
       return;
     }
@@ -1494,9 +1499,10 @@ export class App {
   }
 
   protected openHandoffCenter(): void {
-    const latest = this.activeHandoffRecords()[0];
-    if (!this.handoffPreview() && latest) {
-      this.selectHandoffRecord(latest);
+    const records = this.activeHandoffRecords();
+    if (!records.some((record) => record.id === this.handoffPreview()?.id)) {
+      this.handoffPreview.set(null);
+      if (records[0]) void this.selectHandoffRecord(records[0]);
     }
     this.handoffOpen.set(true);
   }
@@ -1568,7 +1574,24 @@ export class App {
     }
   }
 
+  private async persistHandoff(handoff: HandoffPackage): Promise<HandoffPackage> {
+    const saved = await this.handoffs.updatePackage(handoff);
+    if (this.handoffPreview()?.id === saved.id) this.handoffPreview.set(saved);
+    return saved;
+  }
+
+  protected async saveHandoffChanges(handoff: HandoffPackage): Promise<void> {
+    if (this.handoffs.busy() || this.handoffSending()) return;
+    try {
+      await this.persistHandoff(handoff);
+      this.showToast(this.i18n.t('handoff.saved'));
+    } catch (error) {
+      this.showToast(this.errorMessage(error), 'attention');
+    }
+  }
+
   protected async sendHandoff(request: HandoffSendRequest): Promise<void> {
+    if (this.handoffs.busy() || this.handoffSending()) return;
     const workspace = this.state.activeWorkspace();
     const terminal = workspace?.terminals.find((candidate) => candidate.id === request.terminalId);
     if (!workspace || !terminal || terminal.agentType === 'shell') {
@@ -1576,8 +1599,10 @@ export class App {
       return;
     }
     try {
+      this.handoffSending.set(true);
+      const saved = await this.persistHandoff(request.handoff);
       const { continuationPrompt } = await import('./core/models/handoff');
-      const prompt = continuationPrompt(request.handoff);
+      const prompt = continuationPrompt(saved);
       this.rememberPromptDraft(workspace, terminal, prompt);
       await this.deliverTerminalPrompt(terminal.id, prompt, true);
       this.promptAssets.captureInput(workspace, terminal, '\r');
@@ -1586,6 +1611,8 @@ export class App {
       this.showToast(this.i18n.t('handoff.sent', { name: terminal.name }));
     } catch (error) {
       this.showToast(this.errorMessage(error), 'attention');
+    } finally {
+      this.handoffSending.set(false);
     }
   }
 
@@ -2483,13 +2510,34 @@ export class App {
     }
   }
 
-  protected async saveModelProfile(input: ModelProfileInput): Promise<void> {
+  private async persistSettingsProfile(
+    kind: SettingsProfileKind,
+    id: string,
+    save: () => Promise<void>,
+    message: string,
+  ): Promise<void> {
+    if (this.profileSaving()) return;
+    this.profileSaving.set(true);
     try {
-      await this.agents.saveModelProfile(input);
-      this.showToast(this.i18n.t('profile.saved'));
+      await save();
+      this.profileSaveCompleted.set({ kind, id });
+      this.showToast(this.i18n.t(message));
     } catch (error) {
-      this.showToast(this.errorMessage(error));
+      this.showToast(this.errorMessage(error), 'attention');
+    } finally {
+      this.profileSaving.set(false);
     }
+  }
+
+  protected async saveModelProfile(input: ModelProfileInput): Promise<void> {
+    await this.persistSettingsProfile(
+      'models',
+      input.id,
+      async () => {
+        await this.agents.saveModelProfile(input);
+      },
+      'profile.saved',
+    );
   }
 
   /**
@@ -2518,12 +2566,14 @@ export class App {
   }
 
   protected async saveAccountProfile(input: AccountProfileInput): Promise<void> {
-    try {
-      await this.agents.saveAccountProfile(input);
-      this.showToast(this.i18n.t('account.saved'));
-    } catch (error) {
-      this.showToast(this.errorMessage(error));
-    }
+    await this.persistSettingsProfile(
+      'accounts',
+      input.id,
+      async () => {
+        await this.agents.saveAccountProfile(input);
+      },
+      'account.saved',
+    );
   }
 
   protected async deleteAccountProfile(profileId: string): Promise<void> {
@@ -2668,12 +2718,14 @@ export class App {
   }
 
   protected async saveMcpProfile(input: McpProfileInput): Promise<void> {
-    try {
-      await this.agents.saveMcpProfile(input);
-      this.showToast(this.i18n.t('mcp.saved'));
-    } catch (error) {
-      this.showToast(this.errorMessage(error));
-    }
+    await this.persistSettingsProfile(
+      'mcp',
+      input.id,
+      async () => {
+        await this.agents.saveMcpProfile(input);
+      },
+      'mcp.saved',
+    );
   }
 
   protected async deleteMcpProfile(profileId: string): Promise<void> {
@@ -2686,13 +2738,15 @@ export class App {
   }
 
   protected async saveNetworkProfile(input: NetworkProfileInput): Promise<void> {
-    try {
-      await this.agents.saveNetworkProfile(input);
-      this.networkTestResult.set(null);
-      this.showToast(this.i18n.t('network.saved'));
-    } catch (error) {
-      this.showToast(this.errorMessage(error));
-    }
+    await this.persistSettingsProfile(
+      'network',
+      input.id,
+      async () => {
+        await this.agents.saveNetworkProfile(input);
+        this.networkTestResult.set(null);
+      },
+      'network.saved',
+    );
   }
 
   protected async deleteNetworkProfile(profileId: string): Promise<void> {
@@ -2827,8 +2881,11 @@ export class App {
     }
   }
 
-  /** Reports a terminal link that would not open, where it cannot disturb what an agent draws. */
-  protected reportLinkOpenFailure(message: string): void {
+  /**
+   * Shows a failure a child has already put into words, such as a terminal link that would not
+   * open or full screen the browser refused, where it cannot disturb what an agent draws.
+   */
+  protected reportFailure(message: string): void {
     this.showToast(message, 'attention');
   }
 
@@ -3247,6 +3304,11 @@ export class App {
     }
   }
 
+  protected async changeLaunchDirectory(): Promise<void> {
+    const selected = await this.selectTerminalDirectory();
+    if (selected) this.selectedTerminalDirectory.set(selected);
+  }
+
   private async selectTerminalDirectory(): Promise<string | null> {
     const workspace = this.state.activeWorkspace();
     if (!workspace) {
@@ -3278,6 +3340,13 @@ export class App {
     // Remote views render the desktop's terminal grid, which their own window may be too narrow
     // for, so styling needs to know which kind of client this is.
     document.documentElement.dataset['runtime'] = runtimeMode();
+    if (runtimeMode() !== 'desktop') {
+      // Loaded on demand to keep it out of the desktop bundle. It tracks for the life of the page,
+      // which is the life of this root component, so there is nothing to stop.
+      void import('./core/services/visual-viewport').then(({ trackVisualViewport }) =>
+        trackVisualViewport(document.documentElement),
+      );
+    }
     await this.state.initialize();
     this.todos.initialize(this.state.workspaces());
     this.todos.reconcileTerminals(this.state.workspaces());

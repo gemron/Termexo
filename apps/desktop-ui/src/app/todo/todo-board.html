@@ -42,6 +42,13 @@
   </header>
 
   <div class="board-toolbars">
+    <nav class="stage-navigation" aria-label="任务状态">
+      @for (column of columns; track column.stage) {
+        <button type="button" (click)="scrollToStage(column.stage, kanban)">
+          {{ column.title }} {{ tasksFor(column.stage).length }}
+        </button>
+      }
+    </nav>
     <nav class="project-switcher" aria-label="项目筛选">
       <button
         type="button"
@@ -100,7 +107,12 @@
     }
   </div>
 
-  <div class="kanban" data-testid="task-kanban" [class.drag-active]="draggedTaskId() !== null">
+  <div
+    #kanban
+    class="kanban"
+    data-testid="task-kanban"
+    [class.drag-active]="draggedTaskId() !== null"
+  >
     @for (column of columns; track column.stage) {
       <section
         class="kanban-column"
@@ -444,9 +456,11 @@
 </section>
 
 @if (taskDialogOpen()) {
-  <div class="board-backdrop" (mousedown)="closeTaskDialog()" (keydown.escape)="closeTaskDialog()">
+  <div class="board-backdrop" (mousedown)="closeTaskDialog()">
     <section
       class="board-dialog task-dialog"
+      appModal
+      (dismissModal)="closeTaskDialog()"
       role="dialog"
       aria-modal="true"
       (mousedown)="$event.stopPropagation()"
@@ -736,6 +750,8 @@
   <div class="board-backdrop" (mousedown)="closeProjectDialog()">
     <section
       class="board-dialog project-dialog"
+      appModal
+      (dismissModal)="closeProjectDialog()"
       role="dialog"
       aria-modal="true"
       (mousedown)="$event.stopPropagation()"
@@ -751,7 +767,7 @@
             {{
               resumeTaskAfterProject()
                 ? '任务需要归属项目；创建后会自动继续填写任务。'
-                : '同一个工作空间可以统一管理多个代码目录。'
+                : '项目属于当前工作区，任务在项目目录执行；不会更改工作区的默认终端目录。'
             }}
           </p>
         </div>

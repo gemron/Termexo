@@ -873,10 +873,6 @@ button:disabled {
   overflow: auto;
 }
 
-.diagnostic-panel {
-  padding: 18px;
-}
-
 .diagnostic-status {
   display: grid;
   grid-template-columns: 40px minmax(0, 1fr) auto;

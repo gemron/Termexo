@@ -8,8 +8,10 @@ import {
   viewChild,
 } from '@angular/core';
 
+import { isTauriRuntime } from '../core/services/tauri-runtime';
 import { TranslatePipe } from '../core/i18n/translate.pipe';
 import { AgentInstallation } from '../core/models/agent.models';
+import { ModalFocusDirective } from '../shared/modal-focus.directive';
 import { IconComponent } from '../shared/icon/icon';
 
 /**
@@ -22,12 +24,14 @@ import { IconComponent } from '../shared/icon/icon';
  */
 @Component({
   selector: 'app-launch-dialog-shell',
-  imports: [IconComponent, TranslatePipe],
+  imports: [ModalFocusDirective, IconComponent, TranslatePipe],
   template: `
     <div class="backdrop modal modal-open" (mousedown)="dismiss()">
       <section
         #dialog
         class="agent-dialog compact modal-box"
+        appModal
+        (dismissModal)="dismiss()"
         role="dialog"
         aria-modal="true"
         aria-labelledby="launch-dialog-title"
@@ -39,7 +43,6 @@ import { IconComponent } from '../shared/icon/icon';
             <span class="title-icon"><app-icon [name]="icon()" [size]="17" /></span>
             <div>
               <h2 id="launch-dialog-title">{{ heading() }}</h2>
-              <p [title]="workingDirectory()">{{ workingDirectory() }}</p>
             </div>
           </div>
           <button
@@ -65,6 +68,17 @@ import { IconComponent } from '../shared/icon/icon';
           <code>{{ installation()?.version ?? '' }}</code>
         </div>
 
+        <div class="launch-directory">
+          <span [title]="workingDirectory()">{{ workingDirectory() }}</span>
+          <button
+            type="button"
+            class="secondary btn btn-sm"
+            [disabled]="launching()"
+            (click)="directoryChangeRequested.emit()"
+          >
+            {{ 'launch.changeDirectory' | t }}
+          </button>
+        </div>
         <ng-content />
 
         <footer>
@@ -110,6 +124,7 @@ export class LaunchDialogShellComponent {
   readonly cancelled = output<void>();
   /** Asks the workbench for the installer, which is the only way out of a missing CLI. */
   readonly installRequested = output<void>();
+  readonly directoryChangeRequested = output<void>();
 
   /**
    * Whether to offer the installer, which is only once detection has actually answered.
@@ -119,7 +134,7 @@ export class LaunchDialogShellComponent {
    */
   protected readonly offersInstall = computed(() => {
     const installation = this.installation();
-    return installation !== null && !installation.healthy;
+    return isTauriRuntime() && installation !== null && !installation.healthy;
   });
 
   private readonly dialog = viewChild.required<ElementRef<HTMLElement>>('dialog');

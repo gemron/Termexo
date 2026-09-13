@@ -611,7 +611,11 @@ mod tests {
     #[test]
     fn reports_whether_a_rollout_is_still_on_disk() {
         let directory = test_directory("session-exists");
-        let sessions = directory.join("sessions").join("2026").join("09").join("10");
+        let sessions = directory
+            .join("sessions")
+            .join("2026")
+            .join("09")
+            .join("10");
         fs::create_dir_all(&sessions).unwrap();
         let id = "01a08a3d-48f6-7b02-b701-b99a1b89e5dc";
         fs::write(

@@ -11,7 +11,7 @@
 </p>
 
 <p align="center">
-  <img alt="Version 0.10.0" src="https://img.shields.io/badge/version-0.10.0-58c7a0">
+  <img alt="Version 0.10.1" src="https://img.shields.io/badge/version-0.10.1-58c7a0">
   <img alt="Windows" src="https://img.shields.io/badge/platform-Windows-0078D4?logo=windows">
   <img alt="Tauri 2" src="https://img.shields.io/badge/Tauri-2-24C8DB?logo=tauri&logoColor=white">
   <img alt="Angular 22" src="https://img.shields.io/badge/Angular-22-DD0031?logo=angular">
@@ -72,7 +72,7 @@ Keep the token private. Closing Termexo or stopping the PC ends the running proc
 
 ## Latest release
 
-**[v0.10.0](https://github.com/gemron/Termexo/releases/tag/v0.10.0)** adds self-hosted relays, code or account enrollment, cascaded access addresses and v2 encrypted sessions, bringing the same workbench to a browser across networks.
+**[v0.10.1](https://github.com/gemron/Termexo/releases/tag/v0.10.1)** makes the workbench usable from a phone: a floating keypad for Esc, arrows and Shift+Tab, an input line the on-screen keyboard no longer covers, and full screen. Settings keeps unsaved edits, agents launch straight into their dialog, and a console window no longer flashes at startup.
 [Full changelog](CHANGELOG.md).
 
 If Termexo helps your workflow, a **Star on this repository** helps other developers discover it.
@@ -356,7 +356,8 @@ identifiers still use a legacy name. This does not affect the Termexo product na
 | V0.8.7 | A screen parser that cannot strand a terminal | Released |
 | V0.8.8 | A storage panel, and data that can be moved | Released |
 | V0.9.0 | Antigravity as a fourth agent, and vendor installers | Released |
-| V0.10.0 | A self-hosted relay, and end-to-end encrypted remote access | Current |
+| V0.10.0 | A self-hosted relay, and end-to-end encrypted remote access | Released |
+| V0.10.1 | Phone keypad, keyboard-aware remote pages, and settings that keep unsaved edits | Current |
 | V1.0 | Stability, security hardening, and recovery experience | Planned |
 
 See [open issues](https://github.com/gemron/Termexo/issues) for ongoing work and
