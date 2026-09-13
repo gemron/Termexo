@@ -1,5 +1,30 @@
 const translations = {
   en: {
+    navSolutions: "Use cases",
+    solutionsIndex: "DIRECTION / USE CASES",
+    solutionsTitle: "Keep your AI development work connected.",
+    solutionsProblem: "Multiple projects and coding agents can mean scattered windows, missed approvals, and context to explain all over again. Termexo brings the work into view and helps you pick up where you left off.",
+    workflowAlt: "Projects and tasks enter the local Termexo workbench, with optional remote access to continue from another device.",
+    workflowCaption: "Workflow illustration. People assign tasks and approve actions; agents keep running on the host PC.",
+    individualLabel: "FOR INDIVIDUALS",
+    individualTitle: "More projects. Less switching.",
+    individualProjectsTitle: "Work, side projects, open source",
+    individualProjectsBody: "Keep each project's terminals, models, and layout together. Assign agents to implementation, tests, and review, then see who needs you.",
+    individualResumeTitle: "Continue tomorrow, or with another agent",
+    individualResumeBody: "Find a saved native session or prepare a handoff with the goal, progress, and next step. Spend less time repeating the background.",
+    individualRemoteTitle: "Step away without losing touch",
+    individualRemoteBody: "Leave your PC running and reconnect from your phone to check output, answer an approval, or send the next instruction.",
+    enterpriseLabel: "FOR ENTERPRISE DEVELOPERS",
+    enterpriseTitle: "Organize the work. Keep control.",
+    enterpriseTasksTitle: "Project work engineers can follow",
+    enterpriseTasksBody: "Group business projects into workspaces. Engineers use the task board and agent status to assign work, review results, and prepare handoffs.",
+    enterpriseProfilesTitle: "Providers and environments in one place",
+    enterpriseProfilesBody: "Manage model, account, and network profiles for different providers and compatible gateways, with quota visibility where supported.",
+    enterpriseRemoteTitle: "Access to the development PC you manage",
+    enterpriseRemoteBody: "Run the workbench on your organization's Windows PC. Use your own relay or trusted LAN / VPN to reconnect to long-running tasks.",
+    solutionsBoundaryTitle: "Available today / longer-term direction",
+    solutionsBoundaryBody: "Today, individuals and team members operate their own workbenches. Shared workspaces, granular permissions, centralized audit, and broader automatic orchestration remain planned capabilities.",
+    solutionsDataNote: "Local-first describes where the workbench runs. Your agent and model configuration still determines where model requests and code are sent.",
     skip: "Skip to content",
     exploreWorkbench: "Explore the workbench",
     pauseMotion: "Pause motion",
@@ -19,7 +44,7 @@ const translations = {
     heroLine2:
       "Across networks.",
     heroLead:
-      "Claude Code, Codex, OpenCode, and Antigravity in one Windows workbench. Reconnect across networks through your own relay: check output, answer approvals, and send the next instruction to the same live terminal.",
+      "A local-first AI coding workbench that brings agents, models, and projects together, so development can continue securely between your computer and phone.",
     heroRemoteNote:
       "Keep your PC running. Use a reachable HTTPS relay and desktop access token, or connect directly over a trusted LAN or VPN.",
     heroRemoteGuide:
@@ -216,6 +241,31 @@ const translations = {
     relayCompatibility: "Relay: Linux / macOS / Windows, x64 / arm64 and containers. Desktop app: Windows 10 / 11.",
   },
   zh: {
+    navSolutions: "使用场景",
+    solutionsIndex: "项目方向 / 解决方案场景",
+    solutionsTitle: "让 AI 开发工作连起来。",
+    solutionsProblem: "多个项目、多个编程 Agent，往往意味着分散的窗口、错过的确认，以及需要反复交代的背景。Termexo 把任务和状态集中呈现，让中断的工作能继续、离开电脑也能接着处理。",
+    workflowAlt: "项目与任务进入本地 Termexo 工作台，统一管理 Agent、模型配置和会话，并通过可选远程连接跨设备接续。",
+    workflowCaption: "工作流程示意：由人分配任务和处理确认，Agent 始终在宿主电脑上运行。",
+    individualLabel: "个人开发者",
+    individualTitle: "项目再多，也少些来回切换。",
+    individualProjectsTitle: "主业、个人产品与开源项目并行",
+    individualProjectsBody: "按项目保存终端、模型和布局；让不同 Agent 写功能、补测试、做审查，集中看清谁在执行、谁在等你。",
+    individualResumeTitle: "隔天继续，或换个 Agent 接着做",
+    individualResumeBody: "找回已保存的原生会话，或整理包含目标、进度和下一步的交接包，减少重复交代背景。",
+    individualRemoteTitle: "离开电脑，也能接着处理",
+    individualRemoteBody: "电脑保持运行，用手机接回原来的终端，查看输出、回复确认，或发送下一步指令。",
+    enterpriseLabel: "企业研发团队成员",
+    enterpriseTitle: "组织开发流程，掌控运行环境。",
+    enterpriseTasksTitle: "让工程师看清项目与任务进度",
+    enterpriseTasksBody: "按业务项目组织工作区，由工程师通过任务看板和 Agent 状态分配工作、检查结果，并整理任务交接。",
+    enterpriseProfilesTitle: "统一管理供应商与环境配置",
+    enterpriseProfilesBody: "集中管理不同供应商、兼容网关的模型、账号和网络 Profile，查看支持的供应商余量。",
+    enterpriseRemoteTitle: "远程接入自己管理的研发电脑",
+    enterpriseRemoteBody: "工作台运行在企业控制的 Windows 电脑上，通过自建中继或可信局域网 / VPN，接回仍在运行的长任务。",
+    solutionsBoundaryTitle: "当前能力与长期方向",
+    solutionsBoundaryBody: "当前适合个人和团队成员使用各自的工作台；多人共享、细粒度权限、统一审计及更完整的自动编排仍属规划能力。",
+    solutionsDataNote: "本地优先指工作台的运行与管理方式；代码和模型请求是否发往外部，仍由所选 Agent 与模型服务配置决定。",
     skip: "跳到主要内容",
     exploreWorkbench: "探索工作台",
     pauseMotion: "暂停动效",
@@ -234,7 +284,7 @@ const translations = {
     heroLine2:
       "跨网络接着用。",
     heroLead:
-      "Claude Code、Codex、OpenCode、Antigravity，一个 Windows 工作台。通过自建中继，用手机或另一台电脑跨网络接回原来的终端，查看输出、回复审批、发送下一步指令。",
+      "本地优先的 AI 编程工作台，统一管理多个 Agent、模型与项目，让开发工作在电脑与手机之间安全接续。",
     heroRemoteNote:
       "电脑需保持运行。使用双方可达的 HTTPS 中继和桌面访问令牌，也可在可信局域网或 VPN 内直连。",
     heroRemoteGuide:
@@ -426,6 +476,13 @@ function setLanguage(language) {
   const dictionary = translations[language] || translations.en;
   activeLanguage = language in translations ? language : "en";
   document.documentElement.lang = language === "zh" ? "zh-CN" : "en";
+  const workflow = document.querySelector("[data-workflow]");
+  if (workflow) {
+    const asset = `assets/termexo-workflow-${activeLanguage}`;
+    workflow.querySelector("source").srcset = `${asset}-mobile.svg`;
+    workflow.querySelector("img").src = `${asset}.svg`;
+    workflow.querySelector("img").alt = dictionary.workflowAlt;
+  }
   document.title =
     language === "zh"
       ? "Termexo — 电脑上开工，跨网络接着用"
