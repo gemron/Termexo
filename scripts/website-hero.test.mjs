@@ -2,6 +2,7 @@ import { readFileSync, existsSync } from "node:fs";
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import vm from "node:vm";
+import { createHash } from "node:crypto";
 
 const site = new URL("../website/", import.meta.url);
 const html = readFileSync(new URL("index.html", site), "utf8");
@@ -99,7 +100,7 @@ test("static homepage links resolve and existing social artwork is preserved", (
   for (const [, link] of html.matchAll(/(?:src|href)="([^"]+)"/g)) {
     if (/^https?:/.test(link)) continue;
     if (link.startsWith("#")) assert.ok(ids.includes(link.slice(1)), link);
-    else assert.ok(existsSync(new URL(link.split("#")[0], site)), link);
+    else assert.ok(existsSync(new URL(link.split(/[?#]/)[0], site)), link);
   }
   assert.match(html, /href="guide.en.html#remote"\s+data-i18n="heroRemoteGuide"/);
   assert.match(
@@ -114,4 +115,39 @@ test("static homepage links resolve and existing social artwork is preserved", (
     html.match(/<script type="application\/ld\+json">([\s\S]*?)<\/script>/)[1],
   );
   assert.equal(metadata.softwareVersion, version);
+});
+
+test("homepage asset versions match their content so returning visitors fetch new translations", () => {
+  for (const asset of ["app.js", "styles.css"]) {
+    // Match Git's normalized text content across LF and CRLF checkouts.
+    const contents = readFileSync(new URL(asset, site), "utf8").replace(/\r\n/g, "\n");
+    const version = createHash("sha256").update(contents).digest("hex").slice(0, 12);
+    assert.ok(html.includes(`"${asset}?v=${version}"`), `Refresh version for ${asset}`);
+  }
+});
+
+test("every use-case label switches to Chinese and back, including the direction heading", () => {
+  const section = html.slice(html.indexOf('id="solutions"'), html.indexOf('id="workbench"'));
+  const elements = [...section.matchAll(/data-i18n="([^"]+)"/g)].map((match) => ({
+    dataset: { i18n: match[1] }, textContent: "",
+  }));
+  assert.ok(elements.some((element) => element.dataset.i18n === "solutionsIndex"));
+  const context = vm.createContext({
+    document: {
+      documentElement: {}, querySelector: () => null,
+      querySelectorAll: (selector) => selector === "[data-i18n]" ? elements : [],
+    },
+    localStorage: { setItem() {} },
+  });
+  const end = app.indexOf("\nlanguageButtons.forEach((button) => {\n  button.addEventListener");
+  vm.runInContext(app.slice(0, end), context);
+  for (const lang of ["zh", "en", "zh"]) {
+    vm.runInContext(`setLanguage('${lang}')`, context);
+    for (const element of elements) {
+      const key = element.dataset.i18n;
+      assert.ok(dictionaries[lang][key], `${lang}: ${key}`);
+      assert.equal(element.textContent, dictionaries[lang][key]);
+    }
+  }
+  assert.equal(elements.find((element) => element.dataset.i18n === "solutionsIndex").textContent, "项目方向 / 解决方案场景");
 });

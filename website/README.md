@@ -3,6 +3,8 @@
 官网为静态 HTML/CSS/JavaScript；生产域名为 https://www.termexo.com/ 。
 GitHub Pages 从 `gh-pages` 分支根目录发布。仅修改 `main` 下的 `website/` 不会自动上线。
 发布时将经过验证的官网文件同步到 `gh-pages`，保留 CNAME 和 .nojekyll，等待 Pages 构建成功。
+修改首页脚本或样式后，先运行 `node scripts/version-website-assets.mjs` 更新首页引用的内容版本，
+再将 `index.html` 与对应资源一起发布，避免回访用户拿到新页面和缓存中的旧翻译脚本。
 
 ## 公开访问计数器
 
