@@ -12,14 +12,18 @@ const translations = {
     navPrinciples: "Privacy",
     navGuide: "User guide",
     github: "GitHub",
-    eyebrow: "WINDOWS WORKBENCH / MOBILE REMOTE ACCESS",
-    heroLine1: "At your desk.",
-    heroLine2: "Or on your phone.",
+    eyebrow:
+      "WINDOWS WORKBENCH / SELF-HOSTED RELAY",
+    heroLine1:
+      "Start at your desk.",
+    heroLine2:
+      "Across networks.",
     heroLead:
-      "Claude Code, Codex, OpenCode, and Antigravity. One Windows workbench. Check output and send the next instruction from your phone. Your agents keep running on your PC.",
+      "Claude Code, Codex, OpenCode, and Antigravity in one Windows workbench. Reconnect across networks through your own relay: check output, answer approvals, and send the next instruction to the same live terminal.",
     heroRemoteNote:
-      "Keep your PC running. Enable remote access, then connect with a token over a trusted LAN or VPN.",
-    heroRemoteGuide: "How to connect your phone ↗",
+      "Keep your PC running. Use a reachable HTTPS relay and desktop access token, or connect directly over a trusted LAN or VPN.",
+    heroRemoteGuide:
+      "Set up remote relay access ↗",
     sceneHeading: "One workspace. Two ways in.",
     sceneDesktop: "RUN ON YOUR PC",
     sceneMobile: "CONTINUE ON YOUR PHONE",
@@ -29,7 +33,8 @@ const translations = {
     sceneHost: "Session runs on this PC",
     sceneDesktopNote:
       "Your agents and project stay on the host. No session to move or restart.",
-    sceneConnection: "Remote · HTTPS",
+    sceneConnection:
+      "Relay · HTTPS",
     sceneSync: "Two-way connection",
     sceneSameSession: "The same live terminal",
     sceneInstruction: "› Run the tests and summarize any failures.",
@@ -57,9 +62,10 @@ const translations = {
     metricModelTitle: "Swap the model, keep the CLI",
     metricModelBody:
       "Same Claude Code you already know, pointed at a different provider.",
-    metricLocalTitle: "No sign-up, no server",
+    metricLocalTitle:
+      "Local by default",
     metricLocalBody:
-      "Your projects and API keys stay on your computer. Termexo has no cloud to log into.",
+      "Your workbench runs on your PC. Remote access is optional, through a relay you manage or a trusted LAN / VPN.",
 
     attentionTitle: "It tells you when an agent is stuck.",
     attentionLead:
@@ -129,19 +135,21 @@ const translations = {
     featureQuotaTitle: "See your quota before you burn it",
     featureQuotaBody:
       "Check how much of your plan is left and when it resets, before you decide which model to send the next task to.",
-    featureRemoteTitle: "Approve it from your phone",
+    featureRemoteTitle:
+      "Reach your workbench across networks",
     featureRemoteBody:
-      "Open the workbench in your phone's browser, over an encrypted link to your own machine, and let the agent through the approval it has been waiting on.",
+      "A self-hosted relay connects your phone to the same desktop terminals. No public IP or router port forwarding on the desktop.",
 
-    remoteTitle: "The same workbench, in your hand.",
+    remoteTitle:
+      "Your workbench. Across networks.",
     remoteLead:
-      "Turn on remote access and a phone, a tablet, or the laptop in the other room opens the whole workbench in a browser. Not a read-only mirror: the same workspaces and the same live terminals, so the agent stopped on an approval gets its answer while you are away from the desk.",
+      "Your desktop opens an outbound tunnel to your relay. Open the relay link on a phone, tablet, or another computer to check output and continue the same terminal session. The desktop needs no public IP or router port forwarding.",
     remotePoint1:
-      "Encrypted to your own machine, entered with a token you can scan as a QR code and rotate whenever you like",
+      "Self-host termexo-relay; enroll your desktop with a code or relay account",
     remotePoint2:
-      "Terminals scroll by finger and take the size of whichever screen is being used",
+      "Use an HTTPS browser entry point; v2 session frames are encrypted with AES-256-GCM",
     remotePoint3:
-      "Nothing passes through a Termexo server — the link runs between your own devices",
+      "Keep your desktop on and Termexo connected; relay login and the desktop access token are separate checks",
     remoteCaption:
       "The same terminal the desktop is running, one screen at a time.",
 
@@ -160,13 +168,14 @@ const translations = {
     roadmap06Title: "Handing work between agents",
     roadmap06Body:
       "Session summaries, moving a task from one agent to another, routing work, and notifications.",
-    roadmap07Title: "Reaching your desk from anywhere",
+    roadmap07Title:
+      "Remote relay access",
     roadmap07Body:
-      "The workbench opens on a phone or a second computer over an encrypted link to your own machine, driving the same live terminals. Paired devices, roles, and an audit trail come next.",
+      "Shipped in v0.10.0: self-hosted relay access, code or account enrollment, cascaded addresses, and v2 encrypted sessions. Your browser operates the terminals already running on your desktop.",
 
     principlesTitle: "Your work.\nOn your computer.",
     principlesLead:
-      "Termexo has no account, no server, and nothing to sync. Remote access is the one link out, and it is the kind you switch on yourself, hand a token to, and switch off just as fast.",
+      "Termexo runs locally by default. Enable remote access when you need it: use your own relay or a trusted LAN / VPN, control the desktop access token, and disconnect from Settings. Your agent CLIs still connect to the model services you configure.",
     principle1Title: "Local by default",
     principle1Body:
       "Your project paths, sessions, terminal state, and settings sit in a file on your disk. There is no cloud service to sign into.",
@@ -179,7 +188,7 @@ const translations = {
 
     ctaTitle: "One command. No account.",
     ctaLead:
-      "The npm package ships the whole Windows app. Run it, and if you do not like it, delete it — nothing was created anywhere else.",
+      "The npm package includes the Windows app. Start locally without a Termexo account, then connect a self-hosted relay when you need access across networks.",
     getRelease: "Download installer",
     starGithub: "Star on GitHub",
     supportProject:
@@ -200,6 +209,11 @@ const translations = {
     siteVisits: "Website visits (PV)",
     counterNotice:
       "Third-party website statistics only; “—” means unavailable.",
+    navRelay: "Remote relay",
+    sceneProtocol: "RELAY / LAN / VPN",
+    relayDeploy: "Deploy your relay ↗",
+    relaySetup: "Read the connection guide ↗",
+    relayCompatibility: "Relay: Linux / macOS / Windows, x64 / arm64 and containers. Desktop app: Windows 10 / 11.",
   },
   zh: {
     skip: "跳到主要内容",
@@ -214,14 +228,17 @@ const translations = {
     navPrinciples: "隐私",
     navGuide: "使用说明",
     github: "GitHub",
-    eyebrow: "WINDOWS 多 AGENT 工作台 / 手机远程访问",
+    eyebrow:
+      "WINDOWS 多 AGENT 工作台 / 自建中继访问",
     heroLine1: "电脑上开工，",
-    heroLine2: "手机上接着用。",
+    heroLine2:
+      "跨网络接着用。",
     heroLead:
-      "Claude Code、Codex、OpenCode、Antigravity，一个 Windows 工作台。离开书桌，用手机查看输出、发送下一步指令。Agent 继续在电脑上运行。",
+      "Claude Code、Codex、OpenCode、Antigravity，一个 Windows 工作台。通过自建中继，用手机或另一台电脑跨网络接回原来的终端，查看输出、回复审批、发送下一步指令。",
     heroRemoteNote:
-      "电脑需保持运行。开启远程访问后，在可信局域网或 VPN 内使用令牌连接。",
-    heroRemoteGuide: "了解手机如何连接 ↗",
+      "电脑需保持运行。使用双方可达的 HTTPS 中继和桌面访问令牌，也可在可信局域网或 VPN 内直连。",
+    heroRemoteGuide:
+      "了解如何配置中继访问 ↗",
     sceneHeading: "同一个工作台，电脑与手机接续操作。",
     sceneDesktop: "电脑运行 AGENT",
     sceneMobile: "手机远程接着操作",
@@ -230,7 +247,8 @@ const translations = {
     sceneWaiting: "等待你的下一步指令",
     sceneHost: "会话在这台电脑上运行",
     sceneDesktopNote: "Agent 和项目留在电脑上，无需搬运会话，也无需重新启动。",
-    sceneConnection: "远程访问 · HTTPS",
+    sceneConnection:
+      "中继访问 · HTTPS",
     sceneSync: "双向连接",
     sceneSameSession: "同一个正在运行的终端",
     sceneInstruction: "› 运行测试，并汇总失败项。",
@@ -254,9 +272,10 @@ const translations = {
     metricGridBody: "1 到 6 行列随便组合，每个项目记住自己的布局。",
     metricModelTitle: "换模型不换 CLI",
     metricModelBody: "还是你熟悉的 Claude Code，只是指向了别的供应商。",
-    metricLocalTitle: "不注册、不联网",
+    metricLocalTitle:
+      "默认在本地运行",
     metricLocalBody:
-      "项目和 API Key 都在你电脑上，Termexo 没有需要登录的云端。",
+      "工作台运行在你的电脑上。需要远程操作时，再连接自建中继，或通过可信局域网 / VPN 访问。",
 
     attentionTitle: "Agent 卡住了，它会喊你。",
     attentionLead:
@@ -315,17 +334,21 @@ const translations = {
     featureQuotaTitle: "额度烧完之前就知道",
     featureQuotaBody:
       "在决定把下一个任务交给哪个模型之前，先看清套餐还剩多少、什么时候重置。",
-    featureRemoteTitle: "在手机上点同意",
+    featureRemoteTitle:
+      "跨网络接回工作台",
     featureRemoteBody:
-      "用手机浏览器打开工作台，走一条到自己电脑的加密连接，把 Agent 一直在等的那次授权放行。",
+      "通过自建中继，用手机连接桌面正在运行的同一批终端。桌面无需公网 IP，也无需路由器端口映射。",
 
-    remoteTitle: "同一个工作台，装进手里。",
+    remoteTitle:
+      "换个网络，接着用。",
     remoteLead:
-      "打开远程访问，手机、平板或另一个房间的笔记本用浏览器就能打开完整工作台。不是只读的镜像，而是同一批工作空间、同一批正在运行的终端——人不在工位上，卡在授权那一步的 Agent 也能等到回答。",
+      "桌面主动建立到中继的出站隧道。手机、平板或另一台电脑打开中继链接，就能查看输出、继续操作同一个终端。桌面无需公网 IP，也无需路由器端口映射。",
     remotePoint1:
-      "连接加密到你自己的电脑，凭令牌进入，令牌可扫码，也可以随时更换",
-    remotePoint2: "终端支持手指拖拽滚动，尺寸跟随正在使用的那块屏幕",
-    remotePoint3: "不经过 Termexo 的任何服务器，连接只在你自己的设备之间",
+      "自建 termexo-relay，通过注册码或中继账号登记桌面设备",
+    remotePoint2:
+      "浏览器使用 HTTPS 入口，v2 会话帧采用 AES-256-GCM 加密",
+    remotePoint3:
+      "电脑保持开机、Termexo 连接中继；中继登录与桌面访问令牌独立校验",
     remoteCaption: "屏幕上是同一个终端，桌面端正在跑的那个。",
 
     roadmapTitle: "接下来做什么。",
@@ -342,13 +365,14 @@ const translations = {
       "一键装好或升级 CLI，多个登录账号分开管理，为公司内网配代理，并盯住套餐还剩多少额度。",
     roadmap06Title: "在 Agent 之间交接工作",
     roadmap06Body: "会话摘要、把任务从一个 Agent 转给另一个、任务分派和通知。",
-    roadmap07Title: "在任何地方连回工位",
+    roadmap07Title:
+      "远程中继访问",
     roadmap07Body:
-      "工作台已经能在手机或另一台电脑上打开，走一条到自己电脑的加密连接，驱动同一批终端。设备配对、权限角色和操作日志是接下来的部分。",
+      "v0.10.0 已发布：自建中继、注册码或账号登记、级联访问地址与 v2 加密会话。浏览器操作的是桌面正在运行的同一批终端。",
 
     principlesTitle: "你的工作，\n留在你的电脑。",
     principlesLead:
-      "Termexo 没有账号、没有服务器，也没有要同步的东西。远程访问是唯一一条对外的连接，也是你自己打开、自己发令牌、随时能关掉的那种。",
+      "Termexo 默认在本地运行。需要时开启远程访问，通过自建中继或可信局域网 / VPN 连接，自己管理桌面访问令牌，并可在设置中断开。Agent CLI 仍会连接你配置的模型服务。",
     principle1Title: "默认就在本地",
     principle1Body:
       "项目路径、会话、终端状态和设置都存在你硬盘上的文件里，没有需要登录的云服务。",
@@ -361,7 +385,7 @@ const translations = {
 
     ctaTitle: "一条命令，不用注册。",
     ctaLead:
-      "npm 包里带着完整的 Windows 应用。跑起来看看，不喜欢直接删掉——它不会在别处留下任何东西。",
+      "npm 包包含完整 Windows 应用，无需注册 Termexo 账号即可在本地开始使用。需要跨网络访问时，再连接自己部署的中继。",
     getRelease: "下载安装包",
     starGithub: "在 GitHub 上 Star",
     supportProject:
@@ -381,6 +405,11 @@ const translations = {
     footerTagline: "一个窗口，装下所有编程 Agent",
     siteVisits: "官网累计访问量（PV）",
     counterNotice: "第三方统计仅记录官网访问；“—”表示暂不可用。",
+    navRelay: "中继访问",
+    sceneProtocol: "中继 / 局域网 / VPN",
+    relayDeploy: "部署自己的中继 ↗",
+    relaySetup: "查看连接步骤 ↗",
+    relayCompatibility: "中继支持 Linux / macOS / Windows、x64 / arm64 和容器部署。桌面版支持 Windows 10 / 11。",
   },
 };
 
@@ -399,8 +428,8 @@ function setLanguage(language) {
   document.documentElement.lang = language === "zh" ? "zh-CN" : "en";
   document.title =
     language === "zh"
-      ? "Termexo — 电脑上开工，手机上接着用"
-      : "Termexo — Your agents, from desk to phone";
+      ? "Termexo — 电脑上开工，跨网络接着用"
+      : "Termexo — Your workbench, across networks";
 
   translatedElements.forEach((element) => {
     const value = dictionary[element.dataset.i18n];
@@ -411,7 +440,7 @@ function setLanguage(language) {
         language === "zh" ? "guide.html" : "guide.en.html",
       );
     }
-    if (element.dataset.i18n === "heroRemoteGuide") {
+    if (["heroRemoteGuide", "relaySetup"].includes(element.dataset.i18n)) {
       element.setAttribute(
         "href",
         language === "zh" ? "guide.html#remote" : "guide.en.html#remote",

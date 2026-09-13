@@ -5,17 +5,17 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta
       name="description"
-      content="Run Claude Code, Codex, OpenCode, and Antigravity together on Windows. Step away and use the same live terminals from your phone over a trusted LAN or VPN. Local-first, MIT licensed."
+      content="Run AI coding agents on Windows and reconnect across networks through your own relay. Use the same workbench from your phone; no public IP or port forwarding on the desktop."
     />
     <meta name="theme-color" content="#edf4f8" />
     <meta property="og:type" content="website" />
     <meta
       property="og:title"
-      content="Termexo — Your agents, from desk to phone"
+      content="Termexo — Your workbench, across networks"
     />
     <meta
       property="og:description"
-      content="Your agents run on your Windows PC. Check output and send the next instruction from your phone, over a trusted LAN or VPN."
+      content="Your agents run on Windows. Reconnect from your phone through a self-hosted HTTPS relay, with encrypted sessions and no router port forwarding on the desktop."
     />
     <meta
       property="og:image"
@@ -29,7 +29,7 @@
     />
     <meta
       name="twitter:description"
-      content="Manage real AI coding terminals, resume sessions, and reach the same workbench from your phone. Free, MIT licensed, Windows only."
+      content="Reach the same Windows AI workbench across networks through your own HTTPS relay. Encrypted sessions; no public IP or port forwarding on the desktop."
     />
     <meta
       name="twitter:image"
@@ -46,9 +46,9 @@
         "@context": "https://schema.org",
         "@type": "SoftwareApplication",
         "name": "Termexo",
-        "softwareVersion": "0.9.0",
+        "softwareVersion": "0.10.0",
         "url": "https://www.termexo.com/",
-        "description": "A local-first Windows workspace for Claude Code, Codex, OpenCode and Antigravity, with real terminals, session recovery, task boards and optional remote access.",
+        "description": "A local-first Windows AI coding workbench with self-hosted remote relay access, encrypted sessions, real terminals and session recovery.",
         "applicationCategory": "DeveloperApplication",
         "operatingSystem": "Windows 10, Windows 11",
         "license": "https://github.com/gemron/Termexo/blob/main/LICENSE",
@@ -61,7 +61,7 @@
         "screenshot": "https://www.termexo.com/assets/termexo-workbench.png"
       }
     </script>
-    <title>Termexo — Your agents, from desk to phone</title>
+    <title>Termexo — Your workbench, across networks</title>
     <link rel="canonical" href="https://www.termexo.com/" />
     <link rel="icon" href="assets/termexo-mark.svg" type="image/svg+xml" />
     <link rel="stylesheet" href="styles.css" />
@@ -78,7 +78,7 @@
             <img src="assets/termexo-mark.svg" alt="" />
           </span>
           <span>Termexo</span>
-          <small>0.9.0</small>
+          <small>0.10.0</small>
         </a>
 
         <nav
@@ -87,6 +87,7 @@
           aria-label="Main navigation"
           data-nav
         >
+          <a href="#remote-relay" data-i18n="navRelay">Remote relay</a>
           <a href="#workbench" data-i18n="navWorkbench">Workbench</a>
           <a href="#capabilities" data-i18n="navCapabilities">Features</a>
           <a href="#roadmap" data-i18n="navRoadmap">Roadmap</a>
@@ -134,18 +135,14 @@
           <div class="eyebrow">
             <span class="live-dot"></span>
             <span data-i18n="eyebrow"
-              >WINDOWS WORKBENCH / MOBILE REMOTE ACCESS</span
+              >WINDOWS WORKBENCH / SELF-HOSTED RELAY</span
             >
           </div>
           <h1>
-            <span data-i18n="heroLine1">At your desk.</span>
-            <em data-i18n="heroLine2">Or on your phone.</em>
+            <span data-i18n="heroLine1">Start at your desk.</span>
+            <em data-i18n="heroLine2">Across networks.</em>
           </h1>
-          <p class="hero-lead" data-i18n="heroLead">
-            Claude Code, Codex, OpenCode, and Antigravity. One Windows workbench.
-            Check output and send the next instruction from your phone. Your
-            agents keep running on your PC.
-          </p>
+          <p class="hero-lead" data-i18n="heroLead">Claude Code, Codex, OpenCode, and Antigravity in one Windows workbench. Reconnect across networks through your own relay: check output, answer approvals, and send the next instruction to the same live terminal.</p>
           <ul class="hero-agents" aria-label="Supported agents">
             <li>
               <img src="assets/agent-claude.svg" alt="" width="22" height="22" loading="lazy" />
@@ -164,10 +161,7 @@
               <span>Antigravity</span>
             </li>
           </ul>
-          <p class="hero-remote-note" data-i18n="heroRemoteNote">
-            Keep your PC running. Enable remote access, then connect with a
-            token over a trusted LAN or VPN.
-          </p>
+          <p class="hero-remote-note" data-i18n="heroRemoteNote">Keep your PC running. Use a reachable HTTPS relay and desktop access token, or connect directly over a trusted LAN or VPN.</p>
           <div class="hero-actions">
             <a
               class="button primary"
@@ -205,7 +199,7 @@
             class="hero-guide-link"
             href="guide.en.html#remote"
             data-i18n="heroRemoteGuide"
-            >How to connect your phone ↗</a
+            >Set up remote relay access ↗</a
           >
           <div class="hero-proof">
             <a
@@ -256,7 +250,7 @@
           <div class="scene-heading">
             <span class="scene-dot" aria-hidden="true"></span>
             <span data-i18n="sceneHeading">One workspace. Two ways in.</span>
-            <span class="scene-protocol">LAN / VPN</span>
+            <span class="scene-protocol" data-i18n="sceneProtocol">RELAY / LAN / VPN</span>
           </div>
           <div class="device-scenes">
             <div class="device-connection" aria-hidden="true">
@@ -340,7 +334,7 @@
                   <div class="mobile-browser">
                     <svg viewBox="0 0 24 24" aria-hidden="true">
                       <path d="M7 10V7a5 5 0 0 1 10 0v3M5 10h14v11H5z" /></svg
-                    ><span data-i18n="sceneConnection">Remote · HTTPS</span>
+                    ><span data-i18n="sceneConnection">Relay · HTTPS</span>
                   </div>
                   <svg
                     class="phone-screen"
@@ -454,11 +448,8 @@
           </article>
           <article class="metric reveal" data-delay="3">
             <strong>0</strong>
-            <span data-i18n="metricLocalTitle">No sign-up, no server</span>
-            <p data-i18n="metricLocalBody">
-              Your projects and API keys stay on your computer. Termexo has no
-              cloud to log into.
-            </p>
+            <span data-i18n="metricLocalTitle">Local by default</span>
+            <p data-i18n="metricLocalBody">Your workbench runs on your PC. Remote access is optional, through a relay you manage or a trusted LAN / VPN.</p>
           </article>
         </div>
       </section>
@@ -644,33 +635,20 @@
         </div>
       </section>
 
-      <section class="section model-section shell">
+      <section class="section model-section shell" id="remote-relay">
         <div class="model-copy reveal">
           <span class="section-index" data-i18n="indexRemote"
             >06 / ANY DEVICE</span
           >
-          <h2 data-i18n="remoteTitle">The same workbench, in your hand.</h2>
-          <p data-i18n="remoteLead">
-            Turn on remote access and a phone, a tablet, or the laptop in the
-            other room opens the whole workbench in a browser. Not a read-only
-            mirror: the same workspaces and the same live terminals, so the
-            agent stopped on an approval gets its answer while you are away from
-            the desk.
-          </p>
+          <h2 data-i18n="remoteTitle">Your workbench. Across networks.</h2>
+          <p data-i18n="remoteLead">Your desktop opens an outbound tunnel to your relay. Open the relay link on a phone, tablet, or another computer to check output and continue the same terminal session. The desktop needs no public IP or router port forwarding.</p>
           <ul>
-            <li data-i18n="remotePoint1">
-              Encrypted to your own machine, entered with a token you can scan
-              as a QR code and rotate whenever you like
-            </li>
-            <li data-i18n="remotePoint2">
-              Terminals scroll by finger and take the size of whichever screen
-              is being used
-            </li>
-            <li data-i18n="remotePoint3">
-              Nothing passes through a Termexo server — the link runs between
-              your own devices
-            </li>
+            <li data-i18n="remotePoint1">Self-host termexo-relay; enroll your desktop with a code or relay account</li>
+            <li data-i18n="remotePoint2">Use an HTTPS browser entry point; v2 session frames are encrypted with AES-256-GCM</li>
+            <li data-i18n="remotePoint3">Keep your desktop on and Termexo connected; relay login and the desktop access token are separate checks</li>
           </ul>
+          <div class="relay-links"><a href="https://github.com/gemron/termexo-relay" target="_blank" rel="noopener noreferrer" data-i18n="relayDeploy">Deploy your relay ↗</a><a href="guide.en.html#remote" data-i18n="relaySetup">Read the connection guide ↗</a></div>
+          <p class="relay-compatibility" data-i18n="relayCompatibility">Relay: Linux / macOS / Windows, x64 / arm64 and containers. Desktop app: Windows 10 / 11.</p>
         </div>
         <figure class="settings-frame reveal" data-delay="1">
           <img
@@ -850,12 +828,8 @@
             <article class="bento reveal" data-delay="3">
               <span class="card-tag now" data-i18n="now">WORKS TODAY</span>
               <div class="card-icon cyan" aria-hidden="true">⌁</div>
-              <h3 data-i18n="featureRemoteTitle">Approve it from your phone</h3>
-              <p data-i18n="featureRemoteBody">
-                Open the workbench in your phone's browser, over an encrypted
-                link to your own machine, and let the agent through the approval
-                it has been waiting on.
-              </p>
+              <h3 data-i18n="featureRemoteTitle">Reach your workbench across networks</h3>
+              <p data-i18n="featureRemoteBody">A self-hosted relay connects your phone to the same desktop terminals. No public IP or router port forwarding on the desktop.</p>
               <div class="device-map" aria-hidden="true">
                 <span class="device desktop">▱</span><i></i
                 ><span class="hub">T</span><i></i
@@ -915,16 +889,10 @@
             </article>
             <article class="roadmap-item current reveal" data-delay="3">
               <div>
-                <span>V0.7–0.8</span><b data-i18n="current">YOU ARE HERE</b>
+                <span>V0.10.0</span><b data-i18n="current">YOU ARE HERE</b>
               </div>
-              <h3 data-i18n="roadmap07Title">
-                Reaching your desk from anywhere
-              </h3>
-              <p data-i18n="roadmap07Body">
-                The workbench opens on a phone or a second computer over an
-                encrypted link to your own machine, driving the same live
-                terminals. Paired devices, roles, and an audit trail come next.
-              </p>
+              <h3 data-i18n="roadmap07Title">Remote relay access</h3>
+              <p data-i18n="roadmap07Body">Shipped in v0.10.0: self-hosted relay access, code or account enrollment, cascaded addresses, and v2 encrypted sessions. Your browser operates the terminals already running on your desktop.</p>
             </article>
           </div>
         </div>
@@ -936,11 +904,7 @@
             >09 / PRIVACY</span
           >
           <h2 data-i18n="principlesTitle">Your work. On your computer.</h2>
-          <p data-i18n="principlesLead">
-            Termexo has no account, no server, and nothing to sync. Remote
-            access is the one link out, and it is the kind you switch on
-            yourself, hand a token to, and switch off just as fast.
-          </p>
+          <p data-i18n="principlesLead">Termexo runs locally by default. Enable remote access when you need it: use your own relay or a trusted LAN / VPN, control the desktop access token, and disconnect from Settings. Your agent CLIs still connect to the model services you configure.</p>
         </div>
         <div class="principles-list">
           <article class="reveal">
@@ -986,10 +950,7 @@
         <div>
           <span class="section-index" data-i18n="indexCta">BUILD WITH US</span>
           <h2 data-i18n="ctaTitle">One command. No account.</h2>
-          <p data-i18n="ctaLead">
-            The npm package ships the whole Windows app. Run it, and if you do
-            not like it, delete it — nothing was created anywhere else.
-          </p>
+          <p data-i18n="ctaLead">The npm package includes the Windows app. Start locally without a Termexo account, then connect a self-hosted relay when you need access across networks.</p>
           <p data-i18n="supportProject">
             Built in the open, under the MIT license. If Termexo helps your
             workflow, a GitHub Star helps others discover it. Bug reports and

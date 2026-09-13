@@ -2411,7 +2411,7 @@ html:not(.motion-ready) *::after {
     display: block;
   }
   .hero {
-    grid-template-columns: 1fr;
+    grid-template-columns: minmax(0, 1fr);
     gap: 35px;
     padding: 55px 40px 96px;
   }
@@ -3404,4 +3404,13 @@ html:not(.motion-ready) *::after {
   .mobile-scene {
     transform: rotate(5deg) !important;
   }
+}
+
+/* Relay deployment and setup links share the existing section layout. */
+.relay-links { display: flex; flex-wrap: wrap; gap: 12px 24px; margin-top: 24px; }
+.relay-links a { font-weight: 600; text-underline-offset: 4px; }
+.model-copy .relay-compatibility { font-size: 13px; line-height: 1.7; margin-top: 16px; }
+@media (max-width: 960px) {
+  .hero-copy,
+  .hero-scene { min-width: 0; width: 100%; }
 }
