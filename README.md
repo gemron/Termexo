@@ -30,7 +30,9 @@
   <img src="website/assets/agent-antigravity.svg" alt="Antigravity" title="Antigravity" width="26" height="26">
 </p>
 
-Termexo runs Claude Code, Codex, OpenCode, and Antigravity in one Windows workbench.
+**Termexo is building a local-first AI coding workbench that brings agents, models, and projects together, so development can continue securely between your computer and phone.**
+
+Today, it runs Claude Code, Codex, OpenCode, and Antigravity in one Windows workbench.
 Keep your agents running on your PC, then reconnect through your own relay from a phone or another computer's browser. Check output, answer an approval, or send the next instruction to the same live terminal across networks. Your desktop needs no public IP or router port forwarding.
 
 ![Termexo Windows workbench](website/assets/termexo-workbench.png)
@@ -38,6 +40,28 @@ Keep your agents running on your PC, then reconnect through your own relay from 
 | See your agents together | Know who needs you | Continue from your phone |
 | --- | --- | --- |
 | Arrange real terminals side by side, grouped by project. | Spot an agent waiting for input or approval. | Connect across networks through a self-hosted relay, or directly over a trusted LAN or VPN. |
+
+## The problem it solves
+
+Working across multiple AI coding tools and projects means scattered windows, progress that is hard to track, repeated context when switching tasks, and work you cannot easily continue away from your desk. Termexo organizes projects and terminals into workspaces, brings agent status into view, helps resume work through native sessions and handoff packages, and extends the same running workbench to your phone or another computer.
+
+<picture>
+  <source media="(max-width: 600px)" srcset="website/assets/termexo-workflow-en-mobile.svg">
+  <img src="website/assets/termexo-workflow-en.svg" alt="Termexo workflow: projects and tasks enter a local workbench for agents, model profiles and sessions, with optional remote access to continue from another device">
+</picture>
+
+## Scenarios for individuals and enterprise developers
+
+| Scenario | Individual developers | Enterprise team members | How Termexo helps |
+| --- | --- | --- | --- |
+| Multiple projects | Maintain work projects, a side product, and open-source repositories | Organize each business project's development environment | Workspaces group project folders, terminals, layouts, and configuration, reducing window switching. |
+| Agent task allocation and progress | Assign agents to implementation, tests, and code review | Engineers assign tasks, follow progress, and approve results | Side-by-side terminals, a task board, status indicators, and approval reminders reduce repeated output checks. |
+| Resuming and handing off work | Resume yesterday's session or continue with another agent | Summarize goals, progress, and next steps to help another engineer take over | Search and resume supported native sessions; carry task context in a handoff package. |
+| Long tasks and remote access | Check progress, answer approvals, and send instructions from your phone | Leave tasks running on a development PC and reconnect through a controlled entry point | A self-hosted relay or trusted LAN / VPN connects to the same running terminal; the host PC must stay on. |
+| Models and account configuration | Manage subscriptions and API profiles; choose a model for each task | Manage providers, compatible gateways, and network configuration | Model, account, and network profiles in one place, with quota visibility for supported providers. |
+| Control over the development environment | Run projects and agents on your own PC and host your own remote entry point | Run the workbench in an environment controlled by your organization and manage your relay | Workbench state stays local and remote access is optional; agent and model configuration determines where model requests go. |
+
+**Available today and planned:** These scenarios center on individuals and team members operating their own workbenches, with people assigning tasks and handling approvals. Shared workspaces, granular permissions, centralized audit, and broader automatic orchestration are part of the [long-term product direction](Termexo.md), not a ready-made enterprise administration platform.
 
 ## Try it on Windows
 

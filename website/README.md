@@ -59,6 +59,12 @@ node --test scripts/website-guide.test.mjs
 
 ## 校验与发布命令
 
+首页 `#solutions` 展示项目方向、个人与企业研发场景，以及现有能力和长期规划的边界。
+中英文文案维护在 `app.js`；语言切换同时更新配图和替代文本。
+`assets/termexo-workflow-{zh,en}.svg` 为横版流程图，`-mobile.svg` 为手机竖版；
+README 与官网共用这些素材，图中的连线表示工作组织和访问关系，不表示 Agent 自动编排。
+修改图中文字或布局后运行 `python scripts/build-workflow-illustrations.py`，并复核两种语言、两种布局。
+
 首页采用浅色冰蓝主题，动效由原生 CSS 与 `app.js` 驱动，无动画库或视频依赖。
 设计参考 CBDC 的玻璃材质与悬浮构图：
 https://dribbble.com/shots/24093396-CBDC-Web-Design-for-Digital-Currency-Website

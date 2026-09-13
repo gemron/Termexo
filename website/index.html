@@ -46,7 +46,7 @@
         "@context": "https://schema.org",
         "@type": "SoftwareApplication",
         "name": "Termexo",
-        "softwareVersion": "0.10.0",
+        "softwareVersion": "0.10.1",
         "url": "https://www.termexo.com/",
         "description": "A local-first Windows AI coding workbench with self-hosted remote relay access, encrypted sessions, real terminals and session recovery.",
         "applicationCategory": "DeveloperApplication",
@@ -78,7 +78,7 @@
             <img src="assets/termexo-mark.svg" alt="" />
           </span>
           <span>Termexo</span>
-          <small>0.10.0</small>
+          <small>0.10.1</small>
         </a>
 
         <nav
@@ -89,6 +89,7 @@
         >
           <a href="#remote-relay" data-i18n="navRelay">Remote relay</a>
           <a href="#workbench" data-i18n="navWorkbench">Workbench</a>
+          <a href="#solutions" data-i18n="navSolutions">Use cases</a>
           <a href="#capabilities" data-i18n="navCapabilities">Features</a>
           <a href="#roadmap" data-i18n="navRoadmap">Roadmap</a>
           <a href="#principles" data-i18n="navPrinciples">Privacy</a>
@@ -142,7 +143,7 @@
             <span data-i18n="heroLine1">Start at your desk.</span>
             <em data-i18n="heroLine2">Across networks.</em>
           </h1>
-          <p class="hero-lead" data-i18n="heroLead">Claude Code, Codex, OpenCode, and Antigravity in one Windows workbench. Reconnect across networks through your own relay: check output, answer approvals, and send the next instruction to the same live terminal.</p>
+          <p class="hero-lead" data-i18n="heroLead">A local-first AI coding workbench that brings agents, models, and projects together, so development can continue securely between your computer and phone.</p>
           <ul class="hero-agents" aria-label="Supported agents">
             <li>
               <img src="assets/agent-claude.svg" alt="" width="22" height="22" loading="lazy" />
@@ -387,6 +388,48 @@
           ><span>MiniMax</span><i></i><span>GLM</span><i></i><span>MCP</span
           ><i></i><span>Native PTY</span>
         </div>
+      </section>
+
+      <section class="section shell solutions-section" id="solutions" aria-labelledby="solutions-title">
+        <div class="section-heading reveal">
+          <div>
+            <span class="section-index" data-i18n="solutionsIndex">DIRECTION / USE CASES</span>
+            <h2 id="solutions-title" data-i18n="solutionsTitle">Keep your AI development work connected.</h2>
+          </div>
+          <p data-i18n="solutionsProblem">Multiple projects and coding agents can mean scattered windows, missed approvals, and context to explain all over again. Termexo brings the work into view and helps you pick up where you left off.</p>
+        </div>
+        <figure class="workflow-figure" data-workflow>
+          <picture>
+            <source media="(max-width: 600px)" srcset="assets/termexo-workflow-en-mobile.svg" />
+            <img src="assets/termexo-workflow-en.svg" alt="Projects and tasks enter the local Termexo workbench, with optional remote access to continue from another device." width="1200" height="620" loading="lazy" />
+          </picture>
+          <figcaption data-i18n="workflowCaption">Workflow illustration. People assign tasks and approve actions; agents keep running on the host PC.</figcaption>
+        </figure>
+        <div class="scenario-grid">
+          <article class="scenario-card">
+            <span class="scenario-label" data-i18n="individualLabel">FOR INDIVIDUALS</span>
+            <h3 data-i18n="individualTitle">More projects. Less switching.</h3>
+            <ul>
+              <li><h4 data-i18n="individualProjectsTitle">Work, side projects, open source</h4><p data-i18n="individualProjectsBody">Keep each project's terminals, models, and layout together. Assign agents to implementation, tests, and review, then see who needs you.</p></li>
+              <li><h4 data-i18n="individualResumeTitle">Continue tomorrow, or with another agent</h4><p data-i18n="individualResumeBody">Find a saved native session or prepare a handoff with the goal, progress, and next step. Spend less time repeating the background.</p></li>
+              <li><h4 data-i18n="individualRemoteTitle">Step away without losing touch</h4><p data-i18n="individualRemoteBody">Leave your PC running and reconnect from your phone to check output, answer an approval, or send the next instruction.</p></li>
+            </ul>
+          </article>
+          <article class="scenario-card">
+            <span class="scenario-label" data-i18n="enterpriseLabel">FOR ENTERPRISE DEVELOPERS</span>
+            <h3 data-i18n="enterpriseTitle">Organize the work. Keep control.</h3>
+            <ul>
+              <li><h4 data-i18n="enterpriseTasksTitle">Project work engineers can follow</h4><p data-i18n="enterpriseTasksBody">Group business projects into workspaces. Engineers use the task board and agent status to assign work, review results, and prepare handoffs.</p></li>
+              <li><h4 data-i18n="enterpriseProfilesTitle">Providers and environments in one place</h4><p data-i18n="enterpriseProfilesBody">Manage model, account, and network profiles for different providers and compatible gateways, with quota visibility where supported.</p></li>
+              <li><h4 data-i18n="enterpriseRemoteTitle">Access to the development PC you manage</h4><p data-i18n="enterpriseRemoteBody">Run the workbench on your organization's Windows PC. Use your own relay or trusted LAN / VPN to reconnect to long-running tasks.</p></li>
+            </ul>
+          </article>
+        </div>
+        <aside class="solutions-boundary">
+          <strong data-i18n="solutionsBoundaryTitle">Available today / longer-term direction</strong>
+          <p data-i18n="solutionsBoundaryBody">Today, individuals and team members operate their own workbenches. Shared workspaces, granular permissions, centralized audit, and broader automatic orchestration remain planned capabilities.</p>
+          <p data-i18n="solutionsDataNote">Local-first describes where the workbench runs. Your agent and model configuration still determines where model requests and code are sent.</p>
+        </aside>
       </section>
 
       <section class="section shell" id="workbench">
@@ -889,7 +932,7 @@
             </article>
             <article class="roadmap-item current reveal" data-delay="3">
               <div>
-                <span>V0.10.0</span><b data-i18n="current">YOU ARE HERE</b>
+                <span>V0.10.0–0.10.1</span><b data-i18n="current">YOU ARE HERE</b>
               </div>
               <h3 data-i18n="roadmap07Title">Remote relay access</h3>
               <p data-i18n="roadmap07Body">Shipped in v0.10.0: self-hosted relay access, code or account enrollment, cascaded addresses, and v2 encrypted sessions. Your browser operates the terminals already running on your desktop.</p>

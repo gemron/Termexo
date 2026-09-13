@@ -938,6 +938,45 @@ html:not(.motion-ready) .signal-strip,
 .section {
   padding-block: 115px;
 }
+.workflow-figure {
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: 24px;
+  background: var(--panel);
+}
+.workflow-figure img { width: 100%; }
+.workflow-figure figcaption {
+  padding: 16px 24px;
+  border-top: 1px solid var(--line);
+  color: var(--text-soft);
+  font-size: 13px;
+}
+.scenario-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 24px;
+  margin-top: 32px;
+}
+.scenario-card {
+  padding: 32px;
+  border: 1px solid var(--line);
+  border-radius: 24px;
+  background: var(--bg-raised);
+}
+.scenario-label { color: var(--green); font-size: 12px; letter-spacing: .08em; font-weight: 700; }
+.scenario-card h3 { margin: 12px 0 28px; font-size: clamp(23px, 2.3vw, 32px); line-height: 1.35; letter-spacing: -.03em; }
+.scenario-card ul { list-style: none; margin: 0; padding: 0; }
+.scenario-card li + li { margin-top: 24px; padding-top: 24px; border-top: 1px solid var(--line); }
+.scenario-card h4 { margin: 0 0 8px; font-size: 16px; }
+.scenario-card p { margin: 0; color: var(--text-soft); font-size: 14px; line-height: 1.8; }
+.solutions-boundary { margin-top: 24px; padding: 24px 28px; border-left: 3px solid var(--line-strong); background: var(--panel); border-radius: 0 16px 16px 0; }
+.solutions-boundary strong { font-size: 14px; }
+.solutions-boundary p { margin: 8px 0 0; color: var(--text-soft); font-size: 13px; line-height: 1.8; }
+@media (max-width: 760px) {
+  .scenario-grid { grid-template-columns: 1fr; }
+  .scenario-card { padding: 24px; }
+  .solutions-boundary { padding: 20px; }
+}
 .section-heading {
   display: grid;
   grid-template-columns: 1fr 0.62fr;

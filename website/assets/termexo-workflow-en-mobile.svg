@@ -1,0 +1,55 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="480" height="1110" viewBox="0 0 480 1110" role="img" aria-labelledby="title desc">
+<title id="title">One workbench. Work that carries on.</title><desc id="desc">Agents run on the host PC. Keep it on for remote access. Agents can call providers or compatible gateways</desc>
+<defs><linearGradient id="bg" x2="1" y2="1"><stop stop-color="#f3f8fc"/><stop offset="1" stop-color="#e2eff5"/></linearGradient><marker id="arrow" markerWidth="8" markerHeight="8" refX="6" refY="4" orient="auto"><path d="M1 1 6 4 1 7" fill="none" stroke="#277991" stroke-width="1.5"/></marker></defs>
+<rect width="480" height="1110" rx="24" fill="url(#bg)"/>
+<g font-family="Inter, Arial, Microsoft YaHei, sans-serif">
+<text x="28" y="37" font-size="13" fill="#286f89" font-weight="700">TERMEXO / LOCAL-FIRST AI CODING</text>
+<text x="28" y="73" font-size="25" fill="#142e3d" font-weight="700">One workbench. Keep going.</text>
+<rect x="28" y="103" width="424" height="184" rx="18" fill="#ffffff" stroke="#c9dce5"/>
+<text x="50" y="139" font-size="23" fill="#142e3d" font-weight="700">Projects &amp; tasks</text>
+<text x="50" y="166" font-size="14" fill="#536d7b" font-weight="400">Individual &amp; enterprise work</text>
+<path d="M56 193 h7 l3 4 h10 v12 h-20 Z" fill="none" stroke="#397e96" stroke-width="1.5"/>
+<text x="90" y="206" font-size="17" fill="#142e3d" font-weight="400">Business projects</text>
+<path d="M56 221 h7 l3 4 h10 v12 h-20 Z" fill="none" stroke="#397e96" stroke-width="1.5"/>
+<text x="90" y="234" font-size="17" fill="#142e3d" font-weight="400">Side products</text>
+<path d="M56 249 h7 l3 4 h10 v12 h-20 Z" fill="none" stroke="#397e96" stroke-width="1.5"/>
+<text x="90" y="262" font-size="17" fill="#142e3d" font-weight="400">Open source</text>
+<rect x="28" y="335" width="424" height="302" rx="22" fill="#132f3e" stroke="#264c60"/>
+<circle cx="58" cy="370" r="6" fill="#6bd5bf"/>
+<text x="75" y="378" font-size="28" fill="#ffffff" font-weight="700">Termexo</text>
+<text x="52" y="412" font-size="19" fill="#c5e6f2" font-weight="400">Local Windows workbench</text>
+<text x="52" y="448" font-size="16" fill="#9fc4d6" font-weight="400">Agent terminals · You assign the work</text>
+<rect x="52.0" y="467" width="182.0" height="36" rx="9" fill="#21485c" stroke="#386076"/>
+<circle cx="67.0" cy="485" r="3" fill="#80d9c7"/>
+<text x="79.0" y="491" font-size="16" fill="#ffffff" font-weight="400">Claude Code</text>
+<rect x="246.0" y="467" width="182.0" height="36" rx="9" fill="#21485c" stroke="#386076"/>
+<circle cx="261.0" cy="485" r="3" fill="#80d9c7"/>
+<text x="273.0" y="491" font-size="16" fill="#ffffff" font-weight="400">Codex CLI</text>
+<rect x="52.0" y="515" width="182.0" height="36" rx="9" fill="#21485c" stroke="#386076"/>
+<circle cx="67.0" cy="533" r="3" fill="#80d9c7"/>
+<text x="79.0" y="539" font-size="16" fill="#ffffff" font-weight="400">OpenCode</text>
+<rect x="246.0" y="515" width="182.0" height="36" rx="9" fill="#21485c" stroke="#386076"/>
+<circle cx="261.0" cy="533" r="3" fill="#80d9c7"/>
+<text x="273.0" y="539" font-size="16" fill="#ffffff" font-weight="400">Antigravity</text>
+<text x="52" y="592" font-size="17" fill="#d6e9f0" font-weight="400">Model / account / network profiles</text>
+<text x="52" y="620" font-size="17" fill="#d6e9f0" font-weight="400">Task status / resume / handoffs</text>
+<path d="M240 295 V324" fill="none" stroke="#277991" stroke-width="2" marker-end="url(#arrow)"/>
+<text x="256" y="317" font-size="14" fill="#286f89" font-weight="400">Organize</text>
+<path d="M240 646 V678" fill="none" stroke="#277991" stroke-width="2" marker-end="url(#arrow)" stroke-dasharray="5 5"/>
+<rect x="28" y="691" width="424" height="82" rx="14" fill="#f5fafc" stroke="#bfd5e1"/>
+<text x="48" y="722" font-size="18" fill="#142e3d" font-weight="600">Model services you configure</text>
+<text x="48" y="748" font-size="15" fill="#536d7b" font-weight="400">Agents can call providers or compatible gateways</text>
+<path d="M460 490 V801 H240 V810" fill="none" stroke="#277991" stroke-width="2" marker-end="url(#arrow)"/>
+<text x="34" y="801" font-size="15" fill="#286f89" font-weight="400">Optional: own relay / LAN / VPN</text>
+<rect x="28" y="814" width="424" height="220" rx="18" fill="#ffffff" stroke="#c9dce5"/>
+<g fill="none" stroke="#397e96" stroke-width="2"><rect x="50" y="836" width="39" height="26" rx="3"/><path d="M69 862 v7 m-12 0 h24"/><rect x="97" y="838" width="15" height="31" rx="3"/></g>
+<text x="50" y="900" font-size="22" fill="#142e3d" font-weight="700">Continue on another device</text>
+<text x="50" y="926" font-size="15" fill="#536d7b" font-weight="400">Phone / another computer</text>
+<text x="50" y="962" font-size="18" fill="#277991" font-weight="400">→</text>
+<text x="74" y="962" font-size="16" fill="#142e3d" font-weight="400">Check progress</text>
+<text x="50" y="990" font-size="18" fill="#277991" font-weight="400">→</text>
+<text x="74" y="990" font-size="16" fill="#142e3d" font-weight="400">Answer approvals</text>
+<text x="50" y="1018" font-size="18" fill="#277991" font-weight="400">→</text>
+<text x="74" y="1018" font-size="16" fill="#142e3d" font-weight="400">Send the next instruction</text>
+<text x="28" y="1086" font-size="14" fill="#536d7b" font-weight="400">Agents run on the host PC. Keep it on for remote access.</text>
+</g></svg>
