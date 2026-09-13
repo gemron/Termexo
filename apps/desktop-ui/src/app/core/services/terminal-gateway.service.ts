@@ -96,6 +96,12 @@ export function terminalEventMatchesSession(
   );
 }
 
+/** The default colours a terminal is drawn in, as `#rrggbb`. */
+export interface TerminalPalette {
+  foreground: string;
+  background: string;
+}
+
 interface TerminalStartRequest {
   terminalId: string;
   runtimeRevision: number;
@@ -366,6 +372,23 @@ export class TerminalGatewayService {
         cols,
         rows,
         claim,
+      });
+    }
+  }
+
+  /**
+   * Tells the backend the colours a terminal is drawn in, which the PTY answers colour queries with.
+   *
+   * Left to the viewers, every window showing the terminal answered Codex's query, and any answer
+   * after the first — or one that crossed the relay too late — was typed into its prompt as
+   * `]11;rgb:…`. The browser preview has no program to ask.
+   */
+  async setPalette(terminalId: string, palette: TerminalPalette): Promise<void> {
+    if (hasBackend()) {
+      await invoke('set_terminal_palette', {
+        terminalId,
+        foreground: palette.foreground,
+        background: palette.background,
       });
     }
   }

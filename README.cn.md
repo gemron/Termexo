@@ -11,7 +11,7 @@
 </p>
 
 <p align="center">
-  <img alt="Version 0.10.2" src="https://img.shields.io/badge/version-0.10.2-58c7a0">
+  <img alt="Version 0.10.3" src="https://img.shields.io/badge/version-0.10.3-58c7a0">
   <img alt="Windows" src="https://img.shields.io/badge/platform-Windows-0078D4?logo=windows">
   <img alt="Tauri 2" src="https://img.shields.io/badge/Tauri-2-24C8DB?logo=tauri&logoColor=white">
   <img alt="Angular 22" src="https://img.shields.io/badge/Angular-22-DD0031?logo=angular">
@@ -95,7 +95,7 @@ npx termexo@latest
 
 ## 最新版本
 
-**[v0.10.2](https://github.com/gemron/Termexo/releases/tag/v0.10.2)** 让四个 Agent 终端的状态真正可靠——用真实的 Claude Code、Codex CLI、OpenCode 和 Antigravity 会话逐一端到端验证——新增异常与限流通知，任务看板也支持全部七种语言。
+**[v0.10.3](https://github.com/gemron/Termexo/releases/tag/v0.10.3)** 让终端同时在电脑和手机上打开时，Agent 输入框保持干净——Codex 不再被打进 `]11;rgb:…` 这类乱码——按住 Ctrl 点击链接不再需要先移开鼠标，在 OpenCode 里复制的内容也能进入你正在使用的窗口的剪贴板。
 [完整更新记录](CHANGELOG.cn.md)。
 
 如果 Termexo 帮到了你，欢迎 **给仓库点一个 Star**，帮助更多开发者发现它。
@@ -360,7 +360,8 @@ flowchart LR
 | V0.9.0 | 第四个 agent Antigravity 与厂商安装脚本 | 已发布 |
 | V0.10.0 | 自建中继与端到端加密的远程访问 | 已发布 |
 | V0.10.1 | 手机快捷键、适配输入法的远程页面与保留未保存修改的设置 | 已发布 |
-| V0.10.2 | 可靠的 Agent 状态与通知，以及多语言任务看板 | 当前版本 |
+| V0.10.2 | 可靠的 Agent 状态与通知，以及多语言任务看板 | 已发布 |
+| V0.10.3 | 多端查看时 Agent 输入框不再出现乱码、Ctrl+点击打开链接与 OpenCode 复制 | 当前版本 |
 | V1.0 | 稳定性、安全加固与恢复体验 | 规划中 |
 
 进行中的工作见 [Issues](https://github.com/gemron/Termexo/issues)，实际交付内容见

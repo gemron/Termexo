@@ -178,6 +178,20 @@ pub fn write_terminal(
         .map_err(|error| error.to_string())
 }
 
+/// Records the foreground and background a terminal is drawn in (`#rrggbb`), so the PTY can answer
+/// a program's colour queries itself instead of leaving every viewer to answer them.
+#[tauri::command]
+pub fn set_terminal_palette(
+    terminal_id: String,
+    foreground: String,
+    background: String,
+    manager: State<'_, PtyManager>,
+) -> Result<(), String> {
+    manager
+        .set_palette(&terminal_id, &foreground, &background)
+        .map_err(|error| error.to_string())
+}
+
 /// Reports a viewer's window size; `claim` marks the user working there, which hands that view
 /// the terminal's size. Everyone else renders whatever grid it settles on.
 #[tauri::command]
@@ -209,6 +223,7 @@ pub fn close_terminal(
     watcher.release(&terminal_id);
     if !preserve_repository_baseline {
         repositories.remove_terminal(&terminal_id);
+        manager.forget_palette(&terminal_id);
     }
     result
 }

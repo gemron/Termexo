@@ -1,4 +1,5 @@
 pub mod backend;
+mod colour_query;
 
 use std::collections::HashMap;
 use std::io::{Read, Write};
@@ -11,6 +12,7 @@ use tauri::{AppHandle, Emitter};
 use thiserror::Error;
 
 use crate::commands::terminal::TerminalStartRequest;
+use crate::pty::colour_query::{ColourQueryResponder, InvalidColour, TerminalPalette};
 use crate::remote::{
     RemoteEventHub, EVENT_TERMINAL_EXIT, EVENT_TERMINAL_OUTPUT, EVENT_TERMINAL_RESIZED,
 };
@@ -73,7 +75,15 @@ pub enum PtyError {
     Backend(String),
     #[error("terminal I/O failed: {0}")]
     Io(#[from] std::io::Error),
+    #[error(transparent)]
+    InvalidColour(#[from] InvalidColour),
 }
+
+/// The PTY's input, shared by the viewers typing into it and the reader answering colour queries.
+type SharedWriter = Arc<Mutex<Box<dyn Write + Send>>>;
+
+/// The colours each terminal is drawn in, by terminal id.
+type Palettes = Arc<Mutex<HashMap<String, TerminalPalette>>>;
 
 #[derive(Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -494,7 +504,7 @@ fn lock_recovering<T>(lock: &Mutex<T>) -> std::sync::MutexGuard<'_, T> {
 }
 
 struct PtyProcess {
-    writer: Box<dyn Write + Send>,
+    writer: SharedWriter,
     master: Box<dyn MasterPty + Send>,
     /// The child itself is owned by the exit watcher, which blocks on it; closing a terminal only
     /// ever needs to kill it.
@@ -541,6 +551,9 @@ fn should_apply_viewport(active_viewer: Option<&str>, viewer_id: &str, claim: bo
 
 pub struct PtyManager {
     sessions: Mutex<HashMap<String, PtyProcess>>,
+    /// Kept apart from the sessions: a terminal is drawn in its colours before its process starts,
+    /// and still after a relaunch replaces the process under the same id.
+    palettes: Palettes,
     hub: Arc<RemoteEventHub>,
 }
 
@@ -548,8 +561,26 @@ impl PtyManager {
     pub fn new(hub: Arc<RemoteEventHub>) -> Self {
         Self {
             sessions: Mutex::new(HashMap::new()),
+            palettes: Arc::default(),
             hub,
         }
+    }
+
+    /// Records the colours a terminal is drawn in, which the PTY answers colour queries with.
+    pub fn set_palette(
+        &self,
+        terminal_id: &str,
+        foreground: &str,
+        background: &str,
+    ) -> Result<(), PtyError> {
+        let palette = TerminalPalette::from_hex(foreground, background)?;
+        lock_recovering(&self.palettes).insert(terminal_id.to_owned(), palette);
+        Ok(())
+    }
+
+    /// Drops the colours of a terminal that is gone for good.
+    pub fn forget_palette(&self, terminal_id: &str) {
+        lock_recovering(&self.palettes).remove(terminal_id);
     }
 
     /// Which launch of a terminal is currently running, or `None` when it is not.
@@ -668,16 +699,21 @@ impl PtyManager {
             writer.flush()?;
         }
 
+        let writer: SharedWriter = Arc::new(Mutex::new(writer));
         let history = Arc::new(Mutex::new(OutputHistory::new(
             request.cols.max(1),
             request.rows.max(1),
         )));
         spawn_reader(
-            request.terminal_id.clone(),
-            request.runtime_revision,
-            app.clone(),
-            self.hub.clone(),
-            history.clone(),
+            TerminalReader {
+                terminal_id: request.terminal_id.clone(),
+                runtime_revision: request.runtime_revision,
+                app: app.clone(),
+                hub: self.hub.clone(),
+                history: history.clone(),
+                palettes: self.palettes.clone(),
+                writer: writer.clone(),
+            },
             reader,
         );
         spawn_exit_watcher(
@@ -719,8 +755,9 @@ impl PtyManager {
         let session = sessions
             .get_mut(terminal_id)
             .ok_or_else(|| PtyError::NotFound(terminal_id.into()))?;
-        session.writer.write_all(data)?;
-        session.writer.flush()?;
+        let mut writer = lock_recovering(&session.writer);
+        writer.write_all(data)?;
+        writer.flush()?;
         Ok(())
     }
 
@@ -926,25 +963,60 @@ impl Utf8Reassembler {
     }
 }
 
-fn spawn_reader(
+/// Everything the thread reading a terminal's output needs besides the output itself.
+struct TerminalReader {
     terminal_id: String,
     runtime_revision: u64,
     app: AppHandle,
     hub: Arc<RemoteEventHub>,
     history: Arc<Mutex<OutputHistory>>,
-    mut reader: Box<dyn Read + Send>,
-) {
+    palettes: Palettes,
+    writer: SharedWriter,
+}
+
+impl TerminalReader {
+    /// Answers the colour queries in a chunk and returns what is left for the viewers.
+    fn answer_colour_queries(&self, responder: &mut ColourQueryResponder, chunk: &[u8]) -> Vec<u8> {
+        let palette = lock_recovering(&self.palettes)
+            .get(&self.terminal_id)
+            .copied();
+        let answered = responder.answer(chunk, palette);
+        if !answered.replies.is_empty() {
+            let mut writer = lock_recovering(&self.writer);
+            if let Err(error) = writer
+                .write_all(&answered.replies)
+                .and_then(|()| writer.flush())
+            {
+                tracing::warn!(terminal_id = %self.terminal_id, %error, "could not answer a colour query");
+            }
+        }
+        answered.display
+    }
+}
+
+fn spawn_reader(terminal: TerminalReader, mut reader: Box<dyn Read + Send>) {
     thread::spawn(move || {
+        let TerminalReader {
+            terminal_id,
+            runtime_revision,
+            app,
+            hub,
+            history,
+            ..
+        } = &terminal;
+        let runtime_revision = *runtime_revision;
         let mut buffer = [0_u8; 8 * 1024];
         let mut reassembler = Utf8Reassembler::default();
+        let mut colour_queries = ColourQueryResponder::default();
         loop {
             match reader.read(&mut buffer) {
                 Ok(0) => break,
                 Ok(bytes_read) => {
                     let chunk = reassembler.accept(&buffer[..bytes_read]);
+                    let chunk = terminal.answer_colour_queries(&mut colour_queries, &chunk);
                     if chunk.is_empty() {
-                        // The whole read was the first bytes of a character; nothing to publish
-                        // until the read that completes it.
+                        // The read held only the start of a character or of a colour query, which
+                        // the next read completes, or only colour queries, which are answered.
                         continue;
                     }
                     let chunk = chunk.as_slice();

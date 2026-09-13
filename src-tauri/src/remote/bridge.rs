@@ -113,6 +113,7 @@ pub const REMOTE_ALLOWED: &[&str] = &[
     "create_terminal",
     "write_terminal",
     "resize_terminal",
+    "set_terminal_palette",
     "close_terminal",
     "read_terminal_scrollback",
     "get_remote_access_status",

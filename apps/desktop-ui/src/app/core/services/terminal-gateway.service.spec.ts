@@ -310,6 +310,24 @@ describe('TerminalGatewayService attachment', () => {
     expect(result.rows).toBe(44);
   });
 
+  /** The PTY answers colour queries itself, so it has to be told the colours the terminal uses. */
+  it('hands the terminal colours to the backend', async () => {
+    const calls: [string, Record<string, unknown>][] = [];
+    commandHandler = (command, args) => {
+      calls.push([command, args]);
+      return Promise.resolve(undefined);
+    };
+
+    await service.setPalette('terminal-1', { foreground: '#d5dcda', background: '#070a09' });
+
+    expect(calls).toEqual([
+      [
+        'set_terminal_palette',
+        { terminalId: 'terminal-1', foreground: '#d5dcda', background: '#070a09' },
+      ],
+    ]);
+  });
+
   /** A backend that reports no size leaves the caller with the one it asked for. */
   it('falls back to the requested size when the backend reports none', async () => {
     commandHandler = () => Promise.resolve({ attached: false });

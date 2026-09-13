@@ -218,6 +218,7 @@ pub fn run() {
             commands::terminal::create_terminal,
             commands::terminal::write_terminal,
             commands::terminal::resize_terminal,
+            commands::terminal::set_terminal_palette,
             commands::terminal::close_terminal,
             commands::terminal::read_terminal_scrollback,
             commands::remote::get_remote_access_status,

@@ -10,11 +10,12 @@ import {
   NgZone,
   output,
   signal,
+  untracked,
   viewChild,
 } from '@angular/core';
 import { FitAddon } from '@xterm/addon-fit';
 import type { WebglAddon } from '@xterm/addon-webgl';
-import type { ILink } from '@xterm/xterm';
+import type { ILink, ITheme } from '@xterm/xterm';
 import { Terminal } from '@xterm/xterm';
 
 import { I18nService } from '../core/i18n/i18n.service';
@@ -68,6 +69,7 @@ import {
   terminalScrollRoute,
   wheelScrollRows,
 } from './terminal-scroll-route';
+import { OSC_CLIPBOARD, readClipboardWrite } from './terminal-clipboard';
 import { TerminalQuickKeysComponent } from './terminal-quick-keys';
 import { createTerminalTheme } from './terminal-theme';
 import { decayInertia, TerminalTouchScroller } from './terminal-touch-scroll';
@@ -163,13 +165,15 @@ export class TerminalPanelComponent implements AfterViewInit {
   /** The mark of the agent this terminal runs, drawn in its title. */
   protected readonly agentIcon = computed(() => AGENT_ICONS[this.session().agentType]);
   /**
-   * Whether Ctrl is down, which is the whole gate on link detection.
+   * Whether Ctrl is down, which is what shows a link and what opens it.
    *
    * Underlining every path an agent mentions would make ordinary output look clickable and put a
-   * link under every stray click. Offering them only while the modifier is held is what a code
+   * link under every stray click. Showing them only while the modifier is held is what a code
    * editor does, and it leaves plain clicking to selection.
    */
   private ctrlHeld = false;
+  /** The link under the pointer, whose underline follows Ctrl while the pointer stays put. */
+  private hoveredLink?: ILink;
   private readonly touchScroller = new TerminalTouchScroller(() => this.rowHeight());
   /** Carries the fraction of a row a wheel event left over, so a trackpad still scrolls. */
   private readonly wheelRows = new ScrollRowAccumulator();
@@ -280,10 +284,16 @@ export class TerminalPanelComponent implements AfterViewInit {
       }
     });
     effect(() => {
-      this.terminal.options.theme = createTerminalTheme(this.themeColor());
+      const theme = createTerminalTheme(this.themeColor());
+      this.terminal.options.theme = theme;
       if (this.viewReady && this.visible()) {
         this.terminal.refresh(0, Math.max(0, this.terminal.rows - 1));
       }
+      // Read without tracking: the session changes with every status update, the colours do not.
+      void this.reportPalette(
+        untracked(() => this.session().id),
+        theme,
+      );
     });
     effect(() => {
       const shouldActivate = this.active() && this.visible();
@@ -310,10 +320,13 @@ export class TerminalPanelComponent implements AfterViewInit {
   ngAfterViewInit(): void {
     this.viewReady = true;
     this.terminal.attachCustomKeyEventHandler(this.handleCustomKey);
+    // Links are offered whether or not Ctrl is down. xterm keeps the links it was given for a line
+    // until the pointer leaves that line, so offering them only with Ctrl held meant pressing Ctrl
+    // over a link — the usual order — found none, and clicking it did nothing.
     this.terminal.registerLinkProvider({
-      provideLinks: (bufferLineNumber, callback) =>
-        callback(this.ctrlHeld ? this.linksOnLine(bufferLineNumber) : undefined),
+      provideLinks: (bufferLineNumber, callback) => callback(this.linksOnLine(bufferLineNumber)),
     });
+    this.terminal.parser.registerOscHandler(OSC_CLIPBOARD, this.copyForProgram);
     this.terminal.attachCustomWheelEventHandler(this.handleCustomWheel);
     this.terminal.loadAddon(this.fitAddon);
     const terminalContainer = this.container().nativeElement;
@@ -914,13 +927,52 @@ export class TerminalPanelComponent implements AfterViewInit {
   };
 
   private readonly trackModifier = (event: KeyboardEvent): void => {
-    this.ctrlHeld = event.ctrlKey;
+    this.setCtrlHeld(event.ctrlKey);
   };
 
   /** A window that loses focus never reports the key going up, so the modifier is cleared here. */
   private readonly releaseModifier = (): void => {
-    this.ctrlHeld = false;
+    this.setCtrlHeld(false);
   };
+
+  private setCtrlHeld(held: boolean): void {
+    this.ctrlHeld = held;
+    this.showHoveredLink();
+  }
+
+  /**
+   * Underlines the link under the pointer, and gives it the hand cursor, exactly while Ctrl is down.
+   *
+   * xterm watches a hovered link's decorations and redraws when they change, so pressing or
+   * releasing Ctrl over a link needs no pointer movement to show or hide it.
+   */
+  private showHoveredLink(): void {
+    const decorations = this.hoveredLink?.decorations;
+    if (decorations) {
+      decorations.underline = this.ctrlHeld;
+      decorations.pointerCursor = this.ctrlHeld;
+    }
+  }
+
+  /**
+   * Puts what a program copies through `OSC 52` on this viewer's clipboard.
+   *
+   * A replayed copy is history, not a request. A window without focus is refused by the browser,
+   * which is what keeps a background viewer's clipboard from following the one in use.
+   */
+  private readonly copyForProgram = (payload: string): boolean => {
+    const text = this.replayGate.replaying ? null : readClipboardWrite(payload);
+    if (text !== null) {
+      this.writeClipboard(text);
+    }
+    return true;
+  };
+
+  private writeClipboard(text: string): void {
+    // Clipboard access needs a secure context and a focused window, which a remote client or a
+    // background window may not have; nothing else can reach the clipboard, so it stays silent.
+    void navigator.clipboard?.writeText(text).catch(() => undefined);
+  }
 
   /**
    * The links on the logical line the buffer row belongs to.
@@ -971,21 +1023,33 @@ export class TerminalPanelComponent implements AfterViewInit {
 
   private toTerminalLink(link: TerminalLink, positions: TerminalLineText['positions']): ILink {
     const last = Math.min(link.end, positions.length) - 1;
-    return {
+    const terminalLink: ILink = {
       range: {
         start: positions[link.start],
         // A range ends on the last cell it covers rather than the one after it.
         end: positions[Math.max(link.start, last)],
       },
       text: link.text,
+      decorations: { underline: this.ctrlHeld, pointerCursor: this.ctrlHeld },
+      hover: () => {
+        this.hoveredLink = terminalLink;
+        // xterm starts watching the decorations only after this callback returns, and Ctrl may
+        // have changed since the line's links were offered.
+        queueMicrotask(() => this.showHoveredLink());
+      },
+      leave: () => {
+        if (this.hoveredLink === terminalLink) {
+          this.hoveredLink = undefined;
+        }
+      },
       activate: (event: MouseEvent, text: string) => {
-        // The modifier is checked again at the click: the link was offered while it was held, but
-        // nothing stops it being released before the button goes down.
+        // Read from the click itself: a plain click on a link is left to selection.
         if (event.ctrlKey) {
           void this.openLink(link.kind, text);
         }
       },
     };
+    return terminalLink;
   }
 
   /**
@@ -1023,8 +1087,7 @@ export class TerminalPanelComponent implements AfterViewInit {
     event.preventDefault();
     const selection = this.terminal.getSelection();
     if (selection) {
-      // Clipboard access needs a secure context, which a remote client may not have.
-      void navigator.clipboard?.writeText(selection).catch(() => undefined);
+      this.writeClipboard(selection);
       this.terminal.clearSelection();
       return;
     }
@@ -1094,6 +1157,24 @@ export class TerminalPanelComponent implements AfterViewInit {
 
   /** Any sign the user started working in this view hands it the terminal's size. */
   private readonly claimOnFocus = (): void => void this.claimTerminalSize();
+
+  /**
+   * Lets the PTY answer the program's colour queries with the colours this terminal is drawn in.
+   *
+   * Every viewer reports the same colours, since they come from the workspace, so whichever report
+   * lands last is as good as any. One that fails leaves the queries to the viewers, as before.
+   */
+  private async reportPalette(terminalId: string, theme: ITheme): Promise<void> {
+    const { foreground, background } = theme;
+    if (!foreground || !background) {
+      return;
+    }
+    try {
+      await this.gateway.setPalette(terminalId, { foreground, background });
+    } catch (error) {
+      console.warn('Terminal palette report failed', this.errorMessage(error));
+    }
+  }
 
   /**
    * Draws this view again now that it is on screen with a grid of its own.

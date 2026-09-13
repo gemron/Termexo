@@ -2,6 +2,22 @@
 
 Release notes for every Termexo version, newest first. The current release is summarised in [README.md](README.md).
 
+## V0.10.3
+
+- **Codex no longer finds `]11;rgb:…` typed into its prompt.** Codex CLI asks the terminal for its
+  colours when it starts and reads any answer later than about a tenth of a second as typing. Every
+  window showing the terminal used to answer, so with the desktop and a phone open at once — or an
+  answer crossing the relay too slowly — the extra reply landed in the input box. Termexo now answers
+  colour queries itself, once and at once, whoever is watching; OpenCode gets its colours the same way.
+- **Ctrl+click opens links wherever the pointer already rests.** Pressing Ctrl over a link used to
+  find nothing until the pointer left the line and came back. The underline and hand cursor now
+  follow Ctrl immediately, and a plain click still only selects.
+- **Text copied in OpenCode reaches your clipboard.** OpenCode keeps its own selection and copies it
+  on Ctrl+C through the terminal's clipboard sequence (OSC 52), which the terminal used to ignore — in
+  a phone or other browser nothing was copied at all. The window you are using now receives it;
+  requests to read the clipboard are refused. To select with the terminal itself inside OpenCode or
+  Claude Code, hold Shift while dragging and right-click to copy.
+
 ## V0.10.2
 
 - **Terminal status you can trust for all four agents.** Every state — running, waiting for approval,
