@@ -33,7 +33,7 @@
         </a>
         <nav aria-label="Guide navigation">
           <a href="./">Home</a>
-          <a class="guide-download" href="downloads/termexo-user-guide-en.pdf" download="Termexo-User-Guide-v0.9.0-en.pdf">Download PDF</a>
+          <a class="guide-download" href="downloads/termexo-user-guide-en.pdf" download="Termexo-User-Guide-v0.10.0-en.pdf">Download PDF</a>
         </nav>
         <div class="language-switch" role="group" aria-label="Guide language">
           <a href="guide.en.html" data-lang="en" lang="en" hreflang="en" aria-label="Read in English" aria-current="page" class="active">EN</a>
@@ -55,16 +55,16 @@
           <a href="#faq">07　FAQ</a>
           <a href="#privacy">08　Data &amp; security</a>
         </nav>
-        <p class="guide-sidebar-note">Windows desktop edition<br />V0.9.0 · English</p>
+        <p class="guide-sidebar-note">Windows desktop edition<br />V0.10.0 · English</p>
       </aside>
       <article id="guide-content" class="guide-content" lang="en">
         <header class="guide-intro">
           <p class="guide-label">TERMEXO / USER GUIDE</p>
           <h1>User guide</h1>
           <p class="guide-lead">Start with your first workspace. Keep your terminals, Agents and project progress together.</p>
-          <p class="guide-meta">For V0.9.0 · Updated 2026-09-12 · Windows 10/11 x64</p>
+          <p class="guide-meta">For V0.10.0 · Updated 2026-09-13 · Windows 10/11 x64</p>
           <div class="guide-actions" data-pdf-skip>
-            <a class="button primary" href="downloads/termexo-user-guide-en.pdf" download="Termexo-User-Guide-v0.9.0-en.pdf">Download English guide · PDF</a>
+            <a class="button primary" href="downloads/termexo-user-guide-en.pdf" download="Termexo-User-Guide-v0.10.0-en.pdf">Download English guide · PDF</a>
             <a class="button secondary" href="#quick-start">Start reading ↓</a>
           </div>
           <p class="guide-note" data-pdf-skip>The English PDF matches this page and works offline. Labels and button locations may vary by app language or version. The workbench screenshot shows the Chinese interface.</p>
@@ -170,7 +170,16 @@
         <section id="remote" class="guide-section" data-pdf-page>
           <h2>06 / Mobile and remote access</h2>
           <p>Remote access is off by default. When enabled, a phone, tablet or another computer can operate the desktop's existing workspaces and terminals in a browser. You do not need to install the Agents on your phone.</p>
-          <h3>Enable it on the desktop</h3>
+          <h3>Across networks: connect through your own relay</h3>
+          <p>The desktop opens an outbound tunnel, so it needs no public IP or router port forwarding. Keep the PC on with Termexo running and connected. Terminal processes still run on the desktop.</p>
+          <ol>
+            <li>Follow the <a href="https://github.com/gemron/termexo-relay">termexo-relay documentation</a> to deploy an HTTPS relay reachable by both devices, or obtain an entry point from its administrator. The relay supports Linux, macOS and Windows x64 / arm64 binaries and containers.</li>
+            <li>Enable Remote Access in desktop Settings, enter the relay address, and enroll with an enrollment code or relay account.</li>
+            <li>For a self-signed relay certificate, verify its SHA-256 fingerprint with the administrator before entering it in the fingerprint field. Do not accept an unknown fingerprint.</li>
+            <li>Once connected, copy the relay access link or scan its QR code. Open the HTTPS entry point on your phone and complete the required relay login and desktop access-token check; these are independent. Cascaded relays list available addresses and forwarding routes.</li>
+          </ol>
+          <p>After the v2 handshake, session frames use AES-256-GCM; the relay forwards encrypted terminal sessions. The browser refuses to send the access token through an HTTP relay entry point. If connection fails, check the relay URL, HTTPS certificate, enrollment status and network reachability.</p>
+          <h3 data-pdf-page>LAN / VPN: connect directly to the desktop</h3>
           <ol>
             <li>Open Remote Access in Settings and turn on the main switch. Follow the UI to configure and save the listening address and port. The default port is <code>7420</code>.</li>
             <li>For devices on your LAN, choose a reachable LAN listening address or listen on all interfaces. Listening only on <code>127.0.0.1</code> limits access to the host itself. Keep HTTPS enabled.</li>
@@ -188,7 +197,7 @@
           <h3>Limits and disconnecting</h3>
           <p>The terminal size follows the client currently in use. A narrow phone view shows one terminal, and other clients may need to pan horizontally. Input from both devices affects the same process; avoid typing from both at once.</p>
           <p>The remote page does not expose all desktop file import/export or app self-update features. When finished, turn off remote access in desktop Settings. Rotating the access token invalidates the old token and disconnects existing clients.</p>
-          <p class="guide-callout">The token and QR code are remote-control credentials. Anyone holding them may operate terminals and affect files on the host. Never post them in public chats, Issues or screenshots. Do not expose the service directly to the public internet; use a trusted LAN or controlled VPN.</p>
+          <p class="guide-callout">The token and QR code are remote-control credentials. Anyone holding them may operate terminals and affect files on the host. Never post them in public chats, Issues or screenshots. Use a managed HTTPS relay across networks; keep direct desktop access on a trusted LAN or controlled VPN without exposing its listening port to the internet.</p>
         </section>
 
         <section id="faq" class="guide-section" data-pdf-page>
@@ -220,7 +229,7 @@
       </article>
     </main>
     <footer class="guide-footer">
-      <div class="shell guide-footer-links"><span>Termexo User Guide · V0.9.0</span><a href="#guide-content">Back to top ↑</a><a href="downloads/termexo-user-guide-en.pdf" download="Termexo-User-Guide-v0.9.0-en.pdf">Download PDF</a></div>
+      <div class="shell guide-footer-links"><span>Termexo User Guide · V0.10.0</span><a href="#guide-content">Back to top ↑</a><a href="downloads/termexo-user-guide-en.pdf" download="Termexo-User-Guide-v0.10.0-en.pdf">Download PDF</a></div>
       <div class="shell site-counter">
         <p>Website visits (PV): <span id="busuanzi_value_site_pv" class="site-counter-value">—</span></p>
         <p>Third-party website statistics only; “—” means unavailable.</p>

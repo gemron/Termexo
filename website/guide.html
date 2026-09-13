@@ -33,7 +33,7 @@
         </a>
         <nav aria-label="文档导航">
           <a href="./">返回官网</a>
-          <a class="guide-download" href="downloads/termexo-user-guide.pdf" download="Termexo-使用说明-v0.9.0.pdf">下载 PDF</a>
+          <a class="guide-download" href="downloads/termexo-user-guide.pdf" download="Termexo-使用说明-v0.10.0.pdf">下载 PDF</a>
         </nav>
         <div class="language-switch" role="group" aria-label="文档语言">
           <a href="guide.en.html" data-lang="en" lang="en" hreflang="en" aria-label="Read in English">EN</a>
@@ -55,16 +55,16 @@
           <a href="#faq">07　常见问题</a>
           <a href="#privacy">08　数据与安全</a>
         </nav>
-        <p class="guide-sidebar-note">适用于 Windows 桌面版<br />V0.9.0 · 简体中文</p>
+        <p class="guide-sidebar-note">适用于 Windows 桌面版<br />V0.10.0 · 简体中文</p>
       </aside>
       <article id="guide-content" class="guide-content" lang="zh-CN">
         <header class="guide-intro">
           <p class="guide-label">TERMEXO / USER GUIDE</p>
           <h1>使用说明</h1>
           <p class="guide-lead">从第一个工作空间开始，把终端、Agent 和项目进度放在一起。</p>
-          <p class="guide-meta">适用版本 V0.9.0 · 更新日期 2026-09-12 · Windows 10/11 x64</p>
+          <p class="guide-meta">适用版本 V0.10.0 · 更新日期 2026-09-13 · Windows 10/11 x64</p>
           <div class="guide-actions" data-pdf-skip>
-            <a class="button primary" href="downloads/termexo-user-guide.pdf" download="Termexo-使用说明-v0.9.0.pdf">下载使用说明 · PDF</a>
+            <a class="button primary" href="downloads/termexo-user-guide.pdf" download="Termexo-使用说明-v0.10.0.pdf">下载使用说明 · PDF</a>
             <a class="button secondary" href="#quick-start">开始阅读 ↓</a>
           </div>
           <p class="guide-note" data-pdf-skip>PDF 与本页内容同步，可离线阅读。本文以中文界面为例；其他版本的按钮位置可能略有不同。</p>
@@ -170,7 +170,16 @@
         <section id="remote" class="guide-section" data-pdf-page>
           <h2>06 / 手机与远程访问</h2>
           <p>远程访问默认关闭。打开后，手机、平板或另一台电脑通过浏览器操作桌面端同一批工作空间和终端；不需要在手机上重新安装 Agent。</p>
-          <h3>在电脑端开启</h3>
+          <h3>跨网络：通过自建中继连接</h3>
+          <p>桌面主动连接中继，无需公网 IP 或路由器端口映射。电脑需保持开机、Termexo 运行并连接中继；手机操作的仍是电脑上的终端。</p>
+          <ol>
+            <li>按 <a href="https://github.com/gemron/termexo-relay">termexo-relay 文档</a>部署双方可达的 HTTPS 中继，或获取管理员提供的入口。中继支持 Linux、macOS、Windows 的 x64 / arm64 和容器部署。</li>
+            <li>在桌面「设置 → 远程访问」中开启总开关，填写中继地址，通过注册码或中继账号登记设备。</li>
+            <li>若中继使用自签名证书，先核对管理员提供的 SHA-256 证书指纹，再填写界面中的指纹字段；不要填入不明来源的指纹。</li>
+            <li>连接成功后，复制中继访问链接或扫描二维码。手机使用 HTTPS 打开入口，按提示完成中继登录和桌面访问令牌校验；二者独立。级联中继会显示多个可用地址及转发路径。</li>
+          </ol>
+          <p>v2 握手后，会话帧采用 AES-256-GCM 加密，中继转发加密的终端会话。浏览器拒绝通过 HTTP 中继入口发送访问令牌。若连接失败，先检查中继地址、HTTPS 证书、设备登记状态和两端网络可达性。</p>
+          <h3 data-pdf-page>局域网 / VPN：直接连接桌面</h3>
           <ol>
             <li>打开设置中的「远程访问」，开启总开关。根据界面提示设置并保存监听地址与端口，默认端口为 <code>7420</code>。</li>
             <li>供同一局域网设备使用时，选择可达的局域网监听地址，或监听所有网卡；仅监听 <code>127.0.0.1</code> 时只能本机访问。保留默认 HTTPS。</li>
@@ -188,7 +197,7 @@
           <h3>使用边界与退出</h3>
           <p>终端尺寸跟随当前正在操作的一端；手机窄屏会收为单终端，其他客户端可能需要横向查看。同一个终端上的输入会影响同一进程，避免两端同时输入。</p>
           <p>远程页面不提供全部桌面本地文件导入导出或应用自更新能力。完成后可在电脑设置中关闭远程访问；更换访问令牌会使旧令牌失效，并断开已有连接。</p>
-          <p class="guide-callout">访问令牌和二维码相当于远程控制凭证：持有者可能操作终端并影响电脑文件。不要发到公开群、Issue 或截图中；不要直接暴露到公网。优先使用可信局域网或受控 VPN。</p>
+          <p class="guide-callout">访问令牌和二维码相当于远程控制凭证：持有者可能操作终端并影响电脑文件。不要发到公开群、Issue 或截图中。跨网络使用受管理的 HTTPS 中继；直连使用可信局域网或受控 VPN，不要直接暴露桌面监听端口。</p>
         </section>
 
         <section id="faq" class="guide-section" data-pdf-page>
@@ -220,7 +229,7 @@
       </article>
     </main>
     <footer class="guide-footer">
-      <div class="shell guide-footer-links"><span>Termexo 使用说明 · V0.9.0</span><a href="#guide-content">回到顶部 ↑</a><a href="downloads/termexo-user-guide.pdf" download="Termexo-使用说明-v0.9.0.pdf">下载 PDF</a></div>
+      <div class="shell guide-footer-links"><span>Termexo 使用说明 · V0.10.0</span><a href="#guide-content">回到顶部 ↑</a><a href="downloads/termexo-user-guide.pdf" download="Termexo-使用说明-v0.10.0.pdf">下载 PDF</a></div>
       <div class="shell site-counter">
         <p><span>官网累计访问量（PV）：</span> <span id="busuanzi_value_site_pv" class="site-counter-value">—</span></p>
         <p>第三方统计仅记录官网访问；“—”表示暂不可用。</p>

@@ -40,7 +40,7 @@ GitHub Pages 从 `gh-pages` 分支根目录发布。仅修改 `main` 下的 `web
 - 首页导航和页脚的使用说明链接随首页语言变化，与文档共用 `termexo.website.language` 偏好。
 - 更新正文时同步维护两个语言版本，运行 `scripts/build-user-guide.py --language zh` / `--language en`
   从对应 HTML 重新生成 PDF；不要单独修改 PDF 内容。
-- 构建需要 Python 与 `reportlab`，默认使用 Windows 微软雅黑并嵌入字体子集；其他系统用
+- 构建需要 Python 与 `reportlab`，中文默认使用 Windows 微软雅黑，英文使用 Arial，均嵌入字体子集；其他系统用
   `--font` / `--bold-font` 指定支持中文且允许嵌入的 TrueType 字体。
 - 版本变更时同时更新正文版本、下载文件名及脚本页脚版本；使用 `data-pdf-page` 控制 PDF 分页。
 - 发布前将 PDF 每页渲染成图片检查中文与分页，并确认目录链接、下载文件、正文版本一致。

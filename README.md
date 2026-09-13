@@ -4,7 +4,7 @@
 
 <h1 align="center">Termexo</h1>
 
-<p align="center"><strong>Your coding agents on Windows. Your next instruction from your phone.</strong></p>
+<p align="center"><strong>Start on your desktop. Keep going across networks.</strong></p>
 
 <p align="center">
   <strong>English</strong> · <a href="./README.cn.md">简体中文</a>
@@ -31,14 +31,13 @@
 </p>
 
 Termexo runs Claude Code, Codex, OpenCode, and Antigravity in one Windows workbench.
-Keep your agents running on your PC, then use your phone to check output,
-answer an approval, or send the next instruction to the same live terminal.
+Keep your agents running on your PC, then reconnect through your own relay from a phone or another computer's browser. Check output, answer an approval, or send the next instruction to the same live terminal across networks. Your desktop needs no public IP or router port forwarding.
 
 ![Termexo Windows workbench](website/assets/termexo-workbench.png)
 
 | See your agents together | Know who needs you | Continue from your phone |
 | --- | --- | --- |
-| Arrange real terminals side by side, grouped by project. | Spot an agent waiting for input or approval. | Open the same workbench in a browser over a trusted LAN or VPN. |
+| Arrange real terminals side by side, grouped by project. | Spot an agent waiting for input or approval. | Connect across networks through a self-hosted relay, or directly over a trusted LAN or VPN. |
 
 ## Try it on Windows
 
@@ -54,21 +53,26 @@ Requires Windows 10 build 17763+ and WebView2 Chromium 111+.
 Install and configure your chosen agent CLI and model access; Termexo does not include a model subscription.
 **MIT licensed. No Termexo account required.**
 
-## From your desk to your phone
+## From your desk to your phone, through your own relay
 
 1. Open a project on your PC and start Claude Code, Codex, OpenCode, or Antigravity.
-2. Enable remote access in Termexo; keep your PC awake and connect your phone through a trusted LAN or VPN.
-3. Open the remote link in your phone's browser to read output, respond to approvals, and send instructions.
+2. Follow the **[termexo-relay documentation](https://github.com/gemron/termexo-relay)** to deploy an HTTPS relay reachable by both devices, or use an entry point from its administrator.
+3. Enable Remote Access in Settings, enter the relay address, and enroll with an enrollment code or relay account.
+4. Open the generated relay link or scan its QR code on your phone. Complete the required relay login and desktop access-token check to reconnect to your terminal.
+
+The desktop opens an outbound tunnel, with no public IP or router port forwarding required. **Keep the PC on with Termexo running and connected to the relay.** Direct access over a trusted LAN or controlled VPN is also available.
+
+Relay login and the desktop access token are independent checks. After the v2 handshake, session frames use AES-256-GCM; the relay forwards encrypted terminal sessions. The relay has Linux, macOS and Windows x64 / arm64 binaries and container deployment; the Termexo desktop application is for Windows.
 
 [![Termexo mobile workbench](website/assets/termexo-phone.png)](https://www.termexo.com/guide.en.html#remote)
 
 The image shows the mobile interface. **[Read the phone connection guide](https://www.termexo.com/guide.en.html#remote)** for the complete setup.
-Remote access is off by default, uses an access token, and uses self-signed HTTPS by default.
+Remote access is off by default. The relay browser entry point requires HTTPS; direct desktop access uses self-signed HTTPS by default.
 Keep the token private. Closing Termexo or stopping the PC ends the running processes.
 
 ## Latest release
 
-**[v0.10.0](https://github.com/gemron/Termexo/releases/tag/v0.10.0)** carries the workbench to any network through a relay you host yourself, and seals the traffic so that relay cannot read the terminals it forwards.
+**[v0.10.0](https://github.com/gemron/Termexo/releases/tag/v0.10.0)** adds self-hosted relays, code or account enrollment, cascaded access addresses and v2 encrypted sessions, bringing the same workbench to a browser across networks.
 [Full changelog](CHANGELOG.md).
 
 If Termexo helps your workflow, a **Star on this repository** helps other developers discover it.
@@ -124,7 +128,7 @@ Trying it for the first time? [Tell us what worked or where you got stuck](https
   <tr>
     <td width="50%" valign="top">
       <strong>Answer it from your phone.</strong><br><br>
-      Turn on remote access and any phone, tablet, or second computer on your network or VPN
+      Turn on remote access and any phone, tablet, or second computer connected through your own relay, trusted LAN or VPN
       opens the whole workbench in a browser — the same workspaces and the same live terminals,
       reading and writing the very PTYs the desktop is running. Terminals scroll by finger, the
       layout folds down to one terminal with panels that float over it, and the link is HTTPS

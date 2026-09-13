@@ -4,7 +4,7 @@
 
 <h1 align="center">Termexo</h1>
 
-<p align="center"><strong>电脑运行 Agent，手机接着操作</strong></p>
+<p align="center"><strong>电脑上开工，跨网络接着用</strong></p>
 
 <p align="center">
   <a href="./README.md">English</a> · <strong>简体中文</strong>
@@ -31,13 +31,13 @@
 </p>
 
 Termexo 把 Claude Code、Codex、OpenCode 和 Antigravity 放进同一个 Windows 工作台。
-Agent 留在电脑上运行；离开桌面后，用手机查看输出、回复审批，或向同一个终端发送下一条指令。
+Agent 留在电脑上运行；通过自建中继，用手机或另一台电脑的浏览器跨网络接回同一个工作台，查看输出、回复审批、发送下一条指令。桌面无需公网 IP，也无需路由器端口映射。
 
 ![Termexo Windows 工作台](website/assets/termexo-workbench.png)
 
 | 同时看清多个 Agent | 知道谁在等你 | 手机上接着操作 |
 | --- | --- | --- |
-| 按项目组织真实终端，并排显示。 | 区分运行中、等待输入和等待审批。 | 通过可信局域网或 VPN，在浏览器打开同一个工作台。 |
+| 按项目组织真实终端，并排显示。 | 区分运行中、等待输入和等待审批。 | 通过自建中继跨网络连接，也支持可信局域网或 VPN。 |
 
 ## 在 Windows 上开始使用
 
@@ -53,20 +53,25 @@ npx termexo@latest
 使用 Agent 需安装相应 CLI 并配置模型服务；Termexo 不包含模型订阅。
 **MIT 开源，无需注册 Termexo 账号。**
 
-## 从电脑接到手机
+## 通过自建中继，从电脑接到手机
 
 1. 在电脑上打开项目，启动 Claude Code、Codex、OpenCode 或 Antigravity。
-2. 在 Termexo 中启用远程访问，保持电脑唤醒，让手机通过可信局域网或 VPN 连接。
-3. 用手机浏览器打开远程链接，查看输出、回复审批、发送下一条指令。
+2. 按 **[termexo-relay 文档](https://github.com/gemron/termexo-relay)** 部署双方可达的 HTTPS 中继，或使用管理员提供的入口。
+3. 在「设置 → 远程访问」中启用访问、填写中继地址，使用注册码或中继账号登记设备。
+4. 手机打开生成的中继访问链接或扫描二维码，按提示完成中继登录和桌面访问令牌校验，接回原来的终端。
+
+桌面主动建立出站隧道，无需公网 IP 或路由器端口映射。**电脑需保持开机、Termexo 运行并连接中继。** 同一可信局域网或受控 VPN 内，也可直接连接桌面地址。
+
+中继登录与桌面访问令牌独立校验；v2 会话握手后使用 AES-256-GCM 加密会话帧，中继转发加密的终端会话。中继服务支持 Linux、macOS、Windows 的 x64 / arm64 和容器部署；Termexo 桌面版面向 Windows。
 
 [![Termexo 手机工作台](website/assets/termexo-phone.png)](https://www.termexo.com/guide.html#remote)
 
 上图展示手机界面，完整设置步骤见 **[手机连接指南](https://www.termexo.com/guide.html#remote)**。
-远程访问默认关闭，凭访问令牌连接，默认使用自签名 HTTPS。请保管好令牌；关闭 Termexo 或停止电脑会结束运行中的进程。
+远程访问默认关闭。中继浏览器入口需使用 HTTPS；桌面直连默认使用自签名 HTTPS。请保管好令牌和二维码；关闭 Termexo 或停止电脑会结束运行中的进程。
 
 ## 最新版本
 
-**[v0.10.0](https://github.com/gemron/Termexo/releases/tag/v0.10.0)** 通过你自建的中继把工作台延伸到任意网络，并把流量加封到中继自己也读不到它转发的终端内容。
+**[v0.10.0](https://github.com/gemron/Termexo/releases/tag/v0.10.0)** 新增自建中继、注册码或账号登记、级联访问地址与 v2 加密会话，让工作台跨网络延续到浏览器。
 [完整更新记录](CHANGELOG.cn.md)。
 
 如果 Termexo 帮到了你，欢迎 **给仓库点一个 Star**，帮助更多开发者发现它。
@@ -118,7 +123,7 @@ npx termexo@latest
   <tr>
     <td width="50%" valign="top">
       <strong>在手机上回它一句。</strong><br><br>
-      打开远程访问，同一局域网或 VPN 内的手机、平板、另一台电脑用浏览器就能打开完整工作台——
+      打开远程访问，手机、平板、另一台电脑通过自建中继跨网络连接，也可在可信局域网或 VPN 内直连。浏览器打开完整工作台——
       同一批工作空间、同一批终端，实时读写桌面正在跑的那些 PTY 进程。终端支持手指拖拽滚动，
       布局在窄屏收成单终端、侧栏浮在工作区之上，连接是 HTTPS，凭访问令牌进入，令牌可显示、
       可生成二维码、可随时更换。

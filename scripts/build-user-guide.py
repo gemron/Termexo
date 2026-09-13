@@ -1,6 +1,7 @@
 """Build each downloadable PDF from its matching website guide HTML source.
 
-Requires reportlab. On Windows, Microsoft YaHei is used and subset-embedded.
+Requires reportlab. On Windows, Chinese uses Microsoft YaHei and English uses Arial;
+both are subset-embedded.
 Override fonts with --font / --bold-font when building on another platform.
 """
 
@@ -163,13 +164,13 @@ def build(output, regular_font, bold_font, language="zh"):
         canvas.line(46, 40, A4[0] - 46, 40)
         canvas.setFont("Guide", 8)
         canvas.setFillColor(colors.HexColor("#52685d"))
-        canvas.drawString(46, 26, f"{title} | V0.9.0")
+        canvas.drawString(46, 26, f"{title} | V0.10.0")
         canvas.drawRightString(A4[0] - 46, 26, f"www.termexo.com  /  {doc.page}")
         canvas.restoreState()
 
     output.parent.mkdir(parents=True, exist_ok=True)
     document = GuideDocument(str(output), pagesize=A4, rightMargin=46, leftMargin=46,
-                             topMargin=38, bottomMargin=58, title=f"{title} V0.9.0",
+                             topMargin=38, bottomMargin=58, title=f"{title} V0.10.0",
                              author="Termexo", subject="Setup, Agent sessions, model profiles and remote access" if english else "安装、Agent 会话、模型配置与远程访问")
     document.build(story, onFirstPage=page_chrome, onLaterPages=page_chrome)
     print(f"Built {output} ({output.stat().st_size:,} bytes)")
@@ -179,8 +180,11 @@ if __name__ == "__main__":
     args = argparse.ArgumentParser(description=__doc__)
     args.add_argument("--language", choices=["zh", "en"], default="zh")
     args.add_argument("--output", type=Path)
-    args.add_argument("--font", type=Path, default=Path("C:/Windows/Fonts/msyh.ttc"))
-    args.add_argument("--bold-font", type=Path, default=Path("C:/Windows/Fonts/msyhbd.ttc"))
+    args.add_argument("--font", type=Path)
+    args.add_argument("--bold-font", type=Path)
     options = args.parse_args()
     output = options.output or SITE / "downloads" / ("termexo-user-guide-en.pdf" if options.language == "en" else "termexo-user-guide.pdf")
-    build(output, options.font, options.bold_font, options.language)
+    english = options.language == "en"
+    regular = options.font or Path("C:/Windows/Fonts/arial.ttf" if english else "C:/Windows/Fonts/msyh.ttc")
+    bold = options.bold_font or Path("C:/Windows/Fonts/arialbd.ttf" if english else "C:/Windows/Fonts/msyhbd.ttc")
+    build(output, regular, bold, options.language)

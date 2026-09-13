@@ -95,7 +95,7 @@ test('English is a complete translated article, not just translated menus', () =
     assert.doesNotMatch(section, /[\u3400-\u9fff]/);
   });
   assert.match(guides.en, /Restoring a workspace layout does not bring an exited process back to life/);
-  assert.match(guides.en, /Do not expose the service directly to the public internet/);
+  assert.match(guides.en, /without exposing its listening port to the internet/);
   assert.match(guides.en, /Automatic redaction cannot guarantee removal of every secret/);
 });
 

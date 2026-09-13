@@ -39,8 +39,8 @@ test("desktop and phone workflow have complete bilingual copy and honest boundar
       /not a live session|非实时会话/,
     );
   }
-  assert.match(dictionaries.zh.heroLine2, /手机/);
-  assert.match(dictionaries.en.heroLine2, /phone/);
+  assert.match(dictionaries.zh.heroLine2, /跨网络/);
+  assert.match(dictionaries.en.heroLine2, /networks/);
   assert.doesNotMatch(
     hero,
     /termexo agent status|7 agents active|Nothing leaves your PC/,
