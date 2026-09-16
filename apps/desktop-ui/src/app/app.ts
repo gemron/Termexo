@@ -45,6 +45,7 @@ import {
   TerminalSession,
   Workspace,
   AGENT_ICONS,
+  TERMINAL_STATUS_META,
 } from './core/models/workspace.models';
 import type { HandoffPackage, HandoffRecord } from './core/models/handoff';
 import type { PromptAsset } from './core/models/prompt-assets';
@@ -480,6 +481,11 @@ export class App {
    * it on confirm/cancel so accidental middle-clicks do not lose work.
    */
   protected readonly pendingTerminalClose = signal<string | null>(null);
+  /**
+   * Set while a forced close is round-tripping through the gateway so a double-click on the
+   * "Close anyway" button does not call `terminalGateway.close` twice on the same id.
+   */
+  protected readonly closingTerminal = signal(false);
   /** IDs successive toasts, so a fresh message replaces the running auto-dismiss timer. */
   private toastTimer: number | null = null;
   protected readonly globalNoticeOpen = signal(false);
@@ -577,20 +583,15 @@ export class App {
     normalizeTerminalGridDimension(this.state.activeWorkspace()?.gridRows),
   );
   protected statusLabel(status: TerminalStatus): string {
-    const keys: Record<TerminalStatus, string> = {
-      STARTING: 'status.starting',
-      RUNNING: 'status.running',
-      THINKING: 'status.thinking',
-      WAITING_INPUT: 'status.waitingInput',
-      WAITING_APPROVAL: 'status.waitingApproval',
-      RATE_LIMITED: 'status.rateLimited',
-      IDLE: 'status.idle',
-      COMPLETED: 'status.completed',
-      FAILED: 'status.failed',
-      STOPPED: 'status.stopped',
-      DISCONNECTED: 'status.disconnected',
-    };
-    return this.i18n.t(keys[status]);
+    return this.i18n.t(TERMINAL_STATUS_META[status].labelKey);
+  }
+
+  protected statusTone(status: TerminalStatus): string {
+    return TERMINAL_STATUS_META[status].tone;
+  }
+
+  protected statusMeta(status: TerminalStatus): { tone: string; labelKey: string; pulse: boolean } {
+    return TERMINAL_STATUS_META[status];
   }
   protected readonly visibleTerminalIds = computed(() => {
     const workspace = this.state.activeWorkspace();
@@ -1266,8 +1267,15 @@ export class App {
   }
 
   protected confirmCloseTerminal(terminalId: string): void {
+    if (this.closingTerminal()) {
+      return;
+    }
     this.pendingTerminalClose.set(null);
+    this.closingTerminal.set(true);
     this.closeTerminal(terminalId);
+    // `closeTerminal` is synchronous on the state and async on the gateway; the signal flips
+    // back on the next microtask so the user can still close another terminal right after.
+    queueMicrotask(() => this.closingTerminal.set(false));
   }
 
   /**
@@ -1795,7 +1803,9 @@ export class App {
       return;
     }
     event.preventDefault();
-    this.closeTerminal(terminalId);
+    // Middle-click must also respect the run-state guard introduced for the × button; running
+    // terminals still raise the inline confirmation bar instead of closing immediately.
+    this.requestCloseTerminal(terminalId);
   }
 
   /** Everything a tab cannot show at its width: where it runs, and what it responds to. */

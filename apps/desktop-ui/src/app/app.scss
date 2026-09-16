@@ -542,8 +542,7 @@ app-inspector-panel {
     white-space: nowrap;
   }
 
-  &[data-status='WAITING_INPUT'],
-  &[data-status='WAITING_APPROVAL'] {
+  &[data-tone='attention'] {
     background: color-mix(in srgb, var(--color-warning) 5%, transparent);
 
     > i {
@@ -558,8 +557,8 @@ app-inspector-panel {
     }
   }
 
-  &[data-status='FAILED'],
-  &[data-status='RATE_LIMITED'] {
+  &[data-tone='danger'],
+  &[data-tone='warning'] {
     background: color-mix(in srgb, var(--color-error) 5%, transparent);
 
     > i {
@@ -762,9 +761,7 @@ app-inspector-panel {
       box-shadow: inset 0 -2px 0 color-mix(in oklab, var(--color-primary) 52%, transparent);
     }
 
-    &[data-status='WAITING_INPUT'],
-    &[data-status='WAITING_APPROVAL'],
-    &[data-status='RATE_LIMITED'] {
+    &[data-tone='attention'] {
       color: color-mix(in srgb, var(--color-warning) 78%, var(--text));
       background: color-mix(in srgb, var(--color-warning) 9%, var(--surface-raised));
       box-shadow: inset 0 -2px 0 var(--color-warning);
@@ -773,14 +770,19 @@ app-inspector-panel {
 
     // A failed tab is coloured like a rate-limited one but does not pulse: its process may be gone
     // for good, and the attention banner already asks for the user.
-    &[data-status='RATE_LIMITED'],
-    &[data-status='FAILED'] {
+    &[data-tone='warning'] {
+      color: color-mix(in srgb, var(--color-warning) 78%, var(--text));
+      background: color-mix(in srgb, var(--color-warning) 9%, var(--surface-raised));
+      box-shadow: inset 0 -2px 0 var(--color-warning);
+    }
+
+    &[data-tone='danger'] {
       color: color-mix(in srgb, var(--color-error) 82%, var(--text));
       background: color-mix(in srgb, var(--color-error) 9%, var(--surface-raised));
       box-shadow: inset 0 -2px 0 var(--color-error);
     }
 
-    &[data-status='COMPLETED'] {
+    &[data-tone='success'] {
       color: color-mix(in srgb, var(--color-success) 80%, var(--text));
       background: color-mix(in srgb, var(--color-success) 8%, var(--surface-raised));
       box-shadow: inset 0 -2px 0 var(--color-success);
@@ -797,30 +799,25 @@ app-inspector-panel {
       border-radius: 50%;
       background: var(--text-muted);
 
-      &[data-status='THINKING'],
-      &[data-status='RUNNING'] {
+      &[data-tone='progress'] {
         background: var(--accent);
       }
 
-      &[data-status='WAITING_INPUT'] {
-        background: var(--info);
-      }
-
-      &[data-status='WAITING_APPROVAL'] {
+      &[data-tone='attention'] {
         background: var(--color-warning);
-      }
-
-      &[data-status='RATE_LIMITED'] {
-        background: var(--color-error);
-        box-shadow: 0 0 8px color-mix(in srgb, var(--color-error) 58%, transparent);
         animation: terminal-tab-attention 1.6s ease-in-out infinite;
       }
 
-      &[data-status='FAILED'] {
-        background: var(--color-error);
+      &[data-tone='warning'] {
+        background: var(--color-warning);
       }
 
-      &[data-status='COMPLETED'] {
+      &[data-tone='danger'] {
+        background: var(--color-error);
+        box-shadow: 0 0 8px color-mix(in srgb, var(--color-error) 58%, transparent);
+      }
+
+      &[data-tone='success'] {
         background: var(--color-success);
         box-shadow: 0 0 8px color-mix(in srgb, var(--color-success) 48%, transparent);
       }
@@ -1019,6 +1016,26 @@ app-inspector-panel {
     .app-toast-icon {
       color: var(--color-warning-content);
       background: var(--color-warning);
+    }
+  }
+
+  &[data-tone='error'] {
+    border-color: color-mix(in oklab, var(--color-error) 56%, var(--border));
+    background: color-mix(in oklab, var(--color-error) 13%, var(--surface-raised));
+
+    .app-toast-icon {
+      color: var(--color-error-content);
+      background: var(--color-error);
+    }
+  }
+
+  &[data-tone='info'] {
+    border-color: color-mix(in oklab, var(--color-info) 54%, var(--border));
+    background: color-mix(in oklab, var(--color-info) 12%, var(--surface-raised));
+
+    .app-toast-icon {
+      color: var(--color-info-content);
+      background: var(--color-info);
     }
   }
 }

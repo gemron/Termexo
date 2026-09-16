@@ -413,14 +413,14 @@
                 class="tab"
                 [class.active]="terminal.id === activeTerminalId()"
                 [class.visible]="isTerminalVisible(terminal.id)"
-                [attr.data-status]="terminal.status"
+                [attr.data-tone]="statusTone(terminal.status)"
+                [attr.data-pulse]="statusMeta(terminal.status)?.pulse ?? false"
                 [attr.aria-selected]="terminal.id === activeTerminalId()"
                 [title]="terminalTabTitle(terminal)"
                 (click)="selectTerminal(terminal.id)"
                 (auxclick)="closeTerminalOnMiddleClick($event, terminal.id)"
-              (click)="$event.preventDefault(); requestCloseTerminal(terminal.id)"
               >
-                <i [attr.data-status]="terminal.status"></i>
+                <i [attr.data-tone]="statusTone(terminal.status)"></i>
                 <app-icon [name]="agentIcons[terminal.agentType]" [size]="12" />
                 <span>{{ terminal.name }}</span>
               </button>
@@ -933,6 +933,7 @@
       <button
         type="button"
         class="secondary"
+        [disabled]="closingTerminal()"
         (click)="cancelCloseTerminal()"
       >
         {{ 'common.cancel' | t }}
@@ -940,6 +941,7 @@
       <button
         type="button"
         class="danger"
+        [disabled]="closingTerminal()"
         (click)="confirmCloseTerminal(pendingCloseId)"
       >
         {{ 'terminal.closeForce' | t }}
