@@ -131,15 +131,9 @@
         </button>
         @if (isOpen('details')) {
           <div class="section-body">
+            <!-- Agent name and model already live in the overview block at the top of the
+                 panel; only the pieces that change once the session is created are kept here. -->
             <dl>
-              <div>
-                <dt>Agent</dt>
-                <dd>{{ agentLabels[terminal.agentType] }}</dd>
-              </div>
-              <div>
-                <dt>{{ 'inspector.model' | t }}</dt>
-                <dd>{{ terminal.model }}</dd>
-              </div>
               @if (activeAccountName(); as account) {
                 <div>
                   <dt>{{ 'inspector.account' | t }}</dt>
@@ -147,7 +141,7 @@
                 </div>
               }
               <div>
-                <dt>{{ 'inspector.branch' | t }}</dt>
+                <dt>{{ 'inspector.sessionBranch' | t }}</dt>
                 <dd>{{ terminal.branch }}</dd>
               </div>
               <div>

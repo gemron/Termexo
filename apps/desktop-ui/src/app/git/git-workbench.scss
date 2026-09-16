@@ -153,7 +153,9 @@ button:disabled {
   display: grid;
   min-width: 0;
   min-height: 0;
-  grid-template-rows: minmax(150px, 42%) minmax(180px, 58%);
+  // Changes list gets the bulk of the row — its items are denser per pixel — and the graph
+  // gets whatever is left, with a floor that keeps it readable on shorter windows.
+  grid-template-rows: minmax(220px, 1fr) minmax(180px, 40%);
   border-right: 1px solid var(--border);
   background: var(--surface-1);
 }
@@ -176,7 +178,7 @@ button:disabled {
   justify-content: space-between;
   padding: 0 10px;
   color: var(--text-secondary);
-  font-size: 10px;
+  font-size: 11px;
   letter-spacing: 0.025em;
 }
 .changes-panel > header span,
@@ -186,15 +188,15 @@ button:disabled {
   border-radius: 9px;
   text-align: center;
   background: var(--surface-inset);
-  font: 700 8px/1 var(--mono);
+  font: 600 10px/1 var(--mono);
 }
 
 .baseline-note {
   margin: 0;
   padding: 5px 10px 7px;
   color: var(--text-muted);
-  font-size: 9px;
-  line-height: 1.35;
+  font-size: 11px;
+  line-height: 1.4;
 }
 .change-list,
 .commit-list {
