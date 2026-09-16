@@ -243,7 +243,7 @@
                 <span>{{ taskDirectory(task) }}</span>
               </p>
 
-              @if (task.terminalId) {
+              @if (task.terminalId && task.stage !== 'verified') {
                 <button
                   type="button"
                   class="terminal-binding"
