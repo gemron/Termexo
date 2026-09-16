@@ -67,6 +67,27 @@ export interface DiffRow {
   newText: string;
 }
 
+/**
+ * `equal` rows that the template renders behind a "show N unchanged lines" toggle. The collapse is
+ * purely a render-time convenience — every original row lives in `rows`, in order, so jumping to a
+ * specific line by `oldLine` / `newLine` still resolves.
+ */
+export interface CollapsedEqualRow {
+  kind: 'collapsed';
+  /** Number of equal lines the placeholder stands in for. */
+  count: number;
+  firstOldLine: number;
+  firstNewLine: number;
+  lastOldLine: number;
+  lastNewLine: number;
+}
+
+export type DiffDisplayRow = DiffRow | CollapsedEqualRow;
+
+export function isCollapsed(row: DiffDisplayRow): row is CollapsedEqualRow {
+  return row.kind === 'collapsed';
+}
+
 const MAX_LCS_CELLS = 2_000_000;
 
 /**
@@ -76,7 +97,7 @@ const MAX_LCS_CELLS = 2_000_000;
  * reader, and stopping on each of its lines would make the button useless on exactly the diffs
  * where it matters most.
  */
-export function changeBlockStarts(rows: readonly DiffRow[]): number[] {
+export function changeBlockStarts(rows: readonly DiffDisplayRow[]): number[] {
   const starts: number[] = [];
   let inBlock = false;
   rows.forEach((row, index) => {
@@ -214,4 +235,71 @@ function coarseDiffRows(oldLines: string[], newLines: string[]): DiffRow[] {
     });
   }
   return rows;
+}
+
+/**
+ * Replaces every run of ≥ {@link EQUAL_FOLD_THRESHOLD} consecutive `equal` rows with a single
+ * placeholder so a 200-line file with one edit does not render all 200 unchanged lines. Two
+ * untouched lines are always shown around each placeholder so the reader can still see the edit
+ * in context.
+ */
+export const EQUAL_FOLD_THRESHOLD = 3;
+
+/**
+ * Replaces every run of ≥ {@link EQUAL_FOLD_THRESHOLD} consecutive `equal` rows with a single
+ * placeholder so a 200-line file with one edit does not render all 200 unchanged lines. Two
+ * untouched lines are always shown around each placeholder so the reader can still see the edit
+ * in context. `shouldExpand(placeholder)` lets the caller pass through a previously-collapsed
+ * run (e.g. the user clicked "show N lines").
+ */
+export function withCollapsedEquals(
+  rows: readonly DiffRow[],
+  shouldExpand: (placeholder: CollapsedEqualRow) => boolean = () => false,
+): DiffDisplayRow[] {
+  const out: DiffDisplayRow[] = [];
+  let index = 0;
+  while (index < rows.length) {
+    const start = index;
+    while (index < rows.length && rows[index].kind === 'equal') {
+      index += 1;
+    }
+    const equalRun = index - start;
+    if (equalRun <= EQUAL_FOLD_THRESHOLD) {
+      for (let i = start; i < index; i += 1) out.push(rows[i]);
+      continue;
+    }
+    const visible = EQUAL_FOLD_THRESHOLD;
+    const head = Math.min(visible, Math.floor(equalRun / 2));
+    const tail = Math.min(visible, equalRun - head);
+    for (let i = 0; i < head; i += 1) out.push(rows[start + i]);
+    const collapsedRows = rows.slice(start + head, start + equalRun - tail);
+    const firstOldLine = collapsedRows[0]?.oldLine;
+    const firstNewLine = collapsedRows[0]?.newLine;
+    const lastOldLine = collapsedRows.at(-1)?.oldLine;
+    const lastNewLine = collapsedRows.at(-1)?.newLine;
+    if (
+      firstOldLine !== undefined &&
+      firstNewLine !== undefined &&
+      lastOldLine !== undefined &&
+      lastNewLine !== undefined
+    ) {
+      const placeholder: CollapsedEqualRow = {
+        kind: 'collapsed',
+        count: collapsedRows.length,
+        firstOldLine,
+        firstNewLine,
+        lastOldLine,
+        lastNewLine,
+      };
+      if (shouldExpand(placeholder)) {
+        for (const row of collapsedRows) out.push(row);
+      } else {
+        out.push(placeholder);
+      }
+    } else {
+      for (const row of collapsedRows) out.push(row);
+    }
+    for (let i = equalRun - tail; i < equalRun; i += 1) out.push(rows[start + i]);
+  }
+  return out;
 }

@@ -229,43 +229,78 @@
               <span class="split-head">{{ 'git.before' | t }}</span>
               <span class="split-head">{{ 'git.after' | t }}</span>
               @for (row of rows(); track $index) {
-                <div
-                  class="diff-line old"
-                  [attr.data-row]="$index"
-                  [class.change-anchor]="$index === anchoredRow()"
-                  [attr.data-kind]="
-                    row.oldLine === undefined
-                      ? 'blank'
-                      : row.oldText !== row.newText
-                        ? 'removed'
-                        : 'equal'
-                  "
-                  [class.blank]="row.oldLine === undefined"
-                >
-                  <span>{{ row.oldLine ?? '' }}</span
-                  ><code>{{ row.oldText }}</code>
-                </div>
-                <div
-                  class="diff-line new"
-                  [class.change-anchor]="$index === anchoredRow()"
-                  [attr.data-kind]="
-                    row.newLine === undefined
-                      ? 'blank'
-                      : row.oldText !== row.newText
-                        ? 'added'
-                        : 'equal'
-                  "
-                  [class.blank]="row.newLine === undefined"
-                >
-                  <span>{{ row.newLine ?? '' }}</span
-                  ><code>{{ row.newText }}</code>
-                </div>
+                @if (row.kind === 'collapsed') {
+                  <button
+                    type="button"
+                    class="diff-collapse"
+                    [attr.data-row]="$index"
+                    (click)="toggleCollapse($index)"
+                  >
+                    <span></span
+                    ><code>{{ 'git.collapsedLines' | t: { count: row.count } }}</code>
+                    <span>{{ row.lastNewLine }}</span>
+                  </button>
+                  <button
+                    type="button"
+                    class="diff-collapse"
+                    [attr.data-row]="$index"
+                    (click)="toggleCollapse($index)"
+                  >
+                    <span>{{ row.lastOldLine }}</span
+                    ><code>{{ 'git.collapsedLines' | t: { count: row.count } }}</code>
+                    <span></span>
+                  </button>
+                } @else {
+                  <div
+                    class="diff-line old"
+                    [attr.data-row]="$index"
+                    [class.change-anchor]="$index === anchoredRow()"
+                    [attr.data-kind]="
+                      row.oldLine === undefined
+                        ? 'blank'
+                        : row.oldText !== row.newText
+                          ? 'removed'
+                          : 'equal'
+                    "
+                    [class.blank]="row.oldLine === undefined"
+                  >
+                    <span>{{ row.oldLine ?? '' }}</span
+                    ><code>{{ row.oldText }}</code>
+                  </div>
+                  <div
+                    class="diff-line new"
+                    [class.change-anchor]="$index === anchoredRow()"
+                    [attr.data-kind]="
+                      row.newLine === undefined
+                        ? 'blank'
+                        : row.oldText !== row.newText
+                          ? 'added'
+                          : 'equal'
+                    "
+                    [class.blank]="row.newLine === undefined"
+                  >
+                    <span>{{ row.newLine ?? '' }}</span
+                    ><code>{{ row.newText }}</code>
+                  </div>
+                }
               }
             </div>
           } @else {
             <div class="unified-grid">
               @for (row of rows(); track $index) {
-                @if (
+                @if (row.kind === 'collapsed') {
+                  <button
+                    type="button"
+                    class="diff-collapse"
+                    [attr.data-row]="$index"
+                    (click)="toggleCollapse($index)"
+                  >
+                    <span>{{ row.firstOldLine }}</span
+                    ><span>{{ row.firstNewLine }}</span>
+                    <b>…</b>
+                    <code>{{ 'git.collapsedLines' | t: { count: row.count } }}</code>
+                  </button>
+                } @else if (
                   row.oldLine !== undefined &&
                   row.newLine !== undefined &&
                   row.oldText !== row.newText

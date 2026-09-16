@@ -547,6 +547,39 @@ button:disabled {
 .diff-line[data-kind='removed'] b {
   color: #ef9aaa;
 }
+
+/*
+ * A placeholder that stands in for a run of ≥ EQUAL_FOLD_THRESHOLD equal rows. Renders as a
+ * button so the user can expand it; the line-number cell shows the line that comes right after
+ * the run so jumping the diff still lands in the right place.
+ */
+.diff-collapse {
+  display: grid;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  min-height: 22px;
+  padding: 0 10px;
+  border: 0;
+  border-top: 1px dashed color-mix(in srgb, var(--border) 60%, transparent);
+  border-bottom: 1px dashed color-mix(in srgb, var(--border) 60%, transparent);
+  color: var(--text-muted);
+  background: color-mix(in srgb, var(--surface-2) 36%, transparent);
+  cursor: pointer;
+  font: 10px/22px var(--mono);
+  text-align: left;
+
+  &:hover {
+    color: var(--text);
+    background: color-mix(in srgb, var(--surface-2) 64%, transparent);
+  }
+
+  code {
+    padding: 0;
+    color: inherit;
+    font: inherit;
+  }
+}
 .diff-line.blank {
   background: color-mix(in srgb, var(--surface-2) 55%, var(--surface-inset));
 }

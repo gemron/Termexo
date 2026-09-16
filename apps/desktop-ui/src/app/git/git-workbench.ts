@@ -14,6 +14,9 @@ import {
 import {
   buildDiffRows,
   changeBlockStarts,
+  withCollapsedEquals,
+  type CollapsedEqualRow,
+  type DiffDisplayRow,
   DiffLayout,
   RepositoryChange,
   RepositoryCommit,
@@ -78,9 +81,20 @@ export class GitWorkbenchComponent {
    * to every one of those reads made the button flicker on a three-second cadence.
    */
   protected readonly refreshSpinning = computed(() => this.manualRefreshing() && this.refreshing());
-  protected readonly rows = computed(() => {
+  private readonly rawRows = computed(() => {
     const diff = this.diff();
     return diff && !diff.binary ? buildDiffRows(diff.oldText, diff.newText) : [];
+  });
+
+protected readonly rows = computed(() => {
+    const raw = this.rawRows();
+    // The model produces one row per line; the view layer renders runs of ≥3 equal rows behind
+    // a "show N lines" toggle so a 200-line file with one edit does not render all 200
+    // unchanged lines. The toggle lives in `expandedRows` keyed on the placeholder's
+    // `firstNewLine`; expanding a placeholder restores the equal rows so line numbers stay
+    // correct.
+    const expanded = this.expandedRows();
+    return withCollapsedEquals(raw, (row) => expanded.has(row.firstNewLine));
   });
   /** Line counts for the open diff; a changed row stands for one line on each side. */
   protected readonly diffStats = computed(() => {
@@ -98,6 +112,8 @@ export class GitWorkbenchComponent {
   protected readonly changeBlocks = computed(() => changeBlockStarts(this.rows()));
   /** Which change was stepped to, or -1 before the first step. */
   private readonly activeChange = signal(-1);
+  /** Rows that started as a collapsed placeholder; the user has expanded them. */
+  private readonly expandedRows = signal<ReadonlySet<number>>(new Set());
   /** The row the last jump landed on, which the view marks. */
   protected readonly anchoredRow = computed(() => {
     const index = this.activeChange();
@@ -162,6 +178,23 @@ export class GitWorkbenchComponent {
       step > 0 ? (current + 1) % blocks.length : current <= 0 ? blocks.length - 1 : current - 1;
     this.activeChange.set(next);
     this.scrollToRow(blocks[next]);
+  }
+
+  /**
+   * Toggles the collapsed equal-rows placeholder at `rowIndex`. Expanding leaves the original
+   * equal rows back in their place so stepping past the block still works; collapsing restores
+   * the placeholder so the next change is closer.
+   */
+  protected toggleCollapse(rowIndex: number): void {
+    const expanded = new Set(this.expandedRows());
+    if (expanded.has(rowIndex)) {
+      expanded.delete(rowIndex);
+    } else {
+      expanded.add(rowIndex);
+    }
+    this.expandedRows.set(expanded);
+    this.activeChange.set(-1);
+    queueMicrotask(() => this.scrollToRow(rowIndex));
   }
 
   /** Alt with an arrow key, which nothing in the diff consumes. */
