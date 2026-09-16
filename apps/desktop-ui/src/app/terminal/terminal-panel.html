@@ -2,6 +2,7 @@
   class="terminal-panel card bg-base-200"
   [class.active]="active()"
   [attr.data-status]="session().status"
+  [attr.data-tone]="statusTone()"
   (mousedown)="focus()"
 >
   <header>

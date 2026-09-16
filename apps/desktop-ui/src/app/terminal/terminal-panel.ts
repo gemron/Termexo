@@ -25,6 +25,7 @@ import {
   normalizeTerminalFontSize,
   TerminalSession,
   TerminalStatus,
+  TERMINAL_STATUS_META,
 } from '../core/models/workspace.models';
 import { primaryPointerIsTouch } from '../core/services/input-device';
 import { PtyBackendService } from '../core/services/pty-backend.service';
@@ -506,20 +507,11 @@ export class TerminalPanelComponent implements AfterViewInit {
   }
 
   protected statusLabel(status: TerminalStatus): string {
-    const keys: Record<TerminalStatus, string> = {
-      STARTING: 'status.starting',
-      RUNNING: 'status.running',
-      THINKING: 'status.thinking',
-      WAITING_INPUT: 'status.waitingInput',
-      WAITING_APPROVAL: 'status.waitingApproval',
-      RATE_LIMITED: 'status.rateLimited',
-      IDLE: 'status.idle',
-      COMPLETED: 'status.completed',
-      FAILED: 'status.failed',
-      STOPPED: 'status.stopped',
-      DISCONNECTED: 'status.disconnected',
-    };
-    return this.i18n.t(keys[status]);
+    return this.i18n.t(TERMINAL_STATUS_META[status].labelKey);
+  }
+
+  protected statusTone(): string {
+    return TERMINAL_STATUS_META[this.session().status].tone;
   }
 
   private async initializeRuntime(): Promise<void> {

@@ -50,47 +50,26 @@
   }
 
   /* Status chrome sits on the header band and a left edge bar — never on the outer border, the
-   * outer glow or the title colour, which the active (focused) panel reserves for itself. */
-  &[data-status='WAITING_INPUT'],
-  &[data-status='WAITING_APPROVAL'],
-  &[data-status='RATE_LIMITED'] {
-    header {
-      border-bottom-color: color-mix(in srgb, var(--color-warning) 38%, var(--border));
-      background:
-        linear-gradient(
-          90deg,
-          color-mix(in srgb, var(--color-warning) 16%, transparent),
-          transparent 62%
-        ),
-        var(--surface-raised);
-    }
+   * outer glow or the title colour, which the active (focused) panel reserves for itself. The
+   * `data-tone` attribute is set from `TERMINAL_STATUS_META`; one block covers every tone. */
+  &[data-tone='attention'] header,
+  &[data-tone='warning'] header,
+  &[data-tone='danger'] header,
+  &[data-tone='success'] header {
+    border-bottom-color: color-mix(in srgb, var(--status-edge) 38%, var(--border));
+    background:
+      linear-gradient(
+        90deg,
+        color-mix(in srgb, var(--status-edge) 16%, transparent),
+        transparent 62%
+      ),
+      var(--surface-raised);
   }
 
-  &[data-status='RATE_LIMITED'] {
-    header {
-      border-bottom-color: color-mix(in srgb, var(--color-error) 38%, var(--border));
-      background:
-        linear-gradient(
-          90deg,
-          color-mix(in srgb, var(--color-error) 16%, transparent),
-          transparent 62%
-        ),
-        var(--surface-raised);
-    }
-  }
-
-  &[data-status='COMPLETED'] {
-    header {
-      border-bottom-color: color-mix(in srgb, var(--color-success) 38%, var(--border));
-      background:
-        linear-gradient(
-          90deg,
-          color-mix(in srgb, var(--color-success) 16%, transparent),
-          transparent 62%
-        ),
-        var(--surface-raised);
-    }
-  }
+  &[data-tone='attention'] { --status-edge: var(--color-warning); }
+  &[data-tone='warning'] { --status-edge: var(--color-warning); }
+  &[data-tone='danger'] { --status-edge: var(--color-error); }
+  &[data-tone='success'] { --status-edge: var(--color-success); }
 }
 
 header {
@@ -188,39 +167,30 @@ header {
     box-shadow: 0 0 0 2px color-mix(in srgb, currentColor 14%, transparent);
   }
 
-  &[data-status='STARTING'] .status-light {
-    color: var(--color-warning);
-    animation: terminal-status-light 1.4s ease-in-out infinite;
-  }
-
-  &[data-status='RUNNING'] .status-light {
-    color: var(--color-success);
-    animation: terminal-status-light 1.8s ease-in-out infinite;
-  }
-
-  &[data-status='THINKING'] .status-light {
+  &[data-tone='progress'] .status-light {
     color: var(--accent);
-    animation: terminal-status-light 1.15s ease-in-out infinite;
+    animation: terminal-status-light 1.6s ease-in-out infinite;
   }
 
-  &[data-status='WAITING_INPUT'] .status-light {
-    color: var(--info);
+  &[data-tone='attention'] .status-light {
+    color: var(--color-warning);
+    animation: terminal-status-light 1.2s ease-in-out infinite;
   }
 
-  &[data-status='WAITING_APPROVAL'] .status-light {
-    color: var(--warning);
+  &[data-tone='warning'] .status-light {
+    color: var(--color-warning);
   }
 
-  &[data-status='RATE_LIMITED'] .status-light {
+  &[data-tone='danger'] .status-light {
     color: var(--color-error);
   }
 
-  &[data-status='COMPLETED'] .status-light {
+  &[data-tone='success'] .status-light {
     color: var(--color-success);
   }
 
-  &[data-status='FAILED'] .status-light {
-    color: var(--danger);
+  &[data-tone='neutral'] .status-light {
+    color: var(--text-muted);
   }
 }
 
@@ -232,18 +202,22 @@ header {
   line-height: 1;
   white-space: nowrap;
 
-  &[data-status='WAITING_INPUT'],
-  &[data-status='WAITING_APPROVAL'] {
+  &[data-tone='attention'] {
     color: color-mix(in srgb, var(--color-warning) 78%, var(--text));
     font-weight: 700;
   }
 
-  &[data-status='RATE_LIMITED'] {
+  &[data-tone='warning'] {
+    color: color-mix(in srgb, var(--color-warning) 78%, var(--text));
+    font-weight: 700;
+  }
+
+  &[data-tone='danger'] {
     color: color-mix(in srgb, var(--color-error) 82%, var(--text));
     font-weight: 700;
   }
 
-  &[data-status='COMPLETED'] {
+  &[data-tone='success'] {
     color: color-mix(in srgb, var(--color-success) 82%, var(--text));
     font-weight: 700;
   }

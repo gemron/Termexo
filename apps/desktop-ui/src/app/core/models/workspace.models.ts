@@ -115,18 +115,29 @@ export interface CreateTerminalInput {
   autoConfirm?: boolean;
 }
 
-export const TERMINAL_STATUS_LABELS: Record<TerminalStatus, string> = {
-  STARTING: '启动中',
-  RUNNING: '运行中',
-  THINKING: '思考中',
-  WAITING_INPUT: '等待输入',
-  WAITING_APPROVAL: '需要确认',
-  RATE_LIMITED: '429 限流',
-  IDLE: '空闲',
-  COMPLETED: '已完成',
-  FAILED: '失败',
-  STOPPED: '已停止',
-  DISCONNECTED: '已断开',
+/**
+ * The one source of truth for terminal status presentation.
+ *
+ * The tone drives the colour across panels, labels, banners and the session centre so a status
+ * only ever uses one visual language. Status itself carries the i18n key; tone does not. The
+ * `pulse` flag is reserved for states where the user must act (waiting_*), the rest stay still
+ * so a busy workbench does not have five dots blinking in unison.
+ */
+export const TERMINAL_STATUS_META: Record<
+  TerminalStatus,
+  { tone: 'progress' | 'attention' | 'warning' | 'danger' | 'success' | 'neutral'; labelKey: string; pulse: boolean }
+> = {
+  STARTING: { tone: 'progress', labelKey: 'status.starting', pulse: false },
+  RUNNING: { tone: 'progress', labelKey: 'status.running', pulse: false },
+  THINKING: { tone: 'progress', labelKey: 'status.thinking', pulse: false },
+  WAITING_INPUT: { tone: 'attention', labelKey: 'status.waitingInput', pulse: true },
+  WAITING_APPROVAL: { tone: 'attention', labelKey: 'status.waitingApproval', pulse: true },
+  RATE_LIMITED: { tone: 'warning', labelKey: 'status.rateLimited', pulse: false },
+  IDLE: { tone: 'neutral', labelKey: 'status.idle', pulse: false },
+  COMPLETED: { tone: 'success', labelKey: 'status.completed', pulse: false },
+  FAILED: { tone: 'danger', labelKey: 'status.failed', pulse: false },
+  STOPPED: { tone: 'neutral', labelKey: 'status.stopped', pulse: false },
+  DISCONNECTED: { tone: 'neutral', labelKey: 'status.disconnected', pulse: false },
 };
 
 /**
