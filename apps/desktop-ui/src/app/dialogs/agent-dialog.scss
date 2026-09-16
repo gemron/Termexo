@@ -273,9 +273,10 @@ button:disabled {
 /* Health reads as a status line, not as cards competing with the session rows. */
 .agent-health-strip {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
-  gap: 18px;
-  padding: 7px 17px;
+  gap: 10px 16px;
+  padding: 5px 17px;
   border-bottom: 1px solid var(--border);
   background: var(--surface-inset);
 }
@@ -284,19 +285,19 @@ button:disabled {
   display: flex;
   min-width: 0;
   align-items: center;
-  gap: 7px;
+  gap: 6px;
 
   strong {
     color: var(--text-secondary);
-    font-size: 10px;
-    font-weight: 580;
+    font-size: 11px;
+    font-weight: 560;
     white-space: nowrap;
   }
 
   code {
     overflow: hidden;
     color: var(--color-success);
-    font: 9px/1 var(--mono);
+    font: 10px/1 var(--mono);
     text-overflow: ellipsis;
     white-space: nowrap;
   }
@@ -308,9 +309,9 @@ button:disabled {
 
 .agent-health-icon {
   display: grid;
-  width: 22px;
-  height: 22px;
-  flex: 0 0 22px;
+  width: 20px;
+  height: 20px;
+  flex: 0 0 20px;
   place-items: center;
   border-radius: var(--radius-selector);
   color: var(--color-success);
@@ -1369,14 +1370,7 @@ button:disabled {
     justify-self: start;
   }
 
-  /* The four agent names do not fit side by side on a phone. */
-  .agent-health-strip {
-    overflow-x: auto;
-
-    .agent-health {
-      flex: 0 0 auto;
-    }
-  }
+  /* The strip itself wraps; nothing phone-specific needs to happen here. */
 
   .session-metadata > span:not(.agent-tag):not(.session-branch) {
     display: none;
