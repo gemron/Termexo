@@ -1058,7 +1058,9 @@ app-inspector-panel {
   position: fixed;
   z-index: var(--z-toast);
   right: 18px;
-  bottom: 30px;
+  // Sit above the toast region so the two never overlap. The toast itself sits at
+  // bottom 30px and is up to ~58px tall (46px min-height + 8px bottom padding).
+  bottom: calc(30px + 58px + 8px);
   width: min(360px, calc(100vw - 32px));
   pointer-events: auto;
 }

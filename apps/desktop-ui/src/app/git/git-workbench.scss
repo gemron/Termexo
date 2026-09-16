@@ -461,10 +461,18 @@ button:disabled {
 }
 .split-grid {
   display: grid;
-  width: max-content;
-  min-width: 100%;
-  grid-template-columns: repeat(2, minmax(450px, auto));
+  width: 100%;
+  min-width: 0;
+  // Each pane shares the available width; below 900px the layout collapses to a single
+  // column and the second pane scrolls horizontally on its own instead of overflowing the
+  // whole grid off-screen.
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 12px;
   padding-bottom: 24px;
+
+  @media (max-width: 900px) {
+    grid-template-columns: minmax(0, 1fr);
+  }
 }
 /* Inside the grid rather than above it, so the headings follow the columns as those grow. */
 .split-head {
