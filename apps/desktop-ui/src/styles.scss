@@ -36,8 +36,8 @@
   div > span {
     margin-top: 5px;
     color: var(--text-muted);
-    font-size: 9px;
-    line-height: 1.55;
+    font-size: 11px;
+    line-height: 1.5;
   }
 }
 
@@ -65,8 +65,8 @@
   h3 {
     margin: 0 0 10px;
     color: var(--text-secondary);
-    font-size: 9px;
-    font-weight: 650;
+    font-size: 11px;
+    font-weight: 600;
     letter-spacing: 0.06em;
     text-transform: uppercase;
   }
@@ -80,7 +80,7 @@
   display: block;
   margin-top: 4px;
   color: var(--text-muted);
-  font-size: 9px;
+  font-size: 11px;
   line-height: 1.45;
 }
 
@@ -112,7 +112,7 @@
   }
 
   strong {
-    font-size: 9px;
+    font-size: 11px;
     font-weight: 600;
   }
 
@@ -676,6 +676,18 @@ summary:focus-visible,
   outline: 2px solid color-mix(in oklab, var(--color-primary) 82%, white);
   outline-offset: 2px;
 }
+
+/*
+ * Type-scale tokens. Anything user-facing stays at 11px or larger; the only 10/9px usage that
+ * survives is badge counts, keyboard glyphs and code-metadata rows. Component styles should
+ * reach for these tokens instead of writing pixel sizes of their own.
+ */
+.text-2xs { font-size: 10px; }
+.text-xs { font-size: 11px; line-height: 1.45; }
+.text-sm { font-size: 12px; line-height: 1.45; }
+.text-md { font-size: 13px; line-height: 1.5; }
+.text-lg { font-size: 15px; line-height: 1.4; }
+.text-xl { font-size: 17px; line-height: 1.35; }
 
 ::selection {
   color: var(--color-primary-content);
