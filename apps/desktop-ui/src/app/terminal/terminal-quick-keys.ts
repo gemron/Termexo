@@ -150,7 +150,6 @@ const QUICK_KEY_LAYOUT: readonly QuickKeyButton[] = [
     .quick-key:hover,
     .quick-key:focus-visible {
       color: var(--text);
-      outline: 0;
     }
 
     .quick-key:active {
@@ -178,7 +177,6 @@ const QUICK_KEY_LAYOUT: readonly QuickKeyButton[] = [
     .quick-keys.open .quick-keys-toggle {
       color: var(--text);
       opacity: 1;
-      outline: 0;
     }
 
     @keyframes quick-key-pad-enter {

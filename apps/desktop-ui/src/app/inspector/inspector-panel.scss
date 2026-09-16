@@ -81,7 +81,6 @@
   &:focus-visible {
     color: var(--text);
     background: var(--surface-2);
-    outline: 0;
   }
 }
 
@@ -193,7 +192,6 @@ button.stat {
   &:focus-visible:not(:disabled) {
     border-color: var(--border-strong);
     background: var(--surface-2);
-    outline: 0;
   }
 
   &:disabled {
@@ -225,7 +223,6 @@ button.stat {
   &:focus-visible {
     color: var(--text);
     background: var(--surface-2);
-    outline: 0;
   }
 
   .chevron {
@@ -527,7 +524,6 @@ button.stat {
   &:hover,
   &:focus-visible {
     border-color: color-mix(in srgb, var(--accent) 58%, var(--border));
-    outline: 0;
     background: color-mix(in srgb, var(--accent) 11%, var(--surface-raised));
   }
 }
@@ -553,7 +549,6 @@ button.stat {
 
     &:hover,
     &:focus-visible {
-      outline: 0;
       color: var(--text);
       background: var(--surface-2);
     }

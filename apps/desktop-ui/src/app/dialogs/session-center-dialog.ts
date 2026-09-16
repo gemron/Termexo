@@ -487,6 +487,7 @@ export class SessionCenterDialogComponent {
   readonly installation = input<AgentInstallation | null>(null);
   readonly codexInstallation = input<AgentInstallation | null>(null);
   readonly openCodeInstallation = input<AgentInstallation | null>(null);
+  readonly antigravityInstallation = input<AgentInstallation | null>(null);
   readonly sessions = input<AgentSession[]>([]);
   readonly profiles = input<ModelProfile[]>([]);
   readonly mcpProfiles = input<McpProfile[]>([]);
@@ -741,12 +742,23 @@ export class SessionCenterDialogComponent {
     return presentationOf(session.agentType).icon;
   }
 
+  /**
+   * Every agent answers for itself. The chain this replaces fell through to OpenCode for anything
+   * that was not Claude or Codex, so Antigravity sessions reported OpenCode's version and offered
+   * to resume even with Antigravity missing. A `switch` over the union makes a new agent a
+   * compile error here rather than a silently wrong installation.
+   */
   private installationOf(agentType: NativeAgentType): AgentInstallation | null {
-    return agentType === 'claude'
-      ? this.installation()
-      : agentType === 'codex'
-        ? this.codexInstallation()
-        : this.openCodeInstallation();
+    switch (agentType) {
+      case 'claude':
+        return this.installation();
+      case 'codex':
+        return this.codexInstallation();
+      case 'opencode':
+        return this.openCodeInstallation();
+      case 'antigravity':
+        return this.antigravityInstallation();
+    }
   }
 
   protected shortSessionId(session: AgentSession): string {

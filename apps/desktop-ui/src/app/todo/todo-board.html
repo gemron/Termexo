@@ -910,6 +910,8 @@
   <div class="board-backdrop" (mousedown)="closeValidationFailure()">
     <section
       class="board-dialog validation-dialog"
+      appModal
+      (dismissModal)="closeValidationFailure()"
       role="dialog"
       aria-modal="true"
       (mousedown)="$event.stopPropagation()"

@@ -418,6 +418,7 @@
                 [title]="terminalTabTitle(terminal)"
                 (click)="selectTerminal(terminal.id)"
                 (auxclick)="closeTerminalOnMiddleClick($event, terminal.id)"
+              (click)="$event.preventDefault(); requestCloseTerminal(terminal.id)"
               >
                 <i [attr.data-status]="terminal.status"></i>
                 <app-icon [name]="agentIcons[terminal.agentType]" [size]="12" />
@@ -428,7 +429,7 @@
                 class="tab-close"
                 [title]="'terminal.close' | t"
                 [attr.aria-label]="'terminal.close' | t"
-                (click)="closeTerminal(terminal.id)"
+                (click)="requestCloseTerminal(terminal.id)"
               >
                 <app-icon name="x" [size]="11" />
               </button>
@@ -578,7 +579,7 @@
             [gridColumns]="gridColumns()"
             [gridRows]="gridRows()"
             (terminalSelected)="selectTerminal($event)"
-            (terminalClosed)="closeTerminal($event)"
+            (terminalClosed)="requestCloseTerminal($event)"
             (terminalMaximizeRequested)="toggleTerminalMaximize($event)"
             (launchRequested)="launchAgent($event)"
             (terminalStatusChanged)="handleTerminalStatus($event)"
@@ -782,6 +783,7 @@
     [installation]="agents.installation()"
     [codexInstallation]="agents.codexInstallation()"
     [openCodeInstallation]="agents.openCodeInstallation()"
+    [antigravityInstallation]="agents.antigravityInstallation()"
     [sessions]="agents.sessions()"
     [profiles]="agents.modelProfiles()"
     [mcpProfiles]="agents.mcpProfiles()"
@@ -920,13 +922,67 @@
   />
 }
 
+@if (pendingTerminalClose(); as pendingCloseId) {
+  <div
+    class="app-terminal-close-confirm inline-confirm"
+    role="alert"
+    aria-live="assertive"
+  >
+    <p>{{ 'terminal.closeRunningConfirm' | t }}</p>
+    <div class="inline-confirm-actions">
+      <button
+        type="button"
+        class="secondary"
+        (click)="cancelCloseTerminal()"
+      >
+        {{ 'common.cancel' | t }}
+      </button>
+      <button
+        type="button"
+        class="danger"
+        (click)="confirmCloseTerminal(pendingCloseId)"
+      >
+        {{ 'terminal.closeForce' | t }}
+      </button>
+    </div>
+  </div>
+}
+
 @if (toastMessage(); as message) {
-  <div class="app-toast-region toast toast-end toast-bottom" aria-live="polite">
-    <div class="app-toast alert shadow-xl" role="status" [attr.data-tone]="toastTone()">
+  <div
+    class="app-toast-region toast toast-end toast-bottom"
+    [attr.aria-live]="toastTone() === 'error' ? 'assertive' : 'polite'"
+  >
+    <div
+      class="app-toast alert shadow-xl"
+      [attr.role]="toastTone() === 'error' ? 'alert' : 'status'"
+      [attr.data-tone]="toastTone()"
+    >
       <span class="app-toast-icon">
-        <app-icon [name]="toastTone() === 'attention' ? 'bell' : 'check'" [size]="15" />
+        @switch (toastTone()) {
+          @case ('success') {
+            <app-icon name="check" [size]="15" />
+          }
+          @case ('info') {
+            <app-icon name="info" [size]="15" />
+          }
+          @case ('attention') {
+            <app-icon name="bell" [size]="15" />
+          }
+          @case ('error') {
+            <app-icon name="alert-triangle" [size]="15" />
+          }
+        }
       </span>
       <span>{{ message }}</span>
+      <button
+        type="button"
+        class="app-toast-close"
+        [attr.aria-label]="'common.close' | t"
+        (click)="closeToast()"
+      >
+        <app-icon name="x" [size]="13" />
+      </button>
     </div>
   </div>
 }

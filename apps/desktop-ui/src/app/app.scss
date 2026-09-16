@@ -127,6 +127,10 @@ app-inspector-panel {
   height: 100%;
   min-width: 0;
   min-height: 0;
+  // Without an explicit column, the implicit one is sized by the widest row's minimum content —
+  // the status bar's unwrappable text — so the whole column grew past a phone viewport and the
+  // terminal's close and maximise buttons ended up outside it, with no way to scroll to them.
+  grid-template-columns: minmax(0, 1fr);
   grid-template-rows: var(--panel-header-height) auto minmax(0, 1fr) 22px;
   background: var(--surface-0);
 }
@@ -219,7 +223,6 @@ app-inspector-panel {
   &:focus-visible {
     color: var(--text);
     background: var(--surface-2);
-    outline: 0;
   }
 }
 
@@ -494,7 +497,6 @@ app-inspector-panel {
   &:hover,
   &:focus-visible {
     border-color: var(--border);
-    outline: 0;
     color: var(--text);
     background: var(--surface-2);
   }
@@ -610,7 +612,6 @@ app-inspector-panel {
     &.active {
       color: var(--text);
       background: var(--surface-2);
-      outline: 0;
     }
   }
 }
@@ -646,7 +647,6 @@ app-inspector-panel {
     &:focus-visible {
       color: var(--text);
       background: var(--surface-2);
-      outline: 0;
     }
   }
 
@@ -921,6 +921,9 @@ app-inspector-panel {
 
 .statusbar {
   grid-row: 4;
+  // A flex container refuses to shrink below its content unless told to, and this one sits in the
+  // grid column every other row shares.
+  min-width: 0;
   display: flex;
   align-items: center;
   gap: 14px;
@@ -940,11 +943,11 @@ app-inspector-panel {
 
   .connection {
     &.preview {
-      min-width: 0;
       max-width: 44%;
       line-height: 1.3;
       color: var(--warning, #b88b46);
     }
+    min-width: 0;
     display: flex;
     align-items: center;
     gap: 6px;
@@ -1028,6 +1031,19 @@ app-inspector-panel {
   border-radius: var(--radius-selector);
   color: var(--color-primary-content);
   background: var(--color-primary);
+}
+
+/*
+ * Inline confirmation bar for closing a terminal that has work in flight. Sits at the bottom-right
+ * next to the toast region; its position tracks the toast slot but is otherwise independent.
+ */
+.app-terminal-close-confirm {
+  position: fixed;
+  z-index: 121;
+  right: 18px;
+  bottom: 30px;
+  width: min(360px, calc(100vw - 32px));
+  pointer-events: auto;
 }
 
 @keyframes app-toast-enter {

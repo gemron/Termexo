@@ -123,6 +123,33 @@
   margin-top: 14px;
 }
 
+/*
+ * Inline confirmation for destructive actions inside the settings panels (delete a model, account,
+ * MCP or network profile). Lives in the shared dialog stylesheet so the four editors render it the
+ * same way without each declaring its own copy.
+ */
+.inline-confirm {
+  margin-top: 10px;
+  padding: 10px 12px;
+  border: 1px solid color-mix(in oklab, var(--color-error) 46%, var(--border));
+  border-radius: var(--radius-box);
+  background: var(--error-soft);
+
+  p {
+    margin: 0;
+    color: var(--text-secondary);
+    font-size: 11px;
+    line-height: 1.5;
+  }
+}
+
+.inline-confirm-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 9px;
+}
+
 .manage-profile {
   margin-top: 12px;
 }

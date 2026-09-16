@@ -46,7 +46,6 @@
     width: 100%;
     min-width: 0;
     border: 0;
-    outline: 0;
     color: var(--text);
     background: transparent;
     font: 12px/1 var(--sans);
@@ -74,7 +73,6 @@
   &:focus-visible:not(:disabled) {
     color: var(--text);
     background: var(--surface-2);
-    outline: 0;
   }
 
   &:disabled {
@@ -234,7 +232,6 @@ nav {
   &:focus-visible {
     color: var(--workspace-color);
     background: color-mix(in srgb, var(--workspace-color) 12%, transparent);
-    outline: 0;
   }
 
   &:disabled {
@@ -266,7 +263,6 @@ nav {
   &:focus-visible {
     color: var(--text-secondary);
     background: color-mix(in srgb, var(--workspace-color) 10%, transparent);
-    outline: 0;
   }
 }
 

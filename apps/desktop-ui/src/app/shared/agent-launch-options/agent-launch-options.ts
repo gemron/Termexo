@@ -90,7 +90,6 @@ interface AgentLaunchGroup {
     button:focus-visible {
       color: var(--text);
       background: color-mix(in srgb, var(--accent) 14%, var(--surface-2));
-      outline: 0;
     }
 
     button > span {

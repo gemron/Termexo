@@ -73,6 +73,14 @@ const EN: TranslationTable = {
   'settings.mcpObjectRequired': 'The MCP configuration must be a JSON object.',
   'settings.manageModels': 'Manage model profiles',
   'settings.manageAccounts': 'Manage accounts',
+  'settings.deleteModelConfirm':
+    'Delete this model profile? Any saved API key for it will also be removed.',
+  'settings.deleteAccountConfirm':
+    'Delete this account? Its stored credential will be removed from the system keyring.',
+  'settings.deleteMcpConfirm':
+    'Delete this MCP profile? Servers started from it will stop on the next launch.',
+  'settings.deleteNetworkConfirm':
+    'Delete this network profile? Saved proxy and npm settings will be removed.',
   'launch.changeDirectory': 'Change directory',
   'settings.diagnosticDetails': 'Executable paths and session policy',
   'preview.label': 'Preview',
@@ -307,6 +315,9 @@ const EN: TranslationTable = {
   'terminal.restore': 'Restore terminal window',
   'terminal.restoreShortcut': 'Restore terminal window (Shift+Esc)',
   'terminal.close': 'Close terminal',
+  'terminal.closeRunningConfirm':
+    'This terminal is still running. Closing it will end any in-progress Agent response.',
+  'terminal.closeForce': 'Close anyway',
   'terminal.rename': 'Terminal name',
   'terminal.renameHint': 'Double-click to rename',
   'terminal.aria': 'Terminal',
@@ -847,6 +858,10 @@ const ZH_CN: TranslationTable = {
   'settings.mcpObjectRequired': 'MCP 配置必须是 JSON 对象。',
   'settings.manageModels': '管理模型配置',
   'settings.manageAccounts': '管理登录账号',
+  'settings.deleteModelConfirm': '删除这个模型配置？已保存的 API Key 也会一并移除。',
+  'settings.deleteAccountConfirm': '删除这个账号？它保存在系统凭据库里的凭据会被一并移除。',
+  'settings.deleteMcpConfirm': '删除这个 MCP 配置？下次启动时由它启动的服务器会停止。',
+  'settings.deleteNetworkConfirm': '删除这个网络配置？已保存的代理和 npm 设置都会被移除。',
   'launch.changeDirectory': '更改目录',
   'settings.diagnosticDetails': '查看程序路径与会话策略',
   'preview.label': '预览',
@@ -1080,6 +1095,8 @@ const ZH_CN: TranslationTable = {
   'terminal.restore': '恢复终端窗口',
   'terminal.restoreShortcut': '恢复终端窗口（Shift+Esc）',
   'terminal.close': '关闭终端',
+  'terminal.closeRunningConfirm': '这个终端还在运行中。关闭会中断正在进行的 Agent 响应。',
+  'terminal.closeForce': '仍然关闭',
   'terminal.rename': '终端名称',
   'terminal.renameHint': '双击可重命名',
   'terminal.aria': '终端',
@@ -1593,6 +1610,9 @@ const ES: TranslationTable = {
   'terminal.emptyTitle': 'Este espacio aún no tiene terminales',
   'terminal.emptyDescription': 'Crea un terminal Shell o Agent para comenzar.',
   'terminal.close': 'Cerrar terminal',
+  'terminal.closeRunningConfirm':
+    'Este terminal sigue en ejecución. Cerrarlo interrumpirá la respuesta del agente en curso.',
+  'terminal.closeForce': 'Cerrar de todos modos',
   'status.starting': 'Iniciando',
   'status.running': 'En ejecución',
   'status.thinking': 'Pensando',
@@ -1700,6 +1720,14 @@ const ES: TranslationTable = {
   'settings.mcpObjectRequired': 'La configuración MCP debe ser un objeto JSON.',
   'settings.manageModels': 'Gestionar perfiles de modelo',
   'settings.manageAccounts': 'Gestionar cuentas',
+  'settings.deleteModelConfirm':
+    '¿Eliminar este perfil de modelo? También se borrará cualquier clave API guardada.',
+  'settings.deleteAccountConfirm':
+    '¿Eliminar esta cuenta? Sus credenciales se borrarán del llavero del sistema.',
+  'settings.deleteMcpConfirm':
+    '¿Eliminar este perfil MCP? Los servidores iniciados desde él se detendrán en el próximo arranque.',
+  'settings.deleteNetworkConfirm':
+    '¿Eliminar este perfil de red? Se quitarán los ajustes guardados de proxy y npm.',
   'launch.changeDirectory': 'Cambiar directorio',
   'settings.diagnosticDetails': 'Rutas de ejecutables y política de sesión',
   'preview.label': 'Vista previa',
@@ -1768,6 +1796,9 @@ const FR: TranslationTable = {
   'terminal.emptyTitle': 'Cet espace ne contient encore aucun terminal',
   'terminal.emptyDescription': 'Créez un terminal Shell ou Agent pour commencer.',
   'terminal.close': 'Fermer le terminal',
+  'terminal.closeRunningConfirm':
+    'Ce terminal est encore en cours. Le fermer interrompra la réponse de l’agent en cours.',
+  'terminal.closeForce': 'Fermer quand même',
   'status.starting': 'Démarrage',
   'status.running': 'En cours',
   'status.thinking': 'Réflexion',
@@ -1874,6 +1905,14 @@ const FR: TranslationTable = {
   'settings.mcpObjectRequired': 'La configuration MCP doit être un objet JSON.',
   'settings.manageModels': 'Gérer les profils de modèle',
   'settings.manageAccounts': 'Gérer les comptes',
+  'settings.deleteModelConfirm':
+    'Supprimer ce profil de modèle ? Toute clé API enregistrée sera également retirée.',
+  'settings.deleteAccountConfirm':
+    'Supprimer ce compte ? Ses identifiants seront retirés du trousseau système.',
+  'settings.deleteMcpConfirm':
+    'Supprimer ce profil MCP ? Les serveurs qu’il lançait s’arrêteront au prochain démarrage.',
+  'settings.deleteNetworkConfirm':
+    'Supprimer ce profil réseau ? Les paramètres proxy et npm enregistrés seront retirés.',
   'launch.changeDirectory': 'Changer de dossier',
   'settings.diagnosticDetails': 'Chemins des exécutables et politique de session',
   'preview.label': 'Aperçu',
@@ -1942,6 +1981,9 @@ const DE: TranslationTable = {
   'terminal.emptyTitle': 'Dieser Arbeitsbereich hat noch keine Terminals',
   'terminal.emptyDescription': 'Erstellen Sie ein Shell- oder Agent-Terminal.',
   'terminal.close': 'Terminal schließen',
+  'terminal.closeRunningConfirm':
+    'Dieses Terminal läuft noch. Beenden unterbricht die laufende Agent-Antwort.',
+  'terminal.closeForce': 'Trotzdem schließen',
   'status.starting': 'Startet',
   'status.running': 'Läuft',
   'status.thinking': 'Denkt nach',
@@ -2049,6 +2091,14 @@ const DE: TranslationTable = {
   'settings.mcpObjectRequired': 'Die MCP-Konfiguration muss ein JSON-Objekt sein.',
   'settings.manageModels': 'Modellprofile verwalten',
   'settings.manageAccounts': 'Konten verwalten',
+  'settings.deleteModelConfirm':
+    'Dieses Modellprofil löschen? Gespeicherte API-Schlüssel werden ebenfalls entfernt.',
+  'settings.deleteAccountConfirm':
+    'Dieses Konto löschen? Gespeicherte Anmeldedaten werden aus dem System-Schlüsselbund entfernt.',
+  'settings.deleteMcpConfirm':
+    'Dieses MCP-Profil löschen? Damit gestartete Server werden beim nächsten Start beendet.',
+  'settings.deleteNetworkConfirm':
+    'Dieses Netzwerkprofil löschen? Gespeicherte Proxy- und npm-Einstellungen werden entfernt.',
   'launch.changeDirectory': 'Verzeichnis ändern',
   'settings.diagnosticDetails': 'Programmpfade und Sitzungsrichtlinie',
   'preview.label': 'Vorschau',
@@ -2115,6 +2165,9 @@ const JA: TranslationTable = {
   'terminal.emptyTitle': 'このワークスペースにはまだターミナルがありません',
   'terminal.emptyDescription': 'Shell または Agent ターミナルを作成してください。',
   'terminal.close': 'ターミナルを閉じる',
+  'terminal.closeRunningConfirm':
+    'このターミナルはまだ実行中です。閉じると進行中のエージェント応答が中断されます。',
+  'terminal.closeForce': 'それでも閉じる',
   'status.starting': '起動中',
   'status.running': '実行中',
   'status.thinking': '思考中',
@@ -2221,6 +2274,14 @@ const JA: TranslationTable = {
   'settings.mcpObjectRequired': 'MCP 設定は JSON オブジェクトである必要があります。',
   'settings.manageModels': 'モデルプロファイルを管理',
   'settings.manageAccounts': 'アカウントを管理',
+  'settings.deleteModelConfirm':
+    'このモデルプロファイルを削除しますか？保存済みの API キーも削除されます。',
+  'settings.deleteAccountConfirm':
+    'このアカウントを削除しますか？保存済みの認証情報はシステムのキーチェーンから削除されます。',
+  'settings.deleteMcpConfirm':
+    'この MCP プロファイルを削除しますか？次の起動時から、このプロファイルで起動したサーバーは停止します。',
+  'settings.deleteNetworkConfirm':
+    'このネットワークプロファイルを削除しますか？保存済みのプロキシと npm 設定も削除されます。',
   'launch.changeDirectory': 'ディレクトリを変更',
   'settings.diagnosticDetails': '実行ファイルのパスとセッションポリシー',
   'preview.label': 'プレビュー',
@@ -2287,6 +2348,8 @@ const KO: TranslationTable = {
   'terminal.emptyTitle': '이 작업 공간에는 아직 터미널이 없습니다',
   'terminal.emptyDescription': 'Shell 또는 Agent 터미널을 만들어 시작하세요.',
   'terminal.close': '터미널 닫기',
+  'terminal.closeRunningConfirm': '이 터미널은 아직 실행 중입니다. 닫으면 진행 중인 Agent 응답이 중단됩니다.',
+  'terminal.closeForce': '그래도 닫기',
   'status.starting': '시작 중',
   'status.running': '실행 중',
   'status.thinking': '생각 중',
@@ -2393,6 +2456,14 @@ const KO: TranslationTable = {
   'settings.mcpObjectRequired': 'MCP 설정은 JSON 객체여야 합니다.',
   'settings.manageModels': '모델 프로필 관리',
   'settings.manageAccounts': '계정 관리',
+  'settings.deleteModelConfirm':
+    '이 모델 프로필을 삭제할까요? 저장된 API 키도 함께 삭제됩니다.',
+  'settings.deleteAccountConfirm':
+    '이 계정을 삭제할까요? 저장된 자격 증명이 시스템 키체인에서 제거됩니다.',
+  'settings.deleteMcpConfirm':
+    '이 MCP 프로필을 삭제할까요? 다음 시작 시 이 프로필로 시작한 서버가 중단됩니다.',
+  'settings.deleteNetworkConfirm':
+    '이 네트워크 프로필을 삭제할까요? 저장된 프록시와 npm 설정이 제거됩니다.',
   'launch.changeDirectory': '디렉터리 변경',
   'settings.diagnosticDetails': '실행 파일 경로 및 세션 정책',
   'preview.label': '미리보기',

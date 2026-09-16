@@ -37,7 +37,6 @@ import {
   type CliInstaller,
   MANAGED_AGENT_INSTALLERS,
   ManagedAgentType,
-  NativeAgentType,
   PROVIDER_PRESETS,
 } from '../core/models/agent.models';
 import { createId } from '../core/models/identifiers';
@@ -710,14 +709,38 @@ const DEFAULT_ALERT_THRESHOLD = 80;
                       <small class="draft-status" role="status">{{ 'settings.unsaved' | t }}</small>
                     }
                     @if (accountId() && !accountSystem()) {
-                      <button
-                        type="button"
-                        class="danger"
-                        [disabled]="busy()"
-                        (click)="deleteAccountRequested.emit(accountId())"
-                      >
-                        <app-icon name="trash" [size]="13" />{{ 'common.delete' | t }}
-                      </button>
+                      @if (pendingAccountDelete() === accountId()) {
+                        <div class="inline-confirm" role="alert">
+                          <p>{{ 'settings.deleteAccountConfirm' | t }}</p>
+                          <div class="inline-confirm-actions">
+                            <button
+                              type="button"
+                              class="secondary"
+                              [disabled]="busy()"
+                              (click)="pendingAccountDelete.set(null)"
+                            >
+                              {{ 'common.cancel' | t }}
+                            </button>
+                            <button
+                              type="button"
+                              class="danger"
+                              [disabled]="busy()"
+                              (click)="confirmDeleteAccount()"
+                            >
+                              {{ 'common.delete' | t }}
+                            </button>
+                          </div>
+                        </div>
+                      } @else {
+                        <button
+                          type="button"
+                          class="danger"
+                          [disabled]="busy()"
+                          (click)="pendingAccountDelete.set(accountId())"
+                        >
+                          <app-icon name="trash" [size]="13" />{{ 'common.delete' | t }}
+                        </button>
+                      }
                     }
                     <span></span>
                     @if (accountId()) {
@@ -932,13 +955,38 @@ const DEFAULT_ALERT_THRESHOLD = 80;
                       <small class="draft-status" role="status">{{ 'settings.unsaved' | t }}</small>
                     }
                     @if (modelId() && modelId() !== 'claude-default') {
-                      <button
-                        type="button"
-                        class="danger"
-                        (click)="deleteModelRequested.emit(modelId())"
-                      >
-                        <app-icon name="trash" [size]="13" />{{ 'common.delete' | t }}
-                      </button>
+                      @if (pendingModelDelete() === modelId()) {
+                        <div class="inline-confirm" role="alert">
+                          <p>{{ 'settings.deleteModelConfirm' | t }}</p>
+                          <div class="inline-confirm-actions">
+                            <button
+                              type="button"
+                              class="secondary"
+                              [disabled]="busy()"
+                              (click)="pendingModelDelete.set(null)"
+                            >
+                              {{ 'common.cancel' | t }}
+                            </button>
+                            <button
+                              type="button"
+                              class="danger"
+                              [disabled]="busy()"
+                              (click)="confirmDeleteModel()"
+                            >
+                              {{ 'common.delete' | t }}
+                            </button>
+                          </div>
+                        </div>
+                      } @else {
+                        <button
+                          type="button"
+                          class="danger"
+                          [disabled]="busy()"
+                          (click)="pendingModelDelete.set(modelId())"
+                        >
+                          <app-icon name="trash" [size]="13" />{{ 'common.delete' | t }}
+                        </button>
+                      }
                     }
                     <span></span>
                     <button
@@ -994,13 +1042,38 @@ const DEFAULT_ALERT_THRESHOLD = 80;
                       <small class="draft-status" role="status">{{ 'settings.unsaved' | t }}</small>
                     }
                     @if (mcpId()) {
-                      <button
-                        type="button"
-                        class="danger"
-                        (click)="deleteMcpRequested.emit(mcpId())"
-                      >
-                        <app-icon name="trash" [size]="13" />{{ 'common.delete' | t }}
-                      </button>
+                      @if (pendingMcpDelete() === mcpId()) {
+                        <div class="inline-confirm" role="alert">
+                          <p>{{ 'settings.deleteMcpConfirm' | t }}</p>
+                          <div class="inline-confirm-actions">
+                            <button
+                              type="button"
+                              class="secondary"
+                              [disabled]="busy()"
+                              (click)="pendingMcpDelete.set(null)"
+                            >
+                              {{ 'common.cancel' | t }}
+                            </button>
+                            <button
+                              type="button"
+                              class="danger"
+                              [disabled]="busy()"
+                              (click)="confirmDeleteMcp()"
+                            >
+                              {{ 'common.delete' | t }}
+                            </button>
+                          </div>
+                        </div>
+                      } @else {
+                        <button
+                          type="button"
+                          class="danger"
+                          [disabled]="busy()"
+                          (click)="pendingMcpDelete.set(mcpId())"
+                        >
+                          <app-icon name="trash" [size]="13" />{{ 'common.delete' | t }}
+                        </button>
+                      }
                     }
                     <span></span>
                     <button
@@ -1189,14 +1262,38 @@ const DEFAULT_ALERT_THRESHOLD = 80;
                       <small class="draft-status" role="status">{{ 'settings.unsaved' | t }}</small>
                     }
                     @if (networkId()) {
-                      <button
-                        type="button"
-                        class="danger"
-                        [disabled]="busy()"
-                        (click)="deleteNetworkRequested.emit(networkId())"
-                      >
-                        <app-icon name="trash" [size]="13" />{{ 'common.delete' | t }}
-                      </button>
+                      @if (pendingNetworkDelete() === networkId()) {
+                        <div class="inline-confirm" role="alert">
+                          <p>{{ 'settings.deleteNetworkConfirm' | t }}</p>
+                          <div class="inline-confirm-actions">
+                            <button
+                              type="button"
+                              class="secondary"
+                              [disabled]="busy()"
+                              (click)="pendingNetworkDelete.set(null)"
+                            >
+                              {{ 'common.cancel' | t }}
+                            </button>
+                            <button
+                              type="button"
+                              class="danger"
+                              [disabled]="busy()"
+                              (click)="confirmDeleteNetwork()"
+                            >
+                              {{ 'common.delete' | t }}
+                            </button>
+                          </div>
+                        </div>
+                      } @else {
+                        <button
+                          type="button"
+                          class="danger"
+                          [disabled]="busy()"
+                          (click)="pendingNetworkDelete.set(networkId())"
+                        >
+                          <app-icon name="trash" [size]="13" />{{ 'common.delete' | t }}
+                        </button>
+                      }
                     }
                     <span></span>
                     <button
@@ -1325,6 +1422,17 @@ export class AgentSettingsDialogComponent {
   readonly accountConfigCopyRequested = output<{ sourceId: string; targetId: string }>();
 
   protected readonly confirmClose = signal(false);
+
+  /**
+   * Each editor asks for the id of the profile it's about to delete, so the panel can replace the
+   * row with an inline confirmation block until the user confirms or backs out. `null` keeps the
+   * normal delete button visible. The shared `inline-confirm` styling in `dialog.scss` keeps the
+   * four editors looking the same.
+   */
+  protected readonly pendingModelDelete = signal<string | null>(null);
+  protected readonly pendingAccountDelete = signal<string | null>(null);
+  protected readonly pendingMcpDelete = signal<string | null>(null);
+  protected readonly pendingNetworkDelete = signal<string | null>(null);
   protected readonly categories: readonly { id: SettingsTab; label: string }[] = [
     { id: 'diagnostics', label: 'settings.tabDiagnostics' },
     { id: 'cli', label: 'settings.tabCli' },
@@ -1544,6 +1652,39 @@ export class AgentSettingsDialogComponent {
       this.cliExecuteRequested.emit({ ...this.cliRequest(), confirmed: true });
       this.cliConfirmed = false;
     }
+  }
+
+  /**
+   * Confirms inside the editor clear the pending flag and re-emit the original event so the
+   * surrounding `App` handler runs unchanged. The pending signals themselves are the truth the
+   * templates read, so the busy input stays the single source of "saving in progress".
+   */
+  protected confirmDeleteModel(): void {
+    const id = this.pendingModelDelete();
+    if (!id) return;
+    this.pendingModelDelete.set(null);
+    this.deleteModelRequested.emit(id);
+  }
+
+  protected confirmDeleteAccount(): void {
+    const id = this.pendingAccountDelete();
+    if (!id) return;
+    this.pendingAccountDelete.set(null);
+    this.deleteAccountRequested.emit(id);
+  }
+
+  protected confirmDeleteMcp(): void {
+    const id = this.pendingMcpDelete();
+    if (!id) return;
+    this.pendingMcpDelete.set(null);
+    this.deleteMcpRequested.emit(id);
+  }
+
+  protected confirmDeleteNetwork(): void {
+    const id = this.pendingNetworkDelete();
+    if (!id) return;
+    this.pendingNetworkDelete.set(null);
+    this.deleteNetworkRequested.emit(id);
   }
 
   /** Heading verb: an already-current CLI must not read as an available upgrade. */

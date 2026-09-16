@@ -123,7 +123,6 @@ registerFullscreenTranslations();
     .overflow-trigger.active {
       color: var(--text);
       background: var(--surface-2);
-      outline: 0;
     }
 
     /*

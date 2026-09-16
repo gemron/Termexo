@@ -365,28 +365,8 @@
   margin-top: 12px;
 }
 
-/* Inline confirmation instead of a second dialog on top of the settings dialog. */
-.remote-confirm {
-  margin-top: 12px;
-  padding: 11px 12px;
-  border: 1px solid color-mix(in oklab, var(--color-error) 46%, var(--border));
-  border-radius: var(--radius-box);
-  background: var(--error-soft);
-
-  p {
-    margin: 0;
-    color: var(--text-secondary);
-    font-size: 10px;
-    line-height: 1.55;
-  }
-}
-
-.remote-confirm-actions {
-  display: flex;
-  justify-content: flex-end;
-  gap: 8px;
-  margin-top: 10px;
-}
+/* The inline confirmation block was lifted into the shared dialog stylesheet under
+ * `.inline-confirm` / `.inline-confirm-actions`. The remote panel markup was updated alongside it. */
 
 /* Both lists are short and unrelated to each other, so they read side by side and halve the scroll. */
 .remote-notes-grid {

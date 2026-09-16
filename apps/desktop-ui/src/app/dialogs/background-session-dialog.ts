@@ -2,6 +2,7 @@ import { Component, input, output } from '@angular/core';
 
 import { TranslatePipe } from '../core/i18n/translate.pipe';
 import { BackgroundSessionResolution, ClaudeBackgroundSession } from '../core/models/agent.models';
+import { ModalFocusDirective } from '../shared/modal-focus.directive';
 import { IconComponent } from '../shared/icon/icon';
 
 /**
@@ -13,11 +14,13 @@ import { IconComponent } from '../shared/icon/icon';
  */
 @Component({
   selector: 'app-background-session-dialog',
-  imports: [IconComponent, TranslatePipe],
+  imports: [IconComponent, ModalFocusDirective, TranslatePipe],
   template: `
     <div class="backdrop modal modal-open" (mousedown)="resolved.emit('skip')">
       <section
         class="dialog modal-box"
+        appModal
+        (dismissModal)="resolved.emit('skip')"
         role="dialog"
         aria-modal="true"
         aria-labelledby="background-session-dialog-title"

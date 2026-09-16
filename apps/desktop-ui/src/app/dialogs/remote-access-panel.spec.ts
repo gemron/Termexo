@@ -357,7 +357,7 @@ describe('RemoteAccessPanelComponent', () => {
     fixture.detectChanges();
     expect(service.disconnectCalls).toBe(0);
 
-    root.querySelector<HTMLButtonElement>('.remote-confirm-actions .danger')!.click();
+    root.querySelector<HTMLButtonElement>('.inline-confirm-actions .danger')!.click();
     await fixture.whenStable();
     fixture.detectChanges();
 

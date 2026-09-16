@@ -657,8 +657,22 @@ input[type='radio'] {
 
 button:focus-visible,
 input:focus-visible,
+select:focus-visible,
+textarea:focus-visible,
+a[href]:focus-visible,
+summary:focus-visible,
 [role='tab']:focus-visible,
 [tabindex]:focus-visible {
+  outline: 2px solid color-mix(in oklab, var(--color-primary) 82%, white);
+  outline-offset: 2px;
+}
+
+/*
+ * Components that used to wipe the focus ring now have to opt back into it. The rule below is
+ * intentionally last: any `outline: 0` in component styles is overridden for `:focus-visible` only
+ * — focus is restored without re-introducing the default outline on click or hover.
+ */
+:where(button, [role='tab'], [tabindex]):focus-visible {
   outline: 2px solid color-mix(in oklab, var(--color-primary) 82%, white);
   outline-offset: 2px;
 }

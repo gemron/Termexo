@@ -788,11 +788,16 @@ button:disabled {
 
 .settings-tabs {
   display: flex;
+  // DaisyUI's own tab styling wraps, and the row is pinned to one line's height, so in languages
+  // with longer category names the overflowing tabs were laid out below the visible strip and
+  // could not be reached at all. They scroll instead.
+  flex-wrap: nowrap;
   overflow-x: auto;
   padding: 0 14px;
   border-bottom: 1px solid var(--border);
 
   button {
+    flex: 0 0 auto;
     padding: 0 13px;
     border: 0;
     border-bottom: 2px solid transparent;
@@ -1339,21 +1344,38 @@ button:disabled {
     padding-left: 13px;
   }
 
-  /* Search keeps the first row; filter and scope share the second. */
+  /*
+   * One control per row. Sharing a row put the scope checkbox on top of the agent filter, so the
+   * filter's last buttons were both covered and pushed past the dialog edge.
+   */
   .session-toolbar {
     grid-template-columns: minmax(0, 1fr) 30px;
   }
 
   .session-agent-filter {
-    grid-column: 1;
+    grid-column: 1 / -1;
     grid-row: 2;
-    justify-self: start;
+    justify-self: stretch;
+    overflow-x: auto;
+
+    button {
+      flex: 0 0 auto;
+    }
   }
 
   .scope-control {
-    grid-column: 2 / -1;
-    grid-row: 2;
-    justify-self: end;
+    grid-column: 1 / -1;
+    grid-row: 3;
+    justify-self: start;
+  }
+
+  /* The four agent names do not fit side by side on a phone. */
+  .agent-health-strip {
+    overflow-x: auto;
+
+    .agent-health {
+      flex: 0 0 auto;
+    }
   }
 
   .session-metadata > span:not(.agent-tag):not(.session-branch) {

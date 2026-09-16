@@ -50,6 +50,9 @@ import type { HandoffPackage, HandoffRecord } from './core/models/handoff';
 import type { PromptAsset } from './core/models/prompt-assets';
 import type { RepositoryTarget } from './core/models/git.models';
 import { createId } from './core/models/identifiers';
+
+/** Visual tone for the corner toast region; the template maps each tone to a colour and icon. */
+export type ToastTone = 'success' | 'info' | 'attention' | 'error';
 import { TERMINAL_INPUT_SETTLE_MS, terminalPromptWrites } from './core/models/terminal-input';
 import type { TodoContinuationRequest, TodoTask } from './core/models/todo.models';
 import {
@@ -462,7 +465,15 @@ export class App {
     this.state.findSessionLaunchProfiles(nativeSessionId);
   protected readonly selectedTerminalDirectory = signal<string | null>(null);
   protected readonly toastMessage = signal<string | null>(null);
-  protected readonly toastTone = signal<'success' | 'attention'>('success');
+  protected readonly toastTone = signal<ToastTone>('success');
+  /**
+   * Set when the user clicks × on a terminal whose status is not idle. The terminal panel header
+   * swaps its close button for an inline confirmation block while this is non-null, and clears
+   * it on confirm/cancel so accidental middle-clicks do not lose work.
+   */
+  protected readonly pendingTerminalClose = signal<string | null>(null);
+  /** IDs successive toasts, so a fresh message replaces the running auto-dismiss timer. */
+  private toastTimer: number | null = null;
   protected readonly globalNoticeOpen = signal(false);
   protected readonly dismissedNoticeKeys = signal<ReadonlySet<string>>(new Set());
   protected readonly workspacePendingDeletion = signal<Workspace | null>(null);
@@ -1046,7 +1057,7 @@ export class App {
         this.showToast(this.i18n.t('terminal.started', { name: terminal.name }));
       }
     } catch (error) {
-      this.showToast(this.errorMessage(error));
+      this.showToast(this.errorMessage(error), 'error');
     } finally {
       this.launchingCodex.set(false);
     }
@@ -1104,7 +1115,7 @@ export class App {
         this.showToast(this.i18n.t('terminal.started', { name: terminal.name }));
       }
     } catch (error) {
-      this.showToast(this.errorMessage(error));
+      this.showToast(this.errorMessage(error), 'error');
     } finally {
       this.launchingClaude.set(false);
     }
@@ -1216,10 +1227,47 @@ export class App {
         this.showToast(this.i18n.t('terminal.resuming', { name: value.session.title }));
       }
     } catch (error) {
-      this.showToast(this.errorMessage(error));
+      this.showToast(this.errorMessage(error), 'error');
     } finally {
       launching.set(false);
     }
+  }
+
+  /**
+ * Closing a terminal that has work in progress (a running agent, a turn in flight, an approval
+ * prompt or a rate limit reply) throws away that work and the user only knows it happened when
+ * the process is gone. The view's × buttons, the tab × and the middle-click close all route
+ * through `requestCloseTerminal` first, which only invokes the real close for idle/stopped/
+ * failed/disconnected terminals and otherwise leaves an inline confirmation in the panel header.
+ */
+  protected requestCloseTerminal(terminalId: string): void {
+    const located = this.findTerminal(terminalId);
+    if (!located) {
+      this.closeTerminal(terminalId);
+      return;
+    }
+    if (this.isTerminalIdle(located.terminal.status)) {
+      this.closeTerminal(terminalId);
+      return;
+    }
+    this.pendingTerminalClose.set(terminalId);
+  }
+
+  protected cancelCloseTerminal(): void {
+    this.pendingTerminalClose.set(null);
+  }
+
+  protected confirmCloseTerminal(terminalId: string): void {
+    this.pendingTerminalClose.set(null);
+    this.closeTerminal(terminalId);
+  }
+
+  /**
+   * Whether the terminal is doing nothing that the user might want to keep: idle, stopped,
+   * failed (no agent to interrupt) or disconnected. Anything else deserves a confirmation.
+   */
+  private isTerminalIdle(status: TerminalStatus): boolean {
+    return status === 'IDLE' || status === 'STOPPED' || status === 'FAILED' || status === 'DISCONNECTED';
   }
 
   protected closeTerminal(terminalId: string): void {
@@ -1809,7 +1857,7 @@ export class App {
     try {
       await action();
     } catch (error) {
-      this.showToast(this.errorMessage(error));
+      this.showToast(this.errorMessage(error), 'error');
     }
   }
 
@@ -2640,7 +2688,7 @@ export class App {
       await this.agents.deleteAccountProfile(profileId);
       this.showToast(this.i18n.t('account.removed'));
     } catch (error) {
-      this.showToast(this.errorMessage(error));
+      this.showToast(this.errorMessage(error), 'error');
     }
   }
 
@@ -2650,7 +2698,7 @@ export class App {
       const profile = this.agents.accountProfiles().find((item) => item.id === profileId);
       this.showToast(profile?.diagnostic ?? this.i18n.t('account.refreshed'));
     } catch (error) {
-      this.showToast(this.errorMessage(error));
+      this.showToast(this.errorMessage(error), 'error');
     }
   }
 
@@ -2686,7 +2734,7 @@ export class App {
         void this.watchAccountLogin(profileId, terminalId);
       }
     } catch (error) {
-      this.showToast(this.errorMessage(error));
+      this.showToast(this.errorMessage(error), 'error');
     }
   }
 
@@ -2772,7 +2820,7 @@ export class App {
       await this.agents.deleteModelProfile(profileId);
       this.showToast(this.i18n.t('profile.deleted'));
     } catch (error) {
-      this.showToast(this.errorMessage(error));
+      this.showToast(this.errorMessage(error), 'error');
     }
   }
 
@@ -2792,7 +2840,7 @@ export class App {
       await this.agents.deleteMcpProfile(profileId);
       this.showToast(this.i18n.t('mcp.deleted'));
     } catch (error) {
-      this.showToast(this.errorMessage(error));
+      this.showToast(this.errorMessage(error), 'error');
     }
   }
 
@@ -2814,7 +2862,7 @@ export class App {
       this.networkTestResult.set(null);
       this.showToast(this.i18n.t('network.deleted'));
     } catch (error) {
-      this.showToast(this.errorMessage(error));
+      this.showToast(this.errorMessage(error), 'error');
     }
   }
 
@@ -2914,7 +2962,7 @@ export class App {
       this.cliOperationPlan.set(plan);
       this.showToast(plan.diagnostic);
     } catch (error) {
-      this.showToast(this.errorMessage(error));
+      this.showToast(this.errorMessage(error), 'error');
     }
   }
 
@@ -2936,7 +2984,7 @@ export class App {
       this.cliOperationResult.set(result);
       this.showToast(result.diagnostic);
     } catch (error) {
-      this.showToast(this.errorMessage(error));
+      this.showToast(this.errorMessage(error), 'error');
     }
   }
 
@@ -2948,14 +2996,39 @@ export class App {
     this.showToast(message, 'attention');
   }
 
-  private showToast(message: string, tone: 'success' | 'attention' = 'success'): void {
+  /**
+ * Surfaces a short message in the bottom-right toast region.
+ *
+ * Defaults to `success` for the explicit `showToast(...)` call sites and the legacy single-arg
+ * usage, which were every one an "operation completed" notice; failures must opt into `error`
+ * (or `attention` when the failure is recoverable and the user has something else to do). The
+ * tone also drives how long the message stays on screen — errors do not auto-dismiss so the user
+ * can read the diagnosis before the action retries.
+ */
+  private showToast(message: string, tone: ToastTone = 'success'): void {
+    if (this.toastTimer !== null) {
+      window.clearTimeout(this.toastTimer);
+      this.toastTimer = null;
+    }
     this.toastTone.set(tone);
     this.toastMessage.set(message);
-    window.setTimeout(() => {
-      if (this.toastMessage() === message) {
-        this.toastMessage.set(null);
-      }
+    if (tone === 'error') {
+      // Errors wait for explicit dismissal. The `CloseToastRequested` output on the region clears
+      // the message; nothing else auto-fires.
+      return;
+    }
+    this.toastTimer = window.setTimeout(() => {
+      this.toastMessage.set(null);
+      this.toastTimer = null;
     }, 2_400);
+  }
+
+  protected closeToast(): void {
+    if (this.toastTimer !== null) {
+      window.clearTimeout(this.toastTimer);
+      this.toastTimer = null;
+    }
+    this.toastMessage.set(null);
   }
 
   private errorMessage(error: unknown): string {

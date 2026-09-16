@@ -398,9 +398,9 @@ interface AddressOption {
             @if (readOnly) {
               <p class="remote-empty remote-relay-readonly">{{ 'remote.relayReadOnly' | t }}</p>
             } @else if (confirmingDisconnect()) {
-              <div class="remote-confirm" role="alert">
+              <div class="inline-confirm" role="alert">
                 <p>{{ 'remote.relayDisconnectConfirm' | t }}</p>
-                <div class="remote-confirm-actions">
+                <div class="inline-confirm-actions">
                   <button
                     type="button"
                     class="secondary"
@@ -506,9 +506,9 @@ interface AddressOption {
 
           @if (!readOnly) {
             @if (confirmingRegenerate()) {
-              <div class="remote-confirm" role="alert">
+              <div class="inline-confirm" role="alert">
                 <p>{{ 'remote.tokenRegenerateConfirm' | t }}</p>
-                <div class="remote-confirm-actions">
+                <div class="inline-confirm-actions">
                   <button
                     type="button"
                     class="secondary"
