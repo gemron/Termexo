@@ -52,6 +52,38 @@
   --border: 1px;
   --depth: 1;
   --noise: 0;
+
+  /* Spacing — only the four-/eight-step that the spec admits. 2 and 6 are kept for dense
+   * controls; everything else round-trips back to one of these. */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-8: 32px;
+  --space-10: 40px;
+
+  /* Radius scale: small (4px) for tight badges, medium (6px) for buttons and inputs, large
+   * (8px) for cards, x-large (12px) for dialog surfaces. */
+  --radius-sm: 4px;
+  --radius-md: 6px;
+  --radius-lg: 8px;
+  --radius-xl: 12px;
+
+  /* Shadows: a single popover for floating elements and a single dialog shadow; anything else
+   * is a content area which by the spec should use a border instead. */
+  --shadow-popover: 0 8px 28px rgb(0 0 0 / 24%);
+  --shadow-dialog: 0 22px 70px rgb(0 0 0 / 48%);
+
+  /* Layering — single source of truth. */
+  --z-sticky: 10;
+  --z-panel: 30;
+  --z-popover: 60;
+  --z-dialog: 100;
+  --z-dialog-nested: 110;
+  --z-toast: 120;
+  --z-gate: 200;
 }
 
 :root {

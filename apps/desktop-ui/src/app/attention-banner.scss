@@ -14,7 +14,7 @@
   // other pinned rows if the shell's row layout changes — landing on the workbench row makes
   // the banner take the terminal's whole height.
   grid-row: 2;
-  z-index: 20;
+  z-index: var(--z-panel);
   display: flex;
   flex: 0 0 auto;
   align-items: center;

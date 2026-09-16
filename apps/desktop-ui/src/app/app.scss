@@ -84,7 +84,7 @@ app-inspector-panel {
 
 .sidebar-resizer {
   position: relative;
-  z-index: 35;
+  z-index: var(--z-popover);
   width: 5px;
   min-width: 5px;
   cursor: col-resize;
@@ -146,7 +146,7 @@ app-inspector-panel {
 .topbar {
   grid-area: topbar;
   position: relative;
-  z-index: 30;
+  z-index: var(--z-panel);
   display: grid;
   height: var(--topbar-height);
   min-width: 0;
@@ -384,7 +384,7 @@ app-inspector-panel {
 
 .global-notice-panel {
   position: absolute;
-  z-index: 40;
+  z-index: var(--z-popover);
   top: 34px;
   right: 0;
   width: min(370px, calc(100vw - 24px));
@@ -576,7 +576,7 @@ app-inspector-panel {
 
 .agent-menu {
   position: absolute;
-  z-index: 20;
+  z-index: var(--z-panel);
   top: 34px;
   left: 0;
   width: 210px;
@@ -663,7 +663,7 @@ app-inspector-panel {
   // take most of what a window query would measure.
   container: terminal-tabs / inline-size;
   position: relative;
-  z-index: 10;
+  z-index: var(--z-sticky);
   display: flex;
   min-width: 0;
   align-items: center;
@@ -979,7 +979,7 @@ app-inspector-panel {
 }
 
 .app-toast-region {
-  z-index: 120;
+  z-index: var(--z-toast);
   right: 18px;
   bottom: 30px;
   width: auto;
@@ -1039,7 +1039,7 @@ app-inspector-panel {
  */
 .app-terminal-close-confirm {
   position: fixed;
-  z-index: 121;
+  z-index: var(--z-toast);
   right: 18px;
   bottom: 30px;
   width: min(360px, calc(100vw - 32px));
@@ -1160,7 +1160,7 @@ app-inspector-panel {
   // is where rules reaching into another component's host element live.
   .panel-scrim {
     position: absolute;
-    z-index: 20;
+    z-index: var(--z-panel);
     inset: var(--topbar-height) 0 0;
     border: 0;
     background: #00000075;
