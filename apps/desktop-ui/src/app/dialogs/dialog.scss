@@ -100,23 +100,6 @@
   }
 }
 
-.secondary {
-  border: 1px solid var(--border-strong);
-  color: var(--text-secondary);
-  background: var(--surface-2);
-}
-
-.primary {
-  border: 1px solid color-mix(in oklab, var(--color-primary) 76%, black);
-  color: var(--color-primary-content);
-  background: var(--color-primary);
-
-  &:disabled {
-    cursor: not-allowed;
-    opacity: 0.45;
-  }
-}
-
 .profile-list {
   display: grid;
   gap: 5px;
@@ -124,23 +107,26 @@
 }
 
 /*
- * Inline confirmation for destructive actions inside the settings panels (delete a model, account,
- * MCP or network profile). Lives in the shared dialog stylesheet so the four editors render it the
- * same way without each declaring its own copy.
+ * Button palette aliases. Hand-written before daisyUI was wired in; kept for compatibility so
+ * dialogs that say `class="primary"` still look like primary buttons. New templates should adopt
+ * the daisyUI modifiers (`btn btn-primary`, `btn btn-outline`, `btn btn-error`) directly. All
+ * aliases share the 28px height that `btn-sm` gives, the same radius as input fields and the
+ * theme's danger colour so the destructive action stays clearly red.
  */
-.inline-confirm {
-  margin-top: 10px;
-  padding: 10px 12px;
-  border: 1px solid color-mix(in oklab, var(--color-error) 46%, var(--border));
-  border-radius: var(--radius-box);
-  background: var(--error-soft);
-
-  p {
-    margin: 0;
-    color: var(--text-secondary);
-    font-size: 11px;
-    line-height: 1.5;
-  }
+.primary {
+  border: 1px solid color-mix(in oklab, var(--color-primary) 76%, black);
+  color: var(--color-primary-content);
+  background: var(--color-primary);
+}
+.secondary {
+  border: 1px solid var(--border-strong);
+  color: var(--text-secondary);
+  background: var(--surface-2);
+}
+.danger {
+  border: 1px solid color-mix(in oklab, var(--color-error) 70%, black);
+  color: var(--color-error-content);
+  background: var(--color-error);
 }
 
 .inline-confirm-actions {
