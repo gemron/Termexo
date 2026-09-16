@@ -99,6 +99,16 @@ type AssetFilter = 'all' | 'draft' | 'history' | 'favorite' | 'pinned';
                 <div class="asset-actions">
                   <button
                     type="button"
+                    class="btn btn-primary btn-xs"
+                    [title]="canUse() ? ('prompt.useHint' | t) : ('prompt.noAgent' | t)"
+                    [disabled]="!canUse()"
+                    (click)="used.emit(asset)"
+                  >
+                    <app-icon name="play" [size]="12" />
+                    {{ 'prompt.use' | t }}
+                  </button>
+                  <button
+                    type="button"
                     [class.active]="asset.pinned"
                     [title]="asset.pinned ? ('prompt.unpin' | t) : ('prompt.pin' | t)"
                     (click)="pinToggled.emit(asset)"
@@ -113,14 +123,34 @@ type AssetFilter = 'all' | 'draft' | 'history' | 'favorite' | 'pinned';
                   >
                     <app-icon name="star" [size]="13" />
                   </button>
-                  <button
-                    type="button"
-                    class="delete"
-                    [title]="'common.delete' | t"
-                    (click)="deleted.emit(asset)"
-                  >
-                    <app-icon name="trash" [size]="13" />
-                  </button>
+                  @if (pendingDelete() === asset.id) {
+                    <div class="inline-confirm" role="alert">
+                      <span>{{ 'prompt.deleteConfirm' | t }}</span>
+                      <button
+                        type="button"
+                        class="btn btn-sm"
+                        (click)="pendingDelete.set(null)"
+                      >
+                        {{ 'common.cancel' | t }}
+                      </button>
+                      <button
+                        type="button"
+                        class="btn btn-error btn-sm"
+                        (click)="confirmDelete(asset)"
+                      >
+                        {{ 'common.delete' | t }}
+                      </button>
+                    </div>
+                  } @else {
+                    <button
+                      type="button"
+                      class="delete"
+                      [title]="'common.delete' | t"
+                      (click)="pendingDelete.set(asset.id)"
+                    >
+                      <app-icon name="trash" [size]="13" />
+                    </button>
+                  }
                 </div>
               </article>
             }
@@ -153,6 +183,13 @@ export class PromptLibraryDialogComponent {
   readonly pinToggled = output<PromptAsset>();
   readonly deleted = output<PromptAsset>();
   readonly cancelled = output<void>();
+
+  protected readonly pendingDelete = signal<string | null>(null);
+
+  protected confirmDelete(asset: PromptAsset): void {
+    this.pendingDelete.set(null);
+    this.deleted.emit(asset);
+  }
 
   protected readonly query = signal('');
   protected readonly filter = signal<AssetFilter>('all');

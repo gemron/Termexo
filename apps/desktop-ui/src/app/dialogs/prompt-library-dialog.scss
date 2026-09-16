@@ -205,6 +205,7 @@
 .asset-actions {
   display: flex;
   align-items: center;
+  gap: 6px;
   padding: 0 8px;
   border-left: 1px solid var(--border);
 
@@ -227,6 +228,38 @@
     &.delete:hover {
       color: var(--color-error);
       background: color-mix(in oklab, var(--color-error) 12%, transparent);
+    }
+  }
+
+  // The "Use" button needs to read as a primary action alongside the icon-only buttons.
+  > button.btn {
+    width: auto;
+    height: 28px;
+    padding: 0 9px;
+    gap: 5px;
+    font-size: 11px;
+    color: var(--color-primary-content);
+  }
+
+  // Inline delete confirmation replaces the icon buttons; sits in the same row.
+  > .inline-confirm {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    padding: 4px 8px;
+    margin: 0;
+
+    span {
+      font-size: 11px;
+      color: var(--text-secondary);
+      white-space: nowrap;
+    }
+
+    button {
+      width: auto;
+      height: 24px;
+      padding: 0 9px;
+      font-size: 11px;
     }
   }
 }

@@ -112,6 +112,8 @@ const EN: TranslationTable = {
   'prompt.filter': 'Filter prompt assets',
   'prompt.useHint': 'Restore into the active agent terminal',
   'prompt.noAgent': 'Select a Claude Code or Codex terminal first',
+  'prompt.use': 'Use',
+  'prompt.deleteConfirm': 'Delete this prompt? Its history entry will also be removed.',
   'prompt.draft': 'Draft',
   'prompt.history': 'History',
   'prompt.redacted': 'Redacted',
@@ -892,6 +894,8 @@ const ZH_CN: TranslationTable = {
   'prompt.filter': '筛选提示词资产',
   'prompt.useHint': '恢复到当前 Agent 终端',
   'prompt.noAgent': '请先选择 Claude Code 或 Codex 终端',
+  'prompt.use': '使用',
+  'prompt.deleteConfirm': '删除这条提示词？历史记录中的对应条目也会一并移除。',
   'prompt.draft': '草稿',
   'prompt.history': '历史',
   'prompt.redacted': '已脱敏',
@@ -1757,6 +1761,9 @@ const ES: TranslationTable = {
   'restore.openCodeFailed': 'No se pudieron restaurar {count} terminales de OpenCode.',
   'common.selectDirectory': 'Seleccionar carpeta',
   'common.codexNotDetected': 'No se detectó Codex CLI',
+  'prompt.use': 'Usar',
+  'prompt.deleteConfirm':
+    '¿Eliminar este prompt? También se borrará la entrada de su historial.',
 };
 
 const FR: TranslationTable = {
@@ -1942,6 +1949,9 @@ const FR: TranslationTable = {
   'restore.openCodeFailed': '{count} terminaux OpenCode n’ont pas pu être restaurés.',
   'common.selectDirectory': 'Choisir un dossier',
   'common.codexNotDetected': 'Codex CLI n’a pas été détecté',
+  'prompt.use': 'Utiliser',
+  'prompt.deleteConfirm':
+    'Supprimer ce prompt ? L’entrée d’historique correspondante sera également retirée.',
 };
 
 const DE: TranslationTable = {
@@ -2127,6 +2137,9 @@ const DE: TranslationTable = {
   'restore.openCodeFailed': '{count} OpenCode-Terminals konnten nicht wiederhergestellt werden.',
   'common.selectDirectory': 'Ordner auswählen',
   'common.codexNotDetected': 'Codex CLI wurde nicht erkannt',
+  'prompt.use': 'Verwenden',
+  'prompt.deleteConfirm':
+    'Diesen Prompt löschen? Der zugehörige Verlaufseintrag wird ebenfalls entfernt.',
 };
 
 const JA: TranslationTable = {
@@ -2310,6 +2323,9 @@ const JA: TranslationTable = {
   'restore.openCodeFailed': 'OpenCode ターミナル {count} 個を復元できませんでした。',
   'common.selectDirectory': 'フォルダーを選択',
   'common.codexNotDetected': 'Codex CLI が検出されませんでした',
+  'prompt.use': '使用',
+  'prompt.deleteConfirm':
+    'このプロンプトを削除しますか？履歴の対応するエントリも削除されます。',
 };
 
 const KO: TranslationTable = {
@@ -2492,6 +2508,9 @@ const KO: TranslationTable = {
   'restore.openCodeFailed': 'OpenCode 터미널 {count}개를 복원하지 못했습니다.',
   'common.selectDirectory': '폴더 선택',
   'common.codexNotDetected': 'Codex CLI가 감지되지 않았습니다',
+  'prompt.use': '사용',
+  'prompt.deleteConfirm':
+    '이 프롬프트를 삭제할까요? 해당 기록 항목도 함께 삭제됩니다.',
 };
 
 const TRANSLATIONS: Readonly<Record<AppLanguage, TranslationTable>> = {
