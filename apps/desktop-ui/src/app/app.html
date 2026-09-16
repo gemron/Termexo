@@ -853,7 +853,7 @@
       [networkTestResult]="networkTestResult()"
       [cliPlan]="cliOperationPlan()"
       [cliResult]="cliOperationResult()"
-      [busy]="agents.busy() || profileSaving()"
+      [busy]="agents.busy() || profileSaving() || profileDeleting()"
       [saving]="profileSaving()"
       [updateResult]="updates.result()"
       [updateChecking]="updates.checking()"

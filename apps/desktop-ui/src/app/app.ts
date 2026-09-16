@@ -308,6 +308,14 @@ export class App {
   protected readonly remoteConnection = inject(RemoteConnectionService);
   protected readonly previewMode = runtimeMode() === 'preview';
   protected readonly profileSaving = signal(false);
+  /**
+   * Set while a profile delete round-trip is in flight so the four delete buttons (and their
+   * confirmation row) stay disabled for the duration. The dialog disables every editor button
+   * via its `busy()` input, but that input previously had no delete signal and only `agents.busy()`
+   * flipped when something else (CLI install, npm update) was busy — so a delete could fire while
+   * another profile's save was still running, and the user could double-submit a delete.
+   */
+  protected readonly profileDeleting = signal(false);
   /** True only in the browser client served by the desktop app's remote access server. */
   protected readonly remoteMode = this.remoteConnection.mode === 'remote';
   protected readonly directoryPicker = inject(DirectoryPickerService);
@@ -2684,11 +2692,15 @@ export class App {
   }
 
   protected async deleteAccountProfile(profileId: string): Promise<void> {
+    if (this.profileDeleting()) return;
+    this.profileDeleting.set(true);
     try {
       await this.agents.deleteAccountProfile(profileId);
       this.showToast(this.i18n.t('account.removed'));
     } catch (error) {
       this.showToast(this.errorMessage(error), 'error');
+    } finally {
+      this.profileDeleting.set(false);
     }
   }
 
@@ -2816,11 +2828,15 @@ export class App {
   }
 
   protected async deleteModelProfile(profileId: string): Promise<void> {
+    if (this.profileDeleting()) return;
+    this.profileDeleting.set(true);
     try {
       await this.agents.deleteModelProfile(profileId);
       this.showToast(this.i18n.t('profile.deleted'));
     } catch (error) {
       this.showToast(this.errorMessage(error), 'error');
+    } finally {
+      this.profileDeleting.set(false);
     }
   }
 
@@ -2836,11 +2852,15 @@ export class App {
   }
 
   protected async deleteMcpProfile(profileId: string): Promise<void> {
+    if (this.profileDeleting()) return;
+    this.profileDeleting.set(true);
     try {
       await this.agents.deleteMcpProfile(profileId);
       this.showToast(this.i18n.t('mcp.deleted'));
     } catch (error) {
       this.showToast(this.errorMessage(error), 'error');
+    } finally {
+      this.profileDeleting.set(false);
     }
   }
 
@@ -2857,12 +2877,16 @@ export class App {
   }
 
   protected async deleteNetworkProfile(profileId: string): Promise<void> {
+    if (this.profileDeleting()) return;
+    this.profileDeleting.set(true);
     try {
       await this.agents.deleteNetworkProfile(profileId);
       this.networkTestResult.set(null);
       this.showToast(this.i18n.t('network.deleted'));
     } catch (error) {
       this.showToast(this.errorMessage(error), 'error');
+    } finally {
+      this.profileDeleting.set(false);
     }
   }
 
