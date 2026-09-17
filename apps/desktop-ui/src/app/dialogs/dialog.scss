@@ -269,3 +269,35 @@
     font-size: 10px;
   }
 }
+
+/*
+ * Shared field chrome. The four previous copies of `.field-error` and three copies of
+ * `.field-hint` carried the same 11px line-height-1.45 red hint and small muted hint. They
+ * collapse here so the launch, account, model, MCP and remote panels all render identical
+ * field hints without each owning a copy.
+ */
+.field-error {
+  display: block;
+  margin-top: 4px;
+  color: var(--color-error);
+  font-size: 11px;
+  line-height: 1.45;
+}
+
+.field-hint {
+  display: block;
+  margin-top: 5px;
+  color: var(--text-muted);
+  font-size: 11px;
+  line-height: 1.45;
+}
+
+/*
+ * Single-line hint shown above a dialog body. The task dialog uses this for its subtitle.
+ */
+.dialog-hint {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 11px;
+  line-height: 1.4;
+}

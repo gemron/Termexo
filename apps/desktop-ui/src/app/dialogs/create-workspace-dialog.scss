@@ -28,12 +28,6 @@
   }
 }
 
-.field-error {
-  color: var(--color-error);
-  font-size: 11px;
-  line-height: 1.4;
-}
-
 @media (max-width: 480px) {
   .directory-field {
     grid-template-columns: 1fr;
