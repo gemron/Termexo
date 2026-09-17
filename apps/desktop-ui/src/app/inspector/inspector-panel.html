@@ -317,16 +317,25 @@
               }
             </article>
           } @empty {
-            <p class="quota-empty" role="status">
-              {{
-                (quotaLoading()
-                  ? 'quota.refreshing'
-                  : showAllQuotas()
-                    ? 'quota.none'
-                    : 'quota.currentNone'
-                ) | t
-              }}
-            </p>
+            @if (quotaLoading()) {
+              <p class="quota-empty" role="status">{{ 'quota.refreshing' | t }}</p>
+            } @else {
+              <div class="quota-empty" role="status">
+                <strong>
+                  {{
+                    (showAllQuotas() ? 'quota.none' : 'quota.currentNone') | t
+                  }}
+                </strong>
+                <button
+                  type="button"
+                  class="quota-empty-action"
+                  (click)="openSettingsRequested.emit('models')"
+                >
+                  <app-icon name="play" [size]="12" />
+                  {{ 'quota.openModels' | t }}
+                </button>
+              </div>
+            }
           }
         </div>
       }

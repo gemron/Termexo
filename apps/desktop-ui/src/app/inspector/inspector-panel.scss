@@ -892,14 +892,38 @@ button.stat {
 }
 
 .quota-empty {
+  display: grid;
+  gap: 8px;
   margin: 0;
   padding: 10px 9px;
   border: 1px dashed var(--border);
   border-radius: 8px;
   color: var(--text-muted);
   font-size: 11px;
-  line-height: 1.6;
+  line-height: 1.5;
   text-align: center;
+
+  strong {
+    color: var(--text-secondary);
+    font-weight: 500;
+  }
+}
+
+.quota-empty-action {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  justify-self: center;
+  padding: 4px 10px;
+  border: 1px solid color-mix(in srgb, var(--accent) 50%, var(--border));
+  border-radius: var(--radius-field);
+  color: var(--color-primary-content);
+  background: color-mix(in srgb, var(--accent) 16%, transparent);
+  font-size: 11px;
+
+  &:hover {
+    background: color-mix(in srgb, var(--accent) 26%, transparent);
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {

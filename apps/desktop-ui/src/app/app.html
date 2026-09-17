@@ -648,6 +648,7 @@
       [repository]="git.overview()"
       (refreshQuotas)="refreshProviderQuotas(true)"
       (gitRequested)="openGitView($event)"
+      (openSettingsRequested)="openSettings($event)"
       (terminalSelected)="selectTerminal($event)"
       (collapseRequested)="toggleInspector()"
     />
