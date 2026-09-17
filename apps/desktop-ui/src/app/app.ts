@@ -1899,10 +1899,11 @@ export class App {
    * Switches to the Git view and, when the inspector hands us a specific change, jumps the
    * diff to that file. A change-less click still flips the view without a selection.
    */
-  protected openGitView(change: { path: string } | null | undefined): void {
+  protected openGitView(change: { path: string } | null | undefined | void): void {
+    const path = change?.path;
     this.workspaceView.set('git');
-    if (change && change.path) {
-      this.git.selectPath(change.path);
+    if (path) {
+      this.git.selectPath(path);
     }
   }
 
