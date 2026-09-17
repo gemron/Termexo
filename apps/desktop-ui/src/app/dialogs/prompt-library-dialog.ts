@@ -114,7 +114,7 @@ type AssetFilter = 'all' | 'draft' | 'history' | 'favorite' | 'pinned';
                     [title]="asset.pinned ? ('prompt.unpin' | t) : ('prompt.pin' | t)"
                     (click)="pinToggled.emit(asset)"
                   >
-                    <app-icon name="link" [size]="13" />
+                    <app-icon name="bookmark" [size]="13" />
                   </button>
                   <button
                     type="button"
