@@ -25,15 +25,15 @@ export const ONBOARDING_TRANSLATIONS: TranslationBundle = {
   'zh-CN': {
     'onboarding.title': '欢迎使用 Termexo',
     'onboarding.lead':
-      '一个工作空间就是一个项目目录，加上你在里面运行的终端。Termexo 会把两者都记住，不用搭第二遍。',
-    'onboarding.step1Title': '创建工作空间',
+      '一个工作区就是一个项目目录，加上你在里面运行的终端。Termexo 会把两者都记住，不用搭第二遍。',
+    'onboarding.step1Title': '创建工作区',
     'onboarding.step1Body': '选择你正在开发的项目目录，给它起个名字。',
     'onboarding.step2Title': '打开终端',
     'onboarding.step2Body':
       '在标签栏点 + ，开一个普通 Shell，或者直接启动 Claude Code、Codex、OpenCode。',
     'onboarding.step3Title': '随时回来接着做',
     'onboarding.step3Body': '关掉应用再打开，目录、标签、布局、模型和主题都还在。',
-    'onboarding.create': '创建第一个工作空间',
+    'onboarding.create': '创建第一个工作区',
     'onboarding.privacy': '所有内容都留在这台电脑上，不需要注册，也没有同步。',
   },
   es: {

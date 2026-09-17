@@ -108,9 +108,9 @@ export const TODO_TRANSLATIONS: TranslationBundle = {
     'taskFlow.error.workingDirectoryMissing': '任务缺少可用的工作目录，请先在待办中选择目录。',
     'taskFlow.error.modelProfileMissing': '模型配置已不存在，请编辑待办后重新选择模型。',
     'taskFlow.error.credentialMissing': '模型配置 {name} 缺少凭据。',
-    'taskFlow.error.workspaceClosed': '任务所属工作空间已关闭，无法创建任务终端。',
+    'taskFlow.error.workspaceClosed': '任务所属工作区已关闭，无法创建任务终端。',
     'taskFlow.error.taskMissing': '任务已不存在，已取消终端投递。',
-    'taskFlow.error.terminalOutsideWorkspace': '选择的已有终端不在当前任务的工作空间。',
+    'taskFlow.error.terminalOutsideWorkspace': '选择的已有终端不在当前任务的工作区。',
     'taskFlow.error.terminalUnavailable': '选择的已有终端尚未就绪或已不可用，请重新选择。',
     'taskFlow.error.terminalStarting': '选择的已有终端仍在启动，请稍后重试。',
     'taskFlow.error.agentTypeMismatch':
