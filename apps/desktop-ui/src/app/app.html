@@ -647,7 +647,7 @@
       [accountProfiles]="agents.accountProfiles()"
       [repository]="git.overview()"
       (refreshQuotas)="refreshProviderQuotas(true)"
-      (gitRequested)="workspaceView.set('git')"
+      (gitRequested)="openGitView($event)"
       (terminalSelected)="selectTerminal($event)"
       (collapseRequested)="toggleInspector()"
     />

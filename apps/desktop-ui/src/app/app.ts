@@ -1895,6 +1895,17 @@ export class App {
     });
   }
 
+  /**
+   * Switches to the Git view and, when the inspector hands us a specific change, jumps the
+   * diff to that file. A change-less click still flips the view without a selection.
+   */
+  protected openGitView(change: { path: string } | null | undefined): void {
+    this.workspaceView.set('git');
+    if (change && change.path) {
+      this.git.selectPath(change.path);
+    }
+  }
+
   protected startSidebarResize(target: SidebarResizeTarget, event: PointerEvent): void {
     if (event.button !== 0 || this.workspaceMaximized()) {
       return;

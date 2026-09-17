@@ -184,7 +184,7 @@
             </button>
             <div class="git-session-files">
               @for (change of recentCodeChanges(); track change.path) {
-                <button type="button" [title]="change.path" (click)="gitRequested.emit()">
+                <button type="button" [title]="change.path" (click)="gitRequested.emit(change)">
                   <b [attr.data-status]="repositoryChangeStatus(change)">
                     {{ repositoryChangeStatus(change) }}
                   </b>

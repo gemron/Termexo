@@ -11,7 +11,7 @@ import {
 } from '../core/models/agent.models';
 import { I18nService } from '../core/i18n/i18n.service';
 import { TranslatePipe } from '../core/i18n/translate.pipe';
-import { RepositoryOverview, repositoryChangeStatus } from '../core/models/git.models';
+import { RepositoryChange, RepositoryOverview, repositoryChangeStatus } from '../core/models/git.models';
 import {
   AGENT_ICONS,
   AGENT_LABELS,
@@ -102,7 +102,7 @@ export class InspectorPanelComponent {
   readonly accountProfiles = input<AccountProfile[]>([]);
   readonly repository = input<RepositoryOverview | null>(null);
   readonly refreshQuotas = output<void>();
-  readonly gitRequested = output<void>();
+  readonly gitRequested = output<RepositoryChange | void>();
   readonly terminalSelected = output<string>();
   readonly collapseRequested = output<void>();
   protected readonly showAllQuotas = signal(false);
