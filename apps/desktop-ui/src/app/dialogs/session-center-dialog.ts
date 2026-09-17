@@ -4,6 +4,7 @@ import {
   afterNextRender,
   Component,
   computed,
+  effect,
   type ElementRef,
   inject,
   input,
@@ -400,7 +401,7 @@ function presentationOf(agentType: NativeAgentType): AgentPresentation {
               <span>{{ 'session.scanningHelp' | t }}</span>
             </div>
           } @else {
-            @for (session of filteredSessions(); track session.id) {
+            @for (session of visibleSessions(); track session.id) {
               <article class="session-row" [attr.data-agent]="session.agentType">
                 <span class="session-agent" [attr.data-agent]="session.agentType">
                   <app-icon [name]="agentIcon(session)" [size]="15" />
@@ -460,6 +461,16 @@ function presentationOf(agentType: NativeAgentType): AgentPresentation {
                   </button>
                 }
               </div>
+            }
+            @if (hiddenSessionCount() > 0) {
+              <button
+                type="button"
+                class="load-more"
+                data-testid="session-load-more"
+                (click)="loadMoreSessions()"
+              >
+                {{ 'session.loadMore' | t: { count: hiddenSessionCount() } }}
+              </button>
             }
           }
         </div>
@@ -573,7 +584,7 @@ export class SessionCenterDialogComponent {
       '',
   );
   protected readonly filteredSessions = computed(() => {
-    const query = this.search().trim().toLocaleLowerCase();
+    const query = this.debouncedSearch().trim().toLocaleLowerCase();
     const agentFilter = this.agentFilter();
     return this.sessions().filter((session) => {
       if (agentFilter !== 'all' && session.agentType !== agentFilter) {
@@ -594,6 +605,57 @@ export class SessionCenterDialogComponent {
         .some((value) => value!.toLocaleLowerCase().includes(query));
     });
   });
+
+  /**
+   * Hard cap on rendered rows. A workspace can carry thousands of sessions; rendering all of
+   * them freezes the workbench for the duration of the diff. The user can paginate forward via
+   * `loadMoreSessions()`.
+   */
+  private static readonly INITIAL_VISIBLE_ROWS = 80;
+  private static readonly ROW_INCREMENT = 80;
+  protected readonly visibleSessionCount = signal(SessionCenterDialogComponent.INITIAL_VISIBLE_ROWS);
+  protected readonly visibleSessions = computed(() =>
+    this.filteredSessions().slice(0, this.visibleSessionCount()),
+  );
+  protected readonly hiddenSessionCount = computed(() => {
+    const total = this.filteredSessions().length;
+    const shown = this.visibleSessionCount();
+    return total > shown ? total - shown : 0;
+  });
+  protected loadMoreSessions(): void {
+    this.visibleSessionCount.update((count) => count + SessionCenterDialogComponent.ROW_INCREMENT);
+  }
+  /**
+   * Reset the visible-row window whenever the filter changes; otherwise a narrowed result can
+   * still show the old "load more" tail that no longer exists.
+   */
+  private resetVisibleRows = effect(() => {
+    // Touch the signals so this effect re-runs whenever the user types in the search field or
+    // picks a different agent filter.
+    this.search();
+    this.agentFilter();
+    this.visibleSessionCount.set(SessionCenterDialogComponent.INITIAL_VISIBLE_ROWS);
+  });
+
+  /**
+   * The filter pipeline reads `search` directly to keep the input responsive, but with 2k+
+   * sessions a 1ms keystroke can take 4 seconds to filter. Mirror `search` into a debounced
+   * signal so the filter only re-runs after the user stops typing for 150ms; the input itself
+   * shows the un-debounced value.
+   */
+  protected readonly debouncedSearch = signal('');
+  private debounceTimer: ReturnType<typeof setTimeout> | null = null;
+  private rescheduleDebounce = effect(() => {
+    const next = this.search();
+    if (this.debounceTimer !== null) {
+      clearTimeout(this.debounceTimer);
+    }
+    this.debounceTimer = setTimeout(() => {
+      this.debouncedSearch.set(next);
+      this.debounceTimer = null;
+    }, 150);
+  });
+
   protected readonly showsClaudeOptions = computed(
     () =>
       (this.agentFilter() === 'all' || this.agentFilter() === 'claude') &&
@@ -671,6 +733,11 @@ export class SessionCenterDialogComponent {
     // receives it. Focusing the search field also puts Escape inside the dialog, where it closes
     // this dialog instead of reaching the workbench shortcut on the window.
     afterNextRender(() => this.searchInput()?.nativeElement.focus());
+    // Both `effect()` instances subscribe to filter signals and reset the visible row window or
+    // debounce the search; registering them as field initialisers keeps them alive even though
+    // their values are otherwise unused.
+    this.resetVisibleRows;
+    void this.rescheduleDebounce;
   }
 
   protected handleKeydown(event: KeyboardEvent): void {

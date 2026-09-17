@@ -592,6 +592,25 @@ button:disabled {
   overscroll-behavior: contain;
 }
 
+.load-more {
+  display: block;
+  width: calc(100% - 22px);
+  margin: 10px 11px 12px;
+  padding: 7px 10px;
+  border: 1px dashed color-mix(in srgb, var(--accent) 35%, var(--border));
+  border-radius: var(--radius-field);
+  color: var(--text-secondary);
+  background: transparent;
+  cursor: pointer;
+  font-size: 11px;
+  text-align: center;
+
+  &:hover {
+    color: var(--text);
+    background: color-mix(in srgb, var(--accent) 8%, transparent);
+  }
+}
+
 .session-loading {
   display: grid;
   min-height: 220px;

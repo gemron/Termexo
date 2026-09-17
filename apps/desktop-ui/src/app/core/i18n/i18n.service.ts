@@ -589,6 +589,7 @@ const EN: TranslationTable = {
   'session.filterAria': 'Filter by Agent',
   'session.filterAll': 'All',
   'session.resultCount': 'Showing {visible} / {total}',
+  'session.loadMore': 'Show {count} more',
   'session.resumeConfig': 'Resume settings',
   'session.claudeResumeConfig': 'Claude resume settings',
   'session.claudeResumeHelp':
@@ -1355,6 +1356,7 @@ const ZH_CN: TranslationTable = {
   'session.filterAria': '按 Agent 筛选',
   'session.filterAll': '全部',
   'session.resultCount': '显示 {visible} / {total}',
+  'session.loadMore': '再显示 {count} 项',
   'session.resumeConfig': '恢复配置',
   'session.claudeResumeConfig': 'Claude 恢复配置',
   'session.claudeResumeHelp': '完整恢复会加载历史上下文；跨供应商请使用顶部模型切换的新会话',

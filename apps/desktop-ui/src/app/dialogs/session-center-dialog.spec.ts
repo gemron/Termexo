@@ -1,4 +1,5 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
+import { vi } from 'vitest';
 
 import {
   type AgentInstallation,
@@ -148,15 +149,22 @@ describe('SessionCenterDialogComponent', () => {
   });
 
   it('searches native session ids and emits the selected scan scope', async () => {
-    const input = root.querySelector<HTMLInputElement>('.dialog-search input');
-    expect(input).toBeTruthy();
-    input!.value = 'codex-native';
-    input!.dispatchEvent(new Event('input'));
-    fixture.detectChanges();
-    await fixture.whenStable();
-    fixture.detectChanges();
+    vi.useFakeTimers();
+    try {
+      const input = root.querySelector<HTMLInputElement>('.dialog-search input');
+      expect(input).toBeTruthy();
+      input!.value = 'codex-native';
+      input!.dispatchEvent(new Event('input'));
+      fixture.detectChanges();
+      await vi.runAllTimersAsync();
+      fixture.detectChanges();
 
-    expect(root.querySelectorAll('.session-row')).toHaveLength(1);
+      expect(root.querySelectorAll('.session-row')).toHaveLength(1);
+    } finally {
+      vi.useRealTimers();
+    }
+    // Continue with the scan-scope assertions on the real clock.
+    expect(root.querySelector('.session-row')?.textContent).toContain('Codex adapter');
     expect(root.querySelector('.session-row')?.textContent).toContain('Codex adapter');
 
     const scans: Array<string | undefined> = [];
