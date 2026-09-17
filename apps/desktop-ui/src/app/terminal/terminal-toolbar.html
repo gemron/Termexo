@@ -183,7 +183,7 @@
           [disabled]="gridColumns() === gridRows()"
           (click)="gridSwapRequested.emit()"
         >
-          ×
+          <app-icon name="arrow-swap" [size]="13" />
         </button>
 
         <div class="dimension-stepper" role="group" [attr.aria-label]="'terminal.gridRows' | t">

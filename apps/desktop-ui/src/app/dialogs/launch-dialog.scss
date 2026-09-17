@@ -21,22 +21,44 @@
 }
 
 .launch-directory {
-  display: flex;
-  align-items: center;
-  gap: 10px;
+  display: grid;
+  gap: 4px;
   padding: 8px 17px;
   border-bottom: 1px solid var(--border);
-  span {
-    min-width: 0;
-    flex: 1;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-    font-size: 11px;
+}
+
+.launch-directory-label {
+  color: var(--text-secondary);
+  font-weight: 560;
+  font-size: 11px;
+}
+
+.launch-directory-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.launch-directory-input {
+  flex: 1 1 auto;
+  min-width: 0;
+  height: 28px;
+  padding: 0 9px;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-field);
+  color: var(--text);
+  background: var(--surface-inset);
+  font: 11px/1.4 var(--mono);
+  text-overflow: ellipsis;
+
+  &:focus {
+    border-color: var(--color-primary);
+    box-shadow: 0 0 0 3px color-mix(in oklab, var(--color-primary) 11%, transparent);
   }
-  button {
-    flex-shrink: 0;
-  }
+}
+
+.launch-directory button {
+  flex-shrink: 0;
 }
 
 .installation-line {

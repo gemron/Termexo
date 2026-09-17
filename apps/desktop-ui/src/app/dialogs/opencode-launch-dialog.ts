@@ -37,6 +37,7 @@ export interface OpenCodeLaunchDialogValue {
           <input
             type="text"
             class="input input-bordered input-sm"
+            autofocus
             [placeholder]="'launch.openCodeNameExample' | t"
             [ngModel]="name()"
             (ngModelChange)="name.set($event)"

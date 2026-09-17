@@ -3,8 +3,10 @@ import {
   computed,
   ElementRef,
   afterNextRender,
+  effect,
   input,
   output,
+  signal,
   viewChild,
 } from '@angular/core';
 
@@ -68,17 +70,33 @@ import { IconComponent } from '../shared/icon/icon';
           <code>{{ installation()?.version ?? '' }}</code>
         </div>
 
-        <div class="launch-directory">
-          <span [title]="workingDirectory()">{{ workingDirectory() }}</span>
-          <button
-            type="button"
-            class="secondary btn btn-sm"
-            [disabled]="launching()"
-            (click)="directoryChangeRequested.emit()"
-          >
-            {{ 'launch.changeDirectory' | t }}
-          </button>
-        </div>
+        <label class="launch-directory">
+          <span class="launch-directory-label">{{ 'launch.workingDirectory' | t }}</span>
+          <span class="launch-directory-row">
+            <input
+              type="text"
+              class="launch-directory-input"
+              [value]="workingDirectory()"
+              [disabled]="launching()"
+              [attr.tabindex]="directoryTabindex()"
+              [title]="'launch.workingDirectoryHint' | t"
+              [attr.aria-label]="'launch.workingDirectory' | t"
+              (focus)="directoryTabindex.set(0)"
+              (keydown.enter)="commitWorkingDirectory(directoryInput.value)"
+              #directoryInput
+            />
+            <button
+              type="button"
+              class="secondary btn btn-sm"
+              [disabled]="launching()"
+              (click)="directoryChangeRequested.emit()"
+              [title]="'launch.changeDirectory' | t"
+            >
+              <app-icon name="folder" [size]="12" />
+              {{ 'launch.changeDirectory' | t }}
+            </button>
+          </span>
+        </label>
         <ng-content />
 
         <footer>
@@ -125,6 +143,24 @@ export class LaunchDialogShellComponent {
   /** Asks the workbench for the installer, which is the only way out of a missing CLI. */
   readonly installRequested = output<void>();
   readonly directoryChangeRequested = output<void>();
+  /** Emitted when the user edits the directory input inline and presses Enter. */
+  readonly directoryEdited = output<string>();
+  private readonly directoryInput = viewChild<ElementRef<HTMLInputElement>>('directoryInput');
+  /**
+   * The directory input starts as `tabindex="-1"` so the dialog focus directive skips it and
+   * lands on the session-name field instead. It becomes focusable the moment the user actually
+   * clicks or tabs into it.
+   */
+  protected readonly directoryTabindex = signal<number>(-1);
+
+  /** Commit the inline-edit input if its value changed; clears the focus ring on success. */
+  protected commitWorkingDirectory(value: string): void {
+    const trimmed = value.trim();
+    if (trimmed && trimmed !== this.workingDirectory()) {
+      this.directoryEdited.emit(trimmed);
+    }
+    this.directoryInput()?.nativeElement.blur();
+  }
 
   /**
    * Whether to offer the installer, which is only once detection has actually answered.
@@ -141,11 +177,13 @@ export class LaunchDialogShellComponent {
 
   constructor() {
     // `autofocus` only applies while the document is being parsed, so a dialog created later never
-    // receives it. The first field has to claim focus itself once the projected form exists.
+    // receives it. The session-name fields mark themselves with `autofocus`, so the focus
+    // directive (`appModal`) picks them up; we just need to ensure the section itself can be
+    // focused as a fallback.
     afterNextRender(() => {
       this.dialog()
-        .nativeElement.querySelector<HTMLElement>('input:not([type="checkbox"]), select')
-        ?.focus();
+        .nativeElement.querySelector<HTMLElement>('.session-name-field input')
+        ?.focus({ preventScroll: true });
     });
   }
 

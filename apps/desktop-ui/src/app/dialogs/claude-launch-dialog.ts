@@ -60,6 +60,7 @@ const CONTEXT_1M_OFF = 'off';
           <input
             type="text"
             class="input input-bordered input-sm"
+            autofocus
             [placeholder]="'launch.claudeNameExample' | t"
             [ngModel]="name()"
             (ngModelChange)="name.set($event)"

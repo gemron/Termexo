@@ -82,6 +82,8 @@ const EN: TranslationTable = {
   'settings.deleteNetworkConfirm':
     'Delete this network profile? Saved proxy and npm settings will be removed.',
   'launch.changeDirectory': 'Change directory',
+  'launch.workingDirectory': 'Working directory',
+  'launch.workingDirectoryHint': 'Edit the path directly, or use Change directory to pick one',
   'settings.diagnosticDetails': 'Executable paths and session policy',
   'preview.label': 'Preview',
   'preview.notice': 'Browser preview · sample data; local agents are not connected',
@@ -870,6 +872,8 @@ const ZH_CN: TranslationTable = {
   'settings.deleteMcpConfirm': '删除这个 MCP 配置？下次启动时由它启动的服务器会停止。',
   'settings.deleteNetworkConfirm': '删除这个网络配置？已保存的代理和 npm 设置都会被移除。',
   'launch.changeDirectory': '更改目录',
+  'launch.workingDirectory': '工作目录',
+  'launch.workingDirectoryHint': '直接编辑路径，或点击「更改目录」选择',
   'settings.diagnosticDetails': '查看程序路径与会话策略',
   'preview.label': '预览',
   'preview.notice': '浏览器预览 · 使用演示数据，未连接本机 Agent',

@@ -43,6 +43,7 @@ export interface AntigravityLaunchDialogValue {
           <input
             type="text"
             class="input input-bordered input-sm"
+            autofocus
             [placeholder]="'launch.antigravityNameExample' | t"
             [ngModel]="name()"
             (ngModelChange)="name.set($event)"
