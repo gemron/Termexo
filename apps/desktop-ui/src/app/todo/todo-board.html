@@ -354,39 +354,19 @@
                     >
                       <app-icon name="play" [size]="12" /> {{ 'taskBoard.card.resume' | t }}
                     </button>
-                    <button
-                      type="button"
-                      class="quiet-action"
-                      data-testid="task-backlog-button"
-                      [title]="'taskBoard.card.backlogHint' | t"
-                      (click)="backlogRequested.emit(task.id)"
-                    >
-                      {{ 'taskBoard.card.backlog' | t }}
+                  } @else if (task.executionState === 'failed') {
+                    <button type="button" class="run-action" (click)="requestExecution(task)">
+                      <app-icon name="refresh" [size]="12" />
+                      {{
+                        (task.promptDeliveryState === 'failed'
+                          ? 'taskBoard.card.resend'
+                          : 'common.retry'
+                        ) | t
+                      }}
                     </button>
-                  } @else {
-                    @if (task.executionState === 'failed') {
-                      <button type="button" class="run-action" (click)="requestExecution(task)">
-                        <app-icon name="refresh" [size]="12" />
-                        {{
-                          (task.promptDeliveryState === 'failed'
-                            ? 'taskBoard.card.resend'
-                            : 'common.retry'
-                          ) | t
-                        }}
-                      </button>
-                    }
-                    @if (canAmend(task)) {
-                      <button
-                        type="button"
-                        class="quiet-action"
-                        data-testid="task-amend-button"
-                        [title]="'taskBoard.card.amendHint' | t"
-                        [disabled]="busyTaskId() === task.id"
-                        (click)="openAmendment(task)"
-                      >
-                        <app-icon name="message" [size]="12" /> {{ 'taskBoard.amend' | t }}
-                      </button>
-                    }
+                  } @else if (task.terminalId) {
+                    <!-- A live run with no resume / retry: "stop" stays on the row as the
+                         primary destructive action; "amend" lives in the more menu. -->
                     <button
                       type="button"
                       class="stop-action"
@@ -398,14 +378,8 @@
                       <app-icon name="square" [size]="11" /> {{ 'taskBoard.card.stop' | t }}
                     </button>
                   }
-                  <button type="button" class="quiet-action" (click)="markCompleted(task)">
-                    {{ 'taskBoard.card.submitForReview' | t }}
-                  </button>
                 }
                 @if (task.stage === 'completed') {
-                  <button type="button" class="reject-action" (click)="openValidationFailure(task)">
-                    {{ 'taskBoard.card.reject' | t }}
-                  </button>
                   <button
                     type="button"
                     class="verify-action"
@@ -415,45 +389,77 @@
                   >
                     <app-icon name="shield" [size]="12" /> {{ 'taskBoard.card.verify' | t }}
                   </button>
-                  @if (closableTerminalFor(task); as terminal) {
-                    <button
-                      type="button"
-                      class="stop-action"
-                      data-testid="task-verify-close-terminal"
-                      [title]="'taskBoard.card.verifyCloseHint' | t: { terminal: terminal.name }"
-                      (click)="verify(task, true)"
-                    >
-                      <app-icon name="square" [size]="11" /> {{ 'taskBoard.card.verifyClose' | t }}
-                    </button>
-                  }
                 }
                 @if (task.stage === 'verified') {
-                  <span class="verified-label"
-                    ><app-icon name="shield" [size]="13" /> {{ 'taskBoard.verified' | t }}</span
-                  >
-                }
-                @if (canRestart(task)) {
-                  <button
-                    type="button"
-                    class="quiet-action"
-                    data-testid="task-rerun-button"
-                    [attr.title]="routineHint(task)"
-                    [disabled]="!canRunRoutine(task)"
-                    (click)="runRoutine(task)"
-                  >
-                    <app-icon name="refresh" [size]="12" /> {{ 'taskBoard.card.runAgain' | t }}
-                  </button>
+                  @if (canRestart(task)) {
+                    <button
+                      type="button"
+                      class="quiet-action"
+                      data-testid="task-rerun-button"
+                      [attr.title]="routineHint(task)"
+                      [disabled]="!canRunRoutine(task)"
+                      (click)="runRoutine(task)"
+                    >
+                      <app-icon name="refresh" [size]="12" /> {{ 'taskBoard.card.runAgain' | t }}
+                    </button>
+                  } @else {
+                    <span class="verified-label">
+                      <app-icon name="shield" [size]="13" /> {{ 'taskBoard.verified' | t }}
+                    </span>
+                  }
                 }
                 @if (task.executionState === 'waiting' && task.terminalId) {
                   <button
                     type="button"
                     class="attend-action"
+                    data-testid="task-attend-button"
                     [title]="'taskBoard.card.attendHint' | t"
                     (click)="terminalRequested.emit(task.terminalId)"
                   >
                     <app-icon name="arrow-right" [size]="12" />
                     {{ 'taskBoard.card.attend' | t }}
                   </button>
+                }
+
+                <!--
+                  Secondary actions collapse into a "more" menu so each stage keeps a single
+                  primary button on the row. The button is hidden when there are no secondary
+                  actions to show.
+                -->
+                @if (moreActionsFor(task).length > 0) {
+                  <div class="more-menu">
+                    <button
+                      type="button"
+                      class="quiet-action"
+                      data-testid="task-more-button"
+                      [attr.aria-expanded]="expandedTaskId() === task.id"
+                      [attr.aria-label]="'common.more' | t"
+                      [title]="'common.more' | t"
+                      (click)="toggleMoreMenu(task.id)"
+                    >
+                      <app-icon name="more" [size]="13" />
+                    </button>
+                    @if (expandedTaskId() === task.id) {
+                      <ul role="menu" data-testid="task-more-menu">
+                        @for (action of moreActionsFor(task); track action.key) {
+                          <li>
+                            <button
+                              type="button"
+                              role="menuitem"
+                              [attr.data-action-key]="action.labelKey"
+                              [attr.aria-label]="action.labelKey | t"
+                              [attr.title]="resolveMoreActionTitle(action)"
+                              [disabled]="busyTaskId() === task.id"
+                              (click)="runMoreAction(task, action.key)"
+                            >
+                              <app-icon [name]="action.icon" [size]="13" />
+                              <span>{{ action.labelKey | t }}</span>
+                            </button>
+                          </li>
+                        }
+                      </ul>
+                    }
+                  </div>
                 }
               </footer>
             </article>

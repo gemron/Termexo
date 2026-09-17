@@ -31,7 +31,19 @@ const TERMINAL: TerminalSession = {
 };
 
 const VERIFY_BUTTON = '[data-testid="task-verify-button"]';
-const CLOSE_TERMINAL_BUTTON = '[data-testid="task-verify-close-terminal"]';
+const MORE_BUTTON = '[data-testid="task-more-button"]';
+// Inside an open "more" menu; the entry's button is the menuitem keyed by a stable test-id
+// derived from the action's translation key.
+function moreMenuItem(labelKey: string): string {
+  return `[data-testid="task-more-menu"] button[data-action-key="${labelKey}"]`;
+}
+
+function openMoreMenu(host: { root: HTMLElement; fixture: ComponentFixture<TodoBoardComponent> }): void {
+  const button = host.root.querySelector<HTMLButtonElement>(MORE_BUTTON);
+  expect(button).toBeTruthy();
+  button!.click();
+  host.fixture.detectChanges();
+}
 
 function draft(projectId: string, title: string): TodoTaskDraft {
   return {
@@ -95,8 +107,10 @@ describe('TodoBoardComponent verification', () => {
     await render([TERMINAL]);
 
     // A live run can be interrupted or given more to do, but not resumed — it never stopped.
-    expect(root.querySelector('[data-testid="task-amend-button"]')).toBeTruthy();
     expect(root.querySelector('[data-testid="task-stop-button"]')).toBeTruthy();
+    openMoreMenu({ root, fixture });
+    expect(root.querySelector(moreMenuItem('taskBoard.amend'))).toBeTruthy();
+    expect(root.querySelector(moreMenuItem('taskBoard.card.stop'))).toBeNull();
     expect(root.querySelector('[data-testid="task-resume-button"]')).toBeNull();
 
     const resumed: string[] = [];
@@ -108,9 +122,14 @@ describe('TodoBoardComponent verification', () => {
     fixture.detectChanges();
 
     // Stopping keeps the run, so both ways out of it are offered and neither is forced.
-    expect(root.querySelector('[data-testid="task-amend-button"]')).toBeNull();
+    // The "stop" primary button disappears (the run is already stopped); "amend" also goes
+    // away because a stopped agent no longer accepts new instructions.
+    expect(root.querySelector('[data-testid="task-stop-button"]')).toBeNull();
+    openMoreMenu({ root, fixture });
+    expect(root.querySelector(moreMenuItem('taskBoard.amend'))).toBeNull();
     click('[data-testid="task-resume-button"]');
-    click('[data-testid="task-backlog-button"]');
+    openMoreMenu({ root, fixture });
+    click(moreMenuItem('taskBoard.card.backlog'));
 
     expect(resumed).toEqual([task.id]);
     expect(dropped).toEqual([task.id]);
@@ -120,10 +139,10 @@ describe('TodoBoardComponent verification', () => {
     const task = completedTask('验收并关闭', TERMINAL.id);
     await render([TERMINAL]);
 
-    expect(root.querySelector(CLOSE_TERMINAL_BUTTON)?.getAttribute('title')).toContain(
-      TERMINAL.name,
-    );
-    click(CLOSE_TERMINAL_BUTTON);
+    openMoreMenu({ root, fixture });
+    const closeItem = root.querySelector<HTMLButtonElement>(moreMenuItem('taskBoard.card.verifyClose'));
+    expect(closeItem?.getAttribute('title')).toContain(TERMINAL.name);
+    click(moreMenuItem('taskBoard.card.verifyClose'));
 
     expect(todos.task(task.id)?.stage).toBe('verified');
     expect(closedTerminalIds).toEqual([TERMINAL.id]);
@@ -143,7 +162,8 @@ describe('TodoBoardComponent verification', () => {
     const task = completedTask('终端已关闭', TERMINAL.id);
     await render([]);
 
-    expect(root.querySelector(CLOSE_TERMINAL_BUTTON)).toBeNull();
+    openMoreMenu({ root, fixture });
+    expect(root.querySelector(moreMenuItem('taskBoard.card.verifyClose'))).toBeNull();
     click(VERIFY_BUTTON);
 
     expect(todos.task(task.id)?.stage).toBe('verified');
@@ -157,6 +177,7 @@ describe('TodoBoardComponent verification', () => {
     await render([TERMINAL]);
 
     expect(root.querySelector(VERIFY_BUTTON)).toBeTruthy();
-    expect(root.querySelector(CLOSE_TERMINAL_BUTTON)).toBeNull();
+    openMoreMenu({ root, fixture });
+    expect(root.querySelector(moreMenuItem('taskBoard.card.verifyClose'))).toBeNull();
   });
 });

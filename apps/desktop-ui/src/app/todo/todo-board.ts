@@ -17,6 +17,7 @@ import {
   TodoRoutinePreset,
   TodoStage,
   TodoTask,
+  TaskMoreAction,
   TodoTaskDraft,
   canAmendTodoTask,
   canRestartTodoTask,
@@ -139,6 +140,101 @@ export class TodoBoardComponent {
   protected readonly allProjectsOption = ALL_PROJECTS_OPTION;
   protected readonly selectedProjectId = signal(ALL_PROJECTS_OPTION);
   protected readonly draggedTaskId = signal<string | null>(null);
+  /** Task id whose secondary-actions menu is open. Only one card shows the menu at a time. */
+  protected readonly expandedTaskId = signal<string | null>(null);
+
+  protected toggleMoreMenu(taskId: string): void {
+    this.expandedTaskId.update((current) => (current === taskId ? null : taskId));
+  }
+
+  /**
+   * Returns the secondary actions to surface under the card's "more" menu, or an empty array
+   * when the card already has a primary action and nothing else to do. Each entry carries its own
+   * i18n keys so the label and tooltip can change per locale without the template having to
+   * inline-translate them.
+   */
+  protected readonly moreActionsFor = (task: TodoTask): readonly TaskMoreAction[] => {
+    // Stop and resume are first-class actions that stay on the row; everything else collapses
+    // into the "more" menu.
+    if (task.stage === 'executing' && !this.canResume(task) && this.canAmend(task)) {
+      return [
+        {
+          key: 'amend',
+          labelKey: 'taskBoard.amend',
+          icon: 'message',
+          titleKey: 'taskBoard.card.amendHint',
+        },
+      ];
+    }
+    if (task.stage === 'executing' && this.canResume(task)) {
+      return [
+        {
+          key: 'backlog',
+          labelKey: 'taskBoard.card.backlog',
+          icon: 'rollback',
+          titleKey: 'taskBoard.card.backlogHint',
+        },
+      ];
+    }
+    if (task.stage === 'completed') {
+      const actions: TaskMoreAction[] = [];
+      const closable = this.closableTerminalFor(task);
+      if (closable) {
+        actions.push({
+          key: 'verify-close',
+          labelKey: 'taskBoard.card.verifyClose',
+          icon: 'square',
+          titleKey: 'taskBoard.card.verifyCloseHint',
+          titleParams: { terminal: closable.name },
+        });
+      }
+      actions.push({
+        key: 'reject',
+        labelKey: 'taskBoard.card.reject',
+        icon: 'rollback',
+        titleKey: '',
+      });
+      return actions;
+    }
+    return [];
+  };
+
+  /**
+   * Translates an action's `titleKey` and `titleParams` into a ready-to-render string. The
+   * header attribute only accepts strings, so the interpolation has to happen in TS rather than
+   * the template; the resulting string is also fine when `titleKey` is empty.
+   */
+  protected resolveMoreActionTitle(action: TaskMoreAction): string {
+    if (!action.titleKey) {
+      return '';
+    }
+    return action.titleParams ? this.i18n.t(action.titleKey, action.titleParams) : this.i18n.t(action.titleKey);
+  }
+
+  /** Runs the secondary action whose `key` matches and closes the menu. */
+  protected runMoreAction(task: TodoTask, key: TaskMoreAction['key']): void {
+    this.expandedTaskId.set(null);
+    switch (key) {
+      case 'backlog':
+        this.backlogRequested.emit(task.id);
+        return;
+      case 'amend':
+        this.openAmendment(task);
+        return;
+      case 'submit':
+        this.markCompleted(task);
+        return;
+      case 'stop':
+        this.stopRequested.emit(task.id);
+        return;
+      case 'reject':
+        this.openValidationFailure(task);
+        return;
+      case 'verify-close':
+        this.verify(task, true);
+        return;
+    }
+  }
   protected readonly dropStage = signal<TodoStage | null>(null);
   protected readonly taskDialogOpen = signal(false);
   protected readonly projectDialogOpen = signal(false);

@@ -327,3 +327,24 @@ export function terminalStatusToExecutionState(
       return promptDelivery === 'delivered' ? 'waiting' : 'idle';
   }
 }
+
+/**
+ * Secondary actions rendered under a card's "more" menu. Every entry's label and tooltip come
+ * from i18n keys so the view layer can render them with the active locale.
+ */
+export type TaskMoreActionKey =
+  | 'backlog'
+  | 'amend'
+  | 'submit'
+  | 'stop'
+  | 'reject'
+  | 'verify-close';
+
+export interface TaskMoreAction {
+  readonly key: TaskMoreActionKey;
+  readonly labelKey: string;
+  readonly icon: string;
+  readonly titleKey: string;
+  /** Parameters for the title interpolation, e.g. the terminal name for verify-close. */
+  readonly titleParams?: Readonly<Record<string, string>>;
+}

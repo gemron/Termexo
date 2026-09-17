@@ -190,6 +190,55 @@ button:disabled {
   opacity: 0.5;
 }
 
+/*
+ * The card footer keeps a single primary action on the row plus a "more" menu button that opens
+ * a small dropdown of secondary actions. The dropdown is positioned absolutely so it floats over
+ * adjacent cards rather than reflowing them.
+ */
+.more-menu {
+  position: relative;
+}
+
+.more-menu > ul {
+  position: absolute;
+  z-index: 5;
+  right: 0;
+  bottom: calc(100% + 4px);
+  display: grid;
+  min-width: 180px;
+  gap: 2px;
+  padding: 4px;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-field);
+  background: var(--surface-raised);
+  box-shadow: 0 10px 24px rgb(0 0 0 / 32%);
+
+  li > button {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    width: 100%;
+    min-height: 30px;
+    padding: 0 10px;
+    border: 0;
+    border-radius: 4px;
+    color: var(--text-secondary);
+    background: transparent;
+    font-size: 11px;
+    font-weight: 560;
+    text-align: left;
+
+    &:hover:not(:disabled) {
+      color: var(--text);
+      background: var(--surface-2);
+    }
+
+    &:disabled {
+      opacity: 0.5;
+    }
+  }
+}
+
 .board-toolbars {
   min-width: 0;
 }
