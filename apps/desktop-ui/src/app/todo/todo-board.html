@@ -218,7 +218,7 @@
               </div>
 
               <h3>
-                <button type="button" (click)="openEditTask(task)">{{ task.title }}</button>
+                <button type="button" (click)="openTaskDetail(task)">{{ task.title }}</button>
               </h3>
               @if (task.description) {
                 <p class="task-description">{{ task.description }}</p>
@@ -979,5 +979,118 @@
         </button>
       </footer>
     </section>
+  </div>
+}
+
+<!--
+  Right-side drawer showing a task's full state. Replaces the previous behavior where the only
+  way to read validations or retry attempts was to scroll inside the edit dialog. The card title
+  opens this; the card actions still own edits, runs, etc.
+-->
+@if (detailTask(); as task) {
+  <div class="board-backdrop" (mousedown)="closeTaskDetail()">
+    <aside
+      class="board-dialog task-detail"
+      appModal
+      (dismissModal)="closeTaskDetail()"
+      role="dialog"
+      aria-modal="true"
+      [attr.aria-label]="'taskBoard.detail.title' | t"
+      (mousedown)="$event.stopPropagation()"
+    >
+      <header>
+        <div>
+          <h2>{{ task.title }}</h2>
+          <p class="task-detail-stage">
+            <span class="state badge" [attr.data-status]="task.stage">
+              <i></i>{{ detailStatusLabel() }}
+            </span>
+            <span class="task-detail-meta">
+              {{
+                'taskBoard.detail.priorityMeta'
+                  | t: { priority: priorityChip(task.priority) }
+              }}
+            </span>
+            @if (detailProjectName()) {
+              <span class="task-detail-meta">{{ detailProjectName() }}</span>
+            }
+          </p>
+        </div>
+        <button
+          type="button"
+          class="btn btn-square btn-ghost btn-sm"
+          [title]="'common.close' | t"
+          [attr.aria-label]="'common.close' | t"
+          (click)="closeTaskDetail()"
+        >
+          <app-icon name="x" [size]="15" />
+        </button>
+      </header>
+
+      <div class="task-detail-body">
+        @if (task.description) {
+          <section>
+            <h3>{{ 'taskBoard.detail.description' | t }}</h3>
+            <p class="task-detail-text">{{ task.description }}</p>
+          </section>
+        }
+        @if (task.acceptanceCriteria) {
+          <section>
+            <h3>{{ 'taskBoard.detail.acceptance' | t }}</h3>
+            <p class="task-detail-text">{{ task.acceptanceCriteria }}</p>
+          </section>
+        }
+
+        <section>
+          <h3>{{ 'taskBoard.detail.attempts' | t }}</h3>
+          <p class="task-detail-text">
+            {{ 'taskBoard.detail.attemptsCount' | t: { count: task.attempts } }}
+          </p>
+        </section>
+
+        <section>
+          <h3>{{ 'taskBoard.detail.validations' | t }}</h3>
+          @if (task.validations.length) {
+            <ul class="task-detail-validations">
+              @for (record of task.validations; track record.id) {
+                <li [attr.data-outcome]="record.outcome">
+                  <span
+                    class="state badge badge-sm"
+                    [attr.data-status]="record.outcome === 'passed' ? 'COMPLETED' : 'FAILED'"
+                  >
+                    <i></i>{{
+                      record.outcome === 'passed'
+                        ? ('taskBoard.card.verify' | t)
+                        : ('taskBoard.card.reject' | t)
+                    }}
+                  </span>
+                  <time>{{ record.createdAt | date: 'MM-dd HH:mm' }}</time>
+                  @if (record.note) {
+                    <p>{{ record.note }}</p>
+                  }
+                </li>
+              }
+            </ul>
+          } @else {
+            <p class="task-detail-text">{{ 'taskBoard.detail.noValidations' | t }}</p>
+          }
+        </section>
+
+        <section class="task-detail-actions">
+          <button type="button" class="btn btn-sm" (click)="closeTaskDetail()">
+            {{ 'common.close' | t }}
+          </button>
+          <button
+            type="button"
+            class="primary btn btn-primary btn-sm"
+            data-testid="task-detail-edit"
+            (click)="closeTaskDetail(); openEditTask(task)"
+          >
+            <app-icon name="edit" [size]="12" />
+            {{ 'taskBoard.detail.edit' | t }}
+          </button>
+        </section>
+      </div>
+    </aside>
   </div>
 }

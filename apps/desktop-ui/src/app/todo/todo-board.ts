@@ -1,3 +1,4 @@
+import { DatePipe } from '@angular/common';
 import { Component, computed, effect, inject, input, output, signal } from '@angular/core';
 import { ModalFocusDirective } from '../shared/modal-focus.directive';
 import { FormsModule } from '@angular/forms';
@@ -94,7 +95,7 @@ function formatRunDuration(elapsedMs: number, i18n: I18nService): string {
 
 @Component({
   selector: 'app-todo-board',
-  imports: [ModalFocusDirective, FormsModule, IconComponent, TranslatePipe],
+  imports: [DatePipe, ModalFocusDirective, FormsModule, IconComponent, TranslatePipe],
   templateUrl: './todo-board.html',
   styleUrl: './todo-board.scss',
 })
@@ -142,6 +143,21 @@ export class TodoBoardComponent {
   protected readonly draggedTaskId = signal<string | null>(null);
   /** Task id whose secondary-actions menu is open. Only one card shows the menu at a time. */
   protected readonly expandedTaskId = signal<string | null>(null);
+  /** Task id currently shown in the side drawer. `null` keeps the drawer closed. */
+  protected readonly detailTaskId = signal<string | null>(null);
+  protected readonly detailTask = computed(() => {
+    const id = this.detailTaskId();
+    if (!id) return null;
+    return this.workspaceTasks().find((task) => task.id === id) ?? null;
+  });
+
+  protected openTaskDetail(task: TodoTask): void {
+    this.detailTaskId.set(task.id);
+  }
+
+  protected closeTaskDetail(): void {
+    this.detailTaskId.set(null);
+  }
 
   protected toggleMoreMenu(taskId: string): void {
     this.expandedTaskId.update((current) => (current === taskId ? null : taskId));
@@ -1125,6 +1141,22 @@ export class TodoBoardComponent {
   protected priorityLabel(priority: TodoPriority): string {
     const labelKey = TODO_PRIORITIES.find((item) => item.value === priority)?.labelKey;
     return labelKey ? this.i18n.t(labelKey) : '';
+  }
+
+  protected detailProjectName = computed(() => {
+    const task = this.detailTask();
+    if (!task?.projectId) return '';
+    return this.projects().find((project) => project.id === task.projectId)?.name ?? '';
+  });
+
+  protected detailStatusLabel = computed(() => {
+    const task = this.detailTask();
+    return task ? this.i18n.t(`taskBoard.card.stage.${task.stage}`) : '';
+  });
+
+  /** Format a task priority as a localized label, mirroring the existing `priorityLabel` API. */
+  protected priorityChip(priority: TodoPriority): string {
+    return this.priorityLabel(priority);
   }
 
   protected emptyColumnLabel(stage: TodoStage): string {

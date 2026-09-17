@@ -1411,3 +1411,113 @@ button:disabled {
     flex-basis: 100%;
   }
 }
+
+/*
+ * Task detail drawer. Slides in from the right at roughly 460px wide; the rest of the board
+ * is dimmed by the existing `.board-backdrop` scrim.
+ */
+.board-dialog.task-detail {
+  width: min(460px, 100vw);
+  max-height: 100vh;
+  grid-template-rows: auto minmax(0, 1fr);
+}
+
+.board-dialog.task-detail > header {
+  padding: 16px 18px 12px;
+  border-bottom: 1px solid var(--border);
+
+  h2 {
+    margin: 0 0 4px;
+    color: var(--text);
+    font-size: 16px;
+    font-weight: 620;
+  }
+
+  p {
+    margin: 0;
+    color: var(--text-muted);
+    font-size: 11px;
+  }
+}
+
+.task-detail-body {
+  display: grid;
+  gap: 14px;
+  padding: 14px 18px 18px;
+  overflow-y: auto;
+
+  section {
+    display: grid;
+    gap: 6px;
+  }
+
+  h3 {
+    margin: 0;
+    color: var(--text-secondary);
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.03em;
+    text-transform: uppercase;
+  }
+}
+
+.task-detail-stage {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.task-detail-meta {
+  color: var(--text-muted);
+  font-size: 11px;
+}
+
+.task-detail-text {
+  margin: 0;
+  color: var(--text);
+  font-size: 12px;
+  line-height: 1.55;
+  white-space: pre-wrap;
+}
+
+.task-detail-validations {
+  display: grid;
+  gap: 8px;
+  padding: 0;
+  margin: 0;
+  list-style: none;
+
+  li {
+    display: grid;
+    grid-template-columns: auto auto 1fr;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 10px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-field);
+    background: var(--surface-2);
+
+    time {
+      color: var(--text-muted);
+      font: 10px/1 var(--mono);
+    }
+
+    p {
+      grid-column: 1 / -1;
+      margin: 0;
+      color: var(--text-secondary);
+      font-size: 11px;
+      line-height: 1.4;
+    }
+  }
+}
+
+.task-detail-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  border-top: 1px solid var(--border);
+  margin-top: 4px;
+  padding-top: 14px;
+}
