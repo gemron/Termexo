@@ -114,16 +114,19 @@ const DEFAULT_ALERT_THRESHOLD = 80;
         </header>
 
         <nav class="settings-tabs tabs tabs-border" [attr.aria-label]="'settings.categories' | t">
-          @for (category of categories; track category.id) {
-            <button
-              type="button"
-              class="tab"
-              [class.active]="tab() === category.id"
-              [attr.aria-current]="tab() === category.id ? 'page' : null"
-              (click)="selectTab(category.id)"
-            >
-              {{ category.label | t }}
-            </button>
+          @for (group of tabGroups; track group.section) {
+            <span class="settings-tabs-group">{{ group.section | t }}</span>
+            @for (category of group.tabs; track category.id) {
+              <button
+                type="button"
+                class="tab"
+                [class.active]="tab() === category.id"
+                [attr.aria-current]="tab() === category.id ? 'page' : null"
+                (click)="selectTab(category.id)"
+              >
+                {{ category.label | t }}
+              </button>
+            }
           }
         </nav>
         <select
@@ -132,8 +135,12 @@ const DEFAULT_ALERT_THRESHOLD = 80;
           [ngModel]="tab()"
           (ngModelChange)="selectTab($event)"
         >
-          @for (category of categories; track category.id) {
-            <option [value]="category.id">{{ category.label | t }}</option>
+          @for (group of tabGroups; track group.section) {
+            <optgroup [label]="group.section | t">
+              @for (category of group.tabs; track category.id) {
+                <option [value]="category.id">{{ category.label | t }}</option>
+              }
+            </optgroup>
           }
         </select>
         @if (confirmClose()) {
@@ -1433,15 +1440,30 @@ export class AgentSettingsDialogComponent {
   protected readonly pendingAccountDelete = signal<string | null>(null);
   protected readonly pendingMcpDelete = signal<string | null>(null);
   protected readonly pendingNetworkDelete = signal<string | null>(null);
-  protected readonly categories: readonly { id: SettingsTab; label: string }[] = [
-    { id: 'diagnostics', label: 'settings.tabDiagnostics' },
-    { id: 'cli', label: 'settings.tabCli' },
-    { id: 'accounts', label: 'settings.tabAccounts' },
-    { id: 'models', label: 'settings.tabModels' },
-    { id: 'mcp', label: 'settings.tabMcp' },
-    { id: 'network', label: 'settings.tabNetwork' },
-    { id: 'remote', label: 'settings.tabRemote' },
-    { id: 'storage', label: 'settings.tabStorage' },
+  /** Tabs grouped by their purpose, in display order. Section labels come from i18n. */
+  protected readonly tabGroups: readonly {
+    section: string;
+    tabs: readonly { id: SettingsTab; label: string }[];
+  }[] = [
+    {
+      section: 'settings.sectionAgent',
+      tabs: [
+        { id: 'diagnostics', label: 'settings.tabDiagnostics' },
+        { id: 'cli', label: 'settings.tabCli' },
+        { id: 'accounts', label: 'settings.tabAccounts' },
+        { id: 'models', label: 'settings.tabModels' },
+        { id: 'mcp', label: 'settings.tabMcp' },
+        { id: 'network', label: 'settings.tabNetwork' },
+      ],
+    },
+    {
+      section: 'settings.sectionRemote',
+      tabs: [{ id: 'remote', label: 'settings.tabRemote' }],
+    },
+    {
+      section: 'settings.sectionApp',
+      tabs: [{ id: 'storage', label: 'settings.tabStorage' }],
+    },
   ];
   private readonly modelDrafts = new ProfileDrafts<ModelEditorDraft>();
   private readonly accountDrafts = new ProfileDrafts<ReturnType<typeof this.captureAccountDraft>>();
