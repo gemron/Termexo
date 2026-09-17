@@ -32,6 +32,15 @@
       </button>
       <button
         type="button"
+        class="secondary-action"
+        [title]="'common.settings' | t"
+        [attr.aria-label]="'common.settings' | t"
+        (click)="settingsRequested.emit()"
+      >
+        <app-icon name="settings" [size]="14" />
+      </button>
+      <button
+        type="button"
         class="primary-action"
         data-testid="task-create-button"
         (click)="openCreateTask()"

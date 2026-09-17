@@ -128,6 +128,7 @@ export class TodoBoardComponent {
   readonly terminalRequested = output<string>();
   /** Asks the shell to close a terminal the board no longer needs once a run is accepted. */
   readonly terminalCloseRequested = output<string>();
+  readonly settingsRequested = output<void>();
 
   protected readonly columns = TODO_COLUMNS;
   protected scrollToStage(stage: TodoStage, board: HTMLElement): void {
