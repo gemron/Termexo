@@ -3,6 +3,7 @@ import { Component, computed, input, output, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 
 import { promptAssetMatches, type PromptAsset } from '../core/models/prompt-assets';
+import { AGENT_LABELS, type AgentType } from '../core/models/workspace.models';
 import { TranslatePipe } from '../core/i18n/translate.pipe';
 import { ModalFocusDirective } from '../shared/modal-focus.directive';
 import { IconComponent } from '../shared/icon/icon';
@@ -84,7 +85,7 @@ type AssetFilter = 'all' | 'draft' | 'history' | 'favorite' | 'pinned';
                   (click)="used.emit(asset)"
                 >
                   <span class="asset-meta">
-                    <b [attr.data-agent]="asset.agentType">{{ asset.agentType }}</b>
+                    <b [attr.data-agent]="asset.agentType">{{ agentLabel(asset.agentType) }}</b>
                     <strong>{{ asset.terminalName }}</strong>
                     <em>{{
                       asset.kind === 'draft' ? ('prompt.draft' | t) : ('prompt.history' | t)
@@ -215,5 +216,9 @@ export class PromptLibraryDialogComponent {
 
   protected filterLabel(filter: AssetFilter): string {
     return `prompt.filter.${filter}`;
+  }
+
+  protected agentLabel(agentType: string): string {
+    return AGENT_LABELS[agentType as AgentType] ?? agentType;
   }
 }
