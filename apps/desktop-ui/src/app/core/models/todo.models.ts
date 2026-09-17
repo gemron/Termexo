@@ -338,7 +338,8 @@ export type TaskMoreActionKey =
   | 'submit'
   | 'stop'
   | 'reject'
-  | 'verify-close';
+  | 'verify-close'
+  | 'delete';
 
 export interface TaskMoreAction {
   readonly key: TaskMoreActionKey;

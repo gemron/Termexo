@@ -194,27 +194,6 @@
                     <i></i>{{ project.name }}
                   </span>
                 }
-                <span class="card-tools">
-                  <button
-                    type="button"
-                    class="icon-action"
-                    [attr.aria-label]="'taskBoard.card.edit' | t"
-                    [title]="'taskBoard.card.edit' | t"
-                    (click)="openEditTask(task)"
-                  >
-                    <app-icon name="edit" [size]="13" />
-                  </button>
-                  <button
-                    type="button"
-                    class="icon-action danger-icon"
-                    data-testid="task-card-delete"
-                    [attr.aria-label]="'taskBoard.card.deleteLabel' | t"
-                    [title]="'taskBoard.deleteTask' | t"
-                    (click)="requestTaskDeletion(task)"
-                  >
-                    <app-icon name="trash" [size]="13" />
-                  </button>
-                </span>
               </div>
 
               <h3>
@@ -222,12 +201,6 @@
               </h3>
               @if (task.description) {
                 <p class="task-description">{{ task.description }}</p>
-              }
-              @if (task.acceptanceCriteria) {
-                <div class="acceptance">
-                  <app-icon name="check" [size]="12" />
-                  <span>{{ task.acceptanceCriteria }}</span>
-                </div>
               }
 
               <div class="assignment">
@@ -237,11 +210,6 @@
                 </span>
                 <code>{{ task.modelName }}</code>
               </div>
-
-              <p class="task-directory" [attr.title]="taskDirectory(task)">
-                <app-icon name="folder" [size]="12" />
-                <span>{{ taskDirectory(task) }}</span>
-              </p>
 
               @if (task.terminalId && task.stage !== 'verified') {
                 <button
@@ -447,6 +415,7 @@
                               type="button"
                               role="menuitem"
                               [attr.data-action-key]="action.labelKey"
+                              [attr.data-testid]="action.key === 'delete' ? 'task-card-delete' : null"
                               [attr.aria-label]="action.labelKey | t"
                               [attr.title]="resolveMoreActionTitle(action)"
                               [disabled]="busyTaskId() === task.id"

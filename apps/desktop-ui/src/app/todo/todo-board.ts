@@ -171,7 +171,9 @@ export class TodoBoardComponent {
    */
   protected readonly moreActionsFor = (task: TodoTask): readonly TaskMoreAction[] => {
     // Stop and resume are first-class actions that stay on the row; everything else collapses
-    // into the "more" menu.
+    // into the "more" menu. "Delete" sits at the end of every menu because the card no longer
+    // exposes a dedicated trash button — the drawer is the read-only path, the more menu is
+    // the destructive path.
     if (task.stage === 'executing' && !this.canResume(task) && this.canAmend(task)) {
       return [
         {
@@ -180,6 +182,7 @@ export class TodoBoardComponent {
           icon: 'message',
           titleKey: 'taskBoard.card.amendHint',
         },
+        this.deleteAction(),
       ];
     }
     if (task.stage === 'executing' && this.canResume(task)) {
@@ -190,6 +193,7 @@ export class TodoBoardComponent {
           icon: 'rollback',
           titleKey: 'taskBoard.card.backlogHint',
         },
+        this.deleteAction(),
       ];
     }
     if (task.stage === 'completed') {
@@ -210,10 +214,21 @@ export class TodoBoardComponent {
         icon: 'rollback',
         titleKey: '',
       });
+      actions.push(this.deleteAction());
       return actions;
     }
-    return [];
+    return [this.deleteAction()];
   };
+
+  /** Common "delete this task" entry used by every stage's "more" menu. */
+  private deleteAction(): TaskMoreAction {
+    return {
+      key: 'delete',
+      labelKey: 'taskBoard.deleteTask',
+      icon: 'trash',
+      titleKey: 'taskBoard.card.deleteWarning',
+    };
+  }
 
   /**
    * Translates an action's `titleKey` and `titleParams` into a ready-to-render string. The
@@ -248,6 +263,9 @@ export class TodoBoardComponent {
         return;
       case 'verify-close':
         this.verify(task, true);
+        return;
+      case 'delete':
+        this.requestTaskDeletion(task);
         return;
     }
   }
