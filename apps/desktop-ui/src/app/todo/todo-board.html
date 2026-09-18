@@ -1027,6 +1027,35 @@
         </section>
 
         <section>
+          <h3>{{ 'taskBoard.detail.executionSettings' | t }}</h3>
+          <dl class="task-detail-settings">
+            <div>
+              <dt>{{ 'taskBoard.taskDialog.priorityLabel' | t }}</dt>
+              <dd>{{ priorityChip(task.priority) }}</dd>
+            </div>
+            <div>
+              <dt>{{ 'taskBoard.taskDialog.projectLabel' | t }}</dt>
+              <dd>{{ detailProjectName() || ('taskBoard.detail.noProject' | t) }}</dd>
+            </div>
+            @if (terminalFor(task); as terminal) {
+              <div>
+                <dt>{{ 'taskBoard.taskDialog.terminalLabel' | t }}</dt>
+                <dd>{{ terminal.name }}</dd>
+              </div>
+            } @else {
+              <div>
+                <dt>{{ 'taskBoard.taskDialog.terminalLabel' | t }}</dt>
+                <dd>{{ 'taskBoard.card.terminalUnavailable' | t }}</dd>
+              </div>
+            }
+            <div>
+              <dt>{{ 'taskBoard.workingDirectoryLabel' | t }}</dt>
+              <dd>{{ taskDirectory(task) }}</dd>
+            </div>
+          </dl>
+        </section>
+
+        <section>
           <h3>{{ 'taskBoard.detail.validations' | t }}</h3>
           @if (task.validations.length) {
             <ul class="task-detail-validations">

@@ -1470,6 +1470,33 @@ button:disabled {
   white-space: pre-wrap;
 }
 
+.task-detail-settings {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  font-size: 11px;
+
+  div {
+    display: grid;
+    grid-template-columns: minmax(120px, auto) 1fr;
+    align-items: baseline;
+    gap: 10px;
+  }
+
+  dt {
+    margin: 0;
+    color: var(--text-muted);
+    font-weight: 500;
+  }
+
+  dd {
+    margin: 0;
+    color: var(--text);
+    min-width: 0;
+    overflow-wrap: anywhere;
+  }
+}
+
 .task-detail-validations {
   display: grid;
   gap: 8px;
