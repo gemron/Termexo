@@ -115,7 +115,6 @@ const DEFAULT_ALERT_THRESHOLD = 80;
 
         <nav class="settings-tabs tabs tabs-border" [attr.aria-label]="'settings.categories' | t">
           @for (group of tabGroups; track group.section) {
-            <span class="settings-tabs-group">{{ group.section | t }}</span>
             @for (category of group.tabs; track category.id) {
               <button
                 type="button"

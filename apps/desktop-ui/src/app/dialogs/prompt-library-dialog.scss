@@ -80,6 +80,10 @@
       border: 0;
       outline: 0;
       background: transparent;
+
+      &::-webkit-search-cancel-button {
+        display: none;
+      }
     }
 
     button {

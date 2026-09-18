@@ -1,0 +1,96 @@
+/*
+ * Shared dialog shell. The same surface used by the settings, launch, and session-center
+ * dialogs — three components that used to ship the same ~60 lines of CSS each. The shell is
+ * included by both dialog stylesheets so every dialog that picks up `dialog.scss` gets the header, footer,
+ * close button and title block without depending on the much larger `agent-dialog.scss`.
+ */
+button:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
+}
+
+.agent-dialog {
+  display: grid;
+  width: min(860px, 100%);
+  max-height: min(720px, calc(100vh - 36px));
+  grid-template-rows: 68px auto minmax(0, 1fr);
+  overflow: hidden;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-box);
+  color: var(--text);
+  background: var(--surface-raised);
+  box-shadow:
+    0 24px 76px rgb(0 0 0 / 52%),
+    inset 0 1px 0 color-mix(in oklab, white 4%, transparent);
+
+  > header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 17px;
+    border-bottom: 1px solid var(--border);
+
+    > button {
+      display: grid;
+      width: 28px;
+      height: 28px;
+      place-items: center;
+      border: 0;
+      border-radius: var(--radius-field);
+      color: var(--text-muted);
+      background: transparent;
+
+      &:hover {
+        color: var(--text);
+        background: var(--surface-2);
+      }
+    }
+  }
+
+  > footer {
+    display: flex;
+    justify-content: flex-end;
+    gap: 7px;
+    padding: 14px 17px;
+    border-top: 1px solid var(--border);
+  }
+}
+
+.dialog-title {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 10px;
+
+  .title-icon {
+    display: grid;
+    width: 32px;
+    height: 32px;
+    flex: 0 0 auto;
+    place-items: center;
+    border-radius: var(--radius-field);
+    color: var(--color-primary);
+    background: var(--primary-soft);
+  }
+
+  h2,
+  p {
+    overflow: hidden;
+    margin: 0;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  h2 {
+    font-size: 15px;
+    font-weight: 680;
+    letter-spacing: 0.01em;
+  }
+
+  p {
+    max-width: 620px;
+    margin-top: 5px;
+    color: var(--text-muted);
+    font: 10px/1.35 var(--sans);
+  }
+}

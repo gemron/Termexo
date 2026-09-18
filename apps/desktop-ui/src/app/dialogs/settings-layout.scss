@@ -116,6 +116,16 @@
 }
 
 @media (max-width: 600px) {
+  .cli-version-row {
+    flex-wrap: wrap;
+    label {
+      flex-basis: 100%;
+    }
+    > button {
+      width: 100%;
+    }
+  }
+
   .settings-dialog {
     > header {
       flex-basis: 60px;

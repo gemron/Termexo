@@ -48,12 +48,17 @@ type AssetFilter = 'all' | 'draft' | 'history' | 'favorite' | 'pinned';
             <app-icon name="search" [size]="14" />
             <input
               type="search"
+              [attr.aria-label]="'prompt.search' | t"
               [placeholder]="'prompt.search' | t"
               [ngModel]="query()"
               (ngModelChange)="query.set($event)"
             />
             @if (query()) {
-              <button type="button" (click)="query.set('')">
+              <button
+                type="button"
+                [attr.aria-label]="'common.clearSearch' | t"
+                (click)="query.set('')"
+              >
                 <app-icon name="x" [size]="11" />
               </button>
             }
@@ -127,11 +132,7 @@ type AssetFilter = 'all' | 'draft' | 'history' | 'favorite' | 'pinned';
                   @if (pendingDelete() === asset.id) {
                     <div class="inline-confirm" role="alert">
                       <span>{{ 'prompt.deleteConfirm' | t }}</span>
-                      <button
-                        type="button"
-                        class="btn btn-sm"
-                        (click)="pendingDelete.set(null)"
-                      >
+                      <button type="button" class="btn btn-sm" (click)="pendingDelete.set(null)">
                         {{ 'common.cancel' | t }}
                       </button>
                       <button
