@@ -16,14 +16,37 @@
   border-radius: var(--radius-box);
   background: var(--surface-inset);
   box-shadow: 0 10px 26px rgb(0 0 0 / 12%);
+  transition: border-color 160ms ease, box-shadow 160ms ease;
+
+  // An overlay keeps the selection accent visible without changing the terminal's cell area.
+  &::after {
+    position: absolute;
+    z-index: 5;
+    inset: 0;
+    border-radius: inherit;
+    box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 55%, transparent);
+    background: linear-gradient(
+      90deg,
+      transparent,
+      color-mix(in srgb, var(--accent) 85%, white) 50%,
+      transparent
+    ) top / 100% 2px no-repeat;
+    opacity: 0;
+    pointer-events: none;
+    content: '';
+    transition: opacity 160ms ease;
+  }
 
   &.active {
-    /* The outer 2px ring is the focus indicator. Status rules no longer touch the border so
-     * `.active` always wins, regardless of which status the terminal is in. */
-    border-color: var(--accent);
+    // Keep the active outline independent from warning and completion colours in the header.
+    border-color: color-mix(in srgb, var(--accent) 68%, var(--border-strong));
     box-shadow:
-      inset 0 0 0 1px var(--accent),
-      0 0 0 1px var(--accent);
+      0 0 0 1px color-mix(in srgb, var(--accent) 12%, transparent),
+      0 4px 20px color-mix(in srgb, var(--accent) 9%, transparent);
+
+    &::after {
+      opacity: 1;
+    }
 
     header {
       border-bottom-color: color-mix(in srgb, var(--accent) 32%, var(--border));
@@ -418,6 +441,11 @@ footer {
 }
 
 @media (prefers-reduced-motion: reduce) {
+  .terminal-panel,
+  .terminal-panel::after {
+    transition: none;
+  }
+
   .terminal-panel.active .terminal-identity strong {
     color: color-mix(in srgb, var(--accent) 72%, white);
     text-shadow: none;

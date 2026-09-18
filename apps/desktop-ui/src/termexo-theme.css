@@ -89,7 +89,8 @@
 :root {
   color-scheme: dark;
   --font-ui:
-    'Microsoft YaHei UI', 'PingFang SC', 'Noto Sans SC', 'HarmonyOS Sans SC', 'Source Han Sans SC',
+    'Noto Sans SC', 'Source Han Sans SC', 'PingFang SC', 'HarmonyOS Sans SC', 'Microsoft YaHei UI',
+    'Microsoft YaHei',
     'Segoe UI Variable Text', 'Segoe UI', system-ui, sans-serif;
   --font-code:
     'Cascadia Code', 'JetBrains Mono', 'SFMono-Regular', Consolas, 'Liberation Mono', monospace;
