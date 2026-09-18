@@ -1,6 +1,7 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { beforeEach, describe, expect, it } from 'vitest';
 
+import { I18nService } from '../core/i18n/i18n.service';
 import type { TodoTask, TodoTaskDraft } from '../core/models/todo.models';
 import type { TerminalSession, Workspace } from '../core/models/workspace.models';
 import { TodoService } from '../core/services/todo.service';
@@ -38,7 +39,10 @@ function moreMenuItem(labelKey: string): string {
   return `[data-testid="task-more-menu"] button[data-action-key="${labelKey}"]`;
 }
 
-function openMoreMenu(host: { root: HTMLElement; fixture: ComponentFixture<TodoBoardComponent> }): void {
+function openMoreMenu(host: {
+  root: HTMLElement;
+  fixture: ComponentFixture<TodoBoardComponent>;
+}): void {
   const button = host.root.querySelector<HTMLButtonElement>(MORE_BUTTON);
   expect(button).toBeTruthy();
   button!.click();
@@ -101,6 +105,33 @@ describe('TodoBoardComponent verification', () => {
     projectId = todos.projectsFor(WORKSPACE.id)[0].id;
   });
 
+  it.each([undefined, TERMINAL.id, 'missing-terminal'])(
+    'describes the configured terminal in an unstarted task detail (%s)',
+    async (preferredTerminalId) => {
+      todos.createTask(WORKSPACE.id, {
+        ...draft(projectId, 'Task awaiting execution'),
+        preferredTerminalId,
+      });
+      await render([TERMINAL]);
+      click('.task-card h3 button');
+      const i18n = TestBed.inject(I18nService);
+      const detail = root.querySelector('.task-detail-settings')!;
+      expect(detail.querySelector('dt')?.textContent?.trim()).toBe(
+        i18n.t('taskBoard.priority.label'),
+      );
+      const label =
+        preferredTerminalId === TERMINAL.id
+          ? TERMINAL.name
+          : i18n.t(
+              preferredTerminalId
+                ? 'taskBoard.card.terminalUnavailable'
+                : 'taskBoard.taskDialog.newTerminalOption',
+            );
+      expect(detail.textContent).toContain(label);
+      expect(detail.textContent).not.toContain('taskBoard.taskDialog.priorityLabel');
+    },
+  );
+
   it('offers continuing or dropping a stopped run, and amending a live one', async () => {
     const task = todos.createTask(WORKSPACE.id, draft(projectId, '可中止的任务'))!;
     todos.beginExecution(task.id, { terminalId: TERMINAL.id });
@@ -140,7 +171,9 @@ describe('TodoBoardComponent verification', () => {
     await render([TERMINAL]);
 
     openMoreMenu({ root, fixture });
-    const closeItem = root.querySelector<HTMLButtonElement>(moreMenuItem('taskBoard.card.verifyClose'));
+    const closeItem = root.querySelector<HTMLButtonElement>(
+      moreMenuItem('taskBoard.card.verifyClose'),
+    );
     expect(closeItem?.getAttribute('title')).toContain(TERMINAL.name);
     click(moreMenuItem('taskBoard.card.verifyClose'));
 

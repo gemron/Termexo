@@ -192,20 +192,27 @@ button:disabled {
 
 /*
  * The card footer keeps a single primary action on the row plus a "more" menu button that opens
- * a small dropdown of secondary actions. The dropdown is positioned absolutely so it floats over
- * adjacent cards rather than reflowing them.
+ * a small dropdown of secondary actions. The menu lives outside the scrolling columns and uses
+ * the browser's top layer so neither cards nor scroll containers can clip it.
  */
 .more-menu {
   position: relative;
 }
 
-.more-menu > ul {
-  position: absolute;
-  z-index: 5;
-  right: 0;
-  bottom: calc(100% + 4px);
+.task-more-menu {
+  position: fixed;
+  // Sit above the `.board-backdrop` (1200) so the menu still wins when the Popover API is
+  // unavailable (the host's `showPopover?.()` no-ops on older WebView2 builds); when the
+  // popover top layer is active the z-index inside the layer is the only thing that matters.
+  z-index: 1300;
+  inset: auto;
+  margin: 0;
   display: grid;
-  min-width: 180px;
+  width: max-content;
+  min-width: min(180px, calc(100vw - 16px));
+  overflow: auto;
+  overscroll-behavior: contain;
+  list-style: none;
   gap: 2px;
   padding: 4px;
   border: 1px solid var(--border-strong);
@@ -344,7 +351,10 @@ button:disabled {
   align-items: center;
   gap: 6px;
   padding: 0 10px;
-  border: 1px solid color-mix(in srgb, var(--accent) 32%, var(--border));
+  // The 1px hairline stays close to `--border` so a pill on a soft surface doesn't read
+  // bolder than the rest of the chrome; the accent tint comes from the background, not the
+  // outline. Hover adds a stronger ring without flipping to a hard accent outline.
+  border: 1px solid color-mix(in srgb, var(--accent) 22%, var(--border));
   border-radius: 13px;
   color: var(--text-secondary);
   background: var(--surface-1);
@@ -352,14 +362,15 @@ button:disabled {
 }
 
 .preset-chip {
-  border-style: dashed;
+  // Dashed outlines on small pills exaggerate the stroke — a solid hairline at the same
+  // tint reads as the same chip, just without the visual weight.
+  border-style: solid;
   background: transparent;
 }
 
 .routine-chip:hover:not(:disabled),
 .preset-chip:hover {
-  border-color: var(--accent);
-  border-style: solid;
+  border-color: color-mix(in srgb, var(--accent) 60%, var(--border));
   color: var(--text);
   background: color-mix(in srgb, var(--accent) 13%, var(--surface-2));
 }
@@ -1085,6 +1096,7 @@ button:disabled {
 
   // Body fields share the same inset as the header and footer — the page-level
   // `padding` would have applied the inset twice.
+  > .board-dialog-body,
   > form,
   > .execution-block,
   > .execution-settings {
@@ -1104,6 +1116,13 @@ button:disabled {
     border-top: 1px solid var(--border);
     background: var(--surface-raised);
   }
+}
+
+.board-dialog-body {
+  min-height: 0;
+  display: grid;
+  align-content: start;
+  gap: 14px;
 }
 
 .project-dialog {
@@ -1406,8 +1425,8 @@ button:disabled {
  * is dimmed by the existing `.board-backdrop` scrim.
  */
 .board-dialog.task-detail {
-  width: min(460px, 100vw);
-  max-height: 100vh;
+  width: min(460px, calc(100vw - 32px));
+  max-height: calc(100dvh - 40px);
   grid-template-rows: auto minmax(0, 1fr);
 }
 
@@ -1529,7 +1548,7 @@ button:disabled {
   }
 }
 
-.task-detail-actions {
+.task-detail-body .task-detail-actions {
   display: flex;
   justify-content: flex-end;
   gap: 8px;

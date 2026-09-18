@@ -1,6 +1,7 @@
 import { DatePipe } from '@angular/common';
 import { Component, computed, effect, inject, input, output, signal } from '@angular/core';
 import { ModalFocusDirective } from '../shared/modal-focus.directive';
+import { AnchoredMenuDirective } from '../shared/anchored-menu.directive';
 import { FormsModule } from '@angular/forms';
 
 import { I18nService } from '../core/i18n/i18n.service';
@@ -95,7 +96,7 @@ function formatRunDuration(elapsedMs: number, i18n: I18nService): string {
 
 @Component({
   selector: 'app-todo-board',
-  imports: [DatePipe, ModalFocusDirective, FormsModule, IconComponent, TranslatePipe],
+  imports: [DatePipe, ModalFocusDirective, AnchoredMenuDirective, FormsModule, IconComponent, TranslatePipe],
   templateUrl: './todo-board.html',
   styleUrl: './todo-board.scss',
 })
@@ -144,6 +145,10 @@ export class TodoBoardComponent {
   protected readonly draggedTaskId = signal<string | null>(null);
   /** Task id whose secondary-actions menu is open. Only one card shows the menu at a time. */
   protected readonly expandedTaskId = signal<string | null>(null);
+  protected moreMenuAnchor: HTMLElement | null = null;
+  protected readonly expandedTask = computed(() =>
+    this.workspaceTasks().find((task) => task.id === this.expandedTaskId()) ?? null,
+  );
   /** Task id currently shown in the side drawer. `null` keeps the drawer closed. */
   protected readonly detailTaskId = signal<string | null>(null);
   protected readonly detailTask = computed(() => {
@@ -160,7 +165,8 @@ export class TodoBoardComponent {
     this.detailTaskId.set(null);
   }
 
-  protected toggleMoreMenu(taskId: string): void {
+  protected toggleMoreMenu(taskId: string, anchor: HTMLElement): void {
+    this.moreMenuAnchor = anchor;
     this.expandedTaskId.update((current) => (current === taskId ? null : taskId));
   }
 
@@ -240,7 +246,9 @@ export class TodoBoardComponent {
     if (!action.titleKey) {
       return '';
     }
-    return action.titleParams ? this.i18n.t(action.titleKey, action.titleParams) : this.i18n.t(action.titleKey);
+    return action.titleParams
+      ? this.i18n.t(action.titleKey, action.titleParams)
+      : this.i18n.t(action.titleKey);
   }
 
   /** Runs the secondary action whose `key` matches and closes the menu. */
@@ -517,6 +525,15 @@ export class TodoBoardComponent {
     return task.terminalId
       ? (this.terminals().find((terminal) => terminal.id === task.terminalId) ?? null)
       : null;
+  }
+
+  protected detailTerminalLabel(task: TodoTask): string {
+    const terminalId = task.terminalId || task.preferredTerminalId;
+    if (!terminalId) return this.i18n.t('taskBoard.taskDialog.newTerminalOption');
+    return (
+      this.terminals().find((terminal) => terminal.id === terminalId)?.name ??
+      this.i18n.t('taskBoard.card.terminalUnavailable')
+    );
   }
 
   /** Whether a task other than `exceptTaskId` is still executing inside this terminal. */

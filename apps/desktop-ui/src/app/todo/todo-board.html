@@ -406,37 +406,18 @@
                 @if (moreActionsFor(task).length > 0) {
                   <div class="more-menu">
                     <button
+                      #moreTrigger
                       type="button"
                       class="quiet-action"
                       data-testid="task-more-button"
                       [attr.aria-expanded]="expandedTaskId() === task.id"
+                      aria-haspopup="menu"
                       [attr.aria-label]="'common.more' | t"
                       [title]="'common.more' | t"
-                      (click)="toggleMoreMenu(task.id)"
+                      (click)="toggleMoreMenu(task.id, moreTrigger)"
                     >
                       <app-icon name="more" [size]="13" />
                     </button>
-                    @if (expandedTaskId() === task.id) {
-                      <ul role="menu" data-testid="task-more-menu">
-                        @for (action of moreActionsFor(task); track action.key) {
-                          <li>
-                            <button
-                              type="button"
-                              role="menuitem"
-                              [attr.data-action-key]="action.labelKey"
-                              [attr.data-testid]="action.key === 'delete' ? 'task-card-delete' : null"
-                              [attr.aria-label]="action.labelKey | t"
-                              [attr.title]="resolveMoreActionTitle(action)"
-                              [disabled]="busyTaskId() === task.id"
-                              (click)="runMoreAction(task, action.key)"
-                            >
-                              <app-icon [name]="action.icon" [size]="13" />
-                              <span>{{ action.labelKey | t }}</span>
-                            </button>
-                          </li>
-                        }
-                      </ul>
-                    }
                   </div>
                 }
               </footer>
@@ -461,6 +442,37 @@
   </div>
 </section>
 
+@if (expandedTask(); as task) {
+  @if (moreMenuAnchor; as anchor) {
+    <ul
+      class="task-more-menu"
+      role="menu"
+      data-testid="task-more-menu"
+      [attr.aria-label]="'common.more' | t"
+      [appAnchoredMenu]="anchor"
+      (dismissed)="expandedTaskId.set(null)"
+    >
+      @for (action of moreActionsFor(task); track action.key) {
+        <li role="none">
+          <button
+            type="button"
+            role="menuitem"
+            [attr.data-action-key]="action.labelKey"
+            [attr.data-testid]="action.key === 'delete' ? 'task-card-delete' : null"
+            [attr.aria-label]="action.labelKey | t"
+            [attr.title]="resolveMoreActionTitle(action)"
+            [disabled]="busyTaskId() === task.id"
+            (click)="runMoreAction(task, action.key)"
+          >
+            <app-icon [name]="action.icon" [size]="13" />
+            <span>{{ action.labelKey | t }}</span>
+          </button>
+        </li>
+      }
+    </ul>
+  }
+}
+
 @if (taskDialogOpen()) {
   <div class="board-backdrop" (mousedown)="closeTaskDialog()">
     <section
@@ -469,13 +481,16 @@
       (dismissModal)="closeTaskDialog()"
       role="dialog"
       aria-modal="true"
+      aria-labelledby="task-dialog-title"
       (mousedown)="$event.stopPropagation()"
       (keydown.control.enter)="submitTaskDialog()"
       (keydown.meta.enter)="submitTaskDialog()"
     >
       <header>
         <div>
-          <h2>{{ (editingTask() ? 'taskBoard.editTask' : 'taskBoard.newTask') | t }}</h2>
+          <h2 id="task-dialog-title">
+            {{ (editingTask() ? 'taskBoard.editTask' : 'taskBoard.newTask') | t }}
+          </h2>
           <p>{{ 'taskBoard.taskDialog.subtitle' | t }}</p>
         </div>
         <button
@@ -487,243 +502,248 @@
           <app-icon name="x" [size]="15" />
         </button>
       </header>
-
-      @if (!editingTask()) {
-        <div class="routine-presets">
-          <span>{{ 'taskBoard.routineTasks' | t }}</span>
-          @for (preset of routinePresets; track preset.id) {
-            <button
-              type="button"
-              class="preset-chip"
-              data-testid="task-routine-preset"
-              [attr.data-preset]="preset.id"
-              (click)="applyRoutinePreset(preset)"
-            >
-              <app-icon name="refresh" [size]="11" /> {{ preset.titleKey | t }}
-            </button>
-          }
-        </div>
-      }
-
-      <label>
-        <span>{{ 'taskBoard.taskDialog.titleLabel' | t }}</span>
-        <input
-          type="text"
-          data-testid="task-title-input"
-          [ngModel]="taskTitle()"
-          (ngModelChange)="taskTitle.set($event)"
-          [placeholder]="'taskBoard.taskDialog.titlePlaceholder' | t"
-          autofocus
-        />
-      </label>
-      <label>
-        <span>{{ 'taskBoard.taskDialog.descriptionLabel' | t }}</span>
-        <textarea
-          rows="4"
-          data-testid="task-description-input"
-          [ngModel]="taskDescription()"
-          (ngModelChange)="taskDescription.set($event)"
-          [placeholder]="'taskBoard.taskDialog.descriptionPlaceholder' | t"
-        ></textarea>
-      </label>
-      <label>
-        <span>{{ 'taskBoard.taskDialog.acceptanceLabel' | t }}</span>
-        <textarea
-          rows="3"
-          data-testid="task-acceptance-input"
-          [ngModel]="taskAcceptance()"
-          (ngModelChange)="taskAcceptance.set($event)"
-          [placeholder]="'taskBoard.taskDialog.acceptancePlaceholder' | t"
-        ></textarea>
-      </label>
-      <div class="priority-field">
-        <span>{{ 'taskBoard.priority.label' | t }}</span>
-        <div
-          class="priority-choice"
-          role="group"
-          [attr.aria-label]="'taskBoard.priority.label' | t"
-        >
-          @for (option of priorities; track option.value) {
-            <button
-              type="button"
-              [attr.data-priority]="option.value"
-              [class.active]="taskPriority() === option.value"
-              [attr.aria-pressed]="taskPriority() === option.value"
-              (click)="taskPriority.set(option.value)"
-            >
-              {{ option.labelKey | t }}
-            </button>
-          }
-        </div>
-      </div>
-
-      <div class="routine-field">
-        <label class="routine-switch">
-          <input
-            type="checkbox"
-            data-testid="task-recurring-input"
-            [ngModel]="taskRecurring()"
-            (ngModelChange)="taskRecurring.set($event)"
-          />
-          <span>{{ 'taskBoard.taskDialog.recurringLabel' | t }}</span>
-        </label>
-        <small>{{ 'taskBoard.taskDialog.recurringHint' | t }}</small>
-      </div>
-
-      <section class="execution-settings">
-        <button
-          type="button"
-          class="settings-toggle"
-          data-testid="task-execution-toggle"
-          [class.expanded]="executionSettingsExpanded()"
-          [attr.aria-expanded]="executionSettingsExpanded()"
-          (click)="toggleExecutionSettings()"
-        >
-          <app-icon name="chevron-down" [size]="13" />
-          <strong>{{ 'taskBoard.taskDialog.executionSettings' | t }}</strong>
-          <span data-testid="task-execution-summary">{{ executionSummary() }}</span>
-        </button>
-
-        @if (executionSettingsExpanded()) {
-          <label>
-            <span>{{ 'taskBoard.taskDialog.projectLabel' | t }}</span>
-            <select
-              data-testid="task-project-select"
-              [ngModel]="taskProjectId()"
-              [disabled]="taskExecutionLocked()"
-              (ngModelChange)="changeTaskProject($event)"
-            >
-              @for (project of projects(); track project.id) {
-                <option [value]="project.id">{{ project.name }} · {{ project.path }}</option>
-              }
-            </select>
-          </label>
-          <label>
-            <span>{{ 'taskBoard.taskDialog.terminalLabel' | t }}</span>
-            <select
-              data-testid="task-terminal-select"
-              [ngModel]="taskTerminalId()"
-              [disabled]="taskExecutionLocked()"
-              (ngModelChange)="changeTaskTerminal($event)"
-            >
-              <option [value]="newTerminalOption">
-                {{ 'taskBoard.taskDialog.newTerminalOption' | t }}
-              </option>
-              @if (taskTerminalUnavailable()) {
-                <option [value]="taskTerminalId()" disabled>
-                  {{
-                    (taskExecutionLocked()
-                      ? 'taskBoard.taskDialog.lockedTerminalOption'
-                      : 'taskBoard.taskDialog.unavailableTerminalOption'
-                    ) | t
-                  }}
-                </option>
-              }
-              @for (terminal of availableTerminals(); track terminal.id) {
-                <option [value]="terminal.id">
-                  {{ terminal.name }} · {{ agentLabels[terminal.agentType] }} ·
-                  {{ terminalStatusLabel(terminal.status) }}
-                </option>
-              }
-            </select>
-            @if (selectedTaskTerminal(); as terminal) {
-              @if (taskExecutionLocked()) {
-                <small>{{
-                  'taskBoard.taskDialog.terminalLockedHint' | t: { terminal: terminal.name }
-                }}</small>
-              } @else if (!selectedTaskTerminalAvailable()) {
-                <small class="field-error">{{
-                  'taskBoard.taskDialog.terminalUnavailable' | t
-                }}</small>
-              }
-            }
-          </label>
-          @if (selectedTaskTerminal(); as terminal) {
-            <label>
-              <span>{{ 'taskBoard.taskDialog.runConfigLabel' | t }}</span>
-              <div class="terminal-selection-summary" data-testid="task-terminal-summary">
-                <app-icon [name]="agentIcons[terminal.agentType]" [size]="14" />
-                <strong>{{ agentLabels[terminal.agentType] }}</strong>
-                <code>{{ terminal.model }}</code>
-              </div>
-              <small>{{ 'taskBoard.taskDialog.runConfigHint' | t }}</small>
-            </label>
-          } @else {
-            <label>
-              <span>{{ 'taskBoard.taskDialog.modelLabel' | t }}</span>
-              <select
-                data-testid="task-model-select"
-                [ngModel]="taskModelKey()"
-                (ngModelChange)="taskModelKey.set($event)"
-              >
-                @for (option of modelOptions(); track option.key) {
-                  <option [value]="option.key">{{ option.label }}</option>
-                }
-              </select>
-              @if (modelOptions().length === 0) {
-                <small class="field-error">{{ 'taskBoard.taskDialog.noModelProfiles' | t }}</small>
-              }
-            </label>
-            @if (selectedTaskAgentType() === 'opencode') {
-              <label>
-                <span>{{ 'taskBoard.taskDialog.openCodeModelLabel' | t }}</span>
-                <input
-                  type="text"
-                  data-testid="task-opencode-model"
-                  [placeholder]="'taskBoard.taskDialog.openCodeModelPlaceholder' | t"
-                  [ngModel]="taskOpenCodeModel()"
-                  (ngModelChange)="taskOpenCodeModel.set($event)"
-                />
-                <small>{{ 'taskBoard.taskDialog.openCodeModelHint' | t }}</small>
-              </label>
-            }
-          }
-          <label>
-            <span>{{ 'taskBoard.workingDirectoryLabel' | t }}</span>
-            <span class="directory-field">
-              <input
-                type="text"
-                data-testid="task-directory-input"
-                [ngModel]="taskWorkingDirectory()"
-                (ngModelChange)="taskWorkingDirectory.set($event)"
-                [readonly]="selectedTaskTerminal() !== null || taskExecutionLocked()"
-                [placeholder]="'taskBoard.taskDialog.directoryPlaceholder' | t"
-              />
+      <div class="board-dialog-body">
+        @if (!editingTask()) {
+          <div class="routine-presets">
+            <span>{{ 'taskBoard.routineTasks' | t }}</span>
+            @for (preset of routinePresets; track preset.id) {
               <button
                 type="button"
-                class="secondary-action"
-                data-testid="task-directory-browse"
-                [disabled]="
-                  directoryPickerBusy() || selectedTaskTerminal() !== null || taskExecutionLocked()
-                "
-                (click)="browseTaskDirectory()"
+                class="preset-chip"
+                data-testid="task-routine-preset"
+                [attr.data-preset]="preset.id"
+                (click)="applyRoutinePreset(preset)"
               >
-                <app-icon name="folder" [size]="13" /> {{ 'common.selectDirectory' | t }}
+                <app-icon name="refresh" [size]="11" /> {{ preset.titleKey | t }}
               </button>
-            </span>
-            @if (directoryError()) {
-              <small class="field-error">{{ directoryError() }}</small>
-            } @else if (!selectedTaskTerminal()) {
-              <small>{{ 'taskBoard.taskDialog.directoryHint' | t }}</small>
             }
-          </label>
-        }
-      </section>
-
-      @if (taskDiscardPending()) {
-        <div class="dialog-notice" role="alert">
-          <div>
-            <strong>{{ 'taskBoard.taskDialog.discardPrompt' | t }}</strong>
-            <span>{{ 'taskBoard.taskDialog.discardDetail' | t }}</span>
           </div>
-          <button type="button" class="secondary-action" (click)="keepEditingTask()">
-            {{ 'taskBoard.taskDialog.keepEditing' | t }}
-          </button>
-          <button type="button" class="danger-action" (click)="discardTaskChanges()">
-            {{ 'taskBoard.taskDialog.discardChanges' | t }}
-          </button>
+        }
+
+        <label>
+          <span>{{ 'taskBoard.taskDialog.titleLabel' | t }}</span>
+          <input
+            type="text"
+            data-testid="task-title-input"
+            [ngModel]="taskTitle()"
+            (ngModelChange)="taskTitle.set($event)"
+            [placeholder]="'taskBoard.taskDialog.titlePlaceholder' | t"
+            autofocus
+          />
+        </label>
+        <label>
+          <span>{{ 'taskBoard.taskDialog.descriptionLabel' | t }}</span>
+          <textarea
+            rows="4"
+            data-testid="task-description-input"
+            [ngModel]="taskDescription()"
+            (ngModelChange)="taskDescription.set($event)"
+            [placeholder]="'taskBoard.taskDialog.descriptionPlaceholder' | t"
+          ></textarea>
+        </label>
+        <label>
+          <span>{{ 'taskBoard.taskDialog.acceptanceLabel' | t }}</span>
+          <textarea
+            rows="3"
+            data-testid="task-acceptance-input"
+            [ngModel]="taskAcceptance()"
+            (ngModelChange)="taskAcceptance.set($event)"
+            [placeholder]="'taskBoard.taskDialog.acceptancePlaceholder' | t"
+          ></textarea>
+        </label>
+        <div class="priority-field">
+          <span>{{ 'taskBoard.priority.label' | t }}</span>
+          <div
+            class="priority-choice"
+            role="group"
+            [attr.aria-label]="'taskBoard.priority.label' | t"
+          >
+            @for (option of priorities; track option.value) {
+              <button
+                type="button"
+                [attr.data-priority]="option.value"
+                [class.active]="taskPriority() === option.value"
+                [attr.aria-pressed]="taskPriority() === option.value"
+                (click)="taskPriority.set(option.value)"
+              >
+                {{ option.labelKey | t }}
+              </button>
+            }
+          </div>
         </div>
-      }
+
+        <div class="routine-field">
+          <label class="routine-switch">
+            <input
+              type="checkbox"
+              data-testid="task-recurring-input"
+              [ngModel]="taskRecurring()"
+              (ngModelChange)="taskRecurring.set($event)"
+            />
+            <span>{{ 'taskBoard.taskDialog.recurringLabel' | t }}</span>
+          </label>
+          <small>{{ 'taskBoard.taskDialog.recurringHint' | t }}</small>
+        </div>
+
+        <section class="execution-settings">
+          <button
+            type="button"
+            class="settings-toggle"
+            data-testid="task-execution-toggle"
+            [class.expanded]="executionSettingsExpanded()"
+            [attr.aria-expanded]="executionSettingsExpanded()"
+            (click)="toggleExecutionSettings()"
+          >
+            <app-icon name="chevron-down" [size]="13" />
+            <strong>{{ 'taskBoard.taskDialog.executionSettings' | t }}</strong>
+            <span data-testid="task-execution-summary">{{ executionSummary() }}</span>
+          </button>
+
+          @if (executionSettingsExpanded()) {
+            <label>
+              <span>{{ 'taskBoard.taskDialog.projectLabel' | t }}</span>
+              <select
+                data-testid="task-project-select"
+                [ngModel]="taskProjectId()"
+                [disabled]="taskExecutionLocked()"
+                (ngModelChange)="changeTaskProject($event)"
+              >
+                @for (project of projects(); track project.id) {
+                  <option [value]="project.id">{{ project.name }} · {{ project.path }}</option>
+                }
+              </select>
+            </label>
+            <label>
+              <span>{{ 'taskBoard.taskDialog.terminalLabel' | t }}</span>
+              <select
+                data-testid="task-terminal-select"
+                [ngModel]="taskTerminalId()"
+                [disabled]="taskExecutionLocked()"
+                (ngModelChange)="changeTaskTerminal($event)"
+              >
+                <option [value]="newTerminalOption">
+                  {{ 'taskBoard.taskDialog.newTerminalOption' | t }}
+                </option>
+                @if (taskTerminalUnavailable()) {
+                  <option [value]="taskTerminalId()" disabled>
+                    {{
+                      (taskExecutionLocked()
+                        ? 'taskBoard.taskDialog.lockedTerminalOption'
+                        : 'taskBoard.taskDialog.unavailableTerminalOption'
+                      ) | t
+                    }}
+                  </option>
+                }
+                @for (terminal of availableTerminals(); track terminal.id) {
+                  <option [value]="terminal.id">
+                    {{ terminal.name }} · {{ agentLabels[terminal.agentType] }} ·
+                    {{ terminalStatusLabel(terminal.status) }}
+                  </option>
+                }
+              </select>
+              @if (selectedTaskTerminal(); as terminal) {
+                @if (taskExecutionLocked()) {
+                  <small>{{
+                    'taskBoard.taskDialog.terminalLockedHint' | t: { terminal: terminal.name }
+                  }}</small>
+                } @else if (!selectedTaskTerminalAvailable()) {
+                  <small class="field-error">{{
+                    'taskBoard.taskDialog.terminalUnavailable' | t
+                  }}</small>
+                }
+              }
+            </label>
+            @if (selectedTaskTerminal(); as terminal) {
+              <label>
+                <span>{{ 'taskBoard.taskDialog.runConfigLabel' | t }}</span>
+                <div class="terminal-selection-summary" data-testid="task-terminal-summary">
+                  <app-icon [name]="agentIcons[terminal.agentType]" [size]="14" />
+                  <strong>{{ agentLabels[terminal.agentType] }}</strong>
+                  <code>{{ terminal.model }}</code>
+                </div>
+                <small>{{ 'taskBoard.taskDialog.runConfigHint' | t }}</small>
+              </label>
+            } @else {
+              <label>
+                <span>{{ 'taskBoard.taskDialog.modelLabel' | t }}</span>
+                <select
+                  data-testid="task-model-select"
+                  [ngModel]="taskModelKey()"
+                  (ngModelChange)="taskModelKey.set($event)"
+                >
+                  @for (option of modelOptions(); track option.key) {
+                    <option [value]="option.key">{{ option.label }}</option>
+                  }
+                </select>
+                @if (modelOptions().length === 0) {
+                  <small class="field-error">{{
+                    'taskBoard.taskDialog.noModelProfiles' | t
+                  }}</small>
+                }
+              </label>
+              @if (selectedTaskAgentType() === 'opencode') {
+                <label>
+                  <span>{{ 'taskBoard.taskDialog.openCodeModelLabel' | t }}</span>
+                  <input
+                    type="text"
+                    data-testid="task-opencode-model"
+                    [placeholder]="'taskBoard.taskDialog.openCodeModelPlaceholder' | t"
+                    [ngModel]="taskOpenCodeModel()"
+                    (ngModelChange)="taskOpenCodeModel.set($event)"
+                  />
+                  <small>{{ 'taskBoard.taskDialog.openCodeModelHint' | t }}</small>
+                </label>
+              }
+            }
+            <label>
+              <span>{{ 'taskBoard.workingDirectoryLabel' | t }}</span>
+              <span class="directory-field">
+                <input
+                  type="text"
+                  data-testid="task-directory-input"
+                  [ngModel]="taskWorkingDirectory()"
+                  (ngModelChange)="taskWorkingDirectory.set($event)"
+                  [readonly]="selectedTaskTerminal() !== null || taskExecutionLocked()"
+                  [placeholder]="'taskBoard.taskDialog.directoryPlaceholder' | t"
+                />
+                <button
+                  type="button"
+                  class="secondary-action"
+                  data-testid="task-directory-browse"
+                  [disabled]="
+                    directoryPickerBusy() ||
+                    selectedTaskTerminal() !== null ||
+                    taskExecutionLocked()
+                  "
+                  (click)="browseTaskDirectory()"
+                >
+                  <app-icon name="folder" [size]="13" /> {{ 'common.selectDirectory' | t }}
+                </button>
+              </span>
+              @if (directoryError()) {
+                <small class="field-error">{{ directoryError() }}</small>
+              } @else if (!selectedTaskTerminal()) {
+                <small>{{ 'taskBoard.taskDialog.directoryHint' | t }}</small>
+              }
+            </label>
+          }
+        </section>
+
+        @if (taskDiscardPending()) {
+          <div class="dialog-notice" role="alert">
+            <div>
+              <strong>{{ 'taskBoard.taskDialog.discardPrompt' | t }}</strong>
+              <span>{{ 'taskBoard.taskDialog.discardDetail' | t }}</span>
+            </div>
+            <button type="button" class="secondary-action" (click)="keepEditingTask()">
+              {{ 'taskBoard.taskDialog.keepEditing' | t }}
+            </button>
+            <button type="button" class="danger-action" (click)="discardTaskChanges()">
+              {{ 'taskBoard.taskDialog.discardChanges' | t }}
+            </button>
+          </div>
+        }
+      </div>
 
       <footer>
         @if (editingTask() && !taskExecutionLocked()) {
@@ -780,11 +800,12 @@
       (dismissModal)="closeProjectDialog()"
       role="dialog"
       aria-modal="true"
+      aria-labelledby="project-dialog-title"
       (mousedown)="$event.stopPropagation()"
     >
       <header>
         <div>
-          <h2>
+          <h2 id="project-dialog-title">
             {{
               (editingProjectId()
                 ? 'taskBoard.projectDialog.editTitle'
@@ -812,42 +833,44 @@
           <app-icon name="x" [size]="15" />
         </button>
       </header>
-      <label>
-        <span>{{ 'taskBoard.projectDialog.nameLabel' | t }}</span>
-        <input
-          type="text"
-          data-testid="project-name-input"
-          [ngModel]="projectName()"
-          (ngModelChange)="projectName.set($event)"
-          autofocus
-        />
-      </label>
-      <label>
-        <span>{{ 'taskBoard.workingDirectoryLabel' | t }}</span>
-        <span class="directory-field">
+      <div class="board-dialog-body">
+        <label>
+          <span>{{ 'taskBoard.projectDialog.nameLabel' | t }}</span>
           <input
             type="text"
-            data-testid="project-directory-input"
-            [ngModel]="projectPath()"
-            (ngModelChange)="projectPath.set($event)"
+            data-testid="project-name-input"
+            [ngModel]="projectName()"
+            (ngModelChange)="projectName.set($event)"
+            autofocus
           />
-          <button
-            type="button"
-            class="secondary-action"
-            data-testid="project-directory-browse"
-            [disabled]="directoryPickerBusy()"
-            (click)="browseProjectDirectory()"
-          >
-            <app-icon name="folder" [size]="13" /> {{ 'common.selectDirectory' | t }}
-          </button>
-        </span>
-        @if (directoryError()) {
-          <small class="field-error">{{ directoryError() }}</small>
+        </label>
+        <label>
+          <span>{{ 'taskBoard.workingDirectoryLabel' | t }}</span>
+          <span class="directory-field">
+            <input
+              type="text"
+              data-testid="project-directory-input"
+              [ngModel]="projectPath()"
+              (ngModelChange)="projectPath.set($event)"
+            />
+            <button
+              type="button"
+              class="secondary-action"
+              data-testid="project-directory-browse"
+              [disabled]="directoryPickerBusy()"
+              (click)="browseProjectDirectory()"
+            >
+              <app-icon name="folder" [size]="13" /> {{ 'common.selectDirectory' | t }}
+            </button>
+          </span>
+          @if (directoryError()) {
+            <small class="field-error">{{ directoryError() }}</small>
+          }
+        </label>
+        @if (editingProjectId() && projectDeleteBlockedReason()) {
+          <p class="dialog-hint">{{ projectDeleteBlockedReason() }}</p>
         }
-      </label>
-      @if (editingProjectId() && projectDeleteBlockedReason()) {
-        <p class="dialog-hint">{{ projectDeleteBlockedReason() }}</p>
-      }
+      </div>
 
       <footer>
         @if (editingProjectId() && canDeleteEditingProject()) {
@@ -898,11 +921,12 @@
       (dismissModal)="closeValidationFailure()"
       role="dialog"
       aria-modal="true"
+      aria-labelledby="validation-dialog-title"
       (mousedown)="$event.stopPropagation()"
     >
       <header>
         <div>
-          <h2>{{ validationDialogCopy().heading | t }}</h2>
+          <h2 id="validation-dialog-title">{{ validationDialogCopy().heading | t }}</h2>
           <p>{{ task.title }} · {{ validationDialogCopy().hint | t }}</p>
         </div>
         <button
@@ -914,33 +938,36 @@
           <app-icon name="x" [size]="15" />
         </button>
       </header>
-      <label>
-        <span>{{ validationDialogCopy().feedbackLabel | t }}</span>
-        <textarea
-          rows="4"
-          data-testid="validation-feedback-input"
-          [ngModel]="validationFeedback()"
-          (ngModelChange)="validationFeedback.set($event)"
-          [placeholder]="validationDialogCopy().feedbackPlaceholder | t"
-          autofocus
-        ></textarea>
-      </label>
-      <label>
-        <span>{{ 'taskBoard.feedback.descriptionLabel' | t }}</span>
-        <textarea
-          rows="3"
-          [ngModel]="validationDescription()"
-          (ngModelChange)="validationDescription.set($event)"
-        ></textarea>
-      </label>
-      <label>
-        <span>{{ 'taskBoard.feedback.acceptanceLabel' | t }}</span>
-        <textarea
-          rows="3"
-          [ngModel]="validationAcceptance()"
-          (ngModelChange)="validationAcceptance.set($event)"
-        ></textarea>
-      </label>
+      <div class="board-dialog-body">
+        <label>
+          <span>{{ validationDialogCopy().feedbackLabel | t }}</span>
+          <textarea
+            rows="4"
+            data-testid="validation-feedback-input"
+            [ngModel]="validationFeedback()"
+            (ngModelChange)="validationFeedback.set($event)"
+            [placeholder]="validationDialogCopy().feedbackPlaceholder | t"
+            autofocus
+          ></textarea>
+        </label>
+        <label>
+          <span>{{ 'taskBoard.feedback.descriptionLabel' | t }}</span>
+          <textarea
+            rows="3"
+            [ngModel]="validationDescription()"
+            (ngModelChange)="validationDescription.set($event)"
+          ></textarea>
+        </label>
+        <label>
+          <span>{{ 'taskBoard.feedback.acceptanceLabel' | t }}</span>
+          <textarea
+            rows="3"
+            [ngModel]="validationAcceptance()"
+            (ngModelChange)="validationAcceptance.set($event)"
+          ></textarea>
+        </label>
+      </div>
+
       <footer>
         <span></span>
         <button type="button" class="secondary-action" (click)="closeValidationFailure()">
@@ -984,10 +1011,7 @@
               <i></i>{{ detailStatusLabel() }}
             </span>
             <span class="task-detail-meta">
-              {{
-                'taskBoard.detail.priorityMeta'
-                  | t: { priority: priorityChip(task.priority) }
-              }}
+              {{ 'taskBoard.detail.priorityMeta' | t: { priority: priorityChip(task.priority) } }}
             </span>
             @if (detailProjectName()) {
               <span class="task-detail-meta">{{ detailProjectName() }}</span>
@@ -1030,24 +1054,17 @@
           <h3>{{ 'taskBoard.detail.executionSettings' | t }}</h3>
           <dl class="task-detail-settings">
             <div>
-              <dt>{{ 'taskBoard.taskDialog.priorityLabel' | t }}</dt>
+              <dt>{{ 'taskBoard.priority.label' | t }}</dt>
               <dd>{{ priorityChip(task.priority) }}</dd>
             </div>
             <div>
               <dt>{{ 'taskBoard.taskDialog.projectLabel' | t }}</dt>
               <dd>{{ detailProjectName() || ('taskBoard.detail.noProject' | t) }}</dd>
             </div>
-            @if (terminalFor(task); as terminal) {
-              <div>
-                <dt>{{ 'taskBoard.taskDialog.terminalLabel' | t }}</dt>
-                <dd>{{ terminal.name }}</dd>
-              </div>
-            } @else {
-              <div>
-                <dt>{{ 'taskBoard.taskDialog.terminalLabel' | t }}</dt>
-                <dd>{{ 'taskBoard.card.terminalUnavailable' | t }}</dd>
-              </div>
-            }
+            <div>
+              <dt>{{ 'taskBoard.taskDialog.terminalLabel' | t }}</dt>
+              <dd>{{ detailTerminalLabel(task) }}</dd>
+            </div>
             <div>
               <dt>{{ 'taskBoard.workingDirectoryLabel' | t }}</dt>
               <dd>{{ taskDirectory(task) }}</dd>
@@ -1065,7 +1082,8 @@
                     class="state badge badge-sm"
                     [attr.data-status]="record.outcome === 'passed' ? 'COMPLETED' : 'FAILED'"
                   >
-                    <i></i>{{
+                    <i></i
+                    >{{
                       record.outcome === 'passed'
                         ? ('taskBoard.card.verify' | t)
                         : ('taskBoard.card.reject' | t)
