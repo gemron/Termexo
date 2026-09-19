@@ -4895,7 +4895,7 @@ dependencies = [
 
 [[package]]
 name = "termexo"
-version = "0.10.3"
+version = "0.10.4"
 dependencies = [
  "aes-gcm",
  "avt",
@@ -4941,7 +4941,7 @@ dependencies = [
 
 [[package]]
 name = "termexo-relay-protocol"
-version = "0.10.3"
+version = "0.10.4"
 dependencies = [
  "base64 0.22.1",
  "bytes",

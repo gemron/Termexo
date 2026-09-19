@@ -2,6 +2,19 @@
 
 Release notes for every Termexo version, newest first. The current release is summarised in [README.md](README.md).
 
+## V0.10.4
+
+- **Grok Build joins the workbench as a fifth agent.** Detect and launch its CLI from a workspace,
+  resume its sessions, and select it for tasks. Its usage card recognizes an exhausted free allowance
+  and no longer presents an unavailable percentage as 0%; the agent also has its own icon.
+- **Session code changes and the Git panel stay current.** Change counts and file lists refresh after
+  the app has been open, instead of dropping to zero or becoming empty.
+- **Terminal startup is quieter.** The launch command is hidden behind a startup animation. Claude Code
+  accepts Ctrl+V paste, and the close confirmation uses the correct actions and wording for a running agent.
+- **Workspace controls are easier to use.** Drag workspace rows to reorder them; the row menu appears
+  on hover or keyboard focus. The task board no longer duplicates the global Settings button, and
+  dialogs, menus, and responsive layouts received further fixes.
+
 ## V0.10.3
 
 - **Codex no longer finds `]11;rgb:…` typed into its prompt.** Codex CLI asks the terminal for its

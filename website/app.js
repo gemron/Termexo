@@ -75,7 +75,7 @@ const translations = {
     metaLocal: "Local-first · MIT open source",
     metaNpm: "One command to start",
 
-    workbenchTitle: "Four agents. One screen.",
+    workbenchTitle: "Five agents. One screen.",
     workbenchLead:
       "Open as many terminals as you like, then choose which ones stay visible and arrange them in a grid that fits how you work. Switch to another project and back, and everything is exactly where you left it.",
     metricTabsTitle: "Open as many as you want",
@@ -313,7 +313,7 @@ const translations = {
     metaLocal: "本地优先 · MIT 开源",
     metaNpm: "一条命令启动",
 
-    workbenchTitle: "四个 Agent，一块屏幕。",
+    workbenchTitle: "五个 Agent，一块屏幕。",
     workbenchLead:
       "想开多少终端就开多少，再挑出此刻要盯着的那几个，按你顺手的方式排成网格。切到别的项目再切回来，还是你离开时的样子。",
     metricTabsTitle: "想开多少开多少",

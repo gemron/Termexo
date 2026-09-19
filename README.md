@@ -11,7 +11,7 @@
 </p>
 
 <p align="center">
-  <img alt="Version 0.10.3" src="https://img.shields.io/badge/version-0.10.3-58c7a0">
+  <img alt="Version 0.10.4" src="https://img.shields.io/badge/version-0.10.4-58c7a0">
   <img alt="Windows" src="https://img.shields.io/badge/platform-Windows-0078D4?logo=windows">
   <img alt="Tauri 2" src="https://img.shields.io/badge/Tauri-2-24C8DB?logo=tauri&logoColor=white">
   <img alt="Angular 22" src="https://img.shields.io/badge/Angular-22-DD0031?logo=angular">
@@ -96,7 +96,7 @@ Keep the token private. Closing Termexo or stopping the PC ends the running proc
 
 ## Latest release
 
-**[v0.10.3](https://github.com/gemron/Termexo/releases/tag/v0.10.3)** keeps agent prompts clean when a terminal is open on the desktop and a phone at once — Codex no longer finds `]11;rgb:…` typed into its input — makes Ctrl+click open links wherever the pointer already rests, and lets text copied in OpenCode reach the clipboard of the window you are using.
+**[v0.10.4](https://github.com/gemron/Termexo/releases/tag/v0.10.4)** adds Grok Build as a fifth agent, keeps session code changes and the Git panel current, improves terminal startup and Claude Code paste, and lets you drag workspaces into order.
 [Full changelog](CHANGELOG.md).
 
 If Termexo helps your workflow, a **Star on this repository** helps other developers discover it.
@@ -112,8 +112,8 @@ Trying it for the first time? [Tell us what worked or where you got stuck](https
 <table>
   <tr>
     <td width="50%" valign="top">
-      <strong>Four agents. One screen.</strong><br><br>
-      Run Claude Code, Codex, OpenCode, and Antigravity side by side in as many real PTY
+      <strong>Five agents. One screen.</strong><br><br>
+      Run Claude Code, Codex, OpenCode, Antigravity, and Grok Build side by side in as many real PTY
       terminals as you need, choose which stay visible, and arrange them in a custom 1–6
       row/column grid. Reorder tabs by dragging, close one with the middle mouse button, and drive the workbench from the
       keyboard. Each workspace remembers its folder, tabs, layout, model, and theme.
@@ -383,7 +383,8 @@ identifiers still use a legacy name. This does not affect the Termexo product na
 | V0.10.0 | A self-hosted relay, and end-to-end encrypted remote access | Released |
 | V0.10.1 | Phone keypad, keyboard-aware remote pages, and settings that keep unsaved edits | Released |
 | V0.10.2 | Reliable agent status and notifications, and a multilingual task board | Released |
-| V0.10.3 | Clean agent prompts with several viewers, Ctrl+click links, and copying from OpenCode | Current |
+| V0.10.3 | Clean agent prompts with several viewers, Ctrl+click links, and copying from OpenCode | Released |
+| V0.10.4 | Grok Build, reliable Git changes, quieter terminals, and workspace ordering | Current |
 | V1.0 | Stability, security hardening, and recovery experience | Planned |
 
 See [open issues](https://github.com/gemron/Termexo/issues) for ongoing work and
