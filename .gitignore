@@ -15,8 +15,9 @@ packages/termexo/vendor/
 *.db-shm
 *.db-wal
 
-# Local promotion material and agent instructions
+# Local documents and agent instructions
 /docs/promotion/
+/docs/reviews/
 /AGENTS.md
 
 # Editors and operating systems
