@@ -81,6 +81,17 @@ export function terminalKeySequence(event: KeyLike): string | null {
   return REVERSE_TAB_SEQUENCE;
 }
 
+/** Clipboard paste belongs to the terminal input, including full-screen agent prompts. */
+export function terminalPasteShortcut(event: KeyLike): boolean {
+  return (
+    event.type === 'keydown' &&
+    event.ctrlKey &&
+    !event.altKey &&
+    !event.metaKey &&
+    event.key.toLowerCase() === 'v'
+  );
+}
+
 /** The highest tab position `Alt`+digit can reach, one per digit key. */
 const MAX_DIRECT_TAB_INDEX = 9;
 

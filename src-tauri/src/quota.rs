@@ -10,7 +10,7 @@
 //! every provider's parsing testable without a network.
 
 use std::fs;
-use std::io::ErrorKind;
+use std::io::{BufRead, BufReader, ErrorKind};
 use std::path::{Path, PathBuf};
 
 use base64::engine::general_purpose::{URL_SAFE, URL_SAFE_NO_PAD};
@@ -54,12 +54,18 @@ pub enum QuotaUnit {
 pub struct QuotaEntry {
     pub label: String,
     pub unit: QuotaUnit,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub currency: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub total: Option<f64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub used: Option<f64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub remaining: Option<f64>,
     /// Consumed share, 0-100. Derived from the totals when the provider does not send it.
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub percent: Option<f64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub resets_at: Option<i64>,
 }
 
@@ -152,6 +158,7 @@ pub fn is_official(provider: &str) -> bool {
         PROVIDER_GLM,
         AGENT_CLAUDE_LABEL,
         AGENT_CODEX_LABEL,
+        AGENT_GROK_LABEL,
         AGENT_ANTIGRAVITY_LABEL,
         OPENCODE_PROVIDER_LABEL,
     ]
@@ -461,7 +468,9 @@ fn minimax_window(
 
 pub const AGENT_CLAUDE_LABEL: &str = "Claude Code";
 pub const AGENT_CODEX_LABEL: &str = "Codex";
+pub const AGENT_GROK_LABEL: &str = "Grok Build";
 pub const AGENT_ANTIGRAVITY_LABEL: &str = "Antigravity";
+pub const GROK_QUOTA_ID: &str = "agent:grok";
 pub const OPENCODE_PROVIDER_LABEL: &str = "OpenCode";
 pub const OPENCODE_CODEX_QUOTA_ID: &str = "agent:opencode:codex";
 pub const OPENCODE_GO_QUOTA_ID: &str = "agent:opencode:go";
@@ -472,6 +481,8 @@ pub const OPENCODE_GO_PROFILE_NAME: &str = "OpenCode Go";
 const CLAUDE_USAGE_URL: &str = "https://api.anthropic.com/api/oauth/usage";
 /// The endpoint Codex CLI polls for its `/status` figures.
 const CODEX_USAGE_URL: &str = "https://chatgpt.com/backend-api/wham/usage";
+/// The same credits route Grok Build uses for its `/usage` panel.
+const GROK_CREDITS_URL: &str = "https://cli-chat-proxy.grok.com/v1/billing?format=credits";
 /// The endpoint OpenCode Go uses for its rolling, weekly and monthly subscription windows.
 const OPENCODE_GO_USAGE_URL: &str = "https://opencode.ai/zen/go/v1/usage";
 /// The beta gate on the usage endpoint; without it the request is rejected outright.
@@ -483,6 +494,7 @@ const CLAUDE_USER_AGENT: &str = "claude-code/2.0.0";
 pub fn agent_display_name(agent_type: &str) -> &'static str {
     match agent_type.trim() {
         "claude" => AGENT_CLAUDE_LABEL,
+        "grok" => AGENT_GROK_LABEL,
         "antigravity" => AGENT_ANTIGRAVITY_LABEL,
         _ => AGENT_CODEX_LABEL,
     }
@@ -654,6 +666,196 @@ pub fn read_agent_token(agent_type: &str, config_dir: Option<&str>) -> Result<St
                 agent_display_name(agent_type)
             )
         })
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct GrokCredential {
+    pub key: String,
+    pub user_id: String,
+}
+
+/// Reuses the Grok CLI's signed-in account without copying its refresh token.
+pub fn read_grok_credential() -> Result<GrokCredential, String> {
+    let home = grok_home().ok_or_else(|| "无法找到 Grok Build 配置目录".to_owned())?;
+    let auth = read_json(&home.join("auth.json"))?;
+    parse_grok_credential(&auth)
+}
+
+fn grok_home() -> Option<PathBuf> {
+    std::env::var_os("GROK_HOME")
+        .map(PathBuf::from)
+        .or_else(|| {
+            std::env::var_os("USERPROFILE")
+                .or_else(|| std::env::var_os("HOME"))
+                .map(|home| PathBuf::from(home).join(".grok"))
+        })
+}
+
+/// The free plan omits its percentage even after it runs out. Grok's own limit error is the only
+/// local evidence that this period is exhausted; an older period's error must not count.
+pub fn latest_grok_free_usage_exhaustion() -> Option<i64> {
+    latest_grok_free_usage_exhaustion_in(&grok_home()?.join("logs/unified.jsonl"))
+}
+
+fn latest_grok_free_usage_exhaustion_in(path: &Path) -> Option<i64> {
+    let file = fs::File::open(path).ok()?;
+    BufReader::new(file)
+        .lines()
+        .map_while(Result::ok)
+        .filter(|line| line.contains("subscription:free-usage-exhausted"))
+        .filter_map(|line| serde_json::from_str::<Value>(&line).ok())
+        .filter(|event| {
+            event
+                .pointer("/ctx/error")
+                .and_then(Value::as_str)
+                .is_some_and(|error| error.contains("subscription:free-usage-exhausted"))
+        })
+        .filter_map(|event| event.get("ts").and_then(parse_timestamp))
+        .max()
+}
+
+fn parse_grok_credential(auth: &Value) -> Result<GrokCredential, String> {
+    let entries = auth
+        .as_object()
+        .ok_or_else(|| "Grok Build 登录凭据格式无效".to_owned())?;
+    let candidate = entries
+        .iter()
+        .filter_map(|(scope, value)| {
+            if scope != "https://auth.x.ai"
+                && !scope.starts_with("https://auth.x.ai::")
+                && !scope.starts_with("https://accounts.x.ai/")
+            {
+                return None;
+            }
+            let key = value.get("key")?.as_str()?.trim();
+            let user_id = value.get("user_id")?.as_str()?.trim();
+            if key.is_empty() || user_id.is_empty() {
+                return None;
+            }
+            Some(GrokCredential {
+                key: key.into(),
+                user_id: user_id.into(),
+            })
+        })
+        .next();
+    candidate.ok_or_else(|| "Grok Build 尚未通过 grok.com 登录，请先运行 grok login".to_owned())
+}
+
+pub fn build_grok_request(
+    credential: &GrokCredential,
+    version: Option<&str>,
+    proxy_base_url: Option<&str>,
+) -> QuotaRequest {
+    let url = proxy_base_url
+        .map(str::trim)
+        .filter(|url| !url.is_empty())
+        .map(|base| format!("{}/billing?format=credits", base.trim_end_matches('/')))
+        .unwrap_or_else(|| GROK_CREDITS_URL.to_owned());
+    let mut request = QuotaRequest::bearer(url, &credential.key);
+    request.headers.extend([
+        ("X-XAI-Token-Auth", "xai-grok-cli".to_owned()),
+        ("x-userid", credential.user_id.clone()),
+        ("x-grok-client-mode", "interactive".to_owned()),
+        ("Accept", "application/json".to_owned()),
+    ]);
+    if let Some(version) = version.and_then(|value| value.split_whitespace().nth(1)) {
+        request
+            .headers
+            .push(("x-grok-client-version", version.to_owned()));
+    }
+    request
+}
+
+/// The weekly percentage is shared across Grok products, including Build.
+pub fn parse_grok_response(body: &Value) -> Result<Vec<QuotaEntry>, String> {
+    parse_grok_response_with_exhaustion(body, None)
+}
+
+pub fn parse_grok_response_with_exhaustion(
+    body: &Value,
+    exhausted_at: Option<i64>,
+) -> Result<Vec<QuotaEntry>, String> {
+    let config = body
+        .get("config")
+        .ok_or_else(|| "Grok Build 未返回额度配置".to_owned())?;
+    let period = config.get("currentPeriod");
+    let period_type = period
+        .and_then(|value| value.get("type"))
+        .and_then(Value::as_str)
+        .unwrap_or_default();
+    let label = if period_type.contains("WEEKLY") {
+        "每周共享额度"
+    } else if period_type.contains("MONTHLY") {
+        "每月共享额度"
+    } else {
+        "订阅共享额度"
+    };
+    let legacy_limit = config
+        .get("monthlyLimit")
+        .and_then(|value| loose_number(value, "val"))
+        .filter(|value| *value > 0.0);
+    let used_percent = loose_number(config, "creditUsagePercent")
+        .or_else(|| {
+            legacy_limit.and_then(|limit| {
+                config
+                    .get("used")
+                    .and_then(|value| loose_number(value, "val"))
+                    .map(|used| used / limit * 100.0)
+            })
+        })
+        // An omitted percentage is unknown. In particular, an exhausted free allowance can
+        // return a period without a usable percentage; treating absence as zero is misleading.
+        .filter(|percent| percent.is_finite());
+    let mut entries = Vec::new();
+    if used_percent.is_some() || period.is_some() {
+        let period_start = period
+            .and_then(|value| value.get("start"))
+            .and_then(parse_timestamp);
+        let period_end = period
+            .and_then(|value| value.get("end"))
+            .and_then(parse_timestamp);
+        let exhausted = used_percent.is_none()
+            && exhausted_at.is_some_and(|at| {
+                period_start.is_some_and(|start| at >= start)
+                    && period_end.is_none_or(|end| at < end)
+            });
+        let mut entry = QuotaEntry::new(
+            if exhausted {
+                "免费额度已用尽（依据 Grok 限额错误）"
+            } else if used_percent.is_none() {
+                "本期额度（服务端未提供用量百分比）"
+            } else {
+                label
+            },
+            QuotaUnit::Percent,
+        );
+        entry.percent = used_percent.map(|percent| percent.clamp(0.0, 100.0));
+        if exhausted {
+            entry.percent = Some(100.0);
+        }
+        entry.resets_at = period
+            .and_then(|value| value.get("end"))
+            .or_else(|| config.get("billingPeriodEnd"))
+            .and_then(parse_timestamp);
+        entries.push(entry);
+    }
+    if let Some(balance) = config
+        .get("prepaidBalance")
+        .and_then(|value| loose_number(value, "val"))
+        .filter(|balance| balance.is_finite() && *balance > 0.0)
+    {
+        let mut entry = QuotaEntry::new("额外点数余额", QuotaUnit::Currency);
+        entry.currency = Some("USD".into());
+        entry.remaining = Some(balance / 100.0);
+        entries.push(entry);
+    }
+    if entries.is_empty() {
+        return Err(format!(
+            "Grok Build 返回了未识别的额度结构（字段：{}）",
+            key_outline(body)
+        ));
+    }
+    Ok(entries)
 }
 
 fn read_json(path: &Path) -> Result<Value, String> {
@@ -1218,6 +1420,7 @@ mod tests {
         // The agent endpoints are private APIs their own clients call or undocumented.
         assert!(!is_official(AGENT_CLAUDE_LABEL));
         assert!(!is_official(AGENT_CODEX_LABEL));
+        assert!(!is_official(AGENT_GROK_LABEL));
         assert!(!is_official(AGENT_ANTIGRAVITY_LABEL));
         assert!(!is_official(OPENCODE_PROVIDER_LABEL));
     }
@@ -1226,7 +1429,129 @@ mod tests {
     fn reports_expected_agent_display_names() {
         assert_eq!(agent_display_name("claude"), AGENT_CLAUDE_LABEL);
         assert_eq!(agent_display_name("codex"), AGENT_CODEX_LABEL);
+        assert_eq!(agent_display_name("grok"), AGENT_GROK_LABEL);
         assert_eq!(agent_display_name("antigravity"), AGENT_ANTIGRAVITY_LABEL);
+    }
+
+    #[test]
+    fn reads_grok_login_and_builds_the_cli_billing_request() {
+        let auth = json!({
+            "https://other.example": {"key": "other", "user_id": "other-user"},
+            "https://auth.x.ai::client": {
+                "key": "grok-token",
+                "user_id": "grok-user",
+                "refresh_token": "must-not-be-used"
+            }
+        });
+        let credential = parse_grok_credential(&auth).unwrap();
+        assert_eq!(credential.key, "grok-token");
+        assert_eq!(credential.user_id, "grok-user");
+        let request = build_grok_request(&credential, Some("grok 1.0.34 (build)"), None);
+        assert_eq!(request.url, GROK_CREDITS_URL);
+        assert!(request
+            .headers
+            .contains(&("X-XAI-Token-Auth", "xai-grok-cli".into())));
+        assert!(request
+            .headers
+            .contains(&("x-grok-client-version", "1.0.34".into())));
+        assert!(!request
+            .headers
+            .iter()
+            .any(|(_, value)| value == "must-not-be-used"));
+        assert!(parse_grok_credential(&json!({
+            "https://other.example": {"key": "foreign-token", "user_id": "user"}
+        }))
+        .is_err());
+    }
+
+    #[test]
+    fn parses_grok_shared_weekly_usage_and_extra_credits() {
+        let body = json!({
+            "config": {
+                "creditUsagePercent": 37.5,
+                "currentPeriod": {
+                    "type": "USAGE_PERIOD_TYPE_WEEKLY",
+                    "end": "2026-09-22T00:00:00+00:00"
+                },
+                "isUnifiedBillingUser": true,
+                "prepaidBalance": {"val": 725}
+            }
+        });
+        let entries = parse_grok_response(&body).unwrap();
+        assert_eq!(entries.len(), 2);
+        assert_eq!(entries[0].label, "每周共享额度");
+        assert_eq!(entries[0].percent, Some(37.5));
+        assert!(entries[0].resets_at.is_some());
+        assert_eq!(entries[1].remaining, Some(7.25));
+        assert_eq!(entries[1].currency.as_deref(), Some("USD"));
+    }
+
+    #[test]
+    fn does_not_invent_zero_usage_when_grok_omits_the_percentage() {
+        let current = json!({
+            "config": {
+                "currentPeriod": {"type": "USAGE_PERIOD_TYPE_WEEKLY", "end": "2026-09-22T00:00:00Z"},
+                "isUnifiedBillingUser": true,
+                "monthlyLimit": {"val": 1000},
+                "productUsage": [{"product": "PRODUCT_GROK_BUILD", "usagePercent": 0}],
+                "prepaidBalance": {"val": 0}
+            }
+        });
+        let entries = parse_grok_response(&current).unwrap();
+        assert_eq!(entries.len(), 1);
+        assert_eq!(entries[0].percent, None);
+        assert!(entries[0].resets_at.is_some());
+        let serialized = serde_json::to_value(&entries[0]).unwrap();
+        assert!(serialized.get("percent").is_none());
+        assert!(serialized.get("remaining").is_none());
+        assert!(parse_grok_response(&json!({"config": {"unexpected": true}})).is_err());
+    }
+
+    #[test]
+    fn infers_exhaustion_only_from_a_grok_error_in_the_current_period() {
+        let body = json!({"config": {"currentPeriod": {
+            "type": "USAGE_PERIOD_TYPE_WEEKLY",
+            "start": "2026-09-15T00:00:00Z",
+            "end": "2026-09-22T00:00:00Z"
+        }}});
+        let current = parse_rfc3339("2026-09-19T16:23:02Z").unwrap();
+        let old = parse_rfc3339("2026-09-14T16:23:02Z").unwrap();
+        assert_eq!(
+            parse_grok_response_with_exhaustion(&body, Some(current)).unwrap()[0].percent,
+            Some(100.0)
+        );
+        assert_eq!(
+            parse_grok_response_with_exhaustion(&body, Some(old)).unwrap()[0].percent,
+            None
+        );
+    }
+
+    #[test]
+    fn reads_the_last_grok_free_usage_limit_error_without_using_log_contents_as_usage() {
+        let root = std::env::temp_dir().join(format!("termexo-grok-quota-{}", std::process::id()));
+        fs::create_dir_all(&root).unwrap();
+        let log = root.join("unified.jsonl");
+        fs::write(
+            &log,
+            concat!(
+                "{\"ts\":\"2026-09-18T10:00:00Z\",\"msg\":\"agent response failed\",\"ctx\":{\"error\":\"subscription:free-usage-exhausted\"}}\n",
+                "{\"ts\":\"2026-09-19T16:23:02Z\",\"msg\":\"agent response failed\",\"ctx\":{\"error\":\"subscription:free-usage-exhausted\"}}\n",
+                "{\"ts\":\"2026-09-20T00:00:00Z\",\"msg\":\"user mentioned subscription:free-usage-exhausted\"}\n",
+            ),
+        )
+        .unwrap();
+        assert_eq!(
+            latest_grok_free_usage_exhaustion_in(&log),
+            parse_rfc3339("2026-09-19T16:23:02Z")
+        );
+        fs::remove_file(log).unwrap();
+        fs::remove_dir(root).unwrap();
+    }
+
+    #[test]
+    fn accepts_an_explicit_zero_grok_usage_percentage() {
+        let body = json!({"config": {"creditUsagePercent": 0, "isUnifiedBillingUser": true}});
+        assert_eq!(parse_grok_response(&body).unwrap()[0].percent, Some(0.0));
     }
 
     #[test]

@@ -404,6 +404,25 @@ describe('AppStateService', () => {
     );
   });
 
+  it('inserts a dragged workspace at the requested position and persists it', async () => {
+    await service.initialize();
+    repository.saveAll.mockClear();
+    const ids = service.workspaces().map((workspace) => workspace.id);
+
+    expect(service.reorderWorkspace(ids[2], ids[0], 'before')).toBe(true);
+    expect(service.workspaces().map((workspace) => workspace.id)).toEqual([
+      ids[2],
+      ids[0],
+      ids[1],
+    ]);
+    expect(service.workspaces().map((workspace) => workspace.sortOrder)).toEqual([0, 1, 2]);
+    expect(repository.saveAll).toHaveBeenCalledWith(service.workspaces());
+
+    repository.saveAll.mockClear();
+    expect(service.reorderWorkspace(ids[2], ids[0], 'before')).toBe(false);
+    expect(repository.saveAll).not.toHaveBeenCalled();
+  });
+
   it('deletes a workspace and selects a remaining workspace', async () => {
     await service.initialize();
     const deletedWorkspace = service.activeWorkspace()!;

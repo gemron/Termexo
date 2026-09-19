@@ -86,7 +86,7 @@ export class GitWorkbenchComponent {
     return diff && !diff.binary ? buildDiffRows(diff.oldText, diff.newText) : [];
   });
 
-protected readonly rows = computed(() => {
+  protected readonly rows = computed(() => {
     const raw = this.rawRows();
     // The model produces one row per line; the view layer renders runs of ≥3 equal rows behind
     // a "show N lines" toggle so a 200-line file with one edit does not render all 200
@@ -180,18 +180,12 @@ protected readonly rows = computed(() => {
     this.scrollToRow(blocks[next]);
   }
 
-  /**
-   * Toggles the collapsed equal-rows placeholder at `rowIndex`. Expanding leaves the original
-   * equal rows back in their place so stepping past the block still works; collapsing restores
-   * the placeholder so the next change is closer.
-   */
+  /** Expand by the original line number, which stays stable as other blocks open. */
   protected toggleCollapse(rowIndex: number): void {
+    const row = this.rows()[rowIndex];
+    if (row?.kind !== 'collapsed') return;
     const expanded = new Set(this.expandedRows());
-    if (expanded.has(rowIndex)) {
-      expanded.delete(rowIndex);
-    } else {
-      expanded.add(rowIndex);
-    }
+    expanded.add(row.firstNewLine);
     this.expandedRows.set(expanded);
     this.activeChange.set(-1);
     queueMicrotask(() => this.scrollToRow(rowIndex));
@@ -254,6 +248,7 @@ protected readonly rows = computed(() => {
   private resetDiff(): void {
     this.loadedDiffKey = '';
     this.diff.set(null);
+    this.expandedRows.set(new Set());
     this.diffError.set('');
     this.diffLoading.set(false);
   }
@@ -264,6 +259,7 @@ protected readonly rows = computed(() => {
 
   private async loadDiff(path: string, target: RepositoryTarget): Promise<void> {
     const requestRevision = ++this.diffRequestRevision;
+    this.expandedRows.set(new Set());
     this.diffLoading.set(true);
     this.diffError.set('');
     try {

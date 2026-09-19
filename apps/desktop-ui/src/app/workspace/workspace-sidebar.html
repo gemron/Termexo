@@ -36,12 +36,25 @@
     <p class="section-label">{{ 'workspace.section' | t }}</p>
     <ul class="workspace-list menu menu-sm">
       @for (workspace of visibleWorkspaces(); track workspace.id) {
-        <li class="workspace-entry" [style.--workspace-color]="workspaceColor(workspace)">
+        <li
+          class="workspace-entry"
+          [class.dragging]="draggedWorkspaceId() === workspace.id"
+          [class.drop-before]="dropTarget()?.workspaceId === workspace.id && dropTarget()?.position === 'before'"
+          [class.drop-after]="dropTarget()?.workspaceId === workspace.id && dropTarget()?.position === 'after'"
+          [style.--workspace-color]="workspaceColor(workspace)"
+          (dragover)="dragOverWorkspace($event, workspace.id)"
+          (drop)="dropWorkspace($event, workspace.id)"
+        >
           <button
             type="button"
             class="workspace-item"
+            draggable="true"
             [class.active]="workspace.id === activeWorkspaceId()"
+            [attr.aria-keyshortcuts]="'Alt+ArrowUp Alt+ArrowDown'"
             (click)="openActions.set(null); workspaceSelected.emit(workspace.id)"
+            (keydown)="moveWorkspaceWithKeyboard($event, workspace.id)"
+            (dragstart)="startWorkspaceDrag($event, workspace.id)"
+            (dragend)="endWorkspaceDrag()"
           >
             <span class="workspace-glyph">
               <app-icon name="folder" [size]="15" />
@@ -62,28 +75,6 @@
           </button>
           @if (openActions() === workspace.id) {
             <span class="workspace-actions" (click)="openActions.set(null)">
-              <span class="workspace-order-actions" [attr.aria-label]="'workspace.reorder' | t">
-                <button
-                  type="button"
-                  class="workspace-order-action"
-                  [disabled]="workspace.id === workspaces()[0]?.id"
-                  [title]="'workspace.moveUp' | t"
-                  [attr.aria-label]="'workspace.moveUp' | t"
-                  (click)="moveRequested.emit({ workspaceId: workspace.id, direction: -1 })"
-                >
-                  <app-icon name="arrow-up" [size]="10" />
-                </button>
-                <button
-                  type="button"
-                  class="workspace-order-action"
-                  [disabled]="workspace.id === workspaces().at(-1)?.id"
-                  [title]="'workspace.moveDown' | t"
-                  [attr.aria-label]="'workspace.moveDown' | t"
-                  (click)="moveRequested.emit({ workspaceId: workspace.id, direction: 1 })"
-                >
-                  <app-icon name="arrow-down" [size]="10" />
-                </button>
-              </span>
               <button
                 type="button"
                 class="workspace-action edit"

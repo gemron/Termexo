@@ -105,6 +105,39 @@ describe('TodoBoardComponent verification', () => {
     projectId = todos.projectsFor(WORKSPACE.id)[0].id;
   });
 
+  it('creates a Grok task without a Termexo model profile', async () => {
+    await render([]);
+    fixture.componentRef.setInput('grokAvailable', true);
+    fixture.detectChanges();
+    click('[data-testid="task-create-button"]');
+    click('.settings-toggle');
+
+    const title = root.querySelector<HTMLInputElement>('[data-testid="task-title-input"]')!;
+    title.value = 'Review the parser';
+    title.dispatchEvent(new Event('input'));
+    fixture.detectChanges();
+
+    const selection = root.querySelector<HTMLSelectElement>('[data-testid="task-model-select"]')!;
+    expect(selection.querySelector('option[value="grok|"]')).toBeTruthy();
+    selection.value = 'grok|';
+    selection.dispatchEvent(new Event('change'));
+    fixture.detectChanges();
+    const model = root.querySelector<HTMLInputElement>('[data-testid="task-grok-model"]')!;
+    model.value = 'grok-build';
+    model.dispatchEvent(new Event('input'));
+    fixture.detectChanges();
+    click('[data-testid="task-save-button"]');
+
+    expect(todos.tasksFor(WORKSPACE.id)).toEqual([
+      expect.objectContaining({
+        agentType: 'grok',
+        profileId: '',
+        modelName: 'grok-build',
+        title: 'Review the parser',
+      }),
+    ]);
+  });
+
   it.each([undefined, TERMINAL.id, 'missing-terminal'])(
     'describes the configured terminal in an unstarted task detail (%s)',
     async (preferredTerminalId) => {

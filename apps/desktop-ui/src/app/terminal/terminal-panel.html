@@ -115,6 +115,12 @@
   -->
   <div class="terminal-frame">
     <div #terminal class="terminal-host" [attr.aria-label]="'terminal.aria' | t"></div>
+    @if (startupVisible() && (session().status === 'STARTING' || session().status === 'RUNNING')) {
+      <div class="terminal-startup" role="status" aria-live="polite">
+        <span class="terminal-startup-spinner" aria-hidden="true"></span>
+        <span>{{ statusLabel('STARTING') }}</span>
+      </div>
+    }
     <!--
       Outside the host, so it neither scrolls with a grid wider than the phone nor catches the
       touch handlers that turn a drag into scrolling. Only the active terminal gets one: that is

@@ -106,6 +106,7 @@ const EN: TranslationTable = {
   'workspace.taskCount': '{count} tasks',
   'common.claudeNotDetected': 'Claude Code was not detected',
   'common.openCodeNotDetected': 'OpenCode was not detected',
+  'common.grokNotDetected': 'Grok Build was not detected',
   'common.antigravityNotDetected': 'Antigravity CLI was not detected',
   'restore.openCodeFailed': '{count} OpenCode terminals could not be restored.',
   'prompt.title': 'Prompt library',
@@ -323,7 +324,7 @@ const EN: TranslationTable = {
   'terminal.restoreShortcut': 'Restore terminal window (Shift+Esc)',
   'terminal.close': 'Close terminal',
   'terminal.closeRunningConfirm':
-    'This terminal is still running. Closing it will end any in-progress Agent response.',
+    'Closing this terminal will stop its process and may interrupt unfinished work. Close it?',
   'terminal.closeForce': 'Close anyway',
   'terminal.rename': 'Terminal name',
   'terminal.renameHint': 'Double-click to rename',
@@ -504,7 +505,7 @@ const EN: TranslationTable = {
   'mcp.deleted': 'MCP profile deleted',
   'network.saved': 'Network proxy profile saved',
   'network.deleted': 'Network proxy profile deleted',
-  'agent.detectionComplete': 'Claude Code and Codex CLI detection completed',
+  'agent.detectionComplete': 'Agent CLI detection completed',
   'agent.browserInstallation':
     'Browser preview does not connect to local {name}; run the desktop app.',
   'agent.systemAccount': 'System {name} account',
@@ -541,6 +542,13 @@ const EN: TranslationTable = {
   'launch.openCodeModelPlaceholder': 'provider/model, for example anthropic/claude-sonnet-4-5',
   'launch.openCodeModelHelp':
     'Leave blank to use the default model from your OpenCode configuration. Credentials and providers are managed inside OpenCode, not in Termexo.',
+  'launch.newGrok': 'New Grok Build session',
+  'launch.detectingGrok': 'Detecting Grok Build',
+  'launch.grokNameExample': 'Example: review the parser',
+  'launch.grokModel': 'Model (optional)',
+  'launch.grokModelPlaceholder': 'Leave blank for Grok Build default',
+  'launch.grokModelHelp': 'Grok Build manages its own login and model defaults.',
+  'launch.grokContinue': 'Continue the latest session in this directory',
   'launch.followProfile': 'Follow model profile',
   'launch.context1mOn': '1M context on',
   'launch.context1mOff': '1M context off',
@@ -899,6 +907,7 @@ const ZH_CN: TranslationTable = {
   'workspace.taskCount': '{count} 个任务',
   'common.claudeNotDetected': '未检测到可用的 Claude Code。',
   'common.openCodeNotDetected': '未检测到 OpenCode。',
+  'common.grokNotDetected': '未检测到 Grok Build。',
   'common.antigravityNotDetected': '未检测到 Antigravity CLI。',
   'restore.openCodeFailed': '有 {count} 个 OpenCode 终端恢复失败。',
   'prompt.title': '提示词资产库',
@@ -1115,7 +1124,7 @@ const ZH_CN: TranslationTable = {
   'terminal.restore': '恢复终端窗口',
   'terminal.restoreShortcut': '恢复终端窗口（Shift+Esc）',
   'terminal.close': '关闭终端',
-  'terminal.closeRunningConfirm': '这个终端还在运行中。关闭会中断正在进行的 Agent 响应。',
+  'terminal.closeRunningConfirm': '关闭终端会结束其中运行的进程，未完成的工作可能中断。确定关闭吗？',
   'terminal.closeForce': '仍然关闭',
   'terminal.rename': '终端名称',
   'terminal.renameHint': '双击可重命名',
@@ -1287,7 +1296,7 @@ const ZH_CN: TranslationTable = {
   'mcp.deleted': 'MCP Profile 已删除',
   'network.saved': '网络代理 Profile 已保存',
   'network.deleted': '网络代理 Profile 已删除',
-  'agent.detectionComplete': 'Claude Code 与 Codex CLI 检测已完成',
+  'agent.detectionComplete': 'Agent CLI 检测已完成',
   'agent.browserInstallation': '浏览器预览不连接本机 {name}，请运行桌面端。',
   'agent.systemAccount': '系统 {name} 账号',
   'agent.browserAccount': '浏览器预览账号',
@@ -1319,6 +1328,13 @@ const ZH_CN: TranslationTable = {
   'launch.openCodeModelPlaceholder': 'provider/model，例如 anthropic/claude-sonnet-4-5',
   'launch.openCodeModelHelp':
     '留空时使用 OpenCode 自身配置的默认模型。凭据与供应商在 OpenCode 中配置，不由 Termexo 管理。',
+  'launch.newGrok': '新建 Grok Build 会话',
+  'launch.detectingGrok': '正在检测 Grok Build',
+  'launch.grokNameExample': '例如：检查解析器',
+  'launch.grokModel': '模型（可选）',
+  'launch.grokModelPlaceholder': '留空使用 Grok Build 默认模型',
+  'launch.grokModelHelp': '登录状态和默认模型由 Grok Build 自身管理。',
+  'launch.grokContinue': '继续该目录最近的会话',
   'launch.followProfile': '跟随模型配置',
   'launch.context1mOn': '开启 1M 上下文',
   'launch.context1mOff': '关闭 1M 上下文',
@@ -1638,7 +1654,7 @@ const ES: TranslationTable = {
   'terminal.emptyDescription': 'Crea un terminal Shell o Agent para comenzar.',
   'terminal.close': 'Cerrar terminal',
   'terminal.closeRunningConfirm':
-    'Este terminal sigue en ejecución. Cerrarlo interrumpirá la respuesta del agente en curso.',
+    'Cerrar este terminal detendrá su proceso y puede interrumpir el trabajo pendiente. ¿Cerrar?',
   'terminal.closeForce': 'Cerrar de todos modos',
   'status.starting': 'Iniciando',
   'status.running': 'En ejecución',
@@ -1786,8 +1802,7 @@ const ES: TranslationTable = {
   'common.selectDirectory': 'Seleccionar carpeta',
   'common.codexNotDetected': 'No se detectó Codex CLI',
   'prompt.use': 'Usar',
-  'prompt.deleteConfirm':
-    '¿Eliminar este prompt? También se borrará la entrada de su historial.',
+  'prompt.deleteConfirm': '¿Eliminar este prompt? También se borrará la entrada de su historial.',
 };
 
 const FR: TranslationTable = {
@@ -1829,7 +1844,7 @@ const FR: TranslationTable = {
   'terminal.emptyDescription': 'Créez un terminal Shell ou Agent pour commencer.',
   'terminal.close': 'Fermer le terminal',
   'terminal.closeRunningConfirm':
-    'Ce terminal est encore en cours. Le fermer interrompra la réponse de l’agent en cours.',
+    'Fermer ce terminal arrêtera son processus et peut interrompre le travail en cours. Fermer ?',
   'terminal.closeForce': 'Fermer quand même',
   'status.starting': 'Démarrage',
   'status.running': 'En cours',
@@ -2019,7 +2034,7 @@ const DE: TranslationTable = {
   'terminal.emptyDescription': 'Erstellen Sie ein Shell- oder Agent-Terminal.',
   'terminal.close': 'Terminal schließen',
   'terminal.closeRunningConfirm':
-    'Dieses Terminal läuft noch. Beenden unterbricht die laufende Agent-Antwort.',
+    'Das Schließen beendet den Prozess und kann unerledigte Arbeit unterbrechen. Schließen?',
   'terminal.closeForce': 'Trotzdem schließen',
   'status.starting': 'Startet',
   'status.running': 'Läuft',
@@ -2208,7 +2223,7 @@ const JA: TranslationTable = {
   'terminal.emptyDescription': 'Shell または Agent ターミナルを作成してください。',
   'terminal.close': 'ターミナルを閉じる',
   'terminal.closeRunningConfirm':
-    'このターミナルはまだ実行中です。閉じると進行中のエージェント応答が中断されます。',
+    'このターミナルを閉じるとプロセスが終了し、未完了の作業が中断される可能性があります。閉じますか？',
   'terminal.closeForce': 'それでも閉じる',
   'status.starting': '起動中',
   'status.running': '実行中',
@@ -2354,8 +2369,7 @@ const JA: TranslationTable = {
   'common.selectDirectory': 'フォルダーを選択',
   'common.codexNotDetected': 'Codex CLI が検出されませんでした',
   'prompt.use': '使用',
-  'prompt.deleteConfirm':
-    'このプロンプトを削除しますか？履歴の対応するエントリも削除されます。',
+  'prompt.deleteConfirm': 'このプロンプトを削除しますか？履歴の対応するエントリも削除されます。',
 };
 
 const KO: TranslationTable = {
@@ -2395,7 +2409,8 @@ const KO: TranslationTable = {
   'terminal.emptyTitle': '이 작업 공간에는 아직 터미널이 없습니다',
   'terminal.emptyDescription': 'Shell 또는 Agent 터미널을 만들어 시작하세요.',
   'terminal.close': '터미널 닫기',
-  'terminal.closeRunningConfirm': '이 터미널은 아직 실행 중입니다. 닫으면 진행 중인 Agent 응답이 중단됩니다.',
+  'terminal.closeRunningConfirm':
+    '터미널을 닫으면 실행 중인 프로세스가 종료되고 완료되지 않은 작업이 중단될 수 있습니다. 닫을까요?',
   'terminal.closeForce': '그래도 닫기',
   'status.starting': '시작 중',
   'status.running': '실행 중',
@@ -2504,8 +2519,7 @@ const KO: TranslationTable = {
   'settings.mcpObjectRequired': 'MCP 설정은 JSON 객체여야 합니다.',
   'settings.manageModels': '모델 프로필 관리',
   'settings.manageAccounts': '계정 관리',
-  'settings.deleteModelConfirm':
-    '이 모델 프로필을 삭제할까요? 저장된 API 키도 함께 삭제됩니다.',
+  'settings.deleteModelConfirm': '이 모델 프로필을 삭제할까요? 저장된 API 키도 함께 삭제됩니다.',
   'settings.deleteAccountConfirm':
     '이 계정을 삭제할까요? 저장된 자격 증명이 시스템 키체인에서 제거됩니다.',
   'settings.deleteMcpConfirm':
@@ -2541,8 +2555,7 @@ const KO: TranslationTable = {
   'common.selectDirectory': '폴더 선택',
   'common.codexNotDetected': 'Codex CLI가 감지되지 않았습니다',
   'prompt.use': '사용',
-  'prompt.deleteConfirm':
-    '이 프롬프트를 삭제할까요? 해당 기록 항목도 함께 삭제됩니다.',
+  'prompt.deleteConfirm': '이 프롬프트를 삭제할까요? 해당 기록 항목도 함께 삭제됩니다.',
 };
 
 const TRANSLATIONS: Readonly<Record<AppLanguage, TranslationTable>> = {

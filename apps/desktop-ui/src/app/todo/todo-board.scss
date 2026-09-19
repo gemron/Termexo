@@ -351,9 +351,6 @@ button:disabled {
   align-items: center;
   gap: 6px;
   padding: 0 10px;
-  // The 1px hairline stays close to `--border` so a pill on a soft surface doesn't read
-  // bolder than the rest of the chrome; the accent tint comes from the background, not the
-  // outline. Hover adds a stronger ring without flipping to a hard accent outline.
   border: 1px solid color-mix(in srgb, var(--accent) 22%, var(--border));
   border-radius: 13px;
   color: var(--text-secondary);
@@ -362,10 +359,9 @@ button:disabled {
 }
 
 .preset-chip {
-  // Dashed outlines on small pills exaggerate the stroke — a solid hairline at the same
-  // tint reads as the same chip, just without the visual weight.
-  border-style: solid;
-  background: transparent;
+  border: 1px solid color-mix(in srgb, var(--border) 55%, transparent);
+  background: color-mix(in srgb, var(--surface-2) 45%, transparent);
+  box-shadow: none;
 }
 
 .routine-chip:hover:not(:disabled),

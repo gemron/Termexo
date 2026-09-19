@@ -47,8 +47,8 @@ export interface TodoTask {
   /** Overrides the project directory when this task must run somewhere else. */
   workingDirectory?: string;
   /**
-   * OpenCode is included even though it has no Termexo model profile: it resolves its own model
-   * and credentials, so a task targeting it carries an empty `profileId`.
+   * OpenCode and Grok Build resolve their own model and credentials, so tasks targeting them
+   * carry an empty `profileId`.
    */
   agentType: NativeAgentType;
   profileId: string;

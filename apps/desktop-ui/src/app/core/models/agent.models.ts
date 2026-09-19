@@ -1,6 +1,6 @@
 import { AgentType, TerminalStatus } from './workspace.models';
 
-export type NativeAgentType = 'claude' | 'codex' | 'opencode' | 'antigravity';
+export type NativeAgentType = 'claude' | 'codex' | 'opencode' | 'grok' | 'antigravity';
 
 /**
  * The agents Termexo can install and upgrade itself.
@@ -8,7 +8,7 @@ export type NativeAgentType = 'claude' | 'codex' | 'opencode' | 'antigravity';
  * These arrive as npm packages. Antigravity does not — it ships its own installer, puts its
  * binary outside PATH and updates itself — so it is driven but never managed.
  */
-export type ManagedAgentType = 'claude' | 'codex' | 'opencode' | 'antigravity';
+export type ManagedAgentType = 'claude' | 'codex' | 'opencode' | 'grok' | 'antigravity';
 
 export type CliInstaller = 'npm' | 'script';
 
@@ -17,8 +17,7 @@ export type CliInstaller = 'npm' | 'script';
  *
  * npm can be pinned to a version and rolled back to one; a vendor's script always fetches what
  * that vendor currently publishes and puts it where the vendor wants it. Where both are listed
- * the user picks. OpenCode publishes no Windows script (its docs point at npm, Chocolatey or
- * WSL) and Antigravity publishes no package, so those offer one way each.
+ * the user picks. OpenCode and Grok Build offer npm here, while Antigravity uses its own script.
  *
  * The panel needs this before a plan exists, which is why it is stated here rather than read off
  * the plan the backend returns.
@@ -27,6 +26,7 @@ export const MANAGED_AGENT_INSTALLERS: Record<ManagedAgentType, readonly CliInst
   claude: ['npm', 'script'],
   codex: ['npm', 'script'],
   opencode: ['npm'],
+  grok: ['npm'],
   antigravity: ['script'],
 };
 export type AccountAgentType = 'claude' | 'codex';
@@ -265,6 +265,16 @@ export interface OpenCodeLaunchRequest {
   terminalId: string;
   workspaceId?: string;
   sessionId?: string;
+  model?: string;
+  continueLast?: boolean;
+  autoConfirm?: boolean;
+}
+
+export interface GrokLaunchRequest {
+  terminalId: string;
+  workspaceId?: string;
+  sessionId?: string;
+  newSessionId?: string;
   model?: string;
   continueLast?: boolean;
   autoConfirm?: boolean;

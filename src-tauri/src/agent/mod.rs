@@ -2,6 +2,7 @@ mod antigravity;
 pub mod antigravity_settings;
 mod claude;
 mod codex;
+mod grok;
 mod opencode;
 
 use serde::{Deserialize, Serialize};
@@ -10,6 +11,7 @@ pub use antigravity::{AntigravityAdapter, AntigravityModel, AntigravityUsage};
 pub use antigravity_settings::AntigravityStatusFeed;
 pub use claude::{ClaudeBackgroundSession, ClaudeCodeAdapter};
 pub use codex::CodexCliAdapter;
+pub use grok::GrokBuildAdapter;
 pub use opencode::OpenCodeAdapter;
 
 #[derive(Debug, Clone, Serialize)]
@@ -93,6 +95,18 @@ pub struct AntigravityLaunchOptions {
 #[serde(rename_all = "camelCase")]
 pub struct OpenCodeLaunchOptions {
     pub session_id: Option<String>,
+    pub model: Option<String>,
+    #[serde(default)]
+    pub continue_last: bool,
+    #[serde(default)]
+    pub auto_confirm: bool,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct GrokLaunchOptions {
+    pub session_id: Option<String>,
+    pub new_session_id: Option<String>,
     pub model: Option<String>,
     #[serde(default)]
     pub continue_last: bool,

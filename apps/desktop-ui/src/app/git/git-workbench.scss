@@ -143,6 +143,7 @@ button:disabled {
 }
 
 .git-content {
+  grid-row: 3;
   display: grid;
   min-width: 0;
   min-height: 0;
@@ -155,7 +156,7 @@ button:disabled {
   min-height: 0;
   // Changes list gets the bulk of the row — its items are denser per pixel — and the graph
   // gets whatever is left, with a floor that keeps it readable on shorter windows.
-  grid-template-rows: minmax(220px, 1fr) minmax(180px, 40%);
+  grid-template-rows: minmax(0, 3fr) minmax(0, 2fr);
   border-right: 1px solid var(--border);
   background: var(--surface-1);
 }
@@ -463,18 +464,11 @@ button:disabled {
 }
 .split-grid {
   display: grid;
-  width: 100%;
-  min-width: 0;
-  // Each pane shares the available width; below 900px the layout collapses to a single
-  // column and the second pane scrolls horizontally on its own instead of overflowing the
-  // whole grid off-screen.
-  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-  gap: 12px;
+  width: max-content;
+  min-width: 100%;
+  // Keep both sides aligned and let the shared viewport scroll the full longest line.
+  grid-template-columns: repeat(2, minmax(320px, 1fr));
   padding-bottom: 24px;
-
-  @media (max-width: 900px) {
-    grid-template-columns: minmax(0, 1fr);
-  }
 }
 /* Inside the grid rather than above it, so the headings follow the columns as those grow. */
 .split-head {
@@ -582,6 +576,16 @@ button:disabled {
     font: inherit;
   }
 }
+.unified-grid > .diff-collapse {
+  grid-template-columns: 42px 42px 18px minmax(0, 1fr);
+  gap: 0;
+  padding: 0;
+}
+.split-grid > .diff-collapse {
+  grid-template-columns: 42px minmax(0, 1fr) 42px;
+  gap: 0;
+  padding: 0;
+}
 .diff-line.blank {
   background: color-mix(in srgb, var(--surface-2) 55%, var(--surface-inset));
 }
@@ -656,7 +660,7 @@ button:disabled {
     grid-template-columns: minmax(210px, 34%) minmax(0, 1fr);
   }
   .git-sidebar {
-    grid-template-rows: minmax(150px, 50%) minmax(160px, 50%);
+    grid-template-rows: minmax(0, 1fr) minmax(0, 1fr);
   }
 }
 
@@ -681,8 +685,5 @@ button:disabled {
   .diff-layout button {
     font-size: 0;
     gap: 0;
-  }
-  .diff-viewport.split .split-grid {
-    grid-template-columns: repeat(2, minmax(360px, auto));
   }
 }

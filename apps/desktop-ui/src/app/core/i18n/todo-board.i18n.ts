@@ -197,6 +197,10 @@ export const TODO_BOARD_TRANSLATIONS: TranslationBundle = {
       "provider/model; leave blank to use OpenCode's default model",
     'taskBoard.taskDialog.openCodeModelHint':
       'Credentials and providers are configured in OpenCode, not managed by Termexo.',
+    'taskBoard.taskDialog.grokModelOption': 'Grok Build · own model configuration',
+    'taskBoard.taskDialog.grokModelLabel': 'Grok Build model (optional)',
+    'taskBoard.taskDialog.grokModelPlaceholder': 'Leave blank for the Grok Build default',
+    'taskBoard.taskDialog.grokModelHint': 'Login and model defaults are managed by Grok Build.',
     'taskBoard.taskDialog.directoryPlaceholder': 'Directory the agent terminal starts in',
     'taskBoard.taskDialog.directoryHint':
       "Defaults to the project's directory; you can set a different one for this task.",
@@ -411,6 +415,10 @@ export const TODO_BOARD_TRANSLATIONS: TranslationBundle = {
     'taskBoard.taskDialog.openCodeModelLabel': 'OpenCode 模型（可选）',
     'taskBoard.taskDialog.openCodeModelPlaceholder': 'provider/model，留空则用 OpenCode 默认模型',
     'taskBoard.taskDialog.openCodeModelHint': '凭据与供应商在 OpenCode 中配置，不由 Termexo 管理。',
+    'taskBoard.taskDialog.grokModelOption': 'Grok Build · 自有模型配置',
+    'taskBoard.taskDialog.grokModelLabel': 'Grok Build 模型（可选）',
+    'taskBoard.taskDialog.grokModelPlaceholder': '留空使用 Grok Build 默认模型',
+    'taskBoard.taskDialog.grokModelHint': '登录状态和默认模型由 Grok Build 自身管理。',
     'taskBoard.taskDialog.directoryPlaceholder': 'Agent 终端启动时所在的目录',
     'taskBoard.taskDialog.directoryHint': '默认跟随所属项目，可单独指定这条任务运行的目录。',
     'taskBoard.taskDialog.discardPrompt': '要放弃未保存的修改吗？',

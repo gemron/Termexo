@@ -342,7 +342,8 @@ button.stat {
   color: var(--color-primary);
   background: var(--primary-soft);
 
-  &[data-agent='codex'] {
+  &[data-agent='codex'],
+  &[data-agent='grok'] {
     color: var(--color-info);
     background: var(--info-soft);
   }

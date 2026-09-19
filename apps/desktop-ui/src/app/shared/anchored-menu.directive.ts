@@ -1,10 +1,18 @@
-import { AfterViewInit, Directive, ElementRef, OnDestroy, inject, input, output } from '@angular/core';
+import {
+  AfterViewInit,
+  Directive,
+  ElementRef,
+  OnDestroy,
+  inject,
+  input,
+  output,
+} from '@angular/core';
 
 /** Keeps a menu outside scroll clipping and inside the viewport. */
 @Directive({
   selector: '[appAnchoredMenu]',
   host: {
-    'popover': 'manual',
+    popover: 'manual',
     '(document:pointerdown)': 'onOutsidePointer($event)',
     '(document:keydown.escape)': 'onEscape($event)',
     '(keydown)': 'onKeydown($event)',
@@ -106,11 +114,20 @@ export class AnchoredMenuDirective implements AfterViewInit, OnDestroy {
     const index = items.indexOf(this.document.activeElement as HTMLButtonElement);
     let next: number;
     switch (event.key) {
-      case 'ArrowDown': next = (index + 1) % items.length; break;
-      case 'ArrowUp': next = (index - 1 + items.length) % items.length; break;
-      case 'Home': next = 0; break;
-      case 'End': next = items.length - 1; break;
-      default: return;
+      case 'ArrowDown':
+        next = (index + 1) % items.length;
+        break;
+      case 'ArrowUp':
+        next = (index - 1 + items.length) % items.length;
+        break;
+      case 'Home':
+        next = 0;
+        break;
+      case 'End':
+        next = items.length - 1;
+        break;
+      default:
+        return;
     }
     event.preventDefault();
     items[next].focus({ preventScroll: true });

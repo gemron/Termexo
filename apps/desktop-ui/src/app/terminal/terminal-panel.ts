@@ -38,6 +38,7 @@ import {
   type QuickKey,
   quickKeySequence,
   terminalKeySequence,
+  terminalPasteShortcut,
   workbenchShortcut,
 } from './terminal-key-sequences';
 import {
@@ -155,6 +156,9 @@ export class TerminalPanelComponent implements AfterViewInit {
   private activationFrame?: number;
   private compositionAnchor?: TerminalCompositionAnchor;
   private runtimeReady = false;
+  protected readonly startupVisible = signal(false);
+  private startupShownAt = 0;
+  private startupTimer?: number;
   private viewReady = false;
   /** Set when output reaches this view while it is off screen and cannot draw it properly. */
   private wroteWhileHidden = false;
@@ -531,6 +535,7 @@ export class TerminalPanelComponent implements AfterViewInit {
       this.destroyRef.onDestroy(() => {
         unlisten?.();
         unlisten = undefined;
+        if (this.startupTimer !== undefined) window.clearTimeout(this.startupTimer);
       });
 
       // The PTY is shared, so its size is negotiated across every attached client; the emulator
@@ -557,6 +562,11 @@ export class TerminalPanelComponent implements AfterViewInit {
         this.terminal.writeln(
           `\u001b[38;2;150;157;164m${this.i18n.t('terminal.codexStarting')}\u001b[0m`,
         );
+      }
+      if (this.session().status === 'STARTING') {
+        this.startupShownAt = performance.now();
+        this.startupVisible.set(true);
+        this.startupTimer = window.setTimeout(() => this.startupVisible.set(false), 8_000);
       }
       const { attached, cols, rows } = await this.gateway.start(
         this.session(),
@@ -588,6 +598,8 @@ export class TerminalPanelComponent implements AfterViewInit {
       }
       this.fitTerminal();
     } catch (error) {
+      this.startupVisible.set(false);
+      if (this.startupTimer !== undefined) window.clearTimeout(this.startupTimer);
       // The subscription holds output back until the history is written, so a launch that failed
       // still has to release it or anything the PTY produced afterwards is stranded in the buffer.
       await this.gateway.replayInitial(this.session().id).catch(() => undefined);
@@ -875,6 +887,13 @@ export class TerminalPanelComponent implements AfterViewInit {
     // Tab shortcuts belong to the workbench. Declining them here keeps xterm from writing an
     // escape sequence to the PTY; the event still bubbles to the shell, which acts on it.
     if (workbenchShortcut(event)) {
+      return false;
+    }
+    if (terminalPasteShortcut(event)) {
+      event.preventDefault();
+      if (!event.repeat) {
+        void this.pasteFromClipboard();
+      }
       return false;
     }
     const sequence = terminalKeySequence(event);
@@ -1195,6 +1214,11 @@ export class TerminalPanelComponent implements AfterViewInit {
   }
 
   private handleOutput(data: string, replayed = false): void {
+    if (data && this.startupVisible()) {
+      if (this.startupTimer !== undefined) window.clearTimeout(this.startupTimer);
+      const remaining = Math.max(0, 500 - (performance.now() - this.startupShownAt));
+      this.startupTimer = window.setTimeout(() => this.startupVisible.set(false), remaining);
+    }
     if (!this.visible()) {
       // A hidden panel is `display: none`: it has no size to fit to, it never claims the terminal,
       // and its renderer has no box to paint onto. Whatever lands here was laid out for whichever

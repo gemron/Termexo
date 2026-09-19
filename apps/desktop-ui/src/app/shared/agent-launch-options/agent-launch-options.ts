@@ -193,6 +193,13 @@ export class AgentLaunchOptionsComponent {
           tone: 'amber',
         },
         {
+          type: 'grok',
+          title: 'Grok Build',
+          hint: this.installationLabel(this.agents.grokInstallation()),
+          icon: AGENT_ICONS.grok,
+          tone: 'blue',
+        },
+        {
           type: 'antigravity',
           title: 'Antigravity',
           hint: this.installationLabel(this.agents.antigravityInstallation()),

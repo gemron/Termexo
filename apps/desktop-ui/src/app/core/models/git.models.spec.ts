@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { buildDiffRows, changeBlockStarts } from './git.models';
+import { buildDiffRows, changeBlockStarts, withCollapsedEquals } from './git.models';
 
 describe('buildDiffRows', () => {
   it('aligns replacements for split view', () => {
@@ -62,5 +62,21 @@ describe('changeBlockStarts', () => {
 
   it('has nowhere to stop in a file that did not change', () => {
     expect(changeBlockStarts(buildDiffRows('same\n', 'same\n'))).toEqual([]);
+  });
+});
+
+describe('withCollapsedEquals', () => {
+  it('preserves every changed row and reaches the end of the file', () => {
+    const rows = buildDiffRows('old\nkeep\nremove', 'new\nkeep\nadd\nextra');
+    expect(withCollapsedEquals(rows)).toEqual(rows);
+  });
+
+  it('restores all lines when expanding separated unchanged blocks', () => {
+    const context = Array.from({ length: 12 }, (_, i) => `line ${i}`).join('\n');
+    const rows = buildDiffRows(`${context}\nold\n${context}`, `${context}\nnew\n${context}`);
+    const folded = withCollapsedEquals(rows);
+    expect(folded.filter((row) => row.kind === 'collapsed')).toHaveLength(2);
+    expect(folded.filter((row) => row.kind === 'changed')).toHaveLength(1);
+    expect(withCollapsedEquals(rows, () => true)).toEqual(rows);
   });
 });

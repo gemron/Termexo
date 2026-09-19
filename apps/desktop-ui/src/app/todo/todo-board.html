@@ -32,15 +32,6 @@
       </button>
       <button
         type="button"
-        class="secondary-action"
-        [title]="'common.settings' | t"
-        [attr.aria-label]="'common.settings' | t"
-        (click)="settingsRequested.emit()"
-      >
-        <app-icon name="settings" [size]="14" />
-      </button>
-      <button
-        type="button"
         class="primary-action"
         data-testid="task-create-button"
         (click)="openCreateTask()"
@@ -681,17 +672,34 @@
                   }}</small>
                 }
               </label>
-              @if (selectedTaskAgentType() === 'opencode') {
+              @if (selectedTaskAgentType() === 'opencode' || selectedTaskAgentType() === 'grok') {
                 <label>
-                  <span>{{ 'taskBoard.taskDialog.openCodeModelLabel' | t }}</span>
+                  <span>{{
+                    (selectedTaskAgentType() === 'grok'
+                      ? 'taskBoard.taskDialog.grokModelLabel'
+                      : 'taskBoard.taskDialog.openCodeModelLabel'
+                    ) | t
+                  }}</span>
                   <input
                     type="text"
-                    data-testid="task-opencode-model"
-                    [placeholder]="'taskBoard.taskDialog.openCodeModelPlaceholder' | t"
-                    [ngModel]="taskOpenCodeModel()"
-                    (ngModelChange)="taskOpenCodeModel.set($event)"
+                    [attr.data-testid]="
+                      selectedTaskAgentType() === 'grok' ? 'task-grok-model' : 'task-opencode-model'
+                    "
+                    [placeholder]="
+                      (selectedTaskAgentType() === 'grok'
+                        ? 'taskBoard.taskDialog.grokModelPlaceholder'
+                        : 'taskBoard.taskDialog.openCodeModelPlaceholder'
+                      ) | t
+                    "
+                    [ngModel]="taskCliModel()"
+                    (ngModelChange)="taskCliModel.set($event)"
                   />
-                  <small>{{ 'taskBoard.taskDialog.openCodeModelHint' | t }}</small>
+                  <small>{{
+                    (selectedTaskAgentType() === 'grok'
+                      ? 'taskBoard.taskDialog.grokModelHint'
+                      : 'taskBoard.taskDialog.openCodeModelHint'
+                    ) | t
+                  }}</small>
                 </label>
               }
             }

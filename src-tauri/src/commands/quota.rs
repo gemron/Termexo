@@ -10,7 +10,7 @@ use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use tauri::State;
 
-use crate::agent::{AgentAdapter, AntigravityAdapter, AntigravityUsage};
+use crate::agent::{AgentAdapter, AntigravityAdapter, AntigravityUsage, GrokBuildAdapter};
 use crate::commands::agent::network_environment;
 use crate::config::{AccountProfile, CredentialStore, ModelProfile};
 use crate::database::WorkspaceDatabase;
@@ -68,6 +68,7 @@ enum QuotaParser {
     Agent(String),
     OpenCodeCodex,
     OpenCodeGo,
+    Grok,
 }
 
 #[tauri::command]
@@ -134,6 +135,22 @@ pub async fn get_provider_quotas(
             }
         }
         match resolve_opencode(source, opencode_credentials.as_ref(), now) {
+            Ok(query) => pending.push(query),
+            Err(unavailable) => resolved.push(unavailable),
+        }
+    }
+
+    if !force {
+        if let Some(cached) = cache.fresh(quota::GROK_QUOTA_ID, now, AGENT_CACHE_TTL) {
+            resolved.push(cached);
+        } else {
+            match resolve_grok(now) {
+                Ok(query) => pending.push(query),
+                Err(unavailable) => resolved.push(unavailable),
+            }
+        }
+    } else {
+        match resolve_grok(now) {
             Ok(query) => pending.push(query),
             Err(unavailable) => resolved.push(unavailable),
         }
@@ -317,6 +334,37 @@ fn resolve_opencode(
     })
 }
 
+fn resolve_grok(now: i64) -> Result<PendingQuery, ProviderQuota> {
+    let unavailable = |reason: String| {
+        ProviderQuota::unavailable(
+            quota::GROK_QUOTA_ID,
+            quota::AGENT_GROK_LABEL,
+            quota::AGENT_GROK_LABEL,
+            now,
+            reason,
+        )
+    };
+    let installation = GrokBuildAdapter::new()
+        .detect()
+        .map_err(|error| unavailable(error.to_string()))?;
+    if !installation.installed {
+        return Err(unavailable("未检测到 Grok Build CLI".into()));
+    }
+    let credential = quota::read_grok_credential().map_err(unavailable)?;
+    let proxy_base_url = std::env::var("GROK_CLI_CHAT_PROXY_BASE_URL").ok();
+    Ok(PendingQuery {
+        profile_id: quota::GROK_QUOTA_ID.into(),
+        profile_name: quota::AGENT_GROK_LABEL.into(),
+        provider: quota::AGENT_GROK_LABEL.into(),
+        parser: QuotaParser::Grok,
+        request: quota::build_grok_request(
+            &credential,
+            installation.version.as_deref(),
+            proxy_base_url.as_deref(),
+        ),
+    })
+}
+
 fn resolve_antigravity(now: i64) -> ProviderQuota {
     let adapter = AntigravityAdapter::new();
     match adapter.detect() {
@@ -415,6 +463,12 @@ async fn execute(client: reqwest::Client, query: PendingQuery) -> ProviderQuota 
         Ok(response) => response,
         Err(error) => return unavailable(format!("请求余量接口失败：{error}")),
     };
+    if matches!(&query.parser, QuotaParser::Grok)
+        && (response.status() == reqwest::StatusCode::UNAUTHORIZED
+            || response.status() == reqwest::StatusCode::FORBIDDEN)
+    {
+        return unavailable("Grok Build 登录状态已失效，请运行 grok login".into());
+    }
     if !response.status().is_success() {
         return unavailable(format!("余量接口返回 {}", response.status()));
     }
@@ -428,6 +482,12 @@ async fn execute(client: reqwest::Client, query: PendingQuery) -> ProviderQuota 
         QuotaParser::Agent(agent_type) => quota::parse_agent_response(agent_type, &body),
         QuotaParser::OpenCodeCodex => quota::parse_opencode_codex_response(&body),
         QuotaParser::OpenCodeGo => quota::parse_opencode_go_response(&body),
+        QuotaParser::Grok => match quota::latest_grok_free_usage_exhaustion() {
+            Some(exhausted_at) => {
+                quota::parse_grok_response_with_exhaustion(&body, Some(exhausted_at))
+            }
+            None => quota::parse_grok_response(&body),
+        },
     };
     match parsed {
         Ok(entries) => ProviderQuota {

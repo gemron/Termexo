@@ -19,6 +19,7 @@ import {
   CliOperationRequest,
   CliOperationResult,
   CodexLaunchRequest,
+  GrokLaunchRequest,
   ImportSummary,
   ManagedAgentType,
   McpProfile,
@@ -57,6 +58,7 @@ const CLI_PREVIEWS: Record<
     script: 'https://chatgpt.com/codex/install.ps1',
   },
   opencode: { displayName: 'OpenCode', package: 'opencode-ai' },
+  grok: { displayName: 'Grok Build', package: '@xai-official/grok' },
   antigravity: {
     displayName: 'Antigravity',
     script: 'https://antigravity.google/cli/install.ps1',
@@ -72,6 +74,7 @@ export class AgentService {
   private readonly installationState = signal<AgentInstallation | null>(null);
   private readonly codexInstallationState = signal<AgentInstallation | null>(null);
   private readonly openCodeInstallationState = signal<AgentInstallation | null>(null);
+  private readonly grokInstallationState = signal<AgentInstallation | null>(null);
   private readonly antigravityInstallationState = signal<AgentInstallation | null>(null);
   private readonly sessionItems = signal<AgentSession[]>([]);
   private readonly eventItems = signal<AgentEvent[]>([]);
@@ -90,6 +93,7 @@ export class AgentService {
   readonly installation = this.installationState.asReadonly();
   readonly codexInstallation = this.codexInstallationState.asReadonly();
   readonly openCodeInstallation = this.openCodeInstallationState.asReadonly();
+  readonly grokInstallation = this.grokInstallationState.asReadonly();
   readonly antigravityInstallation = this.antigravityInstallationState.asReadonly();
   readonly sessions = this.sessionItems.asReadonly();
   readonly events = this.eventItems.asReadonly();
@@ -126,6 +130,7 @@ export class AgentService {
       this.detectClaude(),
       this.detectCodex(),
       this.detectOpenCode(),
+      this.detectGrok(),
       this.detectAntigravity(),
       this.loadProfiles(),
       this.loadSessions(),
@@ -166,6 +171,16 @@ export class AgentService {
     }
     await this.run(async () => {
       this.openCodeInstallationState.set(await invoke<AgentInstallation>('detect_opencode'));
+    });
+  }
+
+  async detectGrok(): Promise<void> {
+    if (!hasBackend()) {
+      this.grokInstallationState.set(this.browserInstallation('grok'));
+      return;
+    }
+    await this.run(async () => {
+      this.grokInstallationState.set(await invoke<AgentInstallation>('detect_grok'));
     });
   }
 
@@ -228,6 +243,9 @@ export class AgentService {
           projectPath: projectPath || null,
         }),
         invoke<AgentSession[]>('scan_opencode_sessions', {
+          projectPath: projectPath || null,
+        }),
+        invoke<AgentSession[]>('scan_grok_sessions', {
           projectPath: projectPath || null,
         }),
         invoke<AgentSession[]>('scan_antigravity_sessions', {
@@ -333,6 +351,16 @@ export class AgentService {
       };
     }
     return invoke<AgentLaunchSpec>('prepare_opencode_launch', { request });
+  }
+
+  async prepareGrokLaunch(request: GrokLaunchRequest): Promise<AgentLaunchSpec> {
+    if (!hasBackend()) {
+      return {
+        command: `grok${request.sessionId ? ` --resume '${request.sessionId}'` : request.continueLast ? ' --continue' : request.newSessionId ? ` --session-id '${request.newSessionId}'` : ''}${request.model ? ` --model '${request.model}'` : ''}${request.autoConfirm ? ' --always-approve' : ''}`,
+        executablePath: 'grok',
+      };
+    }
+    return invoke<AgentLaunchSpec>('prepare_grok_launch', { request });
   }
 
   async prepareAccountLogin(request: AccountLoginRequest): Promise<AgentLaunchSpec> {
@@ -628,12 +656,13 @@ export class AgentService {
       claude: this.installationState,
       codex: this.codexInstallationState,
       opencode: this.openCodeInstallationState,
+      grok: this.grokInstallationState,
       antigravity: this.antigravityInstallationState,
     };
   }
 
   private browserInstallation(
-    agentType: 'claude' | 'codex' | 'opencode' | 'antigravity',
+    agentType: 'claude' | 'codex' | 'opencode' | 'grok' | 'antigravity',
   ): AgentInstallation {
     const name = AGENT_LABELS[agentType];
     return {
@@ -648,6 +677,7 @@ export class AgentService {
     this.installationState.set(this.browserInstallation('claude'));
     this.codexInstallationState.set(this.browserInstallation('codex'));
     this.openCodeInstallationState.set(this.browserInstallation('opencode'));
+    this.grokInstallationState.set(this.browserInstallation('grok'));
     this.antigravityInstallationState.set(this.browserInstallation('antigravity'));
     if (this.modelProfileItems().length === 0) {
       this.modelProfileItems.set([

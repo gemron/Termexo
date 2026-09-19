@@ -10,7 +10,8 @@ use crate::agent::{
     antigravity_settings, AgentAdapter, AgentInstallation, AgentLaunchSpec, AgentSession,
     AntigravityAdapter, AntigravityLaunchOptions, AntigravityModel, AntigravityStatusFeed,
     ClaudeBackgroundSession, ClaudeCodeAdapter, ClaudeLaunchOptions, CodexCliAdapter,
-    CodexLaunchOptions, OpenCodeAdapter, OpenCodeLaunchOptions,
+    CodexLaunchOptions, GrokBuildAdapter, GrokLaunchOptions, OpenCodeAdapter,
+    OpenCodeLaunchOptions,
 };
 use crate::config::{
     claude_launch_model, normalized_effort, AgentProtocol, CredentialStore, LaunchEnvironmentStore,
@@ -46,6 +47,17 @@ pub async fn detect_codex() -> Result<AgentInstallation, String> {
 pub async fn detect_opencode() -> Result<AgentInstallation, String> {
     tauri::async_runtime::spawn_blocking(|| {
         OpenCodeAdapter::new()
+            .detect()
+            .map_err(|error| error.to_string())
+    })
+    .await
+    .map_err(|error| error.to_string())?
+}
+
+#[tauri::command]
+pub async fn detect_grok() -> Result<AgentInstallation, String> {
+    tauri::async_runtime::spawn_blocking(|| {
+        GrokBuildAdapter::new()
             .detect()
             .map_err(|error| error.to_string())
     })
@@ -143,6 +155,24 @@ pub async fn scan_opencode_sessions(
     Ok(sessions)
 }
 
+#[tauri::command]
+pub async fn scan_grok_sessions(
+    project_path: Option<String>,
+    database: State<'_, WorkspaceDatabase>,
+) -> Result<Vec<AgentSession>, String> {
+    let sessions = tauri::async_runtime::spawn_blocking(move || {
+        GrokBuildAdapter::new()
+            .list_sessions(project_path.as_deref())
+            .map_err(|error| error.to_string())
+    })
+    .await
+    .map_err(|error| error.to_string())??;
+    database
+        .save_agent_sessions(&sessions)
+        .map_err(|error| error.to_string())?;
+    Ok(sessions)
+}
+
 #[tauri::command(async)]
 pub fn list_agent_sessions(
     database: State<'_, WorkspaceDatabase>,
@@ -173,6 +203,13 @@ pub fn build_opencode_launch_command(
     options: OpenCodeLaunchOptions,
 ) -> Result<AgentLaunchSpec, String> {
     OpenCodeAdapter::new()
+        .build_launch_command(&options)
+        .map_err(|error| error.to_string())
+}
+
+#[tauri::command(async)]
+pub fn build_grok_launch_command(options: GrokLaunchOptions) -> Result<AgentLaunchSpec, String> {
+    GrokBuildAdapter::new()
         .build_launch_command(&options)
         .map_err(|error| error.to_string())
 }
@@ -230,6 +267,20 @@ pub struct PrepareOpenCodeLaunchRequest {
     pub terminal_id: String,
     pub workspace_id: Option<String>,
     pub session_id: Option<String>,
+    pub model: Option<String>,
+    #[serde(default)]
+    pub continue_last: bool,
+    #[serde(default)]
+    pub auto_confirm: bool,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PrepareGrokLaunchRequest {
+    pub terminal_id: String,
+    pub workspace_id: Option<String>,
+    pub session_id: Option<String>,
+    pub new_session_id: Option<String>,
     pub model: Option<String>,
     #[serde(default)]
     pub continue_last: bool,
@@ -526,6 +577,29 @@ pub fn prepare_opencode_launch(
     OpenCodeAdapter::new()
         .build_launch_command(&OpenCodeLaunchOptions {
             session_id: request.session_id,
+            model: request.model,
+            continue_last: request.continue_last,
+            auto_confirm: request.auto_confirm,
+        })
+        .map_err(|error| error.to_string())
+}
+
+#[tauri::command(async)]
+pub fn prepare_grok_launch(
+    request: PrepareGrokLaunchRequest,
+    database: State<'_, WorkspaceDatabase>,
+    credentials: State<'_, CredentialStore>,
+    launch_environment: State<'_, LaunchEnvironmentStore>,
+) -> Result<AgentLaunchSpec, String> {
+    let environment =
+        network_environment(&database, &credentials, request.workspace_id.as_deref())?;
+    launch_environment
+        .put(request.terminal_id, environment)
+        .map_err(|error| error.to_string())?;
+    GrokBuildAdapter::new()
+        .build_launch_command(&GrokLaunchOptions {
+            session_id: request.session_id,
+            new_session_id: request.new_session_id,
             model: request.model,
             continue_last: request.continue_last,
             auto_confirm: request.auto_confirm,
@@ -861,6 +935,7 @@ pub(crate) fn relaunch_environment(
 ) -> Result<HashMap<String, String>, String> {
     match request.agent_type {
         "claude" | "codex" => model_agent_relaunch_environment(database, credentials, request),
+        "grok" => network_environment(database, credentials, request.workspace_id),
         "antigravity" => antigravity_launch_environment(
             database,
             credentials,

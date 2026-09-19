@@ -21,6 +21,7 @@ class AgentServiceStub {
   readonly installation = signal<AgentInstallation | null>(null);
   readonly codexInstallation = signal<AgentInstallation | null>(CODEX_INSTALLATION);
   readonly openCodeInstallation = signal<AgentInstallation | null>(null);
+  readonly grokInstallation = signal<AgentInstallation | null>(null);
   readonly antigravityInstallation = signal<AgentInstallation | null>(null);
 }
 
@@ -45,7 +46,7 @@ describe('AgentLaunchOptionsComponent', () => {
   }
 
   it('offers every Agent alongside a plain shell', () => {
-    expect(optionTypes()).toEqual(['claude', 'codex', 'opencode', 'antigravity', 'shell']);
+    expect(optionTypes()).toEqual(['claude', 'codex', 'opencode', 'grok', 'antigravity', 'shell']);
   });
 
   it('shows each Agent version, and why an Agent is unavailable', () => {
@@ -62,8 +63,9 @@ describe('AgentLaunchOptionsComponent', () => {
     fixture.componentInstance.optionSelected.subscribe((type) => picked.push(type));
 
     root.querySelector<HTMLButtonElement>('button[data-agent="claude"]')?.click();
+    root.querySelector<HTMLButtonElement>('button[data-agent="grok"]')?.click();
     root.querySelector<HTMLButtonElement>('button[data-agent="shell"]')?.click();
 
-    expect(picked).toEqual(['claude', 'shell']);
+    expect(picked).toEqual(['claude', 'grok', 'shell']);
   });
 });

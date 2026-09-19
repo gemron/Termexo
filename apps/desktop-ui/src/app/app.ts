@@ -113,6 +113,10 @@ import {
   OpenCodeLaunchDialogComponent,
   type OpenCodeLaunchDialogValue,
 } from './dialogs/opencode-launch-dialog';
+import {
+  GrokLaunchDialogComponent,
+  type GrokLaunchDialogValue,
+} from './dialogs/grok-launch-dialog';
 import { CreateWorkspaceDialogComponent } from './dialogs/create-workspace-dialog';
 import { DirectoryPromptDialogComponent } from './dialogs/directory-prompt-dialog';
 import { WebviewUpgradeDialogComponent } from './dialogs/webview-upgrade-dialog';
@@ -255,6 +259,7 @@ function readStoredString(key: string, fallback: string): string {
     CodexLaunchDialogComponent,
     AntigravityLaunchDialogComponent,
     OpenCodeLaunchDialogComponent,
+    GrokLaunchDialogComponent,
     CreateWorkspaceDialogComponent,
     DirectoryPromptDialogComponent,
     BackgroundSessionDialogComponent,
@@ -351,6 +356,7 @@ export class App {
   protected readonly claudeLaunchOpen = signal(false);
   protected readonly codexLaunchOpen = signal(false);
   protected readonly openCodeLaunchOpen = signal(false);
+  protected readonly grokLaunchOpen = signal(false);
   protected readonly antigravityLaunchOpen = signal(false);
   protected readonly launchingAntigravity = signal(false);
   protected readonly sessionCenterOpen = signal(false);
@@ -468,6 +474,7 @@ export class App {
   protected readonly launchingClaude = signal(false);
   protected readonly launchingCodex = signal(false);
   protected readonly launchingOpenCode = signal(false);
+  protected readonly launchingGrok = signal(false);
   protected readonly updateInstalling = signal(false);
   /** Stable reference so the session center input does not change every check. */
   protected readonly sessionLaunchProfiles = (nativeSessionId: string) =>
@@ -819,6 +826,9 @@ export class App {
       case 'opencode':
         await this.openOpenCodeLaunch();
         break;
+      case 'grok':
+        await this.openGrokLaunch();
+        break;
       case 'antigravity':
         await this.openAntigravityLaunch();
         break;
@@ -1013,6 +1023,68 @@ export class App {
     this.selectedTerminalDirectory.set(null);
   }
 
+  protected openGrokLaunch(): void {
+    this.agentMenuOpen.set(false);
+    const workingDirectory = this.state.activeWorkspace()?.projectPath;
+    if (!workingDirectory) return;
+    this.selectedTerminalDirectory.set(workingDirectory);
+    this.grokLaunchOpen.set(true);
+  }
+
+  protected async launchGrok(value: GrokLaunchDialogValue): Promise<void> {
+    const workspace = this.state.activeWorkspace();
+    const workingDirectory = this.selectedTerminalDirectory();
+    if (!workspace || !workingDirectory || this.launchingGrok()) return;
+    if (!this.agents.grokInstallation()) await this.agents.detectGrok();
+    const installation = this.agents.grokInstallation();
+    if (!installation?.healthy) {
+      this.showToast(
+        installation?.diagnostic ?? this.i18n.t('common.grokNotDetected'),
+        'attention',
+      );
+      return;
+    }
+
+    const terminalId = createId();
+    this.launchingGrok.set(true);
+    try {
+      const newSessionId = value.continueLast ? undefined : createId();
+      const launch = await this.agents.prepareGrokLaunch({
+        terminalId,
+        workspaceId: workspace.id,
+        model: value.model,
+        newSessionId,
+        continueLast: value.continueLast,
+        autoConfirm: value.autoConfirm,
+      });
+      const terminal = this.state.createTerminal({
+        id: terminalId,
+        agentType: 'grok',
+        name: value.name || undefined,
+        command: launch.command,
+        model: value.model || 'Grok Build',
+        nativeSessionId: newSessionId,
+        workingDirectory,
+        autoConfirm: value.autoConfirm,
+      });
+      this.grokLaunchOpen.set(false);
+      this.selectedTerminalDirectory.set(null);
+      if (terminal) {
+        this.revealCreatedTerminal(terminal.id);
+        this.showToast(this.i18n.t('terminal.started', { name: terminal.name }));
+      }
+    } catch (error) {
+      this.showToast(this.errorMessage(error), 'attention');
+    } finally {
+      this.launchingGrok.set(false);
+    }
+  }
+
+  protected closeGrokLaunch(): void {
+    this.grokLaunchOpen.set(false);
+    this.selectedTerminalDirectory.set(null);
+  }
+
   protected async launchCodex(value: CodexLaunchDialogValue): Promise<void> {
     const workspace = this.state.activeWorkspace();
     const workingDirectory = this.selectedTerminalDirectory();
@@ -1152,13 +1224,15 @@ export class App {
         ? this.launchingClaude
         : agentType === 'codex'
           ? this.launchingCodex
-          : this.launchingOpenCode;
+          : agentType === 'grok'
+            ? this.launchingGrok
+            : this.launchingOpenCode;
     if (!workspace || launching()) {
       return;
     }
 
     const profile =
-      agentType === 'opencode'
+      agentType === 'opencode' || agentType === 'grok'
         ? undefined
         : this.agents.modelProfiles().find((item) => item.id === value.profileId);
     if (profile && needsCredential(profile, agentType === 'claude' ? 'claude' : 'codex')) {
@@ -1199,13 +1273,21 @@ export class App {
                 accountProfileId: value.accountProfileId,
                 autoConfirm: value.autoConfirm,
               })
-            : await this.agents.prepareOpenCodeLaunch({
-                terminalId,
-                workspaceId: workspace.id,
-                sessionId: value.session.nativeSessionId,
-                model: value.model,
-                autoConfirm: value.autoConfirm,
-              });
+            : agentType === 'grok'
+              ? await this.agents.prepareGrokLaunch({
+                  terminalId,
+                  workspaceId: workspace.id,
+                  sessionId: value.session.nativeSessionId,
+                  model: value.model,
+                  autoConfirm: value.autoConfirm,
+                })
+              : await this.agents.prepareOpenCodeLaunch({
+                  terminalId,
+                  workspaceId: workspace.id,
+                  sessionId: value.session.nativeSessionId,
+                  model: value.model,
+                  autoConfirm: value.autoConfirm,
+                });
       const terminal = this.state.createTerminal({
         id: terminalId,
         agentType: value.session.agentType,
@@ -1221,17 +1303,20 @@ export class App {
             ? 'Claude Sonnet'
             : agentType === 'codex'
               ? this.i18n.t('terminal.defaultCodexModel')
-              : OPENCODE_DEFAULT_MODEL),
+              : agentType === 'grok'
+                ? 'Grok Build'
+                : OPENCODE_DEFAULT_MODEL),
         nativeSessionId: value.session.nativeSessionId,
         workingDirectory: value.session.projectPath ?? workspace.projectPath,
         profileId: value.profileId,
         mcpProfileId: agentType === 'claude' ? value.mcpProfileId : undefined,
-        accountProfileId: agentType === 'opencode' ? undefined : value.accountProfileId,
+        accountProfileId:
+          agentType === 'opencode' || agentType === 'grok' ? undefined : value.accountProfileId,
         autoConfirm: value.autoConfirm,
       });
       this.sessionCenterOpen.set(false);
       if (terminal) {
-        this.armStartupDialogs(terminal.id);
+        if (agentType !== 'grok') this.armStartupDialogs(terminal.id);
         this.revealCreatedTerminal(terminal.id);
         this.showToast(this.i18n.t('terminal.resuming', { name: value.session.title }));
       }
@@ -1243,19 +1328,19 @@ export class App {
   }
 
   /**
- * Closing a terminal that has work in progress (a running agent, a turn in flight, an approval
- * prompt or a rate limit reply) throws away that work and the user only knows it happened when
- * the process is gone. The view's × buttons, the tab × and the middle-click close all route
- * through `requestCloseTerminal` first, which only invokes the real close for idle/stopped/
- * failed/disconnected terminals and otherwise leaves an inline confirmation in the panel header.
- */
+   * Closing a terminal that has work in progress (a running agent, a turn in flight, an approval
+   * prompt or a rate limit reply) throws away that work and the user only knows it happened when
+   * the process is gone. The view's × buttons, the tab × and the middle-click close all route
+   * through `requestCloseTerminal` first, which closes settled terminals directly and asks before
+   * interrupting a launch, an active turn, or a turn waiting for user input.
+   */
   protected requestCloseTerminal(terminalId: string): void {
     const located = this.findTerminal(terminalId);
     if (!located) {
       this.closeTerminal(terminalId);
       return;
     }
-    if (this.isTerminalIdle(located.terminal.status)) {
+    if (this.isTerminalSettled(located.terminal.status)) {
       this.closeTerminal(terminalId);
       return;
     }
@@ -1279,11 +1364,16 @@ export class App {
   }
 
   /**
-   * Whether the terminal is doing nothing that the user might want to keep: idle, stopped,
-   * failed (no agent to interrupt) or disconnected. Anything else deserves a confirmation.
+   * A completed turn has no work left to interrupt, even if the CLI stays open at its prompt.
    */
-  private isTerminalIdle(status: TerminalStatus): boolean {
-    return status === 'IDLE' || status === 'STOPPED' || status === 'FAILED' || status === 'DISCONNECTED';
+  private isTerminalSettled(status: TerminalStatus): boolean {
+    return (
+      status === 'IDLE' ||
+      status === 'COMPLETED' ||
+      status === 'STOPPED' ||
+      status === 'FAILED' ||
+      status === 'DISCONNECTED'
+    );
   }
 
   protected closeTerminal(terminalId: string): void {
@@ -2402,6 +2492,7 @@ export class App {
       !terminal ||
       terminal.agentType === 'shell' ||
       terminal.agentType === 'opencode' ||
+      terminal.agentType === 'grok' ||
       terminal.agentType === 'antigravity'
     ) {
       return;
@@ -2687,6 +2778,7 @@ export class App {
     this.closeClaudeLaunch();
     this.closeCodexLaunch();
     this.closeOpenCodeLaunch();
+    this.closeGrokLaunch();
     this.closeAntigravityLaunch();
     this.settingsInitialCliAgent.set(agentType);
     this.openSettings('cli');
@@ -3017,6 +3109,7 @@ export class App {
       this.agents.detectClaude(),
       this.agents.detectCodex(),
       this.agents.detectOpenCode(),
+      this.agents.detectGrok(),
       this.agents.detectAntigravity(),
     ]);
     this.showToast(this.i18n.t('agent.detectionComplete'));
@@ -3043,14 +3136,14 @@ export class App {
   }
 
   /**
- * Surfaces a short message in the bottom-right toast region.
- *
- * Defaults to `success` for the explicit `showToast(...)` call sites and the legacy single-arg
- * usage, which were every one an "operation completed" notice; failures must opt into `error`
- * (or `attention` when the failure is recoverable and the user has something else to do). The
- * tone also drives how long the message stays on screen — errors do not auto-dismiss so the user
- * can read the diagnosis before the action retries.
- */
+   * Surfaces a short message in the bottom-right toast region.
+   *
+   * Defaults to `success` for the explicit `showToast(...)` call sites and the legacy single-arg
+   * usage, which were every one an "operation completed" notice; failures must opt into `error`
+   * (or `attention` when the failure is recoverable and the user has something else to do). The
+   * tone also drives how long the message stays on screen — errors do not auto-dismiss so the user
+   * can read the diagnosis before the action retries.
+   */
   private showToast(message: string, tone: ToastTone = 'success'): void {
     if (this.toastTimer !== null) {
       window.clearTimeout(this.toastTimer);
@@ -3102,9 +3195,10 @@ export class App {
     const workspace = this.state.activeWorkspace();
     const project = this.todos.project(task.projectId);
     const workingDirectory = todoWorkingDirectory(task, project);
-    // OpenCode resolves its own model and credentials, so it is the one agent a task can target
-    // without a Termexo model profile.
+    // OpenCode and Grok Build resolve their own models and credentials.
     const isOpenCode = task.agentType === 'opencode';
+    const isGrok = task.agentType === 'grok';
+    const usesOwnModel = isOpenCode || isGrok;
     const profile = this.agents.modelProfiles().find((item) => item.id === task.profileId);
     if (!workspace || workspace.id !== task.workspaceId || !workingDirectory) {
       const message = this.i18n.t('taskFlow.error.workingDirectoryMissing');
@@ -3112,13 +3206,13 @@ export class App {
       this.showToast(message, 'attention');
       return;
     }
-    if (!isOpenCode && !profile) {
+    if (!usesOwnModel && !profile) {
       const message = this.i18n.t('taskFlow.error.modelProfileMissing');
       this.todos.setExecutionError(task.id, message);
       this.showToast(message, 'attention');
       return;
     }
-    if (profile && !isOpenCode && needsCredential(profile, task.agentType as AgentProtocol)) {
+    if (profile && !usesOwnModel && needsCredential(profile, task.agentType as AgentProtocol)) {
       this.openModelCredentialSettings(profile.id, profile.name);
       this.todos.setExecutionError(
         task.id,
@@ -3130,8 +3224,8 @@ export class App {
     // A task carries no account of its own until it has resumed a native session, while the
     // backend silently falls back to the agent's default account. Resolving it here keeps the
     // terminal record honest about the subscription it spends, which is what the inspector
-    // matches provider allowances against. OpenCode has no Termexo account profile at all.
-    const accountProfileId = isOpenCode
+    // matches provider allowances against. These CLIs have no Termexo account profile.
+    const accountProfileId = usesOwnModel
       ? undefined
       : resolveAccountProfileId(
           this.agents.accountProfiles(),
@@ -3141,6 +3235,7 @@ export class App {
 
     this.busyTodoTaskId.set(task.id);
     const terminalId = createId();
+    const nativeSessionId = isGrok ? (sessionId ?? createId()) : sessionId;
     try {
       await this.assertTodoAgentAvailable(task.agentType);
       const reclaim: BackgroundReclaim =
@@ -3157,34 +3252,42 @@ export class App {
             sessionId,
             model: task.modelName || undefined,
           })
-        : task.agentType === 'codex'
-          ? await this.agents.prepareCodexLaunch({
+        : isGrok
+          ? await this.agents.prepareGrokLaunch({
               terminalId,
               workspaceId: workspace.id,
               sessionId,
-              model: profileModel(profile!, 'codex'),
-              profileId: profile!.id,
-              accountProfileId,
+              newSessionId: sessionId ? undefined : nativeSessionId,
+              model: task.modelName || undefined,
             })
-          : await this.agents.prepareLaunch({
-              terminalId,
-              workspaceId: workspace.id,
-              sessionId,
-              profileId: profile!.id,
-              accountProfileId,
-              forkSession: reclaim.forkSession,
-              attachShortId: reclaim.attachShortId,
-            });
+          : task.agentType === 'codex'
+            ? await this.agents.prepareCodexLaunch({
+                terminalId,
+                workspaceId: workspace.id,
+                sessionId,
+                model: profileModel(profile!, 'codex'),
+                profileId: profile!.id,
+                accountProfileId,
+              })
+            : await this.agents.prepareLaunch({
+                terminalId,
+                workspaceId: workspace.id,
+                sessionId,
+                profileId: profile!.id,
+                accountProfileId,
+                forkSession: reclaim.forkSession,
+                attachShortId: reclaim.attachShortId,
+              });
       const terminal = this.state.createTerminal(
         {
           id: terminalId,
           agentType: task.agentType,
           name: this.i18n.t('taskFlow.terminalName', { title: task.title }),
           command: launch.command,
-          model: isOpenCode
-            ? task.modelName || OPENCODE_DEFAULT_MODEL
+          model: usesOwnModel
+            ? task.modelName || (isGrok ? 'Grok Build' : OPENCODE_DEFAULT_MODEL)
             : profileModel(profile!, task.agentType as AgentProtocol),
-          nativeSessionId: sessionId,
+          nativeSessionId,
           workingDirectory,
           profileId: profile?.id,
           accountProfileId,
@@ -3196,7 +3299,7 @@ export class App {
       }
       const started = this.todos.beginExecution(
         task.id,
-        { terminalId, nativeSessionId: sessionId, accountProfileId },
+        { terminalId, nativeSessionId, accountProfileId },
         continuation,
       );
       if (!started) {
@@ -3292,6 +3395,14 @@ export class App {
       const installation = this.agents.openCodeInstallation();
       if (!installation?.healthy) {
         throw new Error(installation?.diagnostic ?? this.i18n.t('common.openCodeNotDetected'));
+      }
+      return;
+    }
+    if (agentType === 'grok') {
+      if (!this.agents.grokInstallation()) await this.agents.detectGrok();
+      const installation = this.agents.grokInstallation();
+      if (!installation?.healthy) {
+        throw new Error(installation?.diagnostic ?? this.i18n.t('common.grokNotDetected'));
       }
       return;
     }
@@ -3587,6 +3698,7 @@ export class App {
     await this.refreshRestoredClaudeLaunches();
     await this.refreshRestoredCodexLaunches();
     await this.refreshRestoredOpenCodeLaunches();
+    await this.refreshRestoredGrokLaunches();
     this.mountWorkspace(this.state.activeWorkspace()?.id);
     const recoveredDraft = this.state.activeTerminal()
       ? this.promptAssets.draftForTerminal(this.state.activeTerminal()!.id)
@@ -3933,6 +4045,53 @@ export class App {
     const failed = results.filter((result) => result.status === 'rejected').length;
     if (failed > 0) {
       this.showToast(this.i18n.t('restore.openCodeFailed', { count: failed }), 'attention');
+    }
+  }
+
+  private async refreshRestoredGrokLaunches(): Promise<void> {
+    const restored = this.state.workspaces().flatMap((workspace) =>
+      workspace.terminals
+        .filter((terminal) => terminal.agentType === 'grok')
+        .filter((terminal) => !this.state.isAdoptedTerminal(terminal.id))
+        .map((terminal) => ({ workspaceId: workspace.id, terminal })),
+    );
+    const results = await Promise.allSettled(
+      restored.map(async ({ workspaceId, terminal }) => {
+        const task = this.todos
+          .tasksFor(workspaceId)
+          .find((item) => item.terminalId === terminal.id);
+        const sessionId = task
+          ? compatibleTodoSessionId(task, this.agents.sessions(), this.agents.events())
+          : compatibleNativeSessionId(
+              'grok',
+              terminal.nativeSessionId,
+              undefined,
+              this.agents.sessions(),
+              this.agents.events(),
+            );
+        const launch = await this.agents.prepareGrokLaunch({
+          terminalId: terminal.id,
+          workspaceId,
+          sessionId,
+          continueLast: !sessionId,
+          model: terminal.model === 'Grok Build' ? undefined : terminal.model,
+          autoConfirm: terminal.autoConfirm,
+        });
+        if (
+          !this.state.updateRestoredTerminalLaunch(terminal.id, launch.command, {
+            model: terminal.model,
+            nativeSessionId: sessionId,
+          })
+        ) {
+          throw new Error(
+            this.i18n.t('restore.terminalMissing', { agent: 'Grok Build', name: terminal.name }),
+          );
+        }
+      }),
+    );
+    const failed = results.filter((result) => result.status === 'rejected').length;
+    if (failed > 0) {
+      this.showToast(`Grok Build: ${failed} terminal(s) could not be restored.`, 'attention');
     }
   }
 

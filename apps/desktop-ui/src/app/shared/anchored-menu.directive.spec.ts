@@ -15,15 +15,22 @@ import { AnchoredMenuDirective } from './anchored-menu.directive';
     }
   `,
 })
-class MenuHost { open = true; }
+class MenuHost {
+  open = true;
+}
 
 describe('AnchoredMenuDirective', () => {
-  afterEach(() => { vi.restoreAllMocks(); vi.unstubAllGlobals(); });
+  afterEach(() => {
+    vi.restoreAllMocks();
+    vi.unstubAllGlobals();
+  });
 
   async function render(left: number, top: number) {
     vi.stubGlobal('innerWidth', 400);
     vi.stubGlobal('innerHeight', 300);
-    vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(function (this: HTMLElement) {
+    vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(function (
+      this: HTMLElement,
+    ) {
       return this.getAttribute('role') === 'menu'
         ? new DOMRect(0, 0, 180, 100)
         : new DOMRect(left, top, 30, 30);
@@ -32,7 +39,12 @@ describe('AnchoredMenuDirective', () => {
     fixture.detectChanges();
     await fixture.whenStable();
     const root = fixture.nativeElement as HTMLElement;
-    return { fixture, root, menu: root.querySelector<HTMLElement>('ul')!, anchor: root.querySelector('button')! };
+    return {
+      fixture,
+      root,
+      menu: root.querySelector<HTMLElement>('ul')!,
+      anchor: root.querySelector('button')!,
+    };
   }
 
   it('opens below a top-edge trigger and clamps to the left viewport margin', async () => {

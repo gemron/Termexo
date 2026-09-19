@@ -167,7 +167,8 @@ header {
   color: var(--color-primary);
   background: var(--primary-soft);
 
-  &[data-agent='codex'] {
+  &[data-agent='codex'],
+  &[data-agent='grok'] {
     color: var(--color-info);
     background: var(--info-soft);
   }
@@ -342,6 +343,33 @@ header {
   overflow: hidden;
 }
 
+.terminal-startup {
+  position: absolute;
+  z-index: 4;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  background: var(--surface-inset);
+  color: var(--text-muted);
+  font-size: 13px;
+  pointer-events: none;
+}
+
+.terminal-startup-spinner {
+  width: 18px;
+  height: 18px;
+  border: 2px solid color-mix(in srgb, var(--accent) 25%, transparent);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: terminal-startup-spin 850ms linear infinite;
+}
+
+@keyframes terminal-startup-spin {
+  to { transform: rotate(1turn); }
+}
+
 /*
  * A remote client draws the grid the desktop set, which its own window is often too narrow for —
  * a phone showing a 130-column agent, say. Scrolling is what makes the rest of it reachable;
@@ -441,6 +469,10 @@ footer {
 }
 
 @media (prefers-reduced-motion: reduce) {
+  .terminal-startup-spinner {
+    animation: none;
+  }
+
   .terminal-panel,
   .terminal-panel::after {
     transition: none;

@@ -224,6 +224,23 @@ const DEFAULT_ALERT_THRESHOLD = 80;
                     antigravityInstallation()?.version ?? ('common.notDetected' | t)
                   }}</code>
                 </div>
+                <div
+                  class="diagnostic-status alert"
+                  [class.unavailable]="!grokInstallation()?.healthy"
+                >
+                  <span><app-icon [name]="agentIcons.grok" [size]="18" /></span>
+                  <div>
+                    <strong>{{
+                      grokInstallation()?.healthy
+                        ? ('settings.available' | t: { name: 'Grok Build' })
+                        : ('settings.unavailable' | t: { name: 'Grok Build' })
+                    }}</strong>
+                    <small>{{
+                      grokInstallation()?.diagnostic ?? ('settings.awaitingDetection' | t)
+                    }}</small>
+                  </div>
+                  <code>{{ grokInstallation()?.version ?? ('common.notDetected' | t) }}</code>
+                </div>
                 <app-antigravity-status-toggle />
                 <details class="diagnostic-details">
                   <summary>{{ 'settings.diagnosticDetails' | t }}</summary>
@@ -243,6 +260,10 @@ const DEFAULT_ALERT_THRESHOLD = 80;
                       <dd>
                         {{ openCodeInstallation()?.executablePath ?? ('settings.notFound' | t) }}
                       </dd>
+                    </div>
+                    <div>
+                      <dt>Grok Build</dt>
+                      <dd>{{ grokInstallation()?.executablePath ?? ('settings.notFound' | t) }}</dd>
                     </div>
                     <div>
                       <dt>{{ 'settings.credentialStorage' | t }}</dt>
@@ -371,6 +392,19 @@ const DEFAULT_ALERT_THRESHOLD = 80;
                     <small>{{
                       openCodeInstallation()?.healthy
                         ? (openCodeInstallation()?.version ?? ('settings.installed' | t))
+                        : ('common.notDetected' | t)
+                    }}</small>
+                  </button>
+                  <button
+                    type="button"
+                    [class.active]="cliAgentType === 'grok'"
+                    (click)="selectCliAgent('grok')"
+                  >
+                    <span><app-icon [name]="agentIcons.grok" [size]="16" /></span>
+                    <strong>Grok Build</strong>
+                    <small>{{
+                      grokInstallation()?.healthy
+                        ? (grokInstallation()?.version ?? ('settings.installed' | t))
                         : ('common.notDetected' | t)
                     }}</small>
                   </button>
@@ -1378,6 +1412,7 @@ export class AgentSettingsDialogComponent {
   readonly installation = input<AgentInstallation | null>(null);
   readonly codexInstallation = input<AgentInstallation | null>(null);
   readonly openCodeInstallation = input<AgentInstallation | null>(null);
+  readonly grokInstallation = input<AgentInstallation | null>(null);
   readonly antigravityInstallation = input<AgentInstallation | null>(null);
   /** The agents' own marks, for the template. */
   protected readonly agentIcons = AGENT_ICONS;

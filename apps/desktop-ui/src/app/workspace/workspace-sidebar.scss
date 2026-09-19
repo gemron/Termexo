@@ -111,6 +111,31 @@ nav {
   position: relative;
   min-width: 0;
   list-style: none;
+
+  &.dragging {
+    opacity: 0.45;
+  }
+
+  &.drop-before::before,
+  &.drop-after::after {
+    position: absolute;
+    right: 2px;
+    left: 2px;
+    z-index: 1;
+    height: 2px;
+    border-radius: 2px;
+    background: var(--color-primary);
+    content: '';
+    pointer-events: none;
+  }
+
+  &.drop-before::before {
+    top: -2px;
+  }
+
+  &.drop-after::after {
+    bottom: -2px;
+  }
 }
 
 .workspace-list .workspace-item {
@@ -128,6 +153,7 @@ nav {
   color: var(--text-secondary);
   text-align: left;
   background: transparent;
+  cursor: grab;
   transition:
     color 140ms ease,
     background-color 140ms ease;
@@ -140,6 +166,10 @@ nav {
     .workspace-glyph {
       color: var(--workspace-color);
     }
+  }
+
+  &:active {
+    cursor: grabbing;
   }
 }
 
@@ -202,6 +232,10 @@ nav {
   border-radius: var(--radius-field);
   color: var(--text-muted);
   background: transparent;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 140ms ease;
+
   &:hover,
   &[aria-expanded='true'] {
     color: var(--text);
@@ -209,39 +243,17 @@ nav {
   }
 }
 
-.workspace-order-actions {
-  display: grid;
-  width: 20px;
-  min-width: 20px;
-  height: 24px;
-  flex: 0 0 20px;
-  grid-template-rows: repeat(2, 12px);
-  color: var(--text-muted);
+.workspace-entry:hover .workspace-more,
+.workspace-entry:focus-within .workspace-more,
+.workspace-more[aria-expanded='true'] {
+  opacity: 1;
+  pointer-events: auto;
 }
 
-.workspace-order-action {
-  display: grid;
-  padding: 0;
-  border: 0;
-  place-items: center;
-  border-radius: 2px;
-  color: inherit;
-  background: transparent;
-
-  &:hover,
-  &:focus-visible {
-    color: var(--workspace-color);
-    background: color-mix(in srgb, var(--workspace-color) 12%, transparent);
-  }
-
-  &:disabled {
-    cursor: default;
-    opacity: 0.2;
-
-    &:hover {
-      color: inherit;
-      background: transparent;
-    }
+@media (hover: none) {
+  .workspace-more {
+    opacity: 1;
+    pointer-events: auto;
   }
 }
 

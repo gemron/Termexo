@@ -11,7 +11,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::agent::{
     AgentAdapter, AgentInstallation, AntigravityAdapter, ClaudeCodeAdapter, CodexCliAdapter,
-    OpenCodeAdapter,
+    GrokBuildAdapter, OpenCodeAdapter,
 };
 use crate::config::NetworkProfile;
 use crate::process::{hide_window, terminate_process_tree};
@@ -643,6 +643,9 @@ fn detect_agent(agent_type: &str) -> Result<AgentInstallation, String> {
         "opencode" => OpenCodeAdapter::new()
             .detect()
             .map_err(|error| error.to_string()),
+        "grok" => GrokBuildAdapter::new()
+            .detect()
+            .map_err(|error| error.to_string()),
         "antigravity" => AntigravityAdapter::new()
             .detect()
             .map_err(|error| error.to_string()),
@@ -947,6 +950,12 @@ fn definition(agent_type: &str) -> Result<CliDefinition, String> {
             package_name: Some("opencode-ai"),
             script: None,
         }),
+        "grok" => Ok(CliDefinition {
+            agent_type: "grok",
+            display_name: "Grok Build",
+            package_name: Some("@xai-official/grok"),
+            script: None,
+        }),
         "antigravity" => Ok(CliDefinition {
             agent_type: "antigravity",
             display_name: "Antigravity",
@@ -1023,6 +1032,10 @@ mod tests {
             definition("opencode").unwrap().package_name,
             Some("opencode-ai")
         );
+        assert_eq!(
+            definition("grok").unwrap().package_name,
+            Some("@xai-official/grok")
+        );
         assert_eq!(definition("antigravity").unwrap().package_name, None);
         assert!(definition("shell").is_err());
     }
@@ -1043,6 +1056,7 @@ mod tests {
         }
         // OpenCode publishes none for Windows, and inventing one would install something else.
         assert!(definition("opencode").unwrap().script.is_none());
+        assert!(definition("grok").unwrap().script.is_none());
     }
 
     /// Asking for an installer the agent does not have is refused, never quietly swapped.

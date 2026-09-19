@@ -311,7 +311,7 @@ export class TerminalGatewayService {
       shell: session.shell,
       workingDirectory: session.workingDirectory,
       command: session.command,
-      hideInitialCommand: session.agentType === 'codex' || session.agentType === 'opencode',
+      hideInitialCommand: session.agentType !== 'shell' && !!session.command,
       cols,
       rows,
       viewerId: runtimeClientId(),

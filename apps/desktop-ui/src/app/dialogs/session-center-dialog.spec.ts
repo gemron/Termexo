@@ -35,6 +35,15 @@ const OPENCODE_INSTALLATION: AgentInstallation = {
   diagnostic: 'OpenCode 已连接',
 };
 
+const GROK_INSTALLATION: AgentInstallation = {
+  agentType: 'grok',
+  installed: true,
+  executablePath: 'grok',
+  version: '0.2.1',
+  healthy: true,
+  diagnostic: 'Grok Build is available',
+};
+
 const SESSIONS: AgentSession[] = [
   {
     id: 'claude:claude-native-session',
@@ -120,6 +129,7 @@ describe('SessionCenterDialogComponent', () => {
     fixture.componentRef.setInput('installation', CLAUDE_INSTALLATION);
     fixture.componentRef.setInput('codexInstallation', CODEX_INSTALLATION);
     fixture.componentRef.setInput('openCodeInstallation', OPENCODE_INSTALLATION);
+    fixture.componentRef.setInput('grokInstallation', GROK_INSTALLATION);
     fixture.componentRef.setInput('sessions', SESSIONS);
     fixture.componentRef.setInput('profiles', [DEFAULT_PROFILE]);
     fixture.componentRef.setInput('projectPath', 'D:\\devlop\\Termexo');
@@ -128,7 +138,7 @@ describe('SessionCenterDialogComponent', () => {
   });
 
   it('shows Agent health, counts, and filters the session list by Agent', () => {
-    expect(root.querySelectorAll('.agent-health')).toHaveLength(4);
+    expect(root.querySelectorAll('.agent-health')).toHaveLength(5);
     expect(root.querySelectorAll('.session-row')).toHaveLength(3);
 
     clickButton('Codex');
@@ -146,6 +156,30 @@ describe('SessionCenterDialogComponent', () => {
     clickResumeFor('OpenCode adapter');
 
     expect(resumed).toEqual([{ session: SESSIONS[2], model: undefined }]);
+  });
+
+  it('filters and resumes Grok sessions without a Termexo model profile', () => {
+    const grokSession: AgentSession = {
+      id: 'grok:grok-native-session',
+      agentType: 'grok',
+      nativeSessionId: 'grok-native-session',
+      projectPath: 'D:\\devlop\\Termexo',
+      modelName: 'grok-build',
+      title: 'Grok review',
+      status: 'HISTORICAL',
+      messageCount: 4,
+      transcriptPath: 'updates.jsonl',
+      createdAt: 1_700_000_600_000,
+      lastUsedAt: 1_700_000_700_000,
+    };
+    fixture.componentRef.setInput('sessions', [...SESSIONS, grokSession]);
+    fixture.detectChanges();
+    clickButton('Grok');
+    expect(root.querySelectorAll('.session-row')).toHaveLength(1);
+    const resumed: ResumeSessionValue[] = [];
+    component.resumed.subscribe((value) => resumed.push(value));
+    clickResumeFor('Grok review');
+    expect(resumed).toEqual([{ session: grokSession, model: undefined, autoConfirm: undefined }]);
   });
 
   it('searches native session ids and emits the selected scan scope', async () => {

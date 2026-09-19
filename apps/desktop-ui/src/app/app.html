@@ -364,6 +364,7 @@
       (mergeRequested)="openWorkspaceMerge($event)"
       (deleteRequested)="openWorkspaceDelete($event)"
       (moveRequested)="state.moveWorkspace($event.workspaceId, $event.direction)"
+      (reorderRequested)="state.reorderWorkspace($event.workspaceId, $event.targetWorkspaceId, $event.position)"
       (createRequested)="createWorkspaceOpen.set(true)"
     />
     <!-- Dragging an edge needs a pointer; on a phone the panel floats and is either open or not. -->
@@ -531,6 +532,7 @@
               [terminals]="activeWorkspace.terminals"
               [modelProfiles]="agents.modelProfiles()"
               [openCodeAvailable]="agents.openCodeInstallation()?.healthy ?? false"
+              [grokAvailable]="agents.grokInstallation()?.healthy ?? false"
               [busyTaskId]="busyTodoTaskId()"
               [awaitingTerminalIds]="agentStartup.awaitingTerminalIds()"
               (executionRequested)="executeTodoTask($event)"
@@ -541,7 +543,6 @@
               (amendRequested)="amendTodoTask($event)"
               (terminalRequested)="openTodoTerminal($event)"
               (terminalCloseRequested)="closeTodoTerminal($event)"
-              (settingsRequested)="openSettings()"
             />
           }
         }
@@ -780,11 +781,26 @@
   }
 }
 
+@defer (when grokLaunchOpen()) {
+  @if (grokLaunchOpen()) {
+    <app-grok-launch-dialog
+      [installation]="agents.grokInstallation()"
+      [workingDirectory]="selectedTerminalDirectory() ?? ''"
+      [launching]="launchingGrok()"
+      (launched)="launchGrok($event)"
+      (cancelled)="closeGrokLaunch()"
+      (installRequested)="installAgent('grok')"
+      (directoryChangeRequested)="changeLaunchDirectory()"
+    />
+  }
+}
+
 @if (sessionCenterOpen()) {
   <app-session-center-dialog
     [installation]="agents.installation()"
     [codexInstallation]="agents.codexInstallation()"
     [openCodeInstallation]="agents.openCodeInstallation()"
+    [grokInstallation]="agents.grokInstallation()"
     [antigravityInstallation]="agents.antigravityInstallation()"
     [sessions]="agents.sessions()"
     [profiles]="agents.modelProfiles()"
@@ -842,6 +858,7 @@
       [installation]="agents.installation()"
       [codexInstallation]="agents.codexInstallation()"
       [openCodeInstallation]="agents.openCodeInstallation()"
+      [grokInstallation]="agents.grokInstallation()"
       [antigravityInstallation]="agents.antigravityInstallation()"
       [modelProfiles]="agents.modelProfiles()"
       [mcpProfiles]="agents.mcpProfiles()"
@@ -925,16 +942,12 @@
 }
 
 @if (pendingTerminalClose(); as pendingCloseId) {
-  <div
-    class="app-terminal-close-confirm inline-confirm"
-    role="alert"
-    aria-live="assertive"
-  >
+  <div class="app-terminal-close-confirm" role="alert" aria-live="assertive">
     <p>{{ 'terminal.closeRunningConfirm' | t }}</p>
-    <div class="inline-confirm-actions">
+    <div class="app-terminal-close-actions">
       <button
         type="button"
-        class="secondary"
+        class="btn btn-sm btn-ghost"
         [disabled]="closingTerminal()"
         (click)="cancelCloseTerminal()"
       >
@@ -942,7 +955,7 @@
       </button>
       <button
         type="button"
-        class="danger"
+        class="btn btn-sm btn-error"
         [disabled]="closingTerminal()"
         (click)="confirmCloseTerminal(pendingCloseId)"
       >

@@ -138,7 +138,8 @@ textarea {
   background: var(--primary-soft);
 }
 
-.session-agent[data-agent='codex'] {
+.session-agent[data-agent='codex'],
+.session-agent[data-agent='grok'] {
   color: var(--color-info);
   background: var(--info-soft);
 }
@@ -231,7 +232,8 @@ textarea {
   background: var(--success-soft);
 }
 
-.agent-health[data-agent='codex'] .agent-health-icon {
+.agent-health[data-agent='codex'] .agent-health-icon,
+.agent-health[data-agent='grok'] .agent-health-icon {
   color: var(--color-info);
   background: var(--info-soft);
 }
@@ -647,7 +649,8 @@ textarea {
   background: var(--primary-soft);
 }
 
-.agent-tag[data-agent='codex'] {
+.agent-tag[data-agent='codex'],
+.agent-tag[data-agent='grok'] {
   color: var(--color-info);
   background: var(--info-soft);
 }

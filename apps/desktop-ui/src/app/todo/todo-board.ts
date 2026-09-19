@@ -57,6 +57,7 @@ type AgentTerminal = TerminalSession & { agentType: TodoTask['agentType'] };
  * key identical to the `agentType|profileId` an OpenCode task round-trips through.
  */
 const OPENCODE_OPTION_KEY = 'opencode|';
+const GROK_OPTION_KEY = 'grok|';
 
 /** The terminal dropdown value that stands for "create one when the task starts". */
 const NEW_TERMINAL_OPTION = 'new';
@@ -96,7 +97,14 @@ function formatRunDuration(elapsedMs: number, i18n: I18nService): string {
 
 @Component({
   selector: 'app-todo-board',
-  imports: [DatePipe, ModalFocusDirective, AnchoredMenuDirective, FormsModule, IconComponent, TranslatePipe],
+  imports: [
+    DatePipe,
+    ModalFocusDirective,
+    AnchoredMenuDirective,
+    FormsModule,
+    IconComponent,
+    TranslatePipe,
+  ],
   templateUrl: './todo-board.html',
   styleUrl: './todo-board.scss',
 })
@@ -112,8 +120,9 @@ export class TodoBoardComponent {
   readonly workspace = input<Workspace | null>(null);
   readonly terminals = input<readonly TerminalSession[]>([]);
   readonly modelProfiles = input<readonly ModelProfile[]>([]);
-  /** OpenCode needs no model profile, so its availability alone decides whether it is offered. */
+  /** CLIs with their own model configuration need no Termexo model profile. */
   readonly openCodeAvailable = input(false);
+  readonly grokAvailable = input(false);
   readonly busyTaskId = input<string | null>(null);
   /** Terminals whose startup dialogs are still being answered before the prompt is sent. */
   readonly awaitingTerminalIds = input<readonly string[]>([]);
@@ -129,7 +138,6 @@ export class TodoBoardComponent {
   readonly terminalRequested = output<string>();
   /** Asks the shell to close a terminal the board no longer needs once a run is accepted. */
   readonly terminalCloseRequested = output<string>();
-  readonly settingsRequested = output<void>();
 
   protected readonly columns = TODO_COLUMNS;
   protected scrollToStage(stage: TodoStage, board: HTMLElement): void {
@@ -146,8 +154,8 @@ export class TodoBoardComponent {
   /** Task id whose secondary-actions menu is open. Only one card shows the menu at a time. */
   protected readonly expandedTaskId = signal<string | null>(null);
   protected moreMenuAnchor: HTMLElement | null = null;
-  protected readonly expandedTask = computed(() =>
-    this.workspaceTasks().find((task) => task.id === this.expandedTaskId()) ?? null,
+  protected readonly expandedTask = computed(
+    () => this.workspaceTasks().find((task) => task.id === this.expandedTaskId()) ?? null,
   );
   /** Task id currently shown in the side drawer. `null` keeps the drawer closed. */
   protected readonly detailTaskId = signal<string | null>(null);
@@ -299,8 +307,8 @@ export class TodoBoardComponent {
   protected readonly taskProjectId = signal('');
   protected readonly taskWorkingDirectory = signal('');
   protected readonly taskModelKey = signal('');
-  /** Free-text `provider/model` for an OpenCode task; blank means OpenCode's own default. */
-  protected readonly taskOpenCodeModel = signal('');
+  /** Optional model for CLIs that manage their own credentials and defaults. */
+  protected readonly taskCliModel = signal('');
   protected readonly taskTerminalId = signal(NEW_TERMINAL_OPTION);
   protected readonly taskRecurring = signal(false);
 
@@ -407,20 +415,26 @@ export class TodoBoardComponent {
       }
       return options;
     });
-    // OpenCode brings its own model and credentials, so being installed is the only condition
-    // for offering it; unlike Claude and Codex it needs no Termexo model profile.
-    return this.openCodeAvailable()
-      ? [
-          ...profileOptions,
-          {
-            key: OPENCODE_OPTION_KEY,
-            agentType: 'opencode' as const,
-            profileId: '',
-            modelName: '',
-            label: this.i18n.t('taskBoard.taskDialog.openCodeModelOption'),
-          },
-        ]
-      : profileOptions;
+    // OpenCode and Grok Build bring their own model configuration and credentials.
+    if (this.openCodeAvailable()) {
+      profileOptions.push({
+        key: OPENCODE_OPTION_KEY,
+        agentType: 'opencode',
+        profileId: '',
+        modelName: '',
+        label: this.i18n.t('taskBoard.taskDialog.openCodeModelOption'),
+      });
+    }
+    if (this.grokAvailable()) {
+      profileOptions.push({
+        key: GROK_OPTION_KEY,
+        agentType: 'grok',
+        profileId: '',
+        modelName: '',
+        label: this.i18n.t('taskBoard.taskDialog.grokModelOption'),
+      });
+    }
+    return profileOptions;
   });
 
   /** The agent the model dropdown points at, so the form can offer that agent's own fields. */
@@ -574,7 +588,7 @@ export class TodoBoardComponent {
     this.taskProjectId.set(projectId);
     this.taskWorkingDirectory.set(this.projectDirectory(projectId));
     this.taskModelKey.set(this.modelOptions()[0]?.key ?? '');
-    this.taskOpenCodeModel.set('');
+    this.taskCliModel.set('');
     this.taskTerminalId.set(NEW_TERMINAL_OPTION);
     this.taskRecurring.set(false);
     this.openTaskDialog(null);
@@ -588,7 +602,9 @@ export class TodoBoardComponent {
     this.taskProjectId.set(task.projectId);
     this.taskWorkingDirectory.set(task.workingDirectory ?? this.projectDirectory(task.projectId));
     this.taskModelKey.set(`${task.agentType}|${task.profileId}`);
-    this.taskOpenCodeModel.set(task.agentType === 'opencode' ? task.modelName : '');
+    this.taskCliModel.set(
+      task.agentType === 'opencode' || task.agentType === 'grok' ? task.modelName : '',
+    );
     this.taskTerminalId.set(task.preferredTerminalId ?? task.terminalId ?? NEW_TERMINAL_OPTION);
     this.taskRecurring.set(task.recurring);
     this.openTaskDialog(task.id);
@@ -766,8 +782,8 @@ export class TodoBoardComponent {
         profileId: terminal?.profileId ?? option?.profileId ?? '',
         modelName:
           terminal?.model ??
-          (option?.agentType === 'opencode'
-            ? this.taskOpenCodeModel().trim()
+          (option?.agentType === 'opencode' || option?.agentType === 'grok'
+            ? this.taskCliModel().trim()
             : option?.modelName) ??
           '',
         preferredTerminalId: terminal?.id,
@@ -888,6 +904,7 @@ export class TodoBoardComponent {
       projectId: this.taskProjectId(),
       workingDirectory: this.taskWorkingDirectory(),
       modelKey: this.taskModelKey(),
+      cliModel: this.taskCliModel(),
       terminalId: this.taskTerminalId(),
       recurring: this.taskRecurring(),
     });

@@ -1,4 +1,4 @@
-export type AgentType = 'claude' | 'codex' | 'opencode' | 'antigravity' | 'shell';
+export type AgentType = 'claude' | 'codex' | 'opencode' | 'grok' | 'antigravity' | 'shell';
 
 /**
  * Model label for an OpenCode terminal that named no model.
@@ -125,7 +125,11 @@ export interface CreateTerminalInput {
  */
 export const TERMINAL_STATUS_META: Record<
   TerminalStatus,
-  { tone: 'progress' | 'attention' | 'warning' | 'danger' | 'success' | 'neutral'; labelKey: string; pulse: boolean }
+  {
+    tone: 'progress' | 'attention' | 'warning' | 'danger' | 'success' | 'neutral';
+    labelKey: string;
+    pulse: boolean;
+  }
 > = {
   STARTING: { tone: 'progress', labelKey: 'status.starting', pulse: false },
   RUNNING: { tone: 'progress', labelKey: 'status.running', pulse: false },
@@ -151,6 +155,7 @@ export const AGENT_ICONS: Record<AgentType, string> = {
   claude: 'brand-claude',
   codex: 'brand-codex',
   opencode: 'brand-opencode',
+  grok: 'brand-grok',
   antigravity: 'brand-antigravity',
   /** A plain shell is not a product and has no mark of its own. */
   shell: 'terminal',
@@ -160,6 +165,7 @@ export const AGENT_LABELS: Record<AgentType, string> = {
   claude: 'Claude Code',
   codex: 'Codex CLI',
   opencode: 'OpenCode',
+  grok: 'Grok Build',
   antigravity: 'Antigravity',
   shell: 'Shell',
 };

@@ -1062,7 +1062,26 @@ app-inspector-panel {
   // bottom 30px and is up to ~58px tall (46px min-height + 8px bottom padding).
   bottom: calc(30px + 58px + 8px);
   width: min(360px, calc(100vw - 32px));
+  padding: 14px;
+  border: 1px solid color-mix(in oklab, var(--color-warning) 48%, var(--border));
+  border-radius: var(--radius-box);
+  color: var(--text);
+  background: var(--surface-raised);
+  box-shadow: 0 12px 32px rgb(0 0 0 / 35%);
+  font-size: 13px;
+  line-height: 1.5;
   pointer-events: auto;
+
+  p {
+    margin: 0;
+  }
+}
+
+.app-terminal-close-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 12px;
 }
 
 @keyframes app-toast-enter {

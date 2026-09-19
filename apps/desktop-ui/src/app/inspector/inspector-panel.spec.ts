@@ -278,6 +278,33 @@ describe('InspectorPanelComponent provider allowances', () => {
     expect(root.querySelector('.overview-stats .stat b')?.textContent?.trim()).toBe('40%');
   });
 
+  it('shows Grok Build shared allowance for a Grok terminal', async () => {
+    fixture.componentRef.setInput('activeTerminal', {
+      ...TERMINAL,
+      agentType: 'grok',
+      model: 'Grok Build',
+      profileId: undefined,
+      accountProfileId: undefined,
+    });
+    fixture.componentRef.setInput('quotas', [
+      {
+        profileId: 'agent:grok',
+        profileName: 'Grok Build',
+        provider: 'Grok Build',
+        official: false,
+        checkedAt: Date.now(),
+        entries: [{ label: '每周共享额度', unit: 'percent', percent: 35 }],
+      },
+      ...OPENCODE_QUOTAS,
+    ]);
+    fixture.detectChanges();
+    await fixture.whenStable();
+
+    expect(root.querySelectorAll('.quota-row')).toHaveLength(1);
+    expect(root.textContent).toContain('Grok Build');
+    expect(root.querySelector('.overview-stats .stat b')?.textContent?.trim()).toBe('65%');
+  });
+
   it('shows live session code changes and opens the full Git view', () => {
     const repository: RepositoryOverview = {
       available: true,

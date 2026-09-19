@@ -7,7 +7,7 @@ use std::io::{Read, Take};
 use std::path::{Component, Path, PathBuf};
 use std::process::Stdio;
 use std::sync::{Arc, Mutex};
-use std::time::Duration;
+use std::time::{Duration, SystemTime};
 
 use serde::Serialize;
 
@@ -34,6 +34,8 @@ struct SessionBaseline {
     root: PathBuf,
     head: Option<String>,
     dirty_files: HashMap<String, BaselineFile>,
+    /// Already dirty at launch, but too large to keep full contents in memory.
+    unsnapshotted_paths: HashMap<String, Option<FileStamp>>,
     repository_missing_at_start: bool,
     snapshot_truncated: bool,
 }
@@ -43,6 +45,12 @@ struct BaselineFile {
     change: RepositoryChange,
     content: Vec<u8>,
     content_fingerprint: Option<u64>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+struct FileStamp {
+    len: u64,
+    modified: Option<SystemTime>,
 }
 
 #[derive(Debug, Clone)]
@@ -166,6 +174,13 @@ impl RepositoryManager {
                 return Ok(());
             }
         }
+        // A restored terminal has a revision above zero. After the app itself restarts its
+        // in-memory baseline is gone; capturing the already dirty tree now would make every
+        // existing change disappear on the next overview refresh. With no earlier baseline,
+        // overview falls back to the worktree diff against HEAD.
+        if runtime_revision > 0 {
+            return Ok(());
+        }
         let directory = PathBuf::from(working_directory);
         let discovered_root = repository_root(&directory)?;
         let repository_missing_at_start = discovered_root.is_none();
@@ -176,19 +191,24 @@ impl RepositoryManager {
             current_head(&root)?
         };
         let mut dirty_files = HashMap::new();
+        let mut unsnapshotted_paths = HashMap::new();
         let mut snapshot_bytes = 0usize;
         let mut snapshot_truncated = false;
         if !repository_missing_at_start {
             for change in collect_worktree_changes(&root, &HashSet::new())? {
+                let path = change.path.clone();
                 if dirty_files.len() >= MAX_BASELINE_FILES {
                     snapshot_truncated = true;
-                    break;
+                    unsnapshotted_paths.insert(path.clone(), worktree_stamp(&root, &path));
+                    continue;
                 }
-                let path = change.path.clone();
                 let content = read_worktree_file(&root, &path)?;
-                if snapshot_bytes.saturating_add(content.len()) > MAX_BASELINE_BYTES {
+                if content.len() > MAX_FILE_BYTES
+                    || snapshot_bytes.saturating_add(content.len()) > MAX_BASELINE_BYTES
+                {
                     snapshot_truncated = true;
-                    break;
+                    unsnapshotted_paths.insert(path.clone(), worktree_stamp(&root, &path));
+                    continue;
                 }
                 snapshot_bytes += content.len();
                 let content_fingerprint = worktree_fingerprint_from_content(&root, &path, &content);
@@ -207,6 +227,7 @@ impl RepositoryManager {
             root,
             head,
             dirty_files,
+            unsnapshotted_paths,
             repository_missing_at_start,
             snapshot_truncated,
         };
@@ -319,7 +340,13 @@ impl RepositoryManager {
         });
         let pre_existing: HashSet<String> = baseline
             .as_ref()
-            .map(|item| item.dirty_files.keys().cloned().collect())
+            .map(|item| {
+                item.dirty_files
+                    .keys()
+                    .chain(item.unsnapshotted_paths.keys())
+                    .cloned()
+                    .collect()
+            })
             .unwrap_or_default();
 
         // One process where there were three: HEAD, the branch and the working tree all come
@@ -348,11 +375,7 @@ impl RepositoryManager {
 
         let mut changes = status.changes;
         if let Some(baseline) = baseline.as_ref() {
-            if baseline.snapshot_truncated {
-                changes.clear();
-            } else {
-                retain_session_worktree_changes(&root, baseline, &mut changes);
-            }
+            retain_session_worktree_changes(&root, baseline, &mut changes);
         }
         merge_change_sets(derived.committed_changes, &mut changes);
         changes.sort_by(|left, right| left.path.cmp(&right.path));
@@ -371,7 +394,9 @@ impl RepositoryManager {
             .as_ref()
             .is_some_and(|item| item.snapshot_truncated)
         {
-            diagnostic.push_str(" 启动时变更过多，无法准确区分后续工作树修改，仅显示提交变更。");
+            diagnostic.push_str(
+                " 启动时部分文件超出快照限制，后续修改按文件大小和时间判断；其他文件仍正常统计。",
+            );
         }
         Ok(RepositoryOverview {
             available: true,
@@ -408,6 +433,10 @@ impl RepositoryManager {
         let root = PathBuf::from(&overview.root);
         let old_path = change.old_path.as_deref().unwrap_or(&change.path);
         let (_, baseline) = self.resolve_target(target, database)?;
+        let baseline_content_missing = baseline.as_ref().is_some_and(|item| {
+            item.unsnapshotted_paths.contains_key(old_path)
+                || item.unsnapshotted_paths.contains_key(&change.path)
+        });
         let baseline_file = baseline.as_ref().and_then(|item| {
             item.dirty_files
                 .get(old_path)
@@ -446,7 +475,11 @@ impl RepositoryManager {
                 String::from_utf8_lossy(&new_bytes[..new_bytes.len().min(MAX_FILE_BYTES)]).into()
             },
             binary,
-            truncated: old_truncated || new_truncated || old_lines_truncated || new_lines_truncated,
+            truncated: baseline_content_missing
+                || old_truncated
+                || new_truncated
+                || old_lines_truncated
+                || new_lines_truncated,
         })
     }
 
@@ -797,6 +830,9 @@ fn retain_session_worktree_changes(
     changes: &mut Vec<RepositoryChange>,
 ) {
     changes.retain(|change| {
+        if let Some(stamp) = baseline.unsnapshotted_paths.get(&change.path) {
+            return *stamp != worktree_stamp(root, &change.path);
+        }
         let Some(file) = baseline.dirty_files.get(&change.path) else {
             return true;
         };
@@ -822,6 +858,23 @@ fn retain_session_worktree_changes(
                     "D"
                 }
                 .into(),
+                untracked: false,
+                committed: false,
+                pre_existing: true,
+            });
+        }
+    }
+    for (path, stamp) in &baseline.unsnapshotted_paths {
+        if changes.iter().any(|change| change.path == *path) {
+            continue;
+        }
+        let current = worktree_stamp(root, path);
+        if current != *stamp {
+            changes.push(RepositoryChange {
+                path: path.clone(),
+                old_path: None,
+                index_status: String::new(),
+                worktree_status: if current.is_some() { "M" } else { "D" }.into(),
                 untracked: false,
                 committed: false,
                 pre_existing: true,
@@ -980,6 +1033,18 @@ fn read_git_blob(root: &Path, revision: &str, path: &str) -> Result<(Vec<u8>, bo
 fn worktree_fingerprint(root: &Path, path: &str) -> Option<u64> {
     let content = read_worktree_file(root, path).ok()?;
     worktree_fingerprint_from_content(root, path, &content)
+}
+
+fn worktree_stamp(root: &Path, path: &str) -> Option<FileStamp> {
+    validate_relative_path(path).ok()?;
+    let metadata = fs::symlink_metadata(root.join(path)).ok()?;
+    if !metadata.is_file() || metadata.file_type().is_symlink() {
+        return None;
+    }
+    Some(FileStamp {
+        len: metadata.len(),
+        modified: metadata.modified().ok(),
+    })
 }
 
 fn worktree_fingerprint_from_content(root: &Path, path: &str, content: &[u8]) -> Option<u64> {
@@ -1223,6 +1288,7 @@ mod tests {
             head: current_head(&root).unwrap(),
             repository_missing_at_start: false,
             snapshot_truncated: false,
+            unsnapshotted_paths: HashMap::new(),
             dirty_files: HashMap::from([(
                 change.path.clone(),
                 BaselineFile {
@@ -1242,6 +1308,48 @@ mod tests {
         retain_session_worktree_changes(&root, &baseline, &mut changed);
         assert_eq!(changed.len(), 1);
         assert!(changed[0].pre_existing);
+        fs::remove_dir_all(&root).ok();
+    }
+
+    #[test]
+    fn oversized_preexisting_file_does_not_hide_other_session_changes() {
+        let root = temporary_repository();
+        fs::create_dir_all(&root).unwrap();
+        if run_git(&root, &["init"]).is_err() {
+            fs::remove_dir_all(&root).ok();
+            return;
+        }
+        fs::write(root.join("large.bin"), vec![0; MAX_FILE_BYTES + 1]).unwrap();
+        fs::write(root.join("small.txt"), "before session\n").unwrap();
+
+        let manager = RepositoryManager::default();
+        manager
+            .capture_baseline(Some("workspace"), "terminal", 0, &root.to_string_lossy())
+            .unwrap();
+        let baseline = manager
+            .baselines
+            .lock()
+            .unwrap()
+            .values()
+            .next()
+            .cloned()
+            .unwrap();
+        assert!(baseline.snapshot_truncated);
+        assert!(baseline.unsnapshotted_paths.contains_key("large.bin"));
+        assert!(baseline.dirty_files.contains_key("small.txt"));
+
+        fs::write(root.join("small.txt"), "changed in session\n").unwrap();
+        let pre_existing = HashSet::from(["large.bin".into(), "small.txt".into()]);
+        let mut changes = collect_worktree_changes(&root, &pre_existing).unwrap();
+        retain_session_worktree_changes(&root, &baseline, &mut changes);
+        assert_eq!(changes.len(), 1);
+        assert_eq!(changes[0].path, "small.txt");
+
+        fs::write(root.join("large.bin"), vec![1; MAX_FILE_BYTES + 2]).unwrap();
+        let mut changes = collect_worktree_changes(&root, &pre_existing).unwrap();
+        retain_session_worktree_changes(&root, &baseline, &mut changes);
+        assert_eq!(changes.len(), 2);
+        assert!(changes.iter().any(|change| change.path == "large.bin"));
         fs::remove_dir_all(&root).ok();
     }
 
@@ -1291,6 +1399,28 @@ mod tests {
         drop(baselines);
         manager.remove_terminal("terminal");
         assert!(manager.baselines.lock().unwrap().is_empty());
+        fs::remove_dir_all(&root).ok();
+    }
+
+    #[test]
+    fn restored_terminal_does_not_capture_existing_changes_as_new_baseline() {
+        let root = temporary_repository();
+        fs::create_dir_all(&root).unwrap();
+        if run_git(&root, &["init"]).is_err() {
+            fs::remove_dir_all(&root).ok();
+            return;
+        }
+        fs::write(root.join("existing.txt"), "changed before restart\n").unwrap();
+
+        // A new RepositoryManager represents a new app process, while revision 1 identifies
+        // the terminal session restored from the persisted workspace.
+        let manager = RepositoryManager::default();
+        manager
+            .capture_baseline(Some("workspace"), "terminal", 1, &root.to_string_lossy())
+            .unwrap();
+        assert!(manager.baselines.lock().unwrap().is_empty());
+        let changes = collect_worktree_changes(&root, &HashSet::new()).unwrap();
+        assert!(changes.iter().any(|change| change.path == "existing.txt"));
         fs::remove_dir_all(&root).ok();
     }
 

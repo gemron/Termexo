@@ -75,6 +75,12 @@ const AGENT_PRESENTATIONS: readonly AgentPresentation[] = [
     icon: AGENT_ICONS.opencode,
   },
   {
+    agentType: 'grok',
+    name: 'Grok Build',
+    shortName: 'Grok',
+    icon: AGENT_ICONS.grok,
+  },
+  {
     agentType: 'antigravity',
     name: 'Antigravity',
     shortName: 'Antigravity',
@@ -498,6 +504,7 @@ export class SessionCenterDialogComponent {
   readonly installation = input<AgentInstallation | null>(null);
   readonly codexInstallation = input<AgentInstallation | null>(null);
   readonly openCodeInstallation = input<AgentInstallation | null>(null);
+  readonly grokInstallation = input<AgentInstallation | null>(null);
   readonly antigravityInstallation = input<AgentInstallation | null>(null);
   readonly sessions = input<AgentSession[]>([]);
   readonly profiles = input<ModelProfile[]>([]);
@@ -613,7 +620,9 @@ export class SessionCenterDialogComponent {
    */
   private static readonly INITIAL_VISIBLE_ROWS = 80;
   private static readonly ROW_INCREMENT = 80;
-  protected readonly visibleSessionCount = signal(SessionCenterDialogComponent.INITIAL_VISIBLE_ROWS);
+  protected readonly visibleSessionCount = signal(
+    SessionCenterDialogComponent.INITIAL_VISIBLE_ROWS,
+  );
   protected readonly visibleSessions = computed(() =>
     this.filteredSessions().slice(0, this.visibleSessionCount()),
   );
@@ -671,6 +680,11 @@ export class SessionCenterDialogComponent {
       (this.agentFilter() === 'all' || this.agentFilter() === 'opencode') &&
       this.sessionCounts().opencode > 0,
   );
+  protected readonly showsGrokOptions = computed(
+    () =>
+      (this.agentFilter() === 'all' || this.agentFilter() === 'grok') &&
+      this.sessionCounts().grok > 0,
+  );
   protected readonly showsAntigravityOptions = computed(
     () =>
       (this.agentFilter() === 'all' || this.agentFilter() === 'antigravity') &&
@@ -682,6 +696,7 @@ export class SessionCenterDialogComponent {
       this.showsClaudeOptions() ||
       this.showsCodexOptions() ||
       this.showsOpenCodeOptions() ||
+      this.showsGrokOptions() ||
       this.showsAntigravityOptions(),
   );
   /** Keeps the active model profiles visible while the configuration panel is collapsed. */
@@ -766,12 +781,15 @@ export class SessionCenterDialogComponent {
    * survives a restart. An explicit pick in the settings panel overrides them.
    */
   protected resume(session: AgentSession): void {
-    if (session.agentType === 'opencode') {
-      // Credentials and providers live inside OpenCode, so only the model and the confirmation
-      // mode are Termexo's to pass along.
+    if (session.agentType === 'opencode' || session.agentType === 'grok') {
+      // These CLIs manage their own credentials. Termexo only passes an optional model for
+      // OpenCode and the confirmation mode selected here.
       this.resumed.emit({
         session,
-        model: this.openCodeModel().trim() || session.modelName || undefined,
+        model:
+          session.agentType === 'opencode'
+            ? this.openCodeModel().trim() || session.modelName || undefined
+            : undefined,
         autoConfirm: this.autoConfirm() || undefined,
       });
       return;
@@ -823,6 +841,8 @@ export class SessionCenterDialogComponent {
         return this.codexInstallation();
       case 'opencode':
         return this.openCodeInstallation();
+      case 'grok':
+        return this.grokInstallation();
       case 'antigravity':
         return this.antigravityInstallation();
     }

@@ -1,5 +1,5 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
-import { beforeEach, describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type {
   RepositoryChange,
@@ -131,5 +131,39 @@ describe('GitWorkbenchComponent states', () => {
     fixture.detectChanges();
 
     expect(root.querySelector('.change-file.active strong')?.textContent).toBe('git-workbench.ts');
+  });
+
+  it.each(['unified', 'split'] as const)('expands all hidden lines in %s view', async (layout) => {
+    const context = Array.from({ length: 12 }, (_, i) => `context ${i}`).join('\n');
+    vi.spyOn(git, 'loadDiff').mockResolvedValue({
+      path: OVERVIEW.changes[0].path,
+      oldText: `${context}\nold\n${context}`,
+      newText: `${context}\nnew\n${context}`,
+      binary: false,
+      truncated: false,
+    });
+    git.setDiffLayout(layout);
+    fixture.componentRef.setInput('overview', OVERVIEW);
+    fixture.componentRef.setInput('target', {
+      workspaceId: 'workspace-1',
+      terminalId: 'terminal-1',
+      runtimeRevision: 0,
+    });
+    fixture.detectChanges();
+    await fixture.whenStable();
+    fixture.detectChanges();
+    expect(root.querySelectorAll('.diff-collapse').length).toBeGreaterThan(0);
+    const viewport = root.querySelector<HTMLElement>('.diff-viewport')!;
+    viewport.scrollTo = vi.fn();
+    for (let block = 0; block < 2; block++) {
+      root.querySelector<HTMLButtonElement>('.diff-collapse')!.click();
+      fixture.detectChanges();
+      await fixture.whenStable();
+    }
+    expect(root.querySelector('.diff-collapse')).toBeNull();
+    expect(root.querySelectorAll('.diff-line')).toHaveLength(layout === 'split' ? 50 : 26);
+    expect(viewport.textContent).toContain('old');
+    expect(viewport.textContent).toContain('new');
+    expect(viewport.textContent).toContain('context 11');
   });
 });

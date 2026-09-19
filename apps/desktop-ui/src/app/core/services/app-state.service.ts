@@ -419,6 +419,28 @@ export class AppStateService {
     return true;
   }
 
+  reorderWorkspace(
+    workspaceId: string,
+    targetWorkspaceId: string,
+    position: 'before' | 'after',
+  ): boolean {
+    const workspaces = [...this.workspaceItems()];
+    const currentIndex = workspaces.findIndex((workspace) => workspace.id === workspaceId);
+    if (currentIndex < 0 || workspaceId === targetWorkspaceId) return false;
+
+    const [moved] = workspaces.splice(currentIndex, 1);
+    const targetIndex = workspaces.findIndex((workspace) => workspace.id === targetWorkspaceId);
+    if (targetIndex < 0) return false;
+    const insertIndex = targetIndex + (position === 'after' ? 1 : 0);
+    if (insertIndex === currentIndex) return false;
+
+    workspaces.splice(insertIndex, 0, moved);
+    const orderedWorkspaces = this.normalizeWorkspaceOrder(workspaces);
+    this.workspaceItems.set(orderedWorkspaces);
+    void this.repository.saveAll(orderedWorkspaces);
+    return true;
+  }
+
   updateWorkspaceAppearance(workspaceId: string, name: string, themeColor: string): boolean {
     const workspace = this.workspaceItems().find((item) => item.id === workspaceId);
     const normalizedName = name.trim();
@@ -821,7 +843,9 @@ export class AppStateService {
             ? 'GPT Codex'
             : agentType === 'opencode'
               ? OPENCODE_DEFAULT_MODEL
-              : 'Local'),
+              : agentType === 'grok'
+                ? 'Grok Build'
+                : 'Local'),
       branch: workspace.activeBranch,
       command: input.command ?? this.defaultCommand(agentType),
       nativeSessionId: input.nativeSessionId,

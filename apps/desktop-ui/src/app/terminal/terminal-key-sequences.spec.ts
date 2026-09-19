@@ -3,6 +3,7 @@ import {
   quickKeySequence,
   REVERSE_TAB_SEQUENCE,
   terminalKeySequence,
+  terminalPasteShortcut,
   workbenchShortcut,
 } from './terminal-key-sequences';
 
@@ -68,6 +69,16 @@ describe('terminalKeySequence', () => {
 
   it('ignores other keys', () => {
     expect(terminalKeySequence(keyEvent({ key: 'Enter' }))).toBeNull();
+  });
+});
+
+describe('terminalPasteShortcut', () => {
+  it('recognizes Ctrl+V and Ctrl+Shift+V only on keydown', () => {
+    expect(terminalPasteShortcut(keyEvent({ key: 'v', ctrlKey: true, shiftKey: false }))).toBe(true);
+    expect(terminalPasteShortcut(keyEvent({ key: 'V', ctrlKey: true }))).toBe(true);
+    expect(terminalPasteShortcut(keyEvent({ key: 'v', ctrlKey: true, type: 'keyup' }))).toBe(false);
+    expect(terminalPasteShortcut(keyEvent({ key: 'v', ctrlKey: true, altKey: true }))).toBe(false);
+    expect(terminalPasteShortcut(keyEvent({ key: 'v', ctrlKey: false }))).toBe(false);
   });
 });
 

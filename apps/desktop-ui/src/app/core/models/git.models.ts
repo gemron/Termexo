@@ -259,6 +259,10 @@ export function withCollapsedEquals(
   const out: DiffDisplayRow[] = [];
   let index = 0;
   while (index < rows.length) {
+    if (rows[index].kind !== 'equal') {
+      out.push(rows[index++]);
+      continue;
+    }
     const start = index;
     while (index < rows.length && rows[index].kind === 'equal') {
       index += 1;

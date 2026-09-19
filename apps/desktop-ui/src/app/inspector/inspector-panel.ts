@@ -157,6 +157,10 @@ export class InspectorPanelComponent {
       }
       return ids;
     }
+    if (terminal.agentType === 'grok') {
+      ids.add('agent:grok');
+      return ids;
+    }
     const activeProfile = terminal.profileId
       ? this.modelProfiles().find((profile) => profile.id === terminal.profileId)
       : undefined;
