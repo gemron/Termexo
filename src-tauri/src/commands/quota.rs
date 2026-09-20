@@ -10,11 +10,14 @@ use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use tauri::State;
 
-use crate::agent::{AgentAdapter, AntigravityAdapter, AntigravityUsage, GrokBuildAdapter};
+use crate::agent::{AgentAdapter, AntigravityUsage, GrokBuildAdapter};
 use crate::commands::agent::network_environment;
 use crate::config::{AccountProfile, CredentialStore, ModelProfile};
 use crate::database::WorkspaceDatabase;
 use crate::quota::{self, ProviderQuota};
+
+#[path = "antigravity_quota.rs"]
+mod antigravity_quota;
 
 const REQUEST_TIMEOUT: Duration = Duration::from_secs(10);
 const USER_AGENT: &str = "Termexo-Quota";
@@ -156,20 +159,21 @@ pub async fn get_provider_quotas(
         }
     }
 
-    // Antigravity does not use per-account profiles, but is driven directly as an installation.
-    // Its allowance status is reported under a dedicated agent entry.
+    // Antigravity uses the signed-in agy credential and the HTTP quota endpoint. No CLI process
+    // is started when the allowance panel refreshes.
+    let antigravity_proxy = proxy.clone();
     let antigravity_task = if !force {
         if let Some(cached) = cache.fresh(ANTIGRAVITY_QUOTA_ID, now, AGENT_CACHE_TTL) {
             resolved.push(cached);
             None
         } else {
-            Some(tauri::async_runtime::spawn_blocking(move || {
-                resolve_antigravity(now)
+            Some(tauri::async_runtime::spawn(async move {
+                resolve_antigravity(now, antigravity_proxy).await
             }))
         }
     } else {
-        Some(tauri::async_runtime::spawn_blocking(move || {
-            resolve_antigravity(now)
+        Some(tauri::async_runtime::spawn(async move {
+            resolve_antigravity(now, antigravity_proxy).await
         }))
     };
 
@@ -365,31 +369,28 @@ fn resolve_grok(now: i64) -> Result<PendingQuery, ProviderQuota> {
     })
 }
 
-fn resolve_antigravity(now: i64) -> ProviderQuota {
-    let adapter = AntigravityAdapter::new();
-    match adapter.detect() {
-        Ok(installation) if installation.installed => {}
-        _ => {
+async fn resolve_antigravity(now: i64, proxy: Option<String>) -> ProviderQuota {
+    let client = match build_client(proxy.as_deref()) {
+        Ok(client) => client,
+        Err(reason) => {
             return ProviderQuota::unavailable(
                 ANTIGRAVITY_QUOTA_ID,
                 quota::AGENT_ANTIGRAVITY_LABEL,
                 quota::AGENT_ANTIGRAVITY_LABEL,
                 now,
-                "未检测到 Antigravity CLI（agy）",
+                reason,
             )
         }
-    }
-
-    // The allowance lives behind the CLI's own `/usage` command; there is no endpoint to call.
-    let usage = match adapter.read_usage() {
+    };
+    let usage = match antigravity_quota::read_usage(&client).await {
         Ok(usage) => usage,
-        Err(error) => {
+        Err(reason) => {
             return ProviderQuota::unavailable(
                 ANTIGRAVITY_QUOTA_ID,
                 quota::AGENT_ANTIGRAVITY_LABEL,
                 quota::AGENT_ANTIGRAVITY_LABEL,
                 now,
-                error.to_string(),
+                reason,
             )
         }
     };
@@ -427,6 +428,9 @@ fn antigravity_entries(usage: &AntigravityUsage) -> Vec<quota::QuotaEntry> {
             let Some(remaining) = bucket.remaining_fraction else {
                 continue;
             };
+            if !(0.0..=1.0).contains(&remaining) {
+                continue;
+            }
             let label = match (group.name.trim(), bucket.name.trim()) {
                 ("", "") => continue,
                 ("", name) => name.to_owned(),

@@ -24,15 +24,6 @@ const VERSION_TIMEOUT: Duration = Duration::from_secs(20);
 /// Listing models reaches the service, so it is given longer than a local version check.
 const MODEL_LIST_TIMEOUT: Duration = Duration::from_secs(45);
 
-/// Reading the allowance reaches the service and starts the CLI, which is not quick.
-const USAGE_TIMEOUT: Duration = Duration::from_secs(60);
-
-/// The slash command that reports the allowance, run as a one-shot prompt.
-///
-/// There is no `agy usage` subcommand — the figures are only reachable through the command the TUI
-/// offers, which a headless run accepts and answers in JSON.
-const USAGE_COMMAND: &str = "/usage";
-
 /// Conversations are summarised in one database beside the transcripts.
 ///
 /// Reading it directly rather than driving the CLI keeps listing fast and works while signed out:
@@ -47,11 +38,9 @@ pub enum AntigravityError {
     CommandFailed(String),
     #[error("读取 Antigravity 会话失败：{0}")]
     SessionRead(String),
-    #[error("无法读取 Antigravity 余量：{0}")]
-    UsageUnavailable(String),
 }
 
-/// One allowance window the CLI reports.
+/// One Antigravity allowance window.
 #[derive(Debug, Clone, serde::Deserialize)]
 pub struct AntigravityUsageBucket {
     #[serde(default)]
@@ -63,7 +52,7 @@ pub struct AntigravityUsageBucket {
     pub reset_time: Option<String>,
 }
 
-/// Models that share one allowance, as the CLI groups them.
+/// Models that share one allowance.
 #[derive(Debug, Clone, serde::Deserialize)]
 pub struct AntigravityUsageGroup {
     #[serde(default)]
@@ -72,7 +61,7 @@ pub struct AntigravityUsageGroup {
     pub buckets: Vec<AntigravityUsageBucket>,
 }
 
-/// What `/usage` reports: the allowance groups.
+/// The allowance groups reported by the Antigravity HTTP endpoint.
 #[derive(Debug, Clone, Default, serde::Deserialize)]
 pub struct AntigravityUsage {
     #[serde(default)]
@@ -99,6 +88,12 @@ pub struct AntigravityAdapter {
 impl AntigravityAdapter {
     pub fn new() -> Self {
         Self::default()
+    }
+
+    /// Locate the installed binary without running it. The quota HTTP client only needs its
+    /// bundled desktop OAuth metadata when a saved access token expires.
+    pub(crate) fn executable_path(&self) -> Option<PathBuf> {
+        self.find_executable()
     }
 
     #[cfg(test)]
@@ -172,33 +167,6 @@ impl AntigravityAdapter {
         }
         let version = String::from_utf8_lossy(&output.stdout).trim().to_owned();
         (!version.is_empty()).then_some(version)
-    }
-
-    /// The allowance the signed-in account has left, as the CLI reports it.
-    ///
-    /// Run headlessly with a JSON envelope, so the figures arrive structured rather than as the
-    /// table the TUI draws. The envelope carries the command's own payload beside the rendered
-    /// text; the payload is what is read, because the text is formatted for a terminal.
-    pub fn read_usage(&self) -> Result<AntigravityUsage, AntigravityError> {
-        let output = self.run(
-            &[
-                "-p",
-                USAGE_COMMAND,
-                "--output-format",
-                "json",
-                // The allowance is a property of the account, not of any workspace, and asking
-                // for it must not add a conversation to whichever folder Termexo happens to be in.
-                "--print-timeout",
-                "1m",
-            ],
-            USAGE_TIMEOUT,
-        )?;
-        if !output.status.success() {
-            return Err(AntigravityError::CommandFailed(
-                String::from_utf8_lossy(&output.stderr).trim().to_owned(),
-            ));
-        }
-        parse_usage(&String::from_utf8_lossy(&output.stdout))
     }
 
     /// The models this installation offers, newest first as the CLI orders them.
@@ -408,41 +376,6 @@ fn file_uri_to_path(uri: &str) -> Option<String> {
     })
 }
 
-/// Reads the usage payload out of the headless envelope.
-///
-/// The envelope reports its own status, which is where an expired session or a service that is
-/// unreachable shows up — a run can exit successfully and still carry nothing worth reading.
-fn parse_usage(stdout: &str) -> Result<AntigravityUsage, AntigravityError> {
-    let line = stdout
-        .lines()
-        .rev()
-        .find(|line| line.trim_start().starts_with('{'))
-        .ok_or_else(|| AntigravityError::UsageUnavailable("CLI 未返回 JSON 结果".into()))?;
-    let envelope: serde_json::Value = serde_json::from_str(line)
-        .map_err(|error| AntigravityError::UsageUnavailable(error.to_string()))?;
-
-    let status = envelope
-        .get("status")
-        .and_then(serde_json::Value::as_str)
-        .unwrap_or_default();
-    if !status.eq_ignore_ascii_case("SUCCESS") {
-        let reason = envelope
-            .get("error")
-            .and_then(serde_json::Value::as_str)
-            .unwrap_or(status);
-        return Err(AntigravityError::UsageUnavailable(reason.to_owned()));
-    }
-
-    let payload = envelope
-        .get("command")
-        .filter(|command| command.get("name").and_then(serde_json::Value::as_str) == Some("usage"))
-        .and_then(|command| command.get("data"))
-        .ok_or_else(|| AntigravityError::UsageUnavailable("CLI 未返回余量数据".into()))?;
-
-    serde_json::from_value(payload.clone())
-        .map_err(|error| AntigravityError::UsageUnavailable(error.to_string()))
-}
-
 fn parse_models(output: &str) -> Vec<AntigravityModel> {
     output
         .lines()
@@ -598,55 +531,6 @@ mod tests {
         if cfg!(windows) {
             assert_eq!(path, "C:\\Users\\gemro\\my project");
         }
-    }
-
-    /// The envelope the CLI actually answers with, trimmed to the fields that are read.
-    const USAGE_ENVELOPE: &str = r#"{"conversation_id":"","status":"SUCCESS","response":"Gemini Models\tWeekly Limit Remaining\t0%\n","command":{"name":"usage","data":{"description":"Within each group, models share a weekly limit.","groups":[{"name":"Gemini Models","description":"Models within this group: Gemini Flash, Gemini Pro","buckets":[{"id":"gemini-weekly","name":"Weekly Limit Remaining","description":"You have hit your weekly limit.","window":"weekly","remaining_fraction":0,"reset_time":"2026-09-18T16:45:19Z"}]},{"name":"Claude and GPT models","buckets":[{"id":"3p-weekly","name":"Weekly Limit Remaining","window":"weekly","remaining_fraction":1,"reset_time":"2026-09-19T01:58:53Z"}]}]}}}"#;
-
-    #[test]
-    fn the_usage_payload_is_read_out_of_the_headless_envelope() {
-        let usage = parse_usage(USAGE_ENVELOPE).unwrap();
-
-        assert_eq!(usage.groups.len(), 2);
-        let gemini = &usage.groups[0];
-        assert_eq!(gemini.name, "Gemini Models");
-        assert_eq!(gemini.buckets[0].remaining_fraction, Some(0.0));
-        assert_eq!(
-            gemini.buckets[0].reset_time.as_deref(),
-            Some("2026-09-18T16:45:19Z")
-        );
-        assert_eq!(usage.groups[1].buckets[0].remaining_fraction, Some(1.0));
-    }
-
-    /// The CLI prints progress before the envelope, so the payload is not on the first line.
-    #[test]
-    fn a_line_printed_before_the_envelope_is_skipped() {
-        let noisy = format!("Fetching usage...\n{USAGE_ENVELOPE}");
-
-        let usage = parse_usage(&noisy).unwrap();
-
-        assert_eq!(usage.groups.len(), 2);
-    }
-
-    /// A run can exit successfully and still carry nothing: a signed-out CLI does exactly that.
-    #[test]
-    fn an_unsuccessful_envelope_is_reported_rather_than_read_as_empty() {
-        let envelope = r#"{"status":"ERROR","error":"authentication required"}"#;
-
-        let result = parse_usage(envelope);
-
-        assert!(matches!(
-            result,
-            Err(AntigravityError::UsageUnavailable(reason)) if reason.contains("authentication")
-        ));
-    }
-
-    #[test]
-    fn output_without_an_envelope_is_refused() {
-        assert!(matches!(
-            parse_usage("Fetching usage...\n"),
-            Err(AntigravityError::UsageUnavailable(_))
-        ));
     }
 
     #[test]
