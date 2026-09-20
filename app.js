@@ -49,6 +49,7 @@ const translations = {
       "Keep your PC running. Use a reachable HTTPS relay and desktop access token, or connect directly over a trusted LAN or VPN.",
     heroRemoteGuide:
       "Set up remote relay access ↗",
+    heroRelease: "New in v0.10.4: Grok Build, live Git changes, and drag-to-order workspaces ↗",
     sceneHeading: "One workspace. Two ways in.",
     sceneDesktop: "RUN ON YOUR PC",
     sceneMobile: "CONTINUE ON YOUR PHONE",
@@ -75,7 +76,7 @@ const translations = {
     metaLocal: "Local-first · MIT open source",
     metaNpm: "One command to start",
 
-    workbenchTitle: "Four agents. One screen.",
+    workbenchTitle: "Five agents. One screen.",
     workbenchLead:
       "Open as many terminals as you like, then choose which ones stay visible and arrange them in a grid that fits how you work. Switch to another project and back, and everything is exactly where you left it.",
     metricTabsTitle: "Open as many as you want",
@@ -103,11 +104,11 @@ const translations = {
 
     sessionTitle: "Pick up yesterday's conversation.",
     sessionLead:
-      "Claude Code and Codex already save your sessions on disk. Termexo simply lists them so you can search and reopen one — it calls the CLI's own resume, so the full context comes back. Nothing you close is really lost.",
+      "Search saved Claude Code, Codex, OpenCode, Grok Build, and Antigravity sessions across projects. Termexo uses each CLI's own resume command to reopen the native context, without changing session files.",
     sessionPoint1:
       "Search across every project by name, path, branch, or model",
     sessionPoint2:
-      "Resumes through the real `claude --resume` and `codex resume`",
+      "Resumes through each supported CLI's native command",
     sessionPoint3:
       "Your session files are read-only — Termexo never edits or deletes them",
     sessionCaption:
@@ -126,10 +127,10 @@ const translations = {
 
     taskTitle: "Hand the work to an agent.",
     taskLead:
-      "Write down what needs doing and what counts as done, pick the agent and the project, and the task opens as a real terminal. It reports its own progress back to the board, so you can see what is running without reading four terminals at once.",
+      "Write down what needs doing and what counts as done, pick the agent and the project, and the task opens as a real terminal. It reports its own progress back to the board, so you can see what is running without reading every terminal at once.",
     taskPoint1:
       "Todo, executing, completed, verified — the terminal moves the card",
-    taskPoint2: "Send a task to Claude Code, Codex, or OpenCode",
+    taskPoint2: "Send a task to Claude Code, Codex, OpenCode, or Grok Build",
     taskPoint3:
       "Reject a result with a note and it goes back for another round",
     taskCaption:
@@ -141,10 +142,10 @@ const translations = {
     roadmapTag: "COMING LATER",
     featureWorkspaceTitle: "Close it. Reopen it. Still there.",
     featureWorkspaceBody:
-      "Project folder, grid layout, which terminals were open, what model each was running, even the colour you picked — it all comes back with the workspace.",
+      "Project folder, grid layout, terminals, and colours come back with the workspace. Drag workspace rows to put projects in your preferred order.",
     featureSessionTitle: "Nothing you close is lost",
     featureSessionBody:
-      "Find any past Claude Code, Codex, OpenCode, or Antigravity session across your projects and reopen it with its full history intact.",
+      "Find past Claude Code, Codex, OpenCode, Grok Build, or Antigravity sessions across your projects and reopen their native history.",
     featureTasksTitle: "Hand a task to an agent",
     featureTasksBody:
       "Write down the task and what counts as done, pick an agent, and it opens as a real terminal that reports its own progress back to the board.",
@@ -159,7 +160,7 @@ const translations = {
       "Follow Windows automatically or switch between Chinese, English, Spanish, French, German, Japanese, and Korean at any time.",
     featureQuotaTitle: "See your quota before you burn it",
     featureQuotaBody:
-      "Check how much of your plan is left and when it resets, before you decide which model to send the next task to.",
+      "Check supported providers' reported quota and reset time. Grok Build shows an exhausted free allowance; unavailable percentages stay unavailable.",
     featureRemoteTitle:
       "Reach your workbench across networks",
     featureRemoteBody:
@@ -197,6 +198,9 @@ const translations = {
       "Remote relay access",
     roadmap07Body:
       "Shipped in v0.10.0: self-hosted relay access, code or account enrollment, cascaded addresses, and v2 encrypted sessions. Your browser operates the terminals already running on your desktop.",
+    roadmap10Title: "Five agents, clearer progress",
+    roadmap10Body:
+      "Grok Build joins the workbench. Session change counts and the Git view keep refreshing; terminals start quietly, and workspace rows can be dragged into order.",
 
     principlesTitle: "Your work.\nOn your computer.",
     principlesLead:
@@ -289,6 +293,7 @@ const translations = {
       "电脑需保持运行。使用双方可达的 HTTPS 中继和桌面访问令牌，也可在可信局域网或 VPN 内直连。",
     heroRemoteGuide:
       "了解如何配置中继访问 ↗",
+    heroRelease: "v0.10.4 新增 Grok Build、持续刷新的 Git 变更和工作区拖拽排序 ↗",
     sceneHeading: "同一个工作台，电脑与手机接续操作。",
     sceneDesktop: "电脑运行 AGENT",
     sceneMobile: "手机远程接着操作",
@@ -313,7 +318,7 @@ const translations = {
     metaLocal: "本地优先 · MIT 开源",
     metaNpm: "一条命令启动",
 
-    workbenchTitle: "四个 Agent，一块屏幕。",
+    workbenchTitle: "五个 Agent，一块屏幕。",
     workbenchLead:
       "想开多少终端就开多少，再挑出此刻要盯着的那几个，按你顺手的方式排成网格。切到别的项目再切回来，还是你离开时的样子。",
     metricTabsTitle: "想开多少开多少",
@@ -337,9 +342,9 @@ const translations = {
 
     sessionTitle: "接着昨天的会话聊。",
     sessionLead:
-      "Claude Code 和 Codex 本来就把会话存在本地，Termexo 只是把它们列出来让你搜。点「恢复」调用的是 CLI 自己的恢复命令，完整上下文原样回来。你关掉的东西，其实没丢。",
+      "跨项目搜索 Claude Code、Codex、OpenCode、Grok Build 和 Antigravity 的本地会话。Termexo 调用各 CLI 的原生恢复命令接回上下文，不改写会话文件。",
     sessionPoint1: "按名称、路径、分支或模型跨项目搜索",
-    sessionPoint2: "走的是真正的 `claude --resume` 和 `codex resume`",
+    sessionPoint2: "通过各 Agent 自己的命令恢复原生会话",
     sessionPoint3: "原生会话文件只读，Termexo 不改也不删",
     sessionCaption: "本地所有会话，可搜索，一键恢复",
 
@@ -353,9 +358,9 @@ const translations = {
 
     taskTitle: "把活儿交给 Agent。",
     taskLead:
-      "写清楚要做什么、做到什么算完成，选好 Agent 和项目，这条任务就会变成一个真实终端。它会把自己的进展回报到看板上，你不用同时盯着四个终端也知道谁在跑。",
+      "写清楚要做什么、做到什么算完成，选好 Agent 和项目，这条任务就会变成一个真实终端。它会把自己的进展回报到看板上，你不用逐个盯着终端也知道谁在跑。",
     taskPoint1: "待办、执行中、已完成、已验收——卡片由终端自己推动",
-    taskPoint2: "任务可以交给 Claude Code、Codex 或 OpenCode",
+    taskPoint2: "任务可以交给 Claude Code、Codex、OpenCode 或 Grok Build",
     taskPoint3: "验收不通过时写一句反馈，任务带着反馈回到执行中",
     taskCaption: "一条任务带着验收标准从待办走到已验收",
     capabilitiesTitle: "那些你一直在手动做的事。",
@@ -365,10 +370,10 @@ const translations = {
     roadmapTag: "以后会有",
     featureWorkspaceTitle: "关掉再打开，东西都还在",
     featureWorkspaceBody:
-      "项目目录、网格布局、开过哪些终端、每个终端跑的什么模型，连你选的主题色，都跟着工作区一起回来。",
+      "项目目录、网格布局、终端和主题色跟着工作区一起回来。拖拽工作区条目，就能调整项目顺序。",
     featureSessionTitle: "关掉的东西没丢",
     featureSessionBody:
-      "翻出任意项目里的历史 Claude Code / Codex / OpenCode / Antigravity 会话，带着完整上下文重新打开。",
+      "翻出各项目里的 Claude Code、Codex、OpenCode、Grok Build 或 Antigravity 历史会话，恢复原生上下文。",
     featureTasksTitle: "把一条任务交给 Agent",
     featureTasksBody:
       "写清楚任务和验收标准，选一个 Agent，它就变成一个真实终端，并把自己的进展回报到看板上。",
@@ -383,7 +388,7 @@ const translations = {
       "自动跟随 Windows，也可随时切换简体中文、英语、西班牙语、法语、德语、日语和韩语。",
     featureQuotaTitle: "额度烧完之前就知道",
     featureQuotaBody:
-      "在决定把下一个任务交给哪个模型之前，先看清套餐还剩多少、什么时候重置。",
+      "查看支持的供应商报告的额度和重置时间。Grok Build 免费额度用尽会明确显示；查不到的百分比不会写成 0%。",
     featureRemoteTitle:
       "跨网络接回工作台",
     featureRemoteBody:
@@ -419,6 +424,9 @@ const translations = {
       "远程中继访问",
     roadmap07Body:
       "v0.10.0 已发布：自建中继、注册码或账号登记、级联访问地址与 v2 加密会话。浏览器操作的是桌面正在运行的同一批终端。",
+    roadmap10Title: "五个 Agent，进度更清楚",
+    roadmap10Body:
+      "Grok Build 加入工作台；会话变更数量与 Git 视图持续刷新。终端安静启动，工作区条目可拖拽排序。",
 
     principlesTitle: "你的工作，\n留在你的电脑。",
     principlesLead:

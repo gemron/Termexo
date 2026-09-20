@@ -33,7 +33,7 @@
         </a>
         <nav aria-label="文档导航">
           <a href="./">返回官网</a>
-          <a class="guide-download" href="downloads/termexo-user-guide.pdf" download="Termexo-使用说明-v0.10.0.pdf">下载 PDF</a>
+          <a class="guide-download" href="downloads/termexo-user-guide.pdf" download="Termexo-使用说明-v0.10.4.pdf">下载 PDF</a>
         </nav>
         <div class="language-switch" role="group" aria-label="文档语言">
           <a href="guide.en.html" data-lang="en" lang="en" hreflang="en" aria-label="Read in English">EN</a>
@@ -55,16 +55,16 @@
           <a href="#faq">07　常见问题</a>
           <a href="#privacy">08　数据与安全</a>
         </nav>
-        <p class="guide-sidebar-note">适用于 Windows 桌面版<br />V0.10.0 · 简体中文</p>
+        <p class="guide-sidebar-note">适用于 Windows 桌面版<br />V0.10.4 · 简体中文</p>
       </aside>
       <article id="guide-content" class="guide-content" lang="zh-CN">
         <header class="guide-intro">
           <p class="guide-label">TERMEXO / USER GUIDE</p>
           <h1>使用说明</h1>
           <p class="guide-lead">从第一个工作空间开始，把终端、Agent 和项目进度放在一起。</p>
-          <p class="guide-meta">适用版本 V0.10.0 · 更新日期 2026-09-13 · Windows 10/11 x64</p>
+          <p class="guide-meta">适用版本 V0.10.4 · 更新日期 2026-09-20 · Windows 10/11 x64</p>
           <div class="guide-actions" data-pdf-skip>
-            <a class="button primary" href="downloads/termexo-user-guide.pdf" download="Termexo-使用说明-v0.10.0.pdf">下载使用说明 · PDF</a>
+            <a class="button primary" href="downloads/termexo-user-guide.pdf" download="Termexo-使用说明-v0.10.4.pdf">下载使用说明 · PDF</a>
             <a class="button secondary" href="#quick-start">开始阅读 ↓</a>
           </div>
           <p class="guide-note" data-pdf-skip>PDF 与本页内容同步，可离线阅读。本文以中文界面为例；其他版本的按钮位置可能略有不同。</p>
@@ -83,7 +83,7 @@
           <h3>第一次使用：完成这三步</h3>
           <ol>
             <li><strong>创建工作空间。</strong>在首次启动引导中创建工作空间，填写项目名称并选择这台电脑上实际存在的项目目录。</li>
-            <li><strong>准备 Agent。</strong>在设置中检查 Claude Code、Codex、OpenCode 与 Antigravity 的检测状态。未安装时可用「CLI 安装与升级」，确认安装预览后继续；按提示完成所选 Agent 的登录或模型配置。为没装的 Agent 新建终端时，启动对话框里也会直接给出「去安装」，并把安装界面停在那个 Agent 上。</li>
+            <li><strong>准备 Agent。</strong>在设置中检查 Claude Code、Codex、OpenCode、Antigravity 与 Grok Build 的检测状态。未安装时可用「CLI 安装与升级」，确认安装预览后继续；按提示完成所选 Agent 的登录或模型配置。为没装的 Agent 新建终端时，启动对话框里也会直接给出「去安装」，并把安装界面停在那个 Agent 上。</li>
             <li><strong>新建终端。</strong>点击标签栏的「新建」，选择 Agent，确认工作目录、账号与模型，启动后输入任务。也可以先选择普通终端，检查项目目录与命令环境。</li>
           </ol>
           <p class="guide-callout">先用一条小任务验证环境，例如「阅读这个项目，说明如何运行测试，先不要修改文件」。确认目录、账号和连接正确后，再安排修改代码的任务。</p>
@@ -91,20 +91,20 @@
           <p>设置里的「CLI 安装与升级」按 Agent 安装它自己的命令行工具，执行前给出完整命令与安装位置，装完再做一次健康检查。有两种来源：</p>
           <ul>
             <li><strong>官方 npm 包：</strong>可以指定版本，失败时自动回滚到原来的版本；需要本机的 Node.js 与 npm，并使用当前生效的代理与 registry。</li>
-            <li><strong>厂商官方安装脚本：</strong>Claude Code、Codex CLI 与 Antigravity 都发布了 Windows 脚本，装的是厂商当前发布的版本，没有版本可选，失败后也不会自动还原；OpenCode 没有发布 Windows 脚本。</li>
+            <li><strong>厂商官方安装脚本：</strong>Claude Code、Codex CLI 与 Antigravity 都发布了 Windows 脚本，装的是厂商当前发布的版本，没有版本可选，失败后也不会自动还原；OpenCode 与 Grok Build 没有发布 Windows 脚本。</li>
           </ul>
         </section>
 
         <section id="workbench" class="guide-section" data-pdf-page>
           <h2>02 / 工作空间与终端</h2>
-          <p>一个工作空间对应一组项目目录、终端标签和布局。不同项目可以分别创建工作空间，并为它们改名、换色、排序；切换项目不必重新排列所有终端。</p>
+          <p>一个工作空间对应一组项目目录、终端标签和布局。不同项目可以分别创建工作空间，并为它们改名、换色；拖拽工作区条目调整顺序，鼠标悬停或键盘聚焦时可打开更多菜单。切换项目不必重新排列所有终端。</p>
           <figure>
             <img src="assets/termexo-workbench.png" alt="Termexo 工作台：左侧工作空间、中间多终端网格、右侧状态与会话信息" width="1800" height="1125" loading="lazy" />
             <figcaption>工作空间组织项目，标签组织终端，网格决定当前看到哪些终端。</figcaption>
           </figure>
           <h3>安排你的工作台</h3>
           <ul>
-            <li>从标签栏「新建」启动普通 Shell、Claude Code、Codex、OpenCode 或 Antigravity。工作目录指向本机文件夹，不是 GitHub 网页地址。</li>
+            <li>从标签栏「新建」启动普通 Shell、Claude Code、Codex、OpenCode、Antigravity 或 Grok Build。工作目录指向本机文件夹，不是 GitHub 网页地址。</li>
             <li>打开多个标签后，选择要显示的终端，再调整网格行列；支持 1 至 6 行/列以及最大化查看。拖动标签可以调整顺序。</li>
             <li>每个终端运行独立的真实进程。多个 Agent 在同一目录中修改文件会相互影响；需要隔离改动时，请使用不同目录或 Git worktree。</li>
           </ul>
@@ -120,7 +120,7 @@
         <section id="sessions" class="guide-section" data-pdf-page>
           <h2>03 / 恢复会话</h2>
           <ol>
-            <li>打开「会话中心」，搜索本机已有的 Claude Code、Codex、OpenCode 或 Antigravity 会话；可结合项目、账号等条件筛选。</li>
+            <li>打开「会话中心」，搜索本机已有的 Claude Code、Codex、OpenCode、Antigravity 或 Grok Build 会话；可结合项目、账号等条件筛选。</li>
             <li>查看会话的目录、Agent、账号与最近活动，确认是要继续的那一次。</li>
             <li>选择恢复，确认启动选项。Termexo 调用 CLI 的原生会话恢复能力，再在终端中继续对话。</li>
           </ol>
@@ -138,7 +138,7 @@
             <li>确认协议与所选 Agent 相匹配。Claude Code 的兼容后端需要支持相应 Anthropic 接口；不是任意模型地址都能直接使用。</li>
             <li>保存后，在启动或恢复终端时选择 Profile，先发起一条简短请求验证。切换现有终端前，阅读界面提示并确认当前任务可以中断。</li>
           </ol>
-          <p>API Key 由 Windows 凭据管理器保存。余量面板按 Profile 显示各供应商的可用额度，Antigravity 的余量通过它自己的 <code>/usage</code> 读取。供应商余额与额度并非都支持查询；界面标为估算或不可用的数据，不应当作官方账单。</p>
+          <p>API Key 由 Windows 凭据管理器保存。余量面板按 Profile 显示支持查询的额度，Antigravity 的余量通过它自己的 <code>/usage</code> 读取。Grok Build 用量卡片可识别免费额度已用尽；若没有可用百分比，会显示无法查询，不会把未知额度当成 0% 已使用。界面标为估算或不可用的数据，不应当作官方账单。</p>
           <h3>Antigravity 的模型与状态回传</h3>
           <p>Antigravity 不使用 Termexo 的模型 Profile。它的模型与推理强度在新建终端的对话框里选择，可选项由本机的 agy 自己提供。</p>
           <p>它也没有按次启动的配置方式，所以要让终端知道它在思考、在跑工具还是在等你回答，Termexo 需要写入 agy 自己设置里的状态行。这一项默认开启，可以在设置中关闭；关闭时会还原你原本的状态行。Termexo 只认自己写的那一段，不会动你自己配置的状态行。</p>
@@ -229,7 +229,7 @@
       </article>
     </main>
     <footer class="guide-footer">
-      <div class="shell guide-footer-links"><span>Termexo 使用说明 · V0.10.0</span><a href="#guide-content">回到顶部 ↑</a><a href="downloads/termexo-user-guide.pdf" download="Termexo-使用说明-v0.10.0.pdf">下载 PDF</a></div>
+      <div class="shell guide-footer-links"><span>Termexo 使用说明 · V0.10.4</span><a href="#guide-content">回到顶部 ↑</a><a href="downloads/termexo-user-guide.pdf" download="Termexo-使用说明-v0.10.4.pdf">下载 PDF</a></div>
       <div class="shell site-counter">
         <p><span>官网累计访问量（PV）：</span> <span id="busuanzi_value_site_pv" class="site-counter-value">—</span></p>
         <p>第三方统计仅记录官网访问；“—”表示暂不可用。</p>
