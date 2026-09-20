@@ -11,7 +11,7 @@
 </p>
 
 <p align="center">
-  <img alt="Version 0.10.4" src="https://img.shields.io/badge/version-0.10.4-58c7a0">
+  <img alt="Version 0.10.5" src="https://img.shields.io/badge/version-0.10.5-58c7a0">
   <img alt="Windows" src="https://img.shields.io/badge/platform-Windows-0078D4?logo=windows">
   <img alt="Tauri 2" src="https://img.shields.io/badge/Tauri-2-24C8DB?logo=tauri&logoColor=white">
   <img alt="Angular 22" src="https://img.shields.io/badge/Angular-22-DD0031?logo=angular">
@@ -96,7 +96,7 @@ npx termexo@latest
 
 ## 最新版本
 
-**[v0.10.4](https://github.com/gemron/Termexo/releases/tag/v0.10.4)** 新增第五个 Agent Grok Build，修复会话代码变更与 Git 面板刷新，改进终端启动和 Claude Code 粘贴，并支持拖拽排序工作区。Grok Build 用量卡片能识别免费额度用尽，查不到的百分比不会显示成已使用 0%。
+**[v0.10.5](https://github.com/gemron/Termexo/releases/tag/v0.10.5)** 支持任务看板本地 SQLite 持久化与快照导入导出备份，多端远程访问实时同步，并重构 Antigravity 余量查询为直连 HTTP 接口，查询更轻量迅速。
 [完整更新记录](CHANGELOG.cn.md)。
 
 如果 Termexo 帮到了你，欢迎 **给仓库点一个 Star**，帮助更多开发者发现它。
@@ -364,7 +364,8 @@ flowchart LR
 | V0.10.1 | 手机快捷键、适配输入法的远程页面与保留未保存修改的设置 | 已发布 |
 | V0.10.2 | 可靠的 Agent 状态与通知，以及多语言任务看板 | 已发布 |
 | V0.10.3 | 多端查看时 Agent 输入框不再出现乱码、Ctrl+点击打开链接与 OpenCode 复制 | 已发布 |
-| V0.10.4 | Grok Build、可靠的 Git 变更显示、安静的终端启动与工作区排序 | 当前版本 |
+| V0.10.4 | Grok Build、可靠的 Git 变更显示、安静的终端启动与工作区排序 | 已发布 |
+| V0.10.5 | 任务看板持久化与快照迁移、轻量快速的 Antigravity 余量查询 | 当前版本 |
 | V1.0 | 稳定性、安全加固与恢复体验 | 规划中 |
 
 进行中的工作见 [Issues](https://github.com/gemron/Termexo/issues)，实际交付内容见

@@ -2,6 +2,11 @@
 
 Release notes for every Termexo version, newest first. The current release is summarised in [README.md](README.md).
 
+## V0.10.5
+
+- **Todo board persistence and snapshot transfer.** Task board snapshots are now saved to the local SQLite database, persisting across app restarts; snapshots can also be exported or imported as backup files, with real-time updates broadcast to connected remote clients.
+- **Faster, lightweight Antigravity allowance queries.** Quotas are queried directly via the Antigravity HTTP quota endpoint rather than spawning background CLI runs, keeping the UI snappy and quota refreshes instant.
+
 ## V0.10.4
 
 - **Grok Build joins the workbench as a fifth agent.** Detect and launch its CLI from a workspace,

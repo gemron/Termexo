@@ -11,7 +11,7 @@
 </p>
 
 <p align="center">
-  <img alt="Version 0.10.4" src="https://img.shields.io/badge/version-0.10.4-58c7a0">
+  <img alt="Version 0.10.5" src="https://img.shields.io/badge/version-0.10.5-58c7a0">
   <img alt="Windows" src="https://img.shields.io/badge/platform-Windows-0078D4?logo=windows">
   <img alt="Tauri 2" src="https://img.shields.io/badge/Tauri-2-24C8DB?logo=tauri&logoColor=white">
   <img alt="Angular 22" src="https://img.shields.io/badge/Angular-22-DD0031?logo=angular">
@@ -97,7 +97,7 @@ Keep the token private. Closing Termexo or stopping the PC ends the running proc
 
 ## Latest release
 
-**[v0.10.4](https://github.com/gemron/Termexo/releases/tag/v0.10.4)** adds Grok Build as a fifth agent, keeps session code changes and the Git panel current, improves terminal startup and Claude Code paste, and lets you drag workspaces into order. Grok Build's usage card now recognizes an exhausted free allowance and leaves unavailable percentages unknown.
+**[v0.10.5](https://github.com/gemron/Termexo/releases/tag/v0.10.5)** adds SQLite persistence and snapshot import/export transfer for the todo board, real-time multi-device sync, and lightweight direct HTTP Antigravity quota queries.
 [Full changelog](CHANGELOG.md).
 
 If Termexo helps your workflow, a **Star on this repository** helps other developers discover it.
@@ -386,7 +386,8 @@ identifiers still use a legacy name. This does not affect the Termexo product na
 | V0.10.1 | Phone keypad, keyboard-aware remote pages, and settings that keep unsaved edits | Released |
 | V0.10.2 | Reliable agent status and notifications, and a multilingual task board | Released |
 | V0.10.3 | Clean agent prompts with several viewers, Ctrl+click links, and copying from OpenCode | Released |
-| V0.10.4 | Grok Build, reliable Git changes, quieter terminals, and workspace ordering | Current |
+| V0.10.4 | Grok Build, reliable Git changes, quieter terminals, and workspace ordering | Released |
+| V0.10.5 | Todo board persistence and snapshot transfer, and lightweight Antigravity quota queries | Current |
 | V1.0 | Stability, security hardening, and recovery experience | Planned |
 
 See [open issues](https://github.com/gemron/Termexo/issues) for ongoing work and
