@@ -3,6 +3,7 @@ import { Component, computed, effect, inject, input, output, signal } from '@ang
 import { ModalFocusDirective } from '../shared/modal-focus.directive';
 import { AnchoredMenuDirective } from '../shared/anchored-menu.directive';
 import { FormsModule } from '@angular/forms';
+import { save } from '@tauri-apps/plugin-dialog';
 
 import { I18nService } from '../core/i18n/i18n.service';
 import { registerTodoBoardTranslations } from '../core/i18n/todo-board.i18n';
@@ -36,6 +37,8 @@ import {
 } from '../core/models/workspace.models';
 import { DirectoryPickerService } from '../core/services/directory-picker.service';
 import { TodoService } from '../core/services/todo.service';
+import { invoke } from '../core/services/backend-bridge';
+import { isTauriRuntime } from '../core/services/tauri-runtime';
 import { IconComponent } from '../shared/icon/icon';
 
 registerTodoBoardTranslations();
@@ -114,10 +117,64 @@ export class TodoBoardComponent {
   protected readonly agentLabels = AGENT_LABELS;
 
   protected readonly todos = inject(TodoService);
+  protected readonly transferBusy = signal(false);
+  protected readonly transferMessage = signal('');
   private readonly directoryPicker = inject(DirectoryPickerService);
   private readonly i18n = inject(I18nService);
 
   readonly workspace = input<Workspace | null>(null);
+
+  protected async exportTasks(): Promise<void> {
+    const workspace = this.workspace();
+    if (!workspace) return;
+    this.transferBusy.set(true);
+    this.transferMessage.set('');
+    try {
+      const contents = this.todos.exportWorkspace(workspace.id);
+      const safeName =
+        workspace.name.replace(/[^\p{L}\p{N}._-]+/gu, '-').slice(0, 48) || 'workspace';
+      const filename = `termexo-tasks-${safeName}.json`;
+      if (isTauriRuntime()) {
+        const path = await save({
+          defaultPath: filename,
+          filters: [{ name: 'JSON', extensions: ['json'] }],
+        });
+        if (!path) return;
+        await invoke('write_todo_export', { path, contents });
+      } else {
+        const url = URL.createObjectURL(new Blob([contents], { type: 'application/json' }));
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = filename;
+        link.click();
+        setTimeout(() => URL.revokeObjectURL(url), 30_000);
+      }
+      this.transferMessage.set(this.i18n.t('taskBoard.exportSuccess'));
+    } catch (error) {
+      this.transferMessage.set(this.i18n.t('taskBoard.transferFailed', { error: String(error) }));
+    } finally {
+      this.transferBusy.set(false);
+    }
+  }
+
+  protected async importTasks(event: Event): Promise<void> {
+    const input = event.target as HTMLInputElement;
+    const file = input.files?.[0];
+    input.value = '';
+    const workspace = this.workspace();
+    if (!file || !workspace) return;
+    this.transferBusy.set(true);
+    this.transferMessage.set('');
+    try {
+      if (file.size > 16 * 1024 * 1024) throw new Error('Task import exceeds the 16 MB limit');
+      const count = await this.todos.importWorkspace(workspace, await file.text());
+      this.transferMessage.set(this.i18n.t('taskBoard.importSuccess', { count }));
+    } catch (error) {
+      this.transferMessage.set(this.i18n.t('taskBoard.transferFailed', { error: String(error) }));
+    } finally {
+      this.transferBusy.set(false);
+    }
+  }
   readonly terminals = input<readonly TerminalSession[]>([]);
   readonly modelProfiles = input<readonly ModelProfile[]>([]);
   /** CLIs with their own model configuration need no Termexo model profile. */

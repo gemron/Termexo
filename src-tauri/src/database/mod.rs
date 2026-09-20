@@ -21,6 +21,7 @@ const PROVIDER_PLAN_MIGRATION: &str = include_str!("../../migrations/0007_provid
 const REASONING_EFFORT_MIGRATION: &str = include_str!("../../migrations/0010_reasoning_effort.sql");
 const V05_ASSETS_MIGRATION: &str = include_str!("../../migrations/0008_v05_assets.sql");
 const APP_SETTINGS_MIGRATION: &str = include_str!("../../migrations/0009_app_settings.sql");
+const TODO_SNAPSHOTS_MIGRATION: &str = include_str!("../../migrations/0012_todo_snapshots.sql");
 const AGENT_EVENT_INDEX_MIGRATION: &str =
     include_str!("../../migrations/0011_agent_events_created_index.sql");
 
@@ -222,6 +223,7 @@ impl WorkspaceDatabase {
         migrate_legacy_minimax_m3_model(&connection)?;
         ensure_default_profile(&connection)?;
         connection.execute_batch(AGENT_EVENT_INDEX_MIGRATION)?;
+        connection.execute_batch(TODO_SNAPSHOTS_MIGRATION)?;
         prune_stale_agent_events(&connection)?;
         // Pruning frees rows but leaves the pages behind, and compacting rewrites the ones that
         // stayed. Reclaiming the file is worth its one-off cost only when either found something,
@@ -268,6 +270,46 @@ impl WorkspaceDatabase {
                  value = excluded.value,
                  updated_at = excluded.updated_at",
             params![key, value, unix_timestamp_millis()],
+        )?;
+        Ok(())
+    }
+
+    pub fn list_todo_snapshots(&self) -> Result<Vec<Value>, DatabaseError> {
+        let connection = lock_recovering_database(&self.connection);
+        let mut statement =
+            connection.prepare("SELECT snapshot_json FROM todo_snapshots ORDER BY workspace_id")?;
+        let documents = statement
+            .query_map([], |row| row.get::<_, String>(0))?
+            .collect::<Result<Vec<_>, _>>()?;
+        documents
+            .into_iter()
+            .map(|document| serde_json::from_str(&document).map_err(DatabaseError::from))
+            .collect()
+    }
+
+    pub fn save_todo_snapshot(
+        &self,
+        workspace_id: &str,
+        snapshot: &Value,
+    ) -> Result<(), DatabaseError> {
+        let document = serde_json::to_string(snapshot)?;
+        let connection = lock_recovering_database(&self.connection);
+        connection.execute(
+            "INSERT INTO todo_snapshots (workspace_id, snapshot_json, updated_at)
+             VALUES (?1, ?2, ?3)
+             ON CONFLICT(workspace_id) DO UPDATE SET
+                 snapshot_json = excluded.snapshot_json,
+                 updated_at = excluded.updated_at",
+            params![workspace_id, document, unix_timestamp_millis()],
+        )?;
+        Ok(())
+    }
+
+    pub fn delete_todo_snapshot(&self, workspace_id: &str) -> Result<(), DatabaseError> {
+        let connection = lock_recovering_database(&self.connection);
+        connection.execute(
+            "DELETE FROM todo_snapshots WHERE workspace_id = ?1",
+            [workspace_id],
         )?;
         Ok(())
     }
@@ -345,6 +387,10 @@ impl WorkspaceDatabase {
             [workspace_id],
         )?;
         transaction.execute("DELETE FROM workspaces WHERE id = ?1", [workspace_id])?;
+        transaction.execute(
+            "DELETE FROM todo_snapshots WHERE workspace_id = ?1",
+            [workspace_id],
+        )?;
         transaction.commit()?;
         Ok(())
     }
@@ -1641,7 +1687,7 @@ mod tests {
             .lock()
             .unwrap()
             .execute_batch(&format!(
-                "{INITIAL_MIGRATION}\n{AGENT_MIGRATION}\n{NETWORK_MIGRATION}\n{ACCOUNT_MIGRATION}\n{V05_ASSETS_MIGRATION}"
+                "{INITIAL_MIGRATION}\n{AGENT_MIGRATION}\n{NETWORK_MIGRATION}\n{ACCOUNT_MIGRATION}\n{V05_ASSETS_MIGRATION}\n{TODO_SNAPSHOTS_MIGRATION}"
             ))
             .unwrap();
 
@@ -1669,6 +1715,13 @@ mod tests {
 
         database.save(&workspace).unwrap();
         database.save(&first_workspace).unwrap();
+        let board = serde_json::json!({
+            "version": 1, "workspaceId": workspace.id,
+            "projects": [{"id": "project-1", "name": "Termexo"}],
+            "tasks": [{"id": "task-1", "title": "Ship release"}]
+        });
+        database.save_todo_snapshot(&workspace.id, &board).unwrap();
+        assert_eq!(database.list_todo_snapshots().unwrap(), vec![board]);
         let stored = database.list().unwrap();
 
         assert_eq!(stored.len(), 2);
@@ -1677,6 +1730,7 @@ mod tests {
         assert_eq!(stored[1].layout, workspace.layout);
 
         database.delete_workspace(&workspace.id).unwrap();
+        assert!(database.list_todo_snapshots().unwrap().is_empty());
         let stored_after_delete = database.list().unwrap();
         assert_eq!(stored_after_delete.len(), 1);
         assert_eq!(stored_after_delete[0].id, first_workspace.id);

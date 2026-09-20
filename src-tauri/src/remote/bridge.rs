@@ -28,6 +28,7 @@ pub const EVENT_TERMINAL_OUTPUT: &str = "terminal-output";
 pub const EVENT_TERMINAL_EXIT: &str = "terminal-exit";
 pub const EVENT_WORKSPACE_CHANGED: &str = "workspace-changed";
 pub const EVENT_WORKSPACE_DELETED: &str = "workspace-deleted";
+pub const EVENT_TODO_SNAPSHOT_CHANGED: &str = "todo-snapshot-changed";
 pub const EVENT_AGENT_EVENTS: &str = "agent-events";
 /// The size a terminal actually settled on after every viewer's claim was considered.
 pub const EVENT_TERMINAL_RESIZED: &str = "terminal-resized";
@@ -37,6 +38,7 @@ pub const REMOTE_EVENTS: &[&str] = &[
     EVENT_TERMINAL_EXIT,
     EVENT_WORKSPACE_CHANGED,
     EVENT_WORKSPACE_DELETED,
+    EVENT_TODO_SNAPSHOT_CHANGED,
     EVENT_AGENT_EVENTS,
     EVENT_TERMINAL_RESIZED,
 ];
@@ -112,6 +114,9 @@ pub const REMOTE_ALLOWED: &[&str] = &[
     "list_workspaces",
     "save_workspace",
     "delete_workspace",
+    "list_todo_snapshots",
+    "save_todo_snapshot",
+    "delete_todo_snapshot",
     "get_pty_backend",
     "list_live_terminals",
     "create_terminal",
@@ -129,6 +134,8 @@ pub const REMOTE_ALLOWED: &[&str] = &[
 
 /// Commands a remote client must never reach, with the reason each one is held back.
 pub const REMOTE_DENIED: &[&str] = &[
+    // The path belongs to the desktop machine; remote users download their JSON in the browser.
+    "write_todo_export",
     // Writes the status feed into the desktop machine's own Antigravity settings, which is a
     // deliberate change to a file Termexo does not own and belongs to whoever is at that
     // machine.

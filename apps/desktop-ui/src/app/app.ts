@@ -3687,8 +3687,8 @@ export class App {
     // actions still await it, because a prompt must never reach an agent as raw keys.
     void this.loadTodoTranslations();
     await this.state.initialize();
+    await this.todos.initialize(this.state.workspaces());
     this.workspacesLoaded.set(true);
-    this.todos.initialize(this.state.workspaces());
     this.todos.reconcileTerminals(this.state.workspaces());
     await Promise.all([
       this.agents.initialize(),

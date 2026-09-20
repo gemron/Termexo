@@ -27,6 +27,31 @@
     </div>
 
     <div class="board-actions">
+      <input
+        #taskImportInput
+        type="file"
+        accept=".json,application/json"
+        hidden
+        (change)="importTasks($event)"
+      />
+      <button
+        type="button"
+        class="secondary-action"
+        [disabled]="transferBusy()"
+        [title]="'taskBoard.import' | t"
+        (click)="taskImportInput.click()"
+      >
+        <app-icon name="upload" [size]="14" /> {{ 'taskBoard.import' | t }}
+      </button>
+      <button
+        type="button"
+        class="secondary-action"
+        [disabled]="transferBusy()"
+        [title]="'taskBoard.export' | t"
+        (click)="exportTasks()"
+      >
+        <app-icon name="download" [size]="14" /> {{ 'taskBoard.export' | t }}
+      </button>
       <button type="button" class="secondary-action" (click)="openCreateProject()">
         <app-icon name="folder" [size]="14" /> {{ 'taskBoard.addProject' | t }}
       </button>
@@ -40,8 +65,12 @@
       </button>
     </div>
   </header>
-
   <div class="board-toolbars">
+    @if (transferMessage() || todos.storageError()) {
+      <p class="board-transfer-message" role="status">
+        {{ todos.storageError() || transferMessage() }}
+      </p>
+    }
     <nav class="stage-navigation" [attr.aria-label]="'todo.stageNavigation' | t">
       @for (column of columns; track column.stage) {
         <button type="button" (click)="scrollToStage(column.stage, kanban)">

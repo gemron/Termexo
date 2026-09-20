@@ -18,6 +18,8 @@ import {
   TodoWorkspaceSnapshot,
 } from '../models/todo.models';
 import type { TerminalStatus, Workspace } from '../models/workspace.models';
+import { mergeTodoImport, parseTodoImport, serializeTodoExport } from './todo-transfer';
+import { TodoRepository } from './todo.repository';
 
 const STORAGE_KEY = 'termexo.todos.v1';
 const OUTPUT_TAIL_LIMIT = 1_200;
@@ -47,18 +49,87 @@ function normalizeProjectDraft(draft: TodoProjectDraft): TodoProjectDraft | null
 
 @Injectable({ providedIn: 'root' })
 export class TodoService {
+  constructor(private readonly repository: TodoRepository = new TodoRepository()) {}
+
   private readonly snapshotItems = signal<Record<string, TodoWorkspaceSnapshot>>({});
+  private readonly storageErrorState = signal<string | null>(null);
+  private readonly queuedSnapshots = new Map<string, string>();
+  private readonly pendingWorkspaceIds = new Map<string, number>();
+  private mutationQueue: Promise<void> = Promise.resolve();
 
   readonly snapshots = this.snapshotItems.asReadonly();
+  readonly storageError = this.storageErrorState.asReadonly();
 
-  initialize(workspaces: readonly Workspace[]): void {
+  async initialize(workspaces: readonly Workspace[]): Promise<void> {
+    const backend = this.repository.enabled();
     const stored = this.readStoredSnapshots();
-    const next = { ...stored };
+    const workspaceIds = new Set(workspaces.map((workspace) => workspace.id));
+    const databaseSnapshots = backend ? await this.repository.list() : [];
+    const next: Record<string, TodoWorkspaceSnapshot> = {};
+    for (const snapshot of databaseSnapshots) {
+      if (snapshot?.workspaceId && snapshot.version === 1) {
+        next[snapshot.workspaceId] = snapshot;
+        this.queuedSnapshots.set(snapshot.workspaceId, JSON.stringify(snapshot));
+      }
+    }
+    // Import each legacy workspace only when the database does not already own it.
+    for (const [id, snapshot] of Object.entries(stored)) {
+      if (workspaceIds.has(id) && !next[id] && snapshot?.workspaceId === id) next[id] = snapshot;
+    }
     for (const workspace of workspaces) {
       next[workspace.id] = this.normalizeSnapshot(workspace, next[workspace.id]);
     }
     this.snapshotItems.set(next);
-    this.persist();
+    await this.persist();
+    if (backend) {
+      // The legacy key is removed only after all migrated snapshots reached SQLite.
+      if (!this.storageErrorState()) {
+        try {
+          window.localStorage.removeItem(STORAGE_KEY);
+        } catch {
+          // SQLite already has the data; the stale browser copy is ignored on later starts.
+        }
+      }
+      await this.repository.watch(({ workspaceId, snapshot }) => {
+        if (this.pendingWorkspaceIds.has(workspaceId)) return;
+        if (snapshot) {
+          this.queuedSnapshots.set(workspaceId, JSON.stringify(snapshot));
+          this.snapshotItems.update((items) => ({ ...items, [workspaceId]: snapshot }));
+        } else {
+          this.queuedSnapshots.delete(workspaceId);
+          this.snapshotItems.update((items) => {
+            const next = { ...items };
+            delete next[workspaceId];
+            return next;
+          });
+        }
+      });
+    }
+  }
+
+  exportWorkspace(workspaceId: string): string {
+    const snapshot = this.snapshot(workspaceId);
+    if (!snapshot) throw new Error('No task board for this workspace');
+    return serializeTodoExport(snapshot);
+  }
+
+  async importWorkspace(workspace: Workspace, contents: string): Promise<number> {
+    const imported = parseTodoImport(contents);
+    this.ensureWorkspace(workspace);
+    await this.mutationQueue;
+    const merged = mergeTodoImport(this.snapshot(workspace.id)!, imported);
+    if (this.repository.enabled()) await this.repository.save(merged);
+    this.queuedSnapshots.set(workspace.id, JSON.stringify(merged));
+    this.snapshotItems.update((items) => ({ ...items, [workspace.id]: merged }));
+    if (!this.repository.enabled()) this.persist();
+    this.storageErrorState.set(null);
+    return imported.tasks.length;
+  }
+
+  async flush(): Promise<void> {
+    await this.mutationQueue;
+    const error = this.storageErrorState();
+    if (error) throw new Error(error);
   }
 
   /** Reconnects persisted executing tasks to the terminals restored with their workspace. */
@@ -768,11 +839,70 @@ export class TodoService {
     }
   }
 
-  private persist(): void {
+  private persist(): Promise<void> {
+    if (this.repository.enabled()) {
+      const snapshots = this.snapshotItems();
+      const operations: Array<{
+        id: string;
+        snapshot: TodoWorkspaceSnapshot | null;
+        serialized?: string;
+      }> = [];
+      for (const [id, snapshot] of Object.entries(snapshots)) {
+        const serialized = JSON.stringify(snapshot);
+        if (this.queuedSnapshots.get(id) !== serialized) {
+          this.queuedSnapshots.set(id, serialized);
+          operations.push({ id, snapshot, serialized });
+        }
+      }
+      for (const id of this.queuedSnapshots.keys()) {
+        if (!(id in snapshots)) {
+          this.queuedSnapshots.delete(id);
+          operations.push({ id, snapshot: null });
+        }
+      }
+      if (!operations.length) return this.mutationQueue;
+      for (const operation of operations) {
+        this.pendingWorkspaceIds.set(
+          operation.id,
+          (this.pendingWorkspaceIds.get(operation.id) ?? 0) + 1,
+        );
+      }
+      this.mutationQueue = this.mutationQueue.then(async () => {
+        let completed = 0;
+        try {
+          for (const operation of operations) {
+            if (operation.snapshot) {
+              await this.repository.save(operation.snapshot);
+            } else {
+              await this.repository.delete(operation.id);
+            }
+            completed++;
+            this.finishPending(operation.id);
+          }
+          this.storageErrorState.set(null);
+        } catch (error) {
+          for (const operation of operations.slice(completed)) {
+            if (this.queuedSnapshots.get(operation.id) === operation.serialized) {
+              this.queuedSnapshots.delete(operation.id);
+            }
+            this.finishPending(operation.id);
+          }
+          this.storageErrorState.set(String(error));
+        }
+      });
+      return this.mutationQueue;
+    }
     try {
       window.localStorage.setItem(STORAGE_KEY, JSON.stringify(this.snapshotItems()));
     } catch {
       // The in-memory board remains usable in restricted previews.
     }
+    return Promise.resolve();
+  }
+
+  private finishPending(workspaceId: string): void {
+    const count = (this.pendingWorkspaceIds.get(workspaceId) ?? 1) - 1;
+    if (count === 0) this.pendingWorkspaceIds.delete(workspaceId);
+    else this.pendingWorkspaceIds.set(workspaceId, count);
   }
 }

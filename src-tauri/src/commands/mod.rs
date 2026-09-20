@@ -12,6 +12,7 @@ pub mod quota;
 pub mod remote;
 pub mod storage;
 pub mod terminal;
+pub mod todo;
 pub mod update;
 pub mod webview;
 pub mod workspace;
