@@ -33,7 +33,7 @@
         </a>
         <nav aria-label="Guide navigation">
           <a href="./">Home</a>
-          <a class="guide-download" href="downloads/termexo-user-guide-en.pdf" download="Termexo-User-Guide-v0.10.0-en.pdf">Download PDF</a>
+          <a class="guide-download" href="downloads/termexo-user-guide-en.pdf" download="Termexo-User-Guide-v0.10.4-en.pdf">Download PDF</a>
         </nav>
         <div class="language-switch" role="group" aria-label="Guide language">
           <a href="guide.en.html" data-lang="en" lang="en" hreflang="en" aria-label="Read in English" aria-current="page" class="active">EN</a>
@@ -55,16 +55,16 @@
           <a href="#faq">07　FAQ</a>
           <a href="#privacy">08　Data &amp; security</a>
         </nav>
-        <p class="guide-sidebar-note">Windows desktop edition<br />V0.10.0 · English</p>
+        <p class="guide-sidebar-note">Windows desktop edition<br />V0.10.4 · English</p>
       </aside>
       <article id="guide-content" class="guide-content" lang="en">
         <header class="guide-intro">
           <p class="guide-label">TERMEXO / USER GUIDE</p>
           <h1>User guide</h1>
           <p class="guide-lead">Start with your first workspace. Keep your terminals, Agents and project progress together.</p>
-          <p class="guide-meta">For V0.10.0 · Updated 2026-09-13 · Windows 10/11 x64</p>
+          <p class="guide-meta">For V0.10.4 · Updated 2026-09-20 · Windows 10/11 x64</p>
           <div class="guide-actions" data-pdf-skip>
-            <a class="button primary" href="downloads/termexo-user-guide-en.pdf" download="Termexo-User-Guide-v0.10.0-en.pdf">Download English guide · PDF</a>
+            <a class="button primary" href="downloads/termexo-user-guide-en.pdf" download="Termexo-User-Guide-v0.10.4-en.pdf">Download English guide · PDF</a>
             <a class="button secondary" href="#quick-start">Start reading ↓</a>
           </div>
           <p class="guide-note" data-pdf-skip>The English PDF matches this page and works offline. Labels and button locations may vary by app language or version. The workbench screenshot shows the Chinese interface.</p>
@@ -83,7 +83,7 @@
           <h3>Your first session in three steps</h3>
           <ol>
             <li><strong>Create a workspace.</strong> Use the first-run guide to create a workspace. Enter a project name and select a project folder that actually exists on this computer.</li>
-            <li><strong>Prepare an Agent.</strong> Check the detection status of Claude Code, Codex, OpenCode and Antigravity in Settings. If needed, use CLI install and update, review the installation preview and confirm. Complete the selected Agent's sign-in or model configuration. Starting a terminal for an agent that is not installed also offers Install from the dialog itself, opened on that agent.</li>
+            <li><strong>Prepare an Agent.</strong> Check the detection status of Claude Code, Codex, OpenCode, Antigravity and Grok Build in Settings. If needed, use CLI install and update, review the installation preview and confirm. Complete the selected Agent's sign-in or model configuration. Starting a terminal for an agent that is not installed also offers Install from the dialog itself, opened on that agent.</li>
             <li><strong>Open a terminal.</strong> Click New on the tab bar, select an Agent, and confirm the working folder, account and model. Start it and enter a task. You can also open a regular terminal first to check the project path and command environment.</li>
           </ol>
           <p class="guide-callout">Start with a small check, such as: "Read this project and explain how to run its tests. Do not change any files yet." Confirm the folder, account and connection before assigning code changes.</p>
@@ -91,20 +91,20 @@
           <p>CLI install and update in Settings installs each agent's own command-line tool, showing the command and where it lands before anything runs and checking the result afterwards. Two sources:</p>
           <ul>
             <li><strong>The official npm package:</strong> a version can be named and a failed install is rolled back to the previous one. Needs Node.js and npm, and uses the proxy and registry settings in effect.</li>
-            <li><strong>The vendor's own Windows script:</strong> published by Claude Code, Codex CLI and Antigravity. Installs whatever that vendor currently publishes, with no version to choose and no rollback; OpenCode publishes none.</li>
+            <li><strong>The vendor's own Windows script:</strong> published by Claude Code, Codex CLI and Antigravity. Installs whatever that vendor currently publishes, with no version to choose and no rollback; OpenCode and Grok Build publish none.</li>
           </ul>
         </section>
 
         <section id="workbench" class="guide-section" data-pdf-page>
           <h2>02 / Workspaces and terminals</h2>
-          <p>A workspace groups a project folder, terminal tabs and a layout. Create separate workspaces for different projects, then rename, color-code and reorder them. Switching projects does not require rearranging every terminal.</p>
+          <p>A workspace groups a project folder, terminal tabs and a layout. Create separate workspaces for different projects, then rename or color-code them. Drag workspace rows to reorder projects; the row menu appears on hover or keyboard focus. Switching projects does not require rearranging every terminal.</p>
           <figure>
             <img src="assets/termexo-workbench.png" alt="Termexo workbench in Chinese: workspaces on the left, terminal grid in the center, status and session information on the right" width="1800" height="1125" loading="lazy" />
             <figcaption>Workspaces organize projects; tabs organize terminals; the grid controls which terminals you see. Screenshot: Chinese interface.</figcaption>
           </figure>
           <h3>Arrange your workbench</h3>
           <ul>
-            <li>Use New on the tab bar to start a regular shell, Claude Code, Codex, OpenCode or Antigravity. The working folder is a local directory, not a GitHub web address.</li>
+            <li>Use New on the tab bar to start a regular shell, Claude Code, Codex, OpenCode, Antigravity or Grok Build. The working folder is a local directory, not a GitHub web address.</li>
             <li>Open several tabs, select the terminals to display, and adjust the grid. Choose 1 to 6 rows/columns or maximize a terminal. Drag tabs to reorder them.</li>
             <li>Each terminal runs a separate real process. Agents editing the same folder can affect each other's work. Use separate directories or Git worktrees when changes need isolation.</li>
           </ul>
@@ -120,7 +120,7 @@
         <section id="sessions" class="guide-section" data-pdf-page>
           <h2>03 / Resume sessions</h2>
           <ol>
-            <li>Open the Session Center and search for local Claude Code, Codex, OpenCode or Antigravity sessions. Narrow the list by project, account or other available filters.</li>
+            <li>Open the Session Center and search for local Claude Code, Codex, OpenCode, Antigravity or Grok Build sessions. Narrow the list by project, account or other available filters.</li>
             <li>Check the folder, Agent, account and recent activity to identify the session you want.</li>
             <li>Select Resume and confirm the launch options. Termexo uses the CLI's native resume capability, then lets you continue in a terminal.</li>
           </ol>
@@ -138,7 +138,7 @@
             <li>Check that the protocol matches the selected Agent. A compatible Claude Code backend must support the relevant Anthropic API. An arbitrary model URL is not necessarily usable.</li>
             <li>Save the profile, select it when starting or resuming a terminal, and send a short test request. Before switching an existing terminal, read the app's notice and make sure the current task can be interrupted.</li>
           </ol>
-          <p>API keys are stored in Windows Credential Manager. The allowance panel shows each provider's remaining quota per profile, and Antigravity's is read through its own <code>/usage</code>. Not every provider supports balance or quota queries. Values marked as estimates or unavailable are not official billing data.</p>
+          <p>API keys are stored in Windows Credential Manager. The allowance panel shows reported quota for supported profiles, and Antigravity's is read through its own <code>/usage</code>. Grok Build's usage card recognizes an exhausted free allowance; an unavailable percentage is shown as unavailable, not as 0% used. Values marked as estimates or unavailable are not official billing data.</p>
           <h3>Antigravity's models and status feed</h3>
           <p>Antigravity does not use Termexo's model profiles. Its model and reasoning effort are chosen in the new-terminal dialog, from what the agy on this machine offers.</p>
           <p>It also has no per-launch configuration of any kind, so for a terminal to know whether it is thinking, running a tool or waiting for an answer, Termexo writes into the status line in agy's own settings. This is on by default and can be turned off in Settings, which puts back whatever status line you had. Termexo only recognises the block it wrote itself and never touches one of your own.</p>
@@ -229,7 +229,7 @@
       </article>
     </main>
     <footer class="guide-footer">
-      <div class="shell guide-footer-links"><span>Termexo User Guide · V0.10.0</span><a href="#guide-content">Back to top ↑</a><a href="downloads/termexo-user-guide-en.pdf" download="Termexo-User-Guide-v0.10.0-en.pdf">Download PDF</a></div>
+      <div class="shell guide-footer-links"><span>Termexo User Guide · V0.10.4</span><a href="#guide-content">Back to top ↑</a><a href="downloads/termexo-user-guide-en.pdf" download="Termexo-User-Guide-v0.10.4-en.pdf">Download PDF</a></div>
       <div class="shell site-counter">
         <p>Website visits (PV): <span id="busuanzi_value_site_pv" class="site-counter-value">—</span></p>
         <p>Third-party website statistics only; “—” means unavailable.</p>

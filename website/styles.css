@@ -450,9 +450,22 @@ html[lang="zh-CN"] .hero h1 {
   font-size: 11px;
   text-underline-offset: 5px;
 }
-.hero-guide-link:hover {
-  text-decoration: underline;
-}
+  .hero-guide-link:hover {
+    text-decoration: underline;
+  }
+  .hero-release-link {
+    display: block;
+    width: fit-content;
+    max-width: 430px;
+    margin-top: 9px;
+    color: #176b57;
+    font-size: 11px;
+    line-height: 1.5;
+    text-underline-offset: 4px;
+  }
+  .hero-release-link:hover {
+    text-decoration: underline;
+  }
 .product-hunt-badge {
   display: block;
   width: 175px;

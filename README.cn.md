@@ -27,12 +27,13 @@
   <img src="website/assets/agent-claude.svg" alt="Claude Code" title="Claude Code" width="26" height="26">&nbsp;&nbsp;
   <img src="website/assets/agent-codex.svg" alt="Codex CLI" title="Codex CLI" width="26" height="26">&nbsp;&nbsp;
   <img src="website/assets/agent-opencode.svg" alt="OpenCode" title="OpenCode" width="26" height="26">&nbsp;&nbsp;
-  <img src="website/assets/agent-antigravity.svg" alt="Antigravity" title="Antigravity" width="26" height="26">
+  <img src="website/assets/agent-antigravity.svg" alt="Antigravity" title="Antigravity" width="26" height="26">&nbsp;&nbsp;
+  <img src="website/assets/agent-grok.svg" alt="Grok Build" title="Grok Build" width="26" height="26">
 </p>
 
 **Termexo 致力于打造本地优先的 AI 编程工作台，统一管理多个 Agent、模型与项目，让开发工作在电脑与手机之间安全接续。**
 
-目前支持在同一个 Windows 工作台中运行 Claude Code、Codex、OpenCode 和 Antigravity。
+目前支持在同一个 Windows 工作台中运行 Claude Code、Codex、OpenCode、Antigravity 和 Grok Build。
 Agent 留在电脑上运行；通过自建中继，用手机或另一台电脑的浏览器跨网络接回同一个工作台，查看输出、回复审批、发送下一条指令。桌面无需公网 IP，也无需路由器端口映射。
 
 ![Termexo Windows 工作台](website/assets/termexo-workbench.png)
@@ -79,7 +80,7 @@ npx termexo@latest
 
 ## 通过自建中继，从电脑接到手机
 
-1. 在电脑上打开项目，启动 Claude Code、Codex、OpenCode 或 Antigravity。
+1. 在电脑上打开项目，启动 Claude Code、Codex、OpenCode、Antigravity 或 Grok Build。
 2. 按 **[termexo-relay 文档](https://github.com/gemron/termexo-relay)** 部署双方可达的 HTTPS 中继，或使用管理员提供的入口。
 3. 在「设置 → 远程访问」中启用访问、填写中继地址，使用注册码或中继账号登记设备。
 4. 手机打开生成的中继访问链接或扫描二维码，按提示完成中继登录和桌面访问令牌校验，接回原来的终端。
@@ -95,7 +96,7 @@ npx termexo@latest
 
 ## 最新版本
 
-**[v0.10.4](https://github.com/gemron/Termexo/releases/tag/v0.10.4)** 新增第五个 Agent Grok Build，修复会话代码变更与 Git 面板刷新，改进终端启动和 Claude Code 粘贴，并支持拖拽排序工作区。
+**[v0.10.4](https://github.com/gemron/Termexo/releases/tag/v0.10.4)** 新增第五个 Agent Grok Build，修复会话代码变更与 Git 面板刷新，改进终端启动和 Claude Code 粘贴，并支持拖拽排序工作区。Grok Build 用量卡片能识别免费额度用尽，查不到的百分比不会显示成已使用 0%。
 [完整更新记录](CHANGELOG.cn.md)。
 
 如果 Termexo 帮到了你，欢迎 **给仓库点一个 Star**，帮助更多开发者发现它。
@@ -129,9 +130,9 @@ npx termexo@latest
   <tr>
     <td width="50%" valign="top">
       <strong>接着昨天的会话继续。</strong><br><br>
-      跨项目、账号、分支和模型搜索本机 Claude Code/Codex/OpenCode/Antigravity 会话。Termexo 调用 CLI
+      跨项目、账号、分支和模型搜索本机 Claude Code/Codex/OpenCode/Antigravity/Grok Build 会话。Termexo 调用 CLI
       原生的 <code>claude --resume</code>、<code>codex resume</code>、<code>opencode --session</code>
-      与 <code>agy --conversation</code>
+      、<code>agy --conversation</code> 与 <code>grok --resume</code>
       恢复完整上下文，也能接管 CLI 仍然持有的 Claude 后台会话，并始终只读原生会话文件。
       <br><br>
       <a href="website/assets/termexo-session-center.png"><img src="website/assets/termexo-session-center.png" alt="Termexo 原生会话中心"></a>
@@ -166,7 +167,7 @@ npx termexo@latest
   <tr>
     <td width="50%" valign="top">
       <strong>把一条任务直接跑成 Agent。</strong><br><br>
-      任务看板按项目管理任务，带优先级和验收标准。把任务交给 Claude Code、Codex 或 OpenCode，
+      任务看板按项目管理任务，带优先级和验收标准。把任务交给 Claude Code、Codex、OpenCode 或 Grok Build，
       它就变成一个真实终端，并随该终端上报的状态在待办、执行中、已完成、已验收之间流转。
     </td>
     <td width="50%" valign="top">
@@ -205,17 +206,18 @@ Termexo 以 **Workspace** 为组织单位，把这些信息集中到一个可观
 
 | 能力               | 当前实现                                                                          |
 | ------------------ | --------------------------------------------------------------------------------- |
-| Workspace 管理     | 创建、改名、换色、手动排序和切换 Workspace，并持久化项目路径、布局与终端配置      |
+| Workspace 管理     | 创建、改名、换色、拖拽排序和切换 Workspace，并持久化项目路径、布局与终端配置      |
 | 多终端工作台       | 不限终端数量、指定窗口显示、1–6 行列网格、终端/工作区最大化；桌面端启动真实 PTY   |
-| Agent 检测         | 在 Windows 上检测 Claude Code、Codex、OpenCode 与 Antigravity 的可执行文件、版本与健康状态 |
-| 新建 Agent 会话    | 按目录启动 Claude/Codex/OpenCode/Antigravity，选择隔离账号与 Agent 对应的模型配置，并可开启自动确认 |
-| Agent 会话中心     | 只读发现多账号 Claude/Codex/OpenCode/Antigravity 会话，支持搜索、Workspace 过滤、原生恢复，以及接管 CLI 仍持有的 Claude 后台会话 |
+| Agent 检测         | 在 Windows 上检测 Claude Code、Codex、OpenCode、Antigravity 与 Grok Build 的可执行文件、版本与健康状态 |
+| 新建 Agent 会话    | 按目录启动 Claude/Codex/OpenCode/Antigravity/Grok Build，并选择对应 CLI 可用的账号、模型和确认选项 |
+| Agent 会话中心     | 只读发现 Claude/Codex/OpenCode/Antigravity/Grok Build 会话，支持搜索、Workspace 过滤、原生恢复，以及接管 CLI 仍持有的 Claude 后台会话 |
 | Agent 状态识别     | 为每个终端生成隔离 Hooks 设置，识别思考、工具调用、权限确认、用户输入和完成状态   |
 | 模型与 MCP Profile | 管理模型、Endpoint、API Key 与 MCP 配置；Claude CLI 可切换 Anthropic 兼容后端     |
 | 网络与 npm Profile | 按全局/Workspace 管理 HTTP/HTTPS/SOCKS 与 npm 配置，测试连通性并在启动时注入      |
 | 多账号管理         | 管理多个隔离 Claude 与 ChatGPT/Codex 登录、默认账号、认证状态和启动时选择         |
 | CLI 生命周期管理   | 预览、确认、安装或升级各 Agent 的 CLI——可用官方 npm 包，也可用厂商自己发布的 Windows 安装脚本——并在完成后验证结果 |
-| 任务看板           | 按项目管理任务，带优先级与验收标准；可将一条任务跑成 Claude/Codex/OpenCode 终端，并从待办跟踪到执行中、已完成、已验收 |
+| 余量查询           | 显示支持的供应商报告的额度，包括 Grok Build 免费额度已用尽状态；未知百分比保持不可用 |
+| 任务看板           | 按项目管理任务，带优先级与验收标准；可将一条任务跑成 Claude/Codex/OpenCode/Grok Build 终端，并从待办跟踪到执行中、已完成、已验收 |
 | 提示词资产         | 按终端恢复实时草稿；搜索、收藏、置顶、删除和复用已提交提示词                     |
 | 会话交接           | 生成带脱敏和 Token 预算的 Git/任务包；导入导出文档并交给另一个 Agent 继续         |
 | Git Graph 与 Diff  | 展示当前终端的分支、提交拓扑和启动后的代码变更，支持单栏或双栏 Diff              |

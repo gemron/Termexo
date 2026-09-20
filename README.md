@@ -27,12 +27,13 @@
   <img src="website/assets/agent-claude.svg" alt="Claude Code" title="Claude Code" width="26" height="26">&nbsp;&nbsp;
   <img src="website/assets/agent-codex.svg" alt="Codex CLI" title="Codex CLI" width="26" height="26">&nbsp;&nbsp;
   <img src="website/assets/agent-opencode.svg" alt="OpenCode" title="OpenCode" width="26" height="26">&nbsp;&nbsp;
-  <img src="website/assets/agent-antigravity.svg" alt="Antigravity" title="Antigravity" width="26" height="26">
+  <img src="website/assets/agent-antigravity.svg" alt="Antigravity" title="Antigravity" width="26" height="26">&nbsp;&nbsp;
+  <img src="website/assets/agent-grok.svg" alt="Grok Build" title="Grok Build" width="26" height="26">
 </p>
 
 **Termexo is building a local-first AI coding workbench that brings agents, models, and projects together, so development can continue securely between your computer and phone.**
 
-Today, it runs Claude Code, Codex, OpenCode, and Antigravity in one Windows workbench.
+Today, it runs Claude Code, Codex, OpenCode, Antigravity, and Grok Build in one Windows workbench.
 Keep your agents running on your PC, then reconnect through your own relay from a phone or another computer's browser. Check output, answer an approval, or send the next instruction to the same live terminal across networks. Your desktop needs no public IP or router port forwarding.
 
 ![Termexo Windows workbench](website/assets/termexo-workbench.png)
@@ -79,7 +80,7 @@ Install and configure your chosen agent CLI and model access; Termexo does not i
 
 ## From your desk to your phone, through your own relay
 
-1. Open a project on your PC and start Claude Code, Codex, OpenCode, or Antigravity.
+1. Open a project on your PC and start Claude Code, Codex, OpenCode, Antigravity, or Grok Build.
 2. Follow the **[termexo-relay documentation](https://github.com/gemron/termexo-relay)** to deploy an HTTPS relay reachable by both devices, or use an entry point from its administrator.
 3. Enable Remote Access in Settings, enter the relay address, and enroll with an enrollment code or relay account.
 4. Open the generated relay link or scan its QR code on your phone. Complete the required relay login and desktop access-token check to reconnect to your terminal.
@@ -96,7 +97,7 @@ Keep the token private. Closing Termexo or stopping the PC ends the running proc
 
 ## Latest release
 
-**[v0.10.4](https://github.com/gemron/Termexo/releases/tag/v0.10.4)** adds Grok Build as a fifth agent, keeps session code changes and the Git panel current, improves terminal startup and Claude Code paste, and lets you drag workspaces into order.
+**[v0.10.4](https://github.com/gemron/Termexo/releases/tag/v0.10.4)** adds Grok Build as a fifth agent, keeps session code changes and the Git panel current, improves terminal startup and Claude Code paste, and lets you drag workspaces into order. Grok Build's usage card now recognizes an exhausted free allowance and leaves unavailable percentages unknown.
 [Full changelog](CHANGELOG.md).
 
 If Termexo helps your workflow, a **Star on this repository** helps other developers discover it.
@@ -132,11 +133,11 @@ Trying it for the first time? [Tell us what worked or where you got stuck](https
   <tr>
     <td width="50%" valign="top">
       <strong>Pick up yesterday's conversation.</strong><br><br>
-      Search local Claude Code, Codex, OpenCode, and Antigravity sessions across projects,
+      Search local Claude Code, Codex, OpenCode, Antigravity, and Grok Build sessions across projects,
       accounts, branches, and models. Termexo restores them through the CLIs' own
       <code>claude --resume</code>, <code>codex resume</code>, <code>opencode --session</code>,
-      and <code>agy --conversation</code> commands, reclaims a Claude session the CLI still holds
-      open, and keeps native session files read-only.
+      <code>agy --conversation</code>, and <code>grok --resume</code> commands. It can reclaim a Claude session the CLI still holds
+      open and keeps native session files read-only.
       <br><br>
       <a href="website/assets/termexo-session-center.png"><img src="website/assets/termexo-session-center.png" alt="Termexo native session center"></a>
     </td>
@@ -174,7 +175,7 @@ Trying it for the first time? [Tell us what worked or where you got stuck](https
     <td width="50%" valign="top">
       <strong>Turn a task into a running agent.</strong><br><br>
       The task board keeps projects and tasks with priorities and acceptance criteria. Hand one
-      to Claude Code, Codex, or OpenCode and it becomes a real terminal, moving through todo,
+      to Claude Code, Codex, OpenCode, or Grok Build and it becomes a real terminal, moving through todo,
       executing, completed, and verified as that terminal reports its own status.
     </td>
     <td width="50%" valign="top">
@@ -216,17 +217,18 @@ a local control plane that is observable, recoverable, and extensible.
 
 | Capability               | Current implementation                                                                                             |
 | ------------------------ | ------------------------------------------------------------------------------------------------------------------ |
-| Workspace management     | Create, rename, theme, manually reorder, and switch workspaces; persist paths, layouts, and terminal configuration |
+| Workspace management     | Create, rename, theme, drag to reorder, and switch workspaces; persist paths, layouts, and terminal configuration |
 | Multi-terminal workbench | Unlimited tabs, explicit pane selection, configurable 1–6 row/column grids, pane/workspace maximize, and real PTYs |
-| Agent detection          | Detect the Claude Code, Codex, OpenCode, and Antigravity executables, their versions, and health on Windows         |
-| Start agent sessions     | Launch Claude, Codex, OpenCode, or Antigravity with a working directory, isolated login account, Agent-specific model configuration, and optional automatic confirmation |
-| Session center           | Read-only multi-account Claude/Codex/OpenCode/Antigravity discovery, search, workspace filtering, native resume, and reclaim of a Claude session the CLI still holds open |
+| Agent detection          | Detect the Claude Code, Codex, OpenCode, Antigravity, and Grok Build executables, their versions, and health on Windows |
+| Start agent sessions     | Launch Claude, Codex, OpenCode, Antigravity, or Grok Build with a working directory and the available account, model, and confirmation options for that CLI |
+| Session center           | Read-only discovery of Claude/Codex/OpenCode/Antigravity/Grok Build sessions, search, workspace filtering, native resume, and reclaim of a Claude session the CLI still holds open |
 | Agent status tracking    | Isolated hooks per terminal for thinking, tool use, approval, user input, completion, and failure states           |
 | Model and MCP profiles   | Manage endpoints, keys, and MCP configuration; switch Claude CLI across Anthropic-compatible backends              |
 | Network and npm profiles | Scope HTTP/HTTPS/SOCKS and npm settings globally or per workspace, test reachability, and inject them at launch    |
 | Account management       | Manage multiple isolated Claude and ChatGPT/Codex logins, defaults, authentication status, and launch-time choice  |
 | Managed CLI lifecycle    | Preview, confirm, install, or upgrade each agent's CLI — from its official npm package, or from the vendor's own Windows installer where one is published — then verify the result |
-| Task board               | Organise projects and tasks with priorities and acceptance criteria, run one as a Claude/Codex/OpenCode terminal, and track it from todo through executing, completed, and verified |
+| Allowance visibility     | Show reported quota where supported, including Grok Build's exhausted free allowance; unknown percentages remain unavailable |
+| Task board               | Organise projects and tasks with priorities and acceptance criteria, run one as a Claude/Codex/OpenCode/Grok Build terminal, and track it from todo through executing, completed, and verified |
 | Prompt assets            | Recover live per-terminal drafts; search, favorite, pin, delete, and reuse submitted prompts                       |
 | Session handoff          | Build redacted, token-budgeted Git/task packages; import/export documents and continue in another Agent            |
 | Git graph and diff       | Show the active terminal's branch, commit topology, and changes since terminal start with unified or split diff    |

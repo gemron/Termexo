@@ -25,7 +25,7 @@
     <meta name="twitter:card" content="summary_large_image" />
     <meta
       name="twitter:title"
-      content="Termexo — Claude Code, Codex, OpenCode and Antigravity in one Windows workspace"
+      content="Termexo — Claude Code, Codex, OpenCode, Grok Build and Antigravity in one Windows workspace"
     />
     <meta
       name="twitter:description"
@@ -46,7 +46,7 @@
         "@context": "https://schema.org",
         "@type": "SoftwareApplication",
         "name": "Termexo",
-        "softwareVersion": "0.10.1",
+        "softwareVersion": "0.10.4",
         "url": "https://www.termexo.com/",
         "description": "A local-first Windows AI coding workbench with self-hosted remote relay access, encrypted sessions, real terminals and session recovery.",
         "applicationCategory": "DeveloperApplication",
@@ -64,8 +64,8 @@
     <title>Termexo — Your workbench, across networks</title>
     <link rel="canonical" href="https://www.termexo.com/" />
     <link rel="icon" href="assets/termexo-mark.svg" type="image/svg+xml" />
-    <link rel="stylesheet" href="styles.css?v=68266d6ae6fe" />
-    <script src="app.js?v=5022b2a3f88c" defer></script>
+    <link rel="stylesheet" href="styles.css?v=c4d2e8500a2e" />
+    <script src="app.js?v=7842d37c9486" defer></script>
     <script src="analytics.js" defer></script>
   </head>
   <body class="home-page">
@@ -78,7 +78,7 @@
             <img src="assets/termexo-mark.svg" alt="" />
           </span>
           <span>Termexo</span>
-          <small>0.10.1</small>
+          <small>0.10.4</small>
         </a>
 
         <nav
@@ -161,6 +161,10 @@
               <img src="assets/agent-antigravity.svg" alt="" width="22" height="22" loading="lazy" />
               <span>Antigravity</span>
             </li>
+            <li>
+              <img src="assets/agent-grok.svg" alt="" width="22" height="22" loading="lazy" />
+              <span>Grok Build</span>
+            </li>
           </ul>
           <p class="hero-remote-note" data-i18n="heroRemoteNote">Keep your PC running. Use a reachable HTTPS relay and desktop access token, or connect directly over a trusted LAN or VPN.</p>
           <div class="hero-actions">
@@ -202,6 +206,7 @@
             data-i18n="heroRemoteGuide"
             >Set up remote relay access ↗</a
           >
+          <a class="hero-release-link" href="https://github.com/gemron/Termexo/releases/tag/v0.10.4" target="_blank" rel="noopener noreferrer" data-i18n="heroRelease">New in v0.10.4: Grok Build, live Git changes, and drag-to-order workspaces ↗</a>
           <div class="hero-proof">
             <a
               class="product-hunt-badge"
@@ -382,7 +387,7 @@
       <section class="signal-strip" aria-label="Supported tools">
         <div class="signal-track">
           <span>Claude Code</span><i></i><span>Codex CLI</span><i></i
-          ><span>OpenCode</span><i></i><span>Antigravity</span><i></i
+          ><span>OpenCode</span><i></i><span>Antigravity</span><i></i><span>Grok Build</span><i></i
           ><span>Task board</span><i></i
           ><span>Multi-account</span><i></i><span>DeepSeek</span><i></i
           ><span>MiniMax</span><i></i><span>GLM</span><i></i><span>MCP</span
@@ -569,17 +574,17 @@
           >
           <h2 data-i18n="sessionTitle">Pick up yesterday's conversation.</h2>
           <p data-i18n="sessionLead">
-            Claude Code and Codex already save your sessions on disk. Termexo
-            simply lists them so you can search and reopen one — it calls the
-            CLI's own resume, so the full context comes back. Nothing you close
-            is really lost.
+            Search saved Claude Code, Codex, OpenCode, Grok Build, and
+            Antigravity sessions across projects. Termexo uses each CLI's own
+            resume command to reopen the native context, without changing
+            session files.
           </p>
           <ul>
             <li data-i18n="sessionPoint1">
               Search across every project by name, path, branch, or model
             </li>
             <li data-i18n="sessionPoint2">
-              Resumes through the real `claude --resume` and `codex resume`
+              Resumes through each supported CLI's native command
             </li>
             <li data-i18n="sessionPoint3">
               Your session files are read-only — Termexo never edits or deletes
@@ -662,14 +667,14 @@
             Write down what needs doing and what counts as done, pick the agent
             and the project, and the task opens as a real terminal. It reports
             its own progress back to the board, so you can see what is running
-            without reading four terminals at once.
+            without reading every terminal at once.
           </p>
           <ul>
             <li data-i18n="taskPoint1">
               Todo, executing, completed, verified — the terminal moves the card
             </li>
             <li data-i18n="taskPoint2">
-              Send a task to Claude Code, Codex, or OpenCode
+              Send a task to Claude Code, Codex, OpenCode, or Grok Build
             </li>
             <li data-i18n="taskPoint3">
               Reject a result with a note and it goes back for another round
@@ -739,9 +744,9 @@
                 Close it. Reopen it. Still there.
               </h3>
               <p data-i18n="featureWorkspaceBody">
-                Project folder, grid layout, which terminals were open, what
-                model each was running, even the colour you picked — it all
-                comes back with the workspace.
+                Project folder, grid layout, terminals, and colours come back
+                with the workspace. Drag workspace rows to put projects in
+                your preferred order.
               </p>
               <div class="workspace-stack" aria-hidden="true">
                 <span style="--tone: #58c7a0"
@@ -761,9 +766,8 @@
               <div class="card-icon orange" aria-hidden="true">↻</div>
               <h3 data-i18n="featureSessionTitle">Nothing you close is lost</h3>
               <p data-i18n="featureSessionBody">
-                Find any past Claude Code, Codex, OpenCode, or Antigravity
-                session across your projects and reopen it with its full
-                history intact.
+                Find any past Claude Code, Codex, OpenCode, Grok Build, or Antigravity
+                sessions across your projects and reopen their native history.
               </p>
               <code>claude --resume · codex resume · opencode --session</code>
             </article>
@@ -862,8 +866,9 @@
                   See your quota before you burn it
                 </h3>
                 <p data-i18n="featureQuotaBody">
-                  Check how much of your plan is left and when it resets, before
-                  you decide which model to send the next task to.
+                  Check supported providers' reported quota and reset time.
+                  Grok Build shows an exhausted free allowance; unavailable
+                  percentages stay unavailable.
                 </p>
               </div>
             </article>
@@ -930,12 +935,17 @@
                 routing work, and notifications.
               </p>
             </article>
-            <article class="roadmap-item current reveal" data-delay="3">
+            <article class="roadmap-item shipped reveal" data-delay="3">
               <div>
-                <span>V0.10.0–0.10.1</span><b data-i18n="current">YOU ARE HERE</b>
+                <span>V0.10.0–0.10.1</span><b data-i18n="shipped">SHIPPED</b>
               </div>
               <h3 data-i18n="roadmap07Title">Remote relay access</h3>
               <p data-i18n="roadmap07Body">Shipped in v0.10.0: self-hosted relay access, code or account enrollment, cascaded addresses, and v2 encrypted sessions. Your browser operates the terminals already running on your desktop.</p>
+            </article>
+            <article class="roadmap-item current reveal" data-delay="3">
+              <div><span>V0.10.4</span><b data-i18n="current">YOU ARE HERE</b></div>
+              <h3 data-i18n="roadmap10Title">Five agents, clearer progress</h3>
+              <p data-i18n="roadmap10Body">Grok Build joins the workbench. Session change counts and the Git view keep refreshing; terminals start quietly, and workspace rows can be dragged into order.</p>
             </article>
           </div>
         </div>
