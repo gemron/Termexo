@@ -144,7 +144,7 @@ figure {
   position: relative;
   padding-block: 10px;
   color: var(--text-soft);
-  font-size: 12px;
+  font-size: 13px;
 }
 .nav-links a::after {
   position: absolute;
@@ -171,7 +171,7 @@ figure {
   display: flex;
   align-items: center;
   gap: 5px;
-  font-size: 11px;
+  font-size: 13px;
 }
 .language-switch button {
   min-height: 36px;
@@ -196,7 +196,7 @@ figure {
   border: 1px solid var(--line);
   border-radius: 30px;
   background: #fff;
-  font-size: 11px;
+  font-size: 13px;
   transition:
     box-shadow 0.3s,
     transform 0.3s;
@@ -282,7 +282,7 @@ figure {
   align-items: center;
   gap: 10px;
   color: var(--green);
-  font: 10px/1.6 var(--mono);
+  font: 12px/1.6 var(--mono);
   letter-spacing: 0.12em;
   text-transform: uppercase;
 }
@@ -322,13 +322,13 @@ html[lang="zh-CN"] .hero h1 {
   letter-spacing: -0.055em;
 }
 .hero-lead {
-  max-width: 425px;
+  max-width: 500px;
   margin: 0;
   color: #445f6d;
-  font-size: 15px;
+  font-size: 17px;
   line-height: 1.85;
 }
-/* The four agents the lead line names, each by the mark its own project publishes. */
+/* The five supported agents use the marks shown throughout the workbench. */
 .hero-agents {
   display: flex;
   flex-wrap: wrap;
@@ -342,7 +342,7 @@ html[lang="zh-CN"] .hero h1 {
   align-items: center;
   gap: 7px;
   color: #4c6774;
-  font-size: 12px;
+  font-size: 14px;
 }
 .hero-agents img {
   width: 22px;
@@ -350,10 +350,10 @@ html[lang="zh-CN"] .hero h1 {
   opacity: 0.9;
 }
 .hero-remote-note {
-  max-width: 400px;
+  max-width: 500px;
   margin: 17px 0 0;
   color: #536d7b;
-  font-size: 11px;
+  font-size: 14px;
   line-height: 1.7;
 }
 .hero-actions,
@@ -373,7 +373,7 @@ html[lang="zh-CN"] .hero h1 {
   padding: 13px 22px;
   border: 1px solid transparent;
   border-radius: 30px;
-  font-size: 12px;
+  font-size: 14px;
   font-weight: 600;
   transition:
     transform 0.35s var(--ease),
@@ -422,11 +422,11 @@ html[lang="zh-CN"] .hero h1 {
   border: 1px solid #ffffffb0;
   border-radius: 10px;
   background: #ffffff40;
-  font: 11px/1.5 var(--mono);
+  font: 13px/1.5 var(--mono);
 }
 .install-command > span {
   color: #6c8490;
-  font-size: 9px;
+  font-size: 11px;
 }
 .install-command code {
   user-select: all;
@@ -438,7 +438,7 @@ html[lang="zh-CN"] .hero h1 {
   border-radius: 6px;
   background: #ffffff78;
   color: #325364;
-  font-size: 10px;
+  font-size: 12px;
 }
 .install-command button:hover {
   background: white;
@@ -447,25 +447,25 @@ html[lang="zh-CN"] .hero h1 {
   display: inline-block;
   margin-top: 13px;
   color: #375f73;
-  font-size: 11px;
+  font-size: 13px;
   text-underline-offset: 5px;
 }
-  .hero-guide-link:hover {
-    text-decoration: underline;
-  }
-  .hero-release-link {
-    display: block;
-    width: fit-content;
-    max-width: 430px;
-    margin-top: 9px;
-    color: #176b57;
-    font-size: 11px;
-    line-height: 1.5;
-    text-underline-offset: 4px;
-  }
-  .hero-release-link:hover {
-    text-decoration: underline;
-  }
+.hero-guide-link:hover {
+  text-decoration: underline;
+}
+.hero-release-link {
+  display: block;
+  width: fit-content;
+  max-width: 500px;
+  margin-top: 9px;
+  color: #176b57;
+  font-size: 13px;
+  line-height: 1.6;
+  text-underline-offset: 4px;
+}
+.hero-release-link:hover {
+  text-decoration: underline;
+}
 .product-hunt-badge {
   display: block;
   width: 175px;
@@ -482,7 +482,7 @@ html[lang="zh-CN"] .hero h1 {
   gap: 6px 16px;
   margin-top: 19px;
   color: #486774;
-  font-size: 9px;
+  font-size: 11px;
 }
 .hero-meta > span {
   display: inline-flex;
@@ -838,7 +838,7 @@ html[lang="zh-CN"] .hero h1 {
   gap: 10px;
   margin-top: 22px;
   color: #446b80;
-  font-size: 9px;
+  font-size: 12px;
   line-height: 1.6;
 }
 .scene-link-line {
@@ -859,7 +859,7 @@ html[lang="zh-CN"] .hero h1 {
   align-items: center;
   gap: 12px;
   color: #466674;
-  font-size: 10px;
+  font-size: 12px;
 }
 .scroll-arrow {
   display: grid;
@@ -881,7 +881,7 @@ html[lang="zh-CN"] .hero h1 {
   border-radius: 30px;
   background: #ffffff38;
   color: #365d70;
-  font-size: 10px;
+  font-size: 12px;
 }
 .motion-ready .motion-toggle {
   display: flex;
@@ -921,7 +921,7 @@ html[lang="zh-CN"] .hero h1 {
   gap: 40px;
   padding: 28px 20px;
   color: #69808c;
-  font: 11px/1 var(--mono);
+  font: 12px/1 var(--mono);
   white-space: nowrap;
 }
 .motion-ready .signal-track {
@@ -962,7 +962,7 @@ html:not(.motion-ready) .signal-strip,
   padding: 16px 24px;
   border-top: 1px solid var(--line);
   color: var(--text-soft);
-  font-size: 13px;
+  font-size: 14px;
 }
 .scenario-grid {
   display: grid;
@@ -974,17 +974,26 @@ html:not(.motion-ready) .signal-strip,
   padding: 32px;
   border: 1px solid var(--line);
   border-radius: 24px;
-  background: var(--bg-raised);
+  background: linear-gradient(150deg, #fff, #f4f8fa);
+  box-shadow: 0 10px 28px #315b7109;
+  transition: transform 0.35s var(--ease), box-shadow 0.35s var(--ease), border-color 0.35s;
 }
-.scenario-label { color: var(--green); font-size: 12px; letter-spacing: .08em; font-weight: 700; }
-.scenario-card h3 { margin: 12px 0 28px; font-size: clamp(23px, 2.3vw, 32px); line-height: 1.35; letter-spacing: -.03em; }
+@media (hover: hover) {
+  .scenario-card:hover {
+    border-color: #b3cedb;
+    box-shadow: 0 20px 38px #315b7118;
+    transform: translateY(-4px);
+  }
+}
+.scenario-label { color: var(--green); font-size: 13px; letter-spacing: .08em; font-weight: 700; }
+.scenario-card h3 { margin: 12px 0 28px; font-size: clamp(25px, 2.3vw, 34px); line-height: 1.35; letter-spacing: -.03em; }
 .scenario-card ul { list-style: none; margin: 0; padding: 0; }
 .scenario-card li + li { margin-top: 24px; padding-top: 24px; border-top: 1px solid var(--line); }
-.scenario-card h4 { margin: 0 0 8px; font-size: 16px; }
-.scenario-card p { margin: 0; color: var(--text-soft); font-size: 14px; line-height: 1.8; }
-.solutions-boundary { margin-top: 24px; padding: 24px 28px; border-left: 3px solid var(--line-strong); background: var(--panel); border-radius: 0 16px 16px 0; }
-.solutions-boundary strong { font-size: 14px; }
-.solutions-boundary p { margin: 8px 0 0; color: var(--text-soft); font-size: 13px; line-height: 1.8; }
+.scenario-card h4 { margin: 0 0 8px; font-size: 18px; }
+.scenario-card p { margin: 0; color: var(--text-soft); font-size: 16px; line-height: 1.8; }
+.solutions-boundary { margin-top: 24px; padding: 24px 28px; border-left: 3px solid #7eafc2; background: linear-gradient(110deg, #e9f3f7, #f3f7f9); border-radius: 0 16px 16px 0; }
+.solutions-boundary strong { font-size: 16px; }
+.solutions-boundary p { margin: 8px 0 0; color: var(--text-soft); font-size: 15px; line-height: 1.8; }
 @media (max-width: 760px) {
   .scenario-grid { grid-template-columns: 1fr; }
   .scenario-card { padding: 24px; }
@@ -1015,8 +1024,8 @@ html:not(.motion-ready) .signal-strip,
 .cta-section p {
   margin: 0;
   color: var(--text-soft);
-  font-size: 14px;
-  line-height: 1.9;
+  font-size: 17px;
+  line-height: 1.75;
 }
 #workbench {
   perspective: 1800px;
@@ -1045,7 +1054,7 @@ html:not(.motion-ready) .signal-strip,
   gap: 20px;
   padding: 5px 13px 12px;
   color: #587180;
-  font: 9px/1.5 var(--mono);
+  font: 11px/1.5 var(--mono);
 }
 .frame-label span {
   display: flex;
@@ -1088,13 +1097,13 @@ html:not(.motion-ready) .signal-strip,
 .metric > span {
   display: block;
   margin-top: 25px;
-  font-size: 13px;
+  font-size: 16px;
   font-weight: 600;
 }
 .metric p {
   margin: 9px 0 0;
   color: var(--text-muted);
-  font-size: 12px;
+  font-size: 15px;
   line-height: 1.8;
 }
 .model-section,
@@ -1123,8 +1132,8 @@ html:not(.motion-ready) .signal-strip,
   position: relative;
   padding-left: 18px;
   color: var(--text-soft);
-  font-size: 12px;
-  line-height: 1.7;
+  font-size: 15px;
+  line-height: 1.75;
 }
 .model-copy li::before {
   position: absolute;
@@ -1143,7 +1152,7 @@ html:not(.motion-ready) .signal-strip,
 .settings-frame figcaption {
   margin-top: 16px;
   color: #566e7b;
-  font: 9px/1.7 var(--mono);
+  font: 11px/1.7 var(--mono);
 }
 .settings-frame figcaption > span {
   display: flex;
@@ -1164,13 +1173,13 @@ html:not(.motion-ready) .signal-strip,
   display: grid;
   grid-auto-flow: row dense;
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 14px;
+  gap: 18px;
 }
 .bento {
   position: relative;
   min-width: 0;
-  min-height: 330px;
-  padding: 30px;
+  min-height: 350px;
+  padding: 32px;
   overflow: hidden;
   border: 1px solid #ffffffcc;
   border-radius: 18px;
@@ -1205,7 +1214,7 @@ html:not(.motion-ready) .signal-strip,
   border-radius: 20px;
   color: #557986;
   background: #e6f2f666;
-  font: 8px/1 var(--mono);
+  font: 11px/1 var(--mono);
   letter-spacing: 0.06em;
 }
 .card-tag.planned {
@@ -1243,7 +1252,7 @@ html:not(.motion-ready) .signal-strip,
 }
 .bento h3 {
   margin: 20px 0 10px;
-  font-size: 21px;
+  font-size: 24px;
   font-weight: 500;
   letter-spacing: -0.03em;
   line-height: 1.3;
@@ -1251,8 +1260,8 @@ html:not(.motion-ready) .signal-strip,
 .bento p {
   margin: 0;
   color: var(--text-soft);
-  font-size: 12px;
-  line-height: 1.85;
+  font-size: 15px;
+  line-height: 1.75;
 }
 .bento code {
   display: block;
@@ -1263,7 +1272,7 @@ html:not(.motion-ready) .signal-strip,
   border-radius: 6px;
   color: #83664e;
   background: #f3f6f8;
-  font: 9px/1.7 var(--mono);
+  font: 11px/1.7 var(--mono);
 }
 .workspace-stack {
   display: grid;
@@ -1477,13 +1486,17 @@ html:not(.motion-ready) .signal-strip,
 }
 .roadmap-list {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(6, minmax(0, 1fr));
   border-block: 1px solid var(--line);
 }
 .roadmap-item {
+  grid-column: span 2;
   min-width: 0;
   padding: 30px;
   border-right: 1px solid var(--line);
+}
+.roadmap-item:nth-child(n + 4) {
+  grid-column: span 3;
 }
 .roadmap-item:first-child {
   border-left: 1px solid var(--line);
@@ -1498,25 +1511,25 @@ html:not(.motion-ready) .signal-strip,
   align-items: center;
   justify-content: space-between;
   gap: 8px;
-  font: 12px/1 var(--mono);
+  font: 13px/1.4 var(--mono);
   color: #4a7b92;
 }
 .roadmap-item > div b {
   color: #5e7c89;
-  font: 8px/1 var(--mono);
+  font: 11px/1.4 var(--mono);
 }
 .roadmap-item h3 {
-  margin: 55px 0 15px;
-  font-size: 17px;
-  font-weight: 500;
+  margin: 42px 0 15px;
+  font-size: 21px;
+  font-weight: 600;
   line-height: 1.4;
   letter-spacing: -0.02em;
 }
 .roadmap-item p {
   margin: 0;
   color: var(--text-soft);
-  font-size: 12px;
-  line-height: 1.8;
+  font-size: 15px;
+  line-height: 1.75;
 }
 .principles-section {
   display: grid;
@@ -1540,19 +1553,19 @@ html:not(.motion-ready) .signal-strip,
 }
 .principles-list article > span {
   color: var(--green);
-  font: 10px/1.5 var(--mono);
+  font: 12px/1.5 var(--mono);
 }
 .principles-list h3 {
   margin: 0 0 12px;
-  font-size: 21px;
-  font-weight: 500;
+  font-size: 23px;
+  font-weight: 600;
   letter-spacing: -0.02em;
 }
 .principles-list p {
   margin: 0;
   color: var(--text-soft);
-  font-size: 13px;
-  line-height: 1.85;
+  font-size: 16px;
+  line-height: 1.8;
 }
 .cta-section {
   position: relative;
@@ -1595,7 +1608,7 @@ html:not(.motion-ready) .signal-strip,
 .footer-inner > p {
   margin: 0;
   color: var(--text-muted);
-  font-size: 11px;
+  font-size: 13px;
 }
 .footer-inner > div {
   display: flex;
@@ -1605,7 +1618,7 @@ html:not(.motion-ready) .signal-strip,
 .footer-inner > div a,
 .footer-inner > small {
   color: var(--text-soft);
-  font-size: 10px;
+  font-size: 13px;
 }
 .footer-inner > div a:hover {
   color: var(--green);
@@ -1618,7 +1631,7 @@ html:not(.motion-ready) .signal-strip,
   padding-block: 18px 26px;
   border-top: 1px solid var(--line);
   color: var(--text-muted);
-  font-size: 10px;
+  font-size: 12px;
 }
 .site-counter p {
   margin: 0;
@@ -1775,7 +1788,7 @@ html:not(.motion-ready) *::after {
 }
 .home-page .section-heading p,
 .home-page .model-copy > p {
-  font-size: 15px;
+  font-size: 17px;
 }
 .home-page .section-index::before {
   width: 18px;
@@ -1835,8 +1848,8 @@ html:not(.motion-ready) *::after {
   box-shadow: 0 2px 6px #395f7105;
 }
 .hero-lead {
-  font-size: 16px;
-  line-height: 1.85;
+  font-size: 18px;
+  line-height: 1.75;
 }
 .hero-remote-note {
   padding-left: 12px;
@@ -1860,11 +1873,11 @@ html:not(.motion-ready) *::after {
   margin: 0;
   padding-left: 17px;
   border-left: 1px solid #688b9d30;
-  font-size: 9px;
+  font-size: 11px;
 }
 .hero-actions .button {
-  min-height: 52px;
-  font-size: 13px;
+  min-height: 54px;
+  font-size: 15px;
 }
 .button.primary {
   background: linear-gradient(150deg, #294e60, #142e3a);
@@ -1896,7 +1909,7 @@ html:not(.motion-ready) *::after {
 }
 .hero-guide-link {
   padding-block: 3px;
-  font-size: 12px;
+  font-size: 13px;
 }
 .hero-wordmark {
   opacity: 0.65;
@@ -2118,7 +2131,7 @@ html:not(.motion-ready) *::after {
   max-width: 55%;
   padding-top: 13px;
   border-top: 1px solid #5b839333;
-  font-size: 10px;
+  font-size: 12px;
 }
 .scene-link-line {
   display: grid;
@@ -2158,7 +2171,7 @@ html:not(.motion-ready) *::after {
 }
 .settings-frame figcaption {
   margin-top: 21px;
-  font-size: 10px;
+  font-size: 12px;
   line-height: 1.7;
 }
 .metrics-grid {
@@ -2169,11 +2182,11 @@ html:not(.motion-ready) *::after {
   font-weight: 350;
 }
 .metric > span {
-  font-size: 14px;
+  font-size: 16px;
 }
 .metric p {
   max-width: 220px;
-  font-size: 13px;
+  font-size: 15px;
 }
 .capabilities-section {
   background:
@@ -2195,7 +2208,7 @@ html:not(.motion-ready) *::after {
   font-weight: 550;
 }
 .bento p {
-  font-size: 13px;
+  font-size: 15px;
 }
 .bento-wide {
   grid-template-rows: auto 1fr;
@@ -2311,7 +2324,7 @@ html:not(.motion-ready) *::after {
   background: #91c7d709;
 }
 .principles-list h3 {
-  font-size: 20px;
+  font-size: 23px;
 }
 .cta-section {
   isolation: isolate;
@@ -2336,7 +2349,7 @@ html:not(.motion-ready) *::after {
   pointer-events: none;
 }
 .cta-section p:last-child {
-  font-size: 12px;
+  font-size: 14px;
   opacity: 0.9;
 }
 .footer-inner {
@@ -2344,7 +2357,7 @@ html:not(.motion-ready) *::after {
 }
 .footer-inner > div a {
   padding-block: 10px;
-  font-size: 11px;
+  font-size: 13px;
 }
 .menu-toggle span {
   transition: transform 0.25s var(--ease);
@@ -2371,7 +2384,10 @@ html:not(.motion-ready) *::after {
   }
   .nav-links,
   .header-actions {
-    gap: 15px;
+    gap: 12px;
+  }
+  .header-inner {
+    gap: 16px;
   }
   .brand {
     font-size: 21px;
@@ -2457,7 +2473,7 @@ html:not(.motion-ready) *::after {
     display: grid;
   }
   .nav-links a {
-    font-size: 14px;
+    font-size: 16px;
   }
   .menu-toggle {
     display: block;
@@ -2556,6 +2572,13 @@ html:not(.motion-ready) *::after {
   .roadmap-list {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
+  .roadmap-item,
+  .roadmap-item:nth-child(n + 4) {
+    grid-column: auto;
+  }
+  .roadmap-item.current {
+    grid-column: 1 / -1;
+  }
   .roadmap-item {
     border-bottom: 1px solid var(--line);
   }
@@ -2605,19 +2628,19 @@ html:not(.motion-ready) *::after {
   .hero-proof .hero-meta {
     min-width: 130px;
     padding-left: 12px;
-    font-size: 8px;
+    font-size: 10px;
   }
   .hero .hero-actions .button {
-    min-height: 46px;
-    font-size: 11px;
+    min-height: 48px;
+    font-size: 14px;
     padding-inline: 14px;
   }
   .hero-guide-link {
-    font-size: 11px;
+    font-size: 13px;
   }
   .home-page .section-heading p,
   .home-page .model-copy > p {
-    font-size: 14px;
+    font-size: 16px;
   }
   .scene-topbar > .window-controls {
     gap: 7px;
@@ -2681,7 +2704,7 @@ html:not(.motion-ready) *::after {
     font-size: 18px;
   }
   .principles-list p {
-    font-size: 12px;
+    font-size: 15px;
   }
   .cta-section::before {
     width: 350px;
@@ -2721,7 +2744,7 @@ html:not(.motion-ready) *::after {
     gap: 3px;
   }
   .language-switch button {
-    font-size: 10px;
+    font-size: 12px;
   }
   .menu-toggle {
     width: 36px;
@@ -2741,7 +2764,7 @@ html:not(.motion-ready) *::after {
   }
   .eyebrow {
     max-width: 280px;
-    font-size: 8px;
+    font-size: 11px;
     letter-spacing: 0.04em;
   }
   .hero h1 {
@@ -2755,11 +2778,11 @@ html:not(.motion-ready) *::after {
     font-size: clamp(33px, 9vw, 52px);
   }
   .hero-lead {
-    font-size: 13px;
-    line-height: 1.85;
+    font-size: 16px;
+    line-height: 1.75;
   }
   .hero-remote-note {
-    font-size: 10px;
+    font-size: 13px;
   }
   .hero-actions {
     gap: 8px;
@@ -2769,18 +2792,18 @@ html:not(.motion-ready) *::after {
     min-height: 45px;
     gap: 9px;
     padding: 11px 15px;
-    font-size: 11px;
+    font-size: 14px;
   }
   .install-command {
     gap: 10px;
-    font-size: 10px;
+    font-size: 12px;
   }
   .product-hunt-badge {
     width: 145px;
     margin-top: 17px;
   }
   .hero-meta {
-    font-size: 8px;
+    font-size: 10px;
   }
   .hero-scene {
     max-width: 400px;
@@ -2862,7 +2885,7 @@ html:not(.motion-ready) *::after {
   .hero-scene figcaption {
     max-width: 290px;
     margin-top: 0;
-    font-size: 8px;
+    font-size: 12px;
   }
   .scene-atmosphere {
     inset: -30px -20px 0;
@@ -2901,7 +2924,7 @@ html:not(.motion-ready) *::after {
   }
   .scroll-cue,
   .motion-toggle {
-    font-size: 8px;
+    font-size: 11px;
   }
   .motion-toggle {
     gap: 8px;
@@ -2910,7 +2933,7 @@ html:not(.motion-ready) *::after {
   .signal-track {
     gap: 30px;
     padding-block: 22px;
-    font-size: 9px;
+    font-size: 11px;
   }
   .section {
     padding-block: 65px;
@@ -2925,13 +2948,13 @@ html:not(.motion-ready) *::after {
     font-size: clamp(33px, 9vw, 45px);
   }
   .section-index {
-    font-size: 9px;
+    font-size: 11px;
   }
   .section-heading p,
   .model-copy > p,
   .principles-copy > p,
   .cta-section p {
-    font-size: 13px;
+    font-size: 16px;
   }
   .product-frame,
   .settings-frame {
@@ -2945,14 +2968,14 @@ html:not(.motion-ready) *::after {
   .frame-label {
     min-height: 29px;
     padding: 4px 7px 8px;
-    font-size: 7px;
+    font-size: 10px;
   }
   .frame-label small {
     display: none;
   }
   .settings-frame figcaption {
     margin: 10px 6px 6px;
-    font-size: 8px;
+    font-size: 11px;
   }
   .metrics-grid {
     margin-top: 30px;
@@ -2965,11 +2988,11 @@ html:not(.motion-ready) *::after {
     font-size: 32px;
   }
   .metric > span {
-    font-size: 12px;
+    font-size: 14px;
     margin-top: 17px;
   }
   .metric p {
-    font-size: 11px;
+    font-size: 13px;
   }
   .bento-grid,
   .roadmap-list {
@@ -2993,7 +3016,7 @@ html:not(.motion-ready) *::after {
     font-size: 23px;
   }
   .bento p {
-    font-size: 13px;
+    font-size: 15px;
   }
   .bento-large .workspace-stack {
     margin-bottom: 12px;
@@ -3039,7 +3062,7 @@ html:not(.motion-ready) *::after {
     grid-row: 1;
   }
   .site-counter {
-    font-size: 9px;
+    font-size: 12px;
   }
 }
 /* Physical devices share one coordinate space with the connection animation. */
