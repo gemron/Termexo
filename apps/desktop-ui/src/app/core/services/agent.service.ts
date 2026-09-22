@@ -57,7 +57,7 @@ const CLI_PREVIEWS: Record<
     package: '@openai/codex',
     script: 'https://chatgpt.com/codex/install.ps1',
   },
-  opencode: { displayName: 'OpenCode', package: 'opencode-ai' },
+  opencode: { displayName: 'OpenCode', package: '@opencode/cli' },
   grok: { displayName: 'Grok Build', package: '@xai-official/grok' },
   antigravity: {
     displayName: 'Antigravity',

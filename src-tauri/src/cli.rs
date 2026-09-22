@@ -947,7 +947,7 @@ fn definition(agent_type: &str) -> Result<CliDefinition, String> {
         "opencode" => Ok(CliDefinition {
             agent_type: "opencode",
             display_name: "OpenCode",
-            package_name: Some("opencode-ai"),
+            package_name: Some("@opencode/cli"),
             script: None,
         }),
         "grok" => Ok(CliDefinition {
@@ -1030,7 +1030,7 @@ mod tests {
         );
         assert_eq!(
             definition("opencode").unwrap().package_name,
-            Some("opencode-ai")
+            Some("@opencode/cli")
         );
         assert_eq!(
             definition("grok").unwrap().package_name,
