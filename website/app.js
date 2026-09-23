@@ -49,7 +49,7 @@ const translations = {
       "Keep your PC running. Use a reachable HTTPS relay and desktop access token, or connect directly over a trusted LAN or VPN.",
     heroRemoteGuide:
       "Set up remote relay access ↗",
-    heroRelease: "New in v0.10.5: Todo board snapshots, real-time sync, and faster Antigravity quota ↗",
+    heroRelease: "New in v0.10.6: OpenCode v2 proxy reliability and updated CLI install ↗",
     sceneHeading: "One workspace. Two ways in.",
     sceneDesktop: "RUN ON YOUR PC",
     sceneMobile: "CONTINUE ON YOUR PHONE",
@@ -293,7 +293,7 @@ const translations = {
       "电脑需保持运行。使用双方可达的 HTTPS 中继和桌面访问令牌，也可在可信局域网或 VPN 内直连。",
     heroRemoteGuide:
       "了解如何配置中继访问 ↗",
-    heroRelease: "v0.10.5 新增任务看板持久化与快照迁移、多端实时同步与 Antigravity 余量极速查询 ↗",
+    heroRelease: "v0.10.6 修复 OpenCode v2 代理与重连，并更新 CLI 安装包 ↗",
     sceneHeading: "同一个工作台，电脑与手机接续操作。",
     sceneDesktop: "电脑运行 AGENT",
     sceneMobile: "手机远程接着操作",

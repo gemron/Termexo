@@ -5,6 +5,9 @@ import { fileURLToPath } from 'node:url';
 const packageRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const repositoryRoot = resolve(packageRoot, '..', '..');
 const destinationDirectory = resolve(packageRoot, 'vendor', 'win32-x64');
+const targetDirectory = process.env.CARGO_TARGET_DIR
+  ? resolve(repositoryRoot, process.env.CARGO_TARGET_DIR)
+  : resolve(repositoryRoot, 'src-tauri', 'target');
 
 /** Smallest plausible release build; anything under it is a stale or truncated artefact. */
 const MINIMUM_EXECUTABLE_BYTES = 1_000_000;
@@ -18,7 +21,7 @@ const MINIMUM_EXECUTABLE_BYTES = 1_000_000;
  */
 const PAYLOAD = [
   {
-    source: resolve(repositoryRoot, 'src-tauri', 'target', 'release', 'termexo.exe'),
+    source: resolve(targetDirectory, 'release', 'termexo.exe'),
     name: 'termexo.exe',
     minimumBytes: MINIMUM_EXECUTABLE_BYTES,
     missing: 'A current release executable was not found at %s. Run npm run tauri:build first.',

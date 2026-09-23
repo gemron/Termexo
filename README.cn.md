@@ -11,7 +11,7 @@
 </p>
 
 <p align="center">
-  <img alt="Version 0.10.5" src="https://img.shields.io/badge/version-0.10.5-58c7a0">
+  <img alt="Version 0.10.6" src="https://img.shields.io/badge/version-0.10.6-58c7a0">
   <img alt="Windows" src="https://img.shields.io/badge/platform-Windows-0078D4?logo=windows">
   <img alt="Tauri 2" src="https://img.shields.io/badge/Tauri-2-24C8DB?logo=tauri&logoColor=white">
   <img alt="Angular 22" src="https://img.shields.io/badge/Angular-22-DD0031?logo=angular">
@@ -96,7 +96,7 @@ npx termexo@latest
 
 ## 最新版本
 
-**[v0.10.5](https://github.com/gemron/Termexo/releases/tag/v0.10.5)** 支持任务看板本地 SQLite 持久化与快照导入导出备份，多端远程访问实时同步，并重构 Antigravity 余量查询为直连 HTTP 接口，查询更轻量迅速。
+**[v0.10.6](https://github.com/gemron/Termexo/releases/tag/v0.10.6)** 确保 OpenCode v2 会话及终端重连后继续使用工作区代理，并更新 OpenCode npm 安装包。
 [完整更新记录](CHANGELOG.cn.md)。
 
 如果 Termexo 帮到了你，欢迎 **给仓库点一个 Star**，帮助更多开发者发现它。
@@ -365,7 +365,8 @@ flowchart LR
 | V0.10.2 | 可靠的 Agent 状态与通知，以及多语言任务看板 | 已发布 |
 | V0.10.3 | 多端查看时 Agent 输入框不再出现乱码、Ctrl+点击打开链接与 OpenCode 复制 | 已发布 |
 | V0.10.4 | Grok Build、可靠的 Git 变更显示、安静的终端启动与工作区排序 | 已发布 |
-| V0.10.5 | 任务看板持久化与快照迁移、轻量快速的 Antigravity 余量查询 | 当前版本 |
+| V0.10.5 | 任务看板持久化与快照迁移、轻量快速的 Antigravity 余量查询 | 已发布 |
+| V0.10.6 | OpenCode v2 代理稳定生效与 CLI 安装更新 | 当前版本 |
 | V1.0 | 稳定性、安全加固与恢复体验 | 规划中 |
 
 进行中的工作见 [Issues](https://github.com/gemron/Termexo/issues)，实际交付内容见
