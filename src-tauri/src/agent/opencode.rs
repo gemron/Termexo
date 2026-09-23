@@ -21,6 +21,8 @@ const AUTO_CONFIRM_FLAG: &str = "--auto";
 /// Keeps a probe from loading the external plugins a user's own OpenCode config may install,
 /// including the one Termexo writes for a terminal.
 const PURE_MODE_FLAG: &str = "--pure";
+/// V2 otherwise connects to a shared service whose proxy environment can differ from this terminal.
+const STANDALONE_FLAG: &str = "--standalone";
 /// Version probes run while the user waits on agent detection at startup.
 const VERSION_TIMEOUT: Duration = Duration::from_secs(10);
 /// The session list is read from the CLI rather than from files, so it needs its own ceiling.
@@ -30,6 +32,8 @@ const SESSION_LIST_TIMEOUT: Duration = Duration::from_secs(20);
 pub enum OpenCodeError {
     #[error("未安装 OpenCode")]
     NotInstalled,
+    #[error("无法确认 OpenCode 版本，已停止启动以避免绕过终端代理")]
+    VersionUnavailable,
     #[error("无法读取 OpenCode 会话：{0}")]
     SessionCommand(String),
     #[error("无法解析 OpenCode 会话：{0}")]
@@ -123,6 +127,36 @@ impl OpenCodeAdapter {
         let version = String::from_utf8_lossy(&output.stdout).trim().to_owned();
         (!version.is_empty()).then_some(version)
     }
+
+    fn supports_private_server(&self) -> Result<bool, OpenCodeError> {
+        self.read_version()
+            .as_deref()
+            .and_then(opencode_major_version)
+            .map(|major| major >= 2)
+            .ok_or(OpenCodeError::VersionUnavailable)
+    }
+
+    /// Also upgrades commands persisted before Termexo added private V2 servers.
+    pub fn ensure_private_server(&self, command: &mut Option<String>) -> Result<(), OpenCodeError> {
+        if let Some(command) = command.as_mut() {
+            if !command.contains(STANDALONE_FLAG) && self.supports_private_server()? {
+                command.push(' ');
+                command.push_str(STANDALONE_FLAG);
+            }
+        }
+        Ok(())
+    }
+}
+
+fn opencode_major_version(version: &str) -> Option<u32> {
+    version
+        .split_whitespace()
+        .last()
+        .unwrap_or_default()
+        .trim_start_matches('v')
+        .split('.')
+        .next()
+        .and_then(|major| major.parse::<u32>().ok())
 }
 
 impl AgentAdapter for OpenCodeAdapter {
@@ -176,6 +210,10 @@ impl AgentAdapter for OpenCodeAdapter {
     ) -> Result<AgentLaunchSpec, Self::Error> {
         let executable = self.find_executable().ok_or(OpenCodeError::NotInstalled)?;
         let mut command = format!("& {}", powershell_quote(&executable.to_string_lossy()));
+        if self.supports_private_server()? {
+            command.push(' ');
+            command.push_str(STANDALONE_FLAG);
+        }
         append_option(&mut command, "--session", options.session_id.as_deref());
         if options.continue_last && options.session_id.as_deref().map_or(true, str::is_empty) {
             command.push_str(" --continue");
@@ -300,6 +338,72 @@ mod tests {
         (directory, executable)
     }
 
+    fn test_versioned_executable(version: &str) -> (PathBuf, PathBuf) {
+        let (directory, executable) = test_executable();
+        if cfg!(windows) {
+            fs::write(&executable, format!("@echo off\r\necho {version}\r\n")).unwrap();
+        } else {
+            fs::write(&executable, format!("#!/bin/sh\necho {version}\n")).unwrap();
+            #[cfg(unix)]
+            {
+                use std::os::unix::fs::PermissionsExt;
+                fs::set_permissions(&executable, fs::Permissions::from_mode(0o755)).unwrap();
+            }
+        }
+        (directory, executable)
+    }
+
+    #[test]
+    fn v2_uses_a_private_server_for_new_and_saved_commands() {
+        let (directory, executable) = test_versioned_executable("opencode v2.0.15");
+        let adapter = OpenCodeAdapter::with_executable(executable);
+        let launch = adapter
+            .build_launch_command(&OpenCodeLaunchOptions {
+                session_id: None,
+                model: None,
+                continue_last: false,
+                auto_confirm: false,
+            })
+            .unwrap();
+        assert!(
+            launch.command.ends_with(" --standalone"),
+            "{}",
+            launch.command
+        );
+
+        let mut saved = Some("& 'opencode' --continue".into());
+        adapter.ensure_private_server(&mut saved).unwrap();
+        adapter.ensure_private_server(&mut saved).unwrap();
+        assert_eq!(saved.unwrap(), "& 'opencode' --continue --standalone");
+        fs::remove_dir_all(directory).unwrap();
+    }
+
+    #[test]
+    fn v1_commands_keep_their_existing_flags() {
+        assert_eq!(opencode_major_version("1.9.0"), Some(1));
+        assert_eq!(opencode_major_version("v2.0.15"), Some(2));
+        assert_eq!(opencode_major_version("opencode v2.0.15"), Some(2));
+        let (directory, executable) = test_versioned_executable("1.9.0");
+        let adapter = OpenCodeAdapter::with_executable(executable);
+        let mut saved = Some("& 'opencode' --continue".into());
+        adapter.ensure_private_server(&mut saved).unwrap();
+        assert_eq!(saved.unwrap(), "& 'opencode' --continue");
+        fs::remove_dir_all(directory).unwrap();
+    }
+
+    #[test]
+    fn an_unreadable_version_does_not_launch_a_shared_service() {
+        let (directory, executable) = test_executable();
+        let adapter = OpenCodeAdapter::with_executable(executable);
+        let mut saved = Some("& 'opencode' --continue".into());
+        assert!(matches!(
+            adapter.ensure_private_server(&mut saved),
+            Err(OpenCodeError::VersionUnavailable)
+        ));
+        assert_eq!(saved.unwrap(), "& 'opencode' --continue");
+        fs::remove_dir_all(directory).unwrap();
+    }
+
     #[test]
     fn parses_and_filters_official_session_json() {
         let value = r#"[
@@ -315,7 +419,7 @@ mod tests {
 
     #[test]
     fn builds_new_and_resume_commands() {
-        let (directory, executable) = test_executable();
+        let (directory, executable) = test_versioned_executable("1.9.0");
         let adapter = OpenCodeAdapter::with_executable(executable);
         let fresh = adapter
             .build_launch_command(&OpenCodeLaunchOptions {
@@ -351,7 +455,7 @@ mod tests {
 
     #[test]
     fn adds_the_auto_approve_flag_only_when_asked() {
-        let (directory, executable) = test_executable();
+        let (directory, executable) = test_versioned_executable("1.9.0");
         let adapter = OpenCodeAdapter::with_executable(executable);
         let automatic = adapter
             .build_launch_command(&OpenCodeLaunchOptions {

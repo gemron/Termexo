@@ -1,6 +1,7 @@
 use serde::{Deserialize, Serialize};
 use tauri::{AppHandle, State};
 
+use crate::agent::OpenCodeAdapter;
 use crate::commands::agent::{relaunch_environment, RelaunchRequest};
 use crate::config::{CredentialStore, LaunchEnvironmentStore};
 use crate::database::WorkspaceDatabase;
@@ -32,6 +33,8 @@ pub struct TerminalStartRequest {
     #[serde(default)]
     pub agent_type: Option<String>,
     #[serde(default)]
+    pub native_session_id: Option<String>,
+    #[serde(default)]
     pub account_profile_id: Option<String>,
     #[serde(default)]
     pub profile_id: Option<String>,
@@ -55,7 +58,7 @@ pub struct TerminalStartResult {
 #[allow(clippy::too_many_arguments)]
 #[tauri::command(async)]
 pub fn create_terminal(
-    request: TerminalStartRequest,
+    mut request: TerminalStartRequest,
     app: AppHandle,
     manager: State<'_, PtyManager>,
     launch_environment: State<'_, LaunchEnvironmentStore>,
@@ -112,12 +115,18 @@ pub fn create_terminal(
                 &RelaunchRequest {
                     terminal_id: &request.terminal_id,
                     agent_type,
+                    native_session_id: request.native_session_id.as_deref(),
                     account_profile_id: request.account_profile_id.as_deref(),
                     model_profile_id: request.profile_id.as_deref(),
                     workspace_id: request.workspace_id.as_deref(),
                 },
             )?;
         }
+    }
+    if request.agent_type.as_deref() == Some("opencode") {
+        OpenCodeAdapter::new()
+            .ensure_private_server(&mut request.command)
+            .map_err(|error| error.to_string())?;
     }
     if let Err(error) = repositories.capture_baseline(
         request.workspace_id.as_deref(),

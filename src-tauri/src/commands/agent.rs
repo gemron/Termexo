@@ -560,16 +560,14 @@ pub fn prepare_opencode_launch(
     launch_environment: State<'_, LaunchEnvironmentStore>,
     hooks: State<'_, HookEventStore>,
 ) -> Result<AgentLaunchSpec, String> {
-    let mut environment =
-        network_environment(&database, &credentials, request.workspace_id.as_deref())?;
-    let runtime = hooks
-        .prepare_opencode_runtime(
-            &request.terminal_id,
-            request.session_id.as_deref(),
-            std::env::var("OPENCODE_CONFIG_CONTENT").ok().as_deref(),
-        )
-        .map_err(|error| error.to_string())?;
-    environment.insert("OPENCODE_CONFIG_CONTENT".into(), runtime.config_content);
+    let environment = opencode_launch_environment(
+        &database,
+        &credentials,
+        &hooks,
+        &request.terminal_id,
+        request.workspace_id.as_deref(),
+        request.session_id.as_deref(),
+    )?;
     log_proxy_environment(&environment);
     launch_environment
         .put(request.terminal_id, environment)
@@ -892,6 +890,51 @@ pub(crate) fn network_environment(
     network::profile_environment(&profile, password.as_deref())
 }
 
+fn opencode_launch_environment(
+    database: &WorkspaceDatabase,
+    credentials: &CredentialStore,
+    hooks: &HookEventStore,
+    terminal_id: &str,
+    workspace_id: Option<&str>,
+    session_id: Option<&str>,
+) -> Result<HashMap<String, String>, String> {
+    let mut environment = network_environment(database, credentials, workspace_id)?;
+    // The CLI talks to its private server over loopback. Exclude it even when the selected
+    // profile omitted NO_PROXY, while keeping every bypass the user already configured.
+    let existing = environment
+        .get("NO_PROXY")
+        .cloned()
+        .or_else(|| std::env::var("NO_PROXY").ok())
+        .or_else(|| std::env::var("no_proxy").ok())
+        .unwrap_or_default();
+    let mut exclusions = existing
+        .split(',')
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+        .map(str::to_owned)
+        .collect::<Vec<_>>();
+    for loopback in ["localhost", "127.0.0.1", "::1"] {
+        if !exclusions
+            .iter()
+            .any(|value| value.eq_ignore_ascii_case(loopback))
+        {
+            exclusions.push(loopback.into());
+        }
+    }
+    let no_proxy = exclusions.join(",");
+    environment.insert("NO_PROXY".into(), no_proxy.clone());
+    environment.insert("no_proxy".into(), no_proxy);
+    let runtime = hooks
+        .prepare_opencode_runtime(
+            terminal_id,
+            session_id,
+            std::env::var("OPENCODE_CONFIG_CONTENT").ok().as_deref(),
+        )
+        .map_err(|error| error.to_string())?;
+    environment.insert("OPENCODE_CONFIG_CONTENT".into(), runtime.config_content);
+    Ok(environment)
+}
+
 /// Picks the profile an agent should launch with, ignoring any that is switched off for it.
 ///
 /// An explicit choice still has to be enabled: a profile the user turned off for this agent has no
@@ -935,6 +978,14 @@ pub(crate) fn relaunch_environment(
 ) -> Result<HashMap<String, String>, String> {
     match request.agent_type {
         "claude" | "codex" => model_agent_relaunch_environment(database, credentials, request),
+        "opencode" => opencode_launch_environment(
+            database,
+            credentials,
+            hooks,
+            request.terminal_id,
+            request.workspace_id,
+            request.native_session_id,
+        ),
         "grok" => network_environment(database, credentials, request.workspace_id),
         "antigravity" => antigravity_launch_environment(
             database,
@@ -952,6 +1003,7 @@ pub(crate) fn relaunch_environment(
 pub(crate) struct RelaunchRequest<'a> {
     pub terminal_id: &'a str,
     pub agent_type: &'a str,
+    pub native_session_id: Option<&'a str>,
     pub account_profile_id: Option<&'a str>,
     pub model_profile_id: Option<&'a str>,
     pub workspace_id: Option<&'a str>,
@@ -1239,6 +1291,7 @@ fn anthropic_profile_environment(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::config::NetworkProfile;
 
     /// A provider serving both agents, which is how the presets configure one.
     fn profile(id: &str, provider: &str) -> ModelProfile {
@@ -1642,6 +1695,7 @@ mod tests {
             &RelaunchRequest {
                 terminal_id: "terminal-1",
                 agent_type: "antigravity",
+                native_session_id: None,
                 account_profile_id: None,
                 model_profile_id: None,
                 workspace_id: None,
@@ -1663,6 +1717,77 @@ mod tests {
         );
         assert!(environment.contains_key("TERMEXO_ANTIGRAVITY_EVENT_FILE"));
 
+        drop(database);
+        std::fs::remove_dir_all(&directory).ok();
+    }
+
+    #[test]
+    fn restores_opencode_proxy_and_terminal_plugin() {
+        let directory = std::env::temp_dir().join(format!(
+            "termexo-opencode-relaunch-{}",
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        std::fs::create_dir_all(&directory).unwrap();
+        let database = WorkspaceDatabase::open(directory.join("termexo.db")).unwrap();
+        let hooks = HookEventStore::new(&directory).unwrap();
+        database
+            .save_network_profile(&NetworkProfile {
+                id: "proxy".into(),
+                name: "proxy".into(),
+                scope: "global".into(),
+                workspace_id: None,
+                enabled: true,
+                is_default: true,
+                http_proxy: None,
+                https_proxy: Some("http://127.0.0.1:7890".into()),
+                all_proxy: None,
+                no_proxy: Some("internal.example".into()),
+                npm_registry: None,
+                npm_proxy: None,
+                npm_https_proxy: None,
+                npm_strict_ssl: true,
+                npm_ca_path: None,
+                proxy_username: None,
+                credential_target: None,
+                has_credential: false,
+            })
+            .unwrap();
+
+        let environment = relaunch_environment(
+            &database,
+            &CredentialStore,
+            &hooks,
+            &RelaunchRequest {
+                terminal_id: "terminal-1",
+                agent_type: "opencode",
+                native_session_id: Some("ses_123"),
+                account_profile_id: None,
+                model_profile_id: None,
+                workspace_id: Some("workspace-1"),
+            },
+        )
+        .unwrap();
+
+        assert_eq!(
+            environment.get("HTTPS_PROXY").map(String::as_str),
+            Some("http://127.0.0.1:7890")
+        );
+        assert_eq!(
+            environment.get("NO_PROXY").map(String::as_str),
+            Some("internal.example,localhost,127.0.0.1,::1")
+        );
+        assert_eq!(environment.get("no_proxy"), environment.get("NO_PROXY"));
+        assert!(environment.contains_key("OPENCODE_CONFIG_CONTENT"));
+        let plugin = std::fs::read_to_string(
+            directory
+                .join("runtime")
+                .join("opencode-terminal-1.plugin.js"),
+        );
+        assert!(plugin.is_ok());
+        assert!(plugin.unwrap().contains("ses_123"));
         drop(database);
         std::fs::remove_dir_all(&directory).ok();
     }

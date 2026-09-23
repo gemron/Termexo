@@ -114,6 +114,7 @@ interface TerminalStartRequest {
   /** Which client these dimensions describe, so several viewers can share one PTY. */
   viewerId: string;
   agentType?: string;
+  nativeSessionId?: string;
   accountProfileId?: string;
   profileId?: string;
   workspaceId?: string;
@@ -318,6 +319,7 @@ export class TerminalGatewayService {
       // Carried so a reconnecting terminal can rebuild the launch environment, which the backend
       // hands out once and loses on restart. Without them it would start as the default account.
       agentType: session.agentType,
+      nativeSessionId: session.nativeSessionId,
       accountProfileId: session.accountProfileId,
       profileId: session.profileId,
       workspaceId,
