@@ -39,9 +39,14 @@ test("desktop and phone workflow have complete bilingual copy and honest boundar
       dictionaries[lang].sceneCaption,
       /not a live session|非实时会话/,
     );
+    assert.match(dictionaries[lang].demoCaption, /v0\.10\.6/);
+    assert.match(dictionaries[lang].demoCaption, /Antigravity/);
+    assert.match(dictionaries[lang].demoCaption, /Waiting intervals are cut|已剪去等待片段/);
   }
-  assert.match(dictionaries.zh.heroLine2, /跨网络/);
-  assert.match(dictionaries.en.heroLine2, /networks/);
+  assert.match(dictionaries.zh.heroLine2, /等你/);
+  assert.match(dictionaries.en.heroLine2, /need you/);
+  assert.match(hero, /data-i18n="heroDownload"/);
+  assert.match(hero, /href="#workbench-demo"/);
   assert.doesNotMatch(
     hero,
     /termexo agent status|7 agents active|Nothing leaves your PC/,
@@ -86,6 +91,12 @@ test("remote guide follows language changes and preserves the remote chapter", (
       lang === "zh" ? "guide.html#remote" : "guide.en.html#remote",
     );
     assert.equal(link.textContent, dictionaries[lang].heroRemoteGuide);
+    assert.equal(
+      context.document.title,
+      lang === "zh"
+        ? "Termexo — Agent 同时跑，谁在等你，一眼看见"
+        : "Termexo — See which coding agent needs you",
+    );
     const guide = readFileSync(
       new URL(link.attrs.href.split("#")[0], site),
       "utf8",
@@ -94,7 +105,7 @@ test("remote guide follows language changes and preserves the remote chapter", (
   }
 });
 
-test("static homepage links resolve and existing social artwork is preserved", () => {
+test("static homepage links resolve and real demo artwork is used in social previews", () => {
   const ids = [...html.matchAll(/\bid="([^"]+)"/g)].map((match) => match[1]);
   assert.equal(new Set(ids).size, ids.length);
   for (const [, link] of html.matchAll(/(?:src|href)="([^"]+)"/g)) {
@@ -103,10 +114,9 @@ test("static homepage links resolve and existing social artwork is preserved", (
     else assert.ok(existsSync(new URL(link.split(/[?#]/)[0], site)), link);
   }
   assert.match(html, /href="guide.en.html#remote"\s+data-i18n="heroRemoteGuide"/);
-  assert.match(
-    html,
-    /property="og:image"\s+content="https:\/\/www.termexo.com\/assets\/termexo-phone.png"/,
-  );
+  assert.match(html, /property="og:image"\s+content="https:\/\/www.termexo.com\/assets\/termexo-workbench-demo.png\?v=[a-f0-9]{12}"/);
+  assert.match(html, /<video controls playsinline preload="none" poster="assets\/termexo-workbench-demo.png\?v=[a-f0-9]{12}"/);
+  assert.match(html, /<source src="assets\/termexo-workbench-demo.mp4\?v=[a-f0-9]{12}" type="video\/mp4"/);
   const { version } = JSON.parse(
     readFileSync(new URL("../package.json", import.meta.url), "utf8"),
   );
@@ -118,9 +128,10 @@ test("static homepage links resolve and existing social artwork is preserved", (
 });
 
 test("homepage asset versions match their content so returning visitors fetch new translations", () => {
-  for (const asset of ["app.js", "styles.css"]) {
+  for (const asset of ["app.js", "styles.css", "assets/termexo-workbench-demo.mp4", "assets/termexo-workbench-demo.png"]) {
     // Match Git's normalized text content across LF and CRLF checkouts.
-    const contents = readFileSync(new URL(asset, site), "utf8").replace(/\r\n/g, "\n");
+    const bytes = readFileSync(new URL(asset, site));
+    const contents = /\.(js|css)$/.test(asset) ? bytes.toString('utf8').replace(/\r\n/g, "\n") : bytes;
     const version = createHash("sha256").update(contents).digest("hex").slice(0, 12);
     assert.ok(html.includes(`"${asset}?v=${version}"`), `Refresh version for ${asset}`);
   }

@@ -4,7 +4,7 @@
 
 <h1 align="center">Termexo</h1>
 
-<p align="center"><strong>电脑上开工，跨网络接着用</strong></p>
+<p align="center"><strong>Agent 同时跑，谁在等你，一眼看见</strong></p>
 
 <p align="center">
   <a href="./README.md">English</a> · <strong>简体中文</strong>
@@ -31,12 +31,15 @@
   <img src="website/assets/agent-grok.svg" alt="Grok Build" title="Grok Build" width="26" height="26">
 </p>
 
-**Termexo 致力于打造本地优先的 AI 编程工作台，统一管理多个 Agent、模型与项目，让开发工作在电脑与手机之间安全接续。**
+**在一个 Windows 工作台运行多个 AI 编程 Agent，集中查看执行、等待确认和完成状态。**
 
-目前支持在同一个 Windows 工作台中运行 Claude Code、Codex、OpenCode、Antigravity 和 Grok Build。
-Agent 留在电脑上运行；通过自建中继，用手机或另一台电脑的浏览器跨网络接回同一个工作台，查看输出、回复审批、发送下一条指令。桌面无需公网 IP，也无需路由器端口映射。
+支持 Claude Code、Codex、OpenCode、Antigravity 和 Grok Build。每个 Agent 仍在本机真实终端运行；你可以按项目找到需要处理的那个终端，恢复原生会话。需要离开电脑时，再通过自建中继、可信局域网或 VPN 从手机接回同一个工作台。
 
-![Termexo Windows 工作台](website/assets/termexo-workbench.png)
+[![Termexo v0.10.6 中的两个真实 Antigravity 会话](website/assets/termexo-workbench-demo.png)](https://www.termexo.com/#workbench-demo)
+
+*点击观看 30 秒 v0.10.6 真实桌面录屏：查看完成提醒、返回对应会话、回复后继续执行，再并排查看两个 Antigravity 会话的结果。附中英字幕，已剪去等待片段。*
+
+**[下载 Windows 安装包](https://github.com/gemron/Termexo/releases/latest)** · [观看演示](https://www.termexo.com/#workbench-demo) · [首次试用反馈](https://github.com/gemron/Termexo/issues/new?template=first-use.yml)
 
 | 同时看清多个 Agent | 知道谁在等你 | 手机上接着操作 |
 | --- | --- | --- |
@@ -66,7 +69,10 @@ Agent 留在电脑上运行；通过自建中继，用手机或另一台电脑�
 
 ## 在 Windows 上开始使用
 
-**[下载 Windows 安装包](https://github.com/gemron/Termexo/releases/latest)**：选择 EXE 或 MSI 文件安装，无需 Rust 或编译工具。
+1. **[下载 Windows 安装包](https://github.com/gemron/Termexo/releases/latest)**：选择 EXE 或 MSI 安装，无需 Rust 或编译工具。
+2. 打开 Termexo，为本机项目目录创建工作区。
+3. 在工作区中新建终端，选择已安装的 Agent；若尚未安装，可在设置中查看检测结果并安装 CLI。
+4. 运行一个任务，查看终端标签和右侧面板的状态；手机访问可在本地流程跑通后按需启用。
 
 已安装 Node.js 18.18+？也可以直接运行：
 
@@ -117,7 +123,7 @@ npx termexo@latest
       要显示的终端，排成 1–6 行/列的自定义网格。标签支持拖拽排序和中键关闭，工作台支持键盘
       快捷键。每个工作空间都会记住目录、标签、布局、模型和主题。
       <br><br>
-      <a href="website/assets/termexo-workbench.png"><img src="website/assets/termexo-workbench.png" alt="Termexo 多 Agent 工作台"></a>
+      <a href="https://www.termexo.com/#workbench-demo"><img src="website/assets/termexo-workbench-demo.png" alt="Termexo v0.10.6 中的两个真实 Antigravity 会话"></a>
     </td>
     <td width="50%" valign="top">
       <strong>Agent 需要你时，马上知道。</strong><br><br>
@@ -244,15 +250,11 @@ Termexo 以 **Workspace** 为组织单位，把这些信息集中到一个可观
 
 ## 当前边界
 
-- Claude Code 与 Codex 都已支持原生检测、按账号/模型启动、本地会话发现、恢复和基于生命周期
-  事件的终端状态。两者的事件语义并不完全相同；兼容供应商模型切换目前只适用于 Claude 终端。
-- 应用退出后，已退出的操作系统进程不会被“伪恢复”。Termexo 只恢复终端配置，
-  历史 Claude 会话需要从会话中心显式恢复。
-- Claude 与 Codex 原始 JSONL 均只读，Termexo 不修改、重命名或删除这些文件。
-- 快照入口会保持隐藏，直到对应生产后端完成。Git 会话变更表示终端启动后观察到的仓库差异，
-  同期运行的编辑器或其他终端也可能参与这些改动。
-- V0.5 迁移的是脱敏后的上下文包，不会改写供应商私有的原生会话记录。自动权限批准、
-  原生 transcript 改写和跨 Agent 批量模型切换事务仍不在当前版本范围内。
+- 五个支持的 Agent 均可在 Windows 上检测、启动，并从会话中心寻找和恢复原生会话。各 CLI 提供的状态事件与启动选项不同；兼容供应商模型切换目前适用于 Claude 终端。
+- 应用退出后，已退出的操作系统进程不会被“伪恢复”。Termexo 恢复终端配置；历史 Agent 会话需从会话中心显式恢复。
+- 原生会话文件只读，Termexo 不修改、重命名或删除。跨 Agent 交接使用脱敏上下文包，不改写供应商私有记录。
+- Git 会话变更表示终端启动后观察到的仓库差异；同期运行的编辑器或其他终端也可能参与这些改动。
+- 手机跨网络访问需要电脑持续运行并接入自建中继；多人共享、细粒度权限和集中审计仍是长期规划。
 
 完整产品规划见 [Termexo.md](./Termexo.md)，当前架构边界见
 [V0.2 架构说明](./docs/architecture/v0.2.md)。
