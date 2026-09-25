@@ -1,0 +1,226 @@
+:host {
+  display: block;
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  overflow: auto;
+  container-type: inline-size;
+}
+
+.onboarding {
+  display: grid;
+  width: min(100%, 680px);
+  box-sizing: border-box;
+  gap: 18px;
+  padding: 28px 24px;
+  margin: 0 auto;
+  color: var(--text);
+  font-size: 12px;
+}
+
+.onboarding-head {
+  display: grid;
+  justify-items: center;
+  gap: 10px;
+  text-align: center;
+
+  h1 {
+    margin: 0;
+    font-size: 21px;
+    font-weight: 650;
+  }
+  p {
+    max-width: 42em;
+  }
+}
+
+p {
+  margin: 0;
+  color: var(--text-secondary);
+  line-height: 1.6;
+}
+h2 {
+  margin: 0 0 3px;
+  font-size: 13px;
+}
+strong {
+  font-weight: 620;
+}
+
+.onboarding-steps {
+  display: flex;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 10px;
+  padding: 0;
+  margin: 0;
+  list-style: none;
+  color: var(--text-muted);
+
+  li {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+  }
+  b {
+    display: grid;
+    width: 22px;
+    height: 22px;
+    place-items: center;
+    border: 1px solid var(--border);
+    border-radius: 50%;
+    font: 600 11px var(--mono);
+  }
+  [aria-current='step'],
+  .done {
+    color: var(--accent);
+  }
+  [aria-current='step'] b,
+  .done b {
+    border-color: color-mix(in srgb, var(--accent) 40%, var(--border));
+    background: color-mix(in srgb, var(--accent) 10%, var(--surface-2));
+  }
+}
+
+.project-card {
+  display: grid;
+  grid-template-columns: 20px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 12px;
+  padding: 14px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-box);
+  background: var(--surface-1);
+
+  p {
+    margin-top: 4px;
+    font-size: 11px;
+  }
+  .project-path {
+    overflow-wrap: anywhere;
+    font-family: var(--mono);
+  }
+}
+
+.ready-label {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  color: var(--color-primary);
+  font-size: 11px;
+}
+.agent-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 10px;
+}
+.agent-heading p {
+  font-size: 11px;
+}
+.agent-list {
+  padding: 0;
+  margin: 0;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-box);
+  overflow: hidden;
+  list-style: none;
+
+  li {
+    display: grid;
+    grid-template-columns: 30px minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 12px;
+    padding: 10px 12px;
+  }
+  li + li {
+    border-top: 1px solid var(--border);
+  }
+  [data-status='ready'] {
+    background: color-mix(in srgb, var(--accent) 4%, var(--surface-1));
+  }
+  [data-status='ready'] .agent-status {
+    color: var(--color-primary);
+  }
+  [data-status='error'] .agent-status,
+  [data-status='unhealthy'] .agent-status {
+    color: var(--color-warning);
+  }
+}
+.agent-icon {
+  display: grid;
+  width: 30px;
+  height: 30px;
+  place-items: center;
+  border-radius: var(--radius-field);
+  background: var(--surface-2);
+}
+.agent-detail strong {
+  display: block;
+}
+.agent-status {
+  display: block;
+  margin-top: 3px;
+  color: var(--text-muted);
+  font-size: 11px;
+}
+.diagnostic {
+  margin-top: 4px;
+  overflow-wrap: anywhere;
+  font-size: 11px;
+}
+.configuration-note {
+  margin-top: 8px;
+  font-size: 11px;
+}
+.run-note {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 12px 14px;
+  border-radius: var(--radius-box);
+  background: var(--surface-2);
+}
+.run-note p {
+  margin-top: 4px;
+  font-size: 11px;
+}
+.preview-note {
+  padding: 14px;
+  border: 1px dashed var(--border);
+  border-radius: var(--radius-box);
+}
+footer {
+  display: grid;
+  justify-items: center;
+  gap: 10px;
+  text-align: center;
+}
+.onboarding-privacy {
+  color: var(--text-muted);
+  font-size: 10px;
+}
+
+@container (max-width: 520px) {
+  .onboarding {
+    padding: 20px 14px;
+  }
+  .project-card {
+    grid-template-columns: 20px minmax(0, 1fr);
+  }
+  .project-card > button,
+  .project-card > .ready-label {
+    grid-column: 2;
+    justify-self: start;
+  }
+  .agent-list li {
+    grid-template-columns: 30px minmax(0, 1fr);
+    gap: 8px 10px;
+  }
+  .agent-list li > button,
+  .agent-list li > app-icon {
+    grid-column: 2;
+    justify-self: start;
+  }
+}

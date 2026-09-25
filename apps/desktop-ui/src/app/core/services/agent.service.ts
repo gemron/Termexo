@@ -68,6 +68,17 @@ const CLI_PREVIEWS: Record<
 const EVENT_POLL_INTERVAL_MS = 1_000;
 const MAX_RECENT_EVENTS = 250;
 
+export type AgentDetectionState =
+  { status: 'checking' | 'complete' } | { status: 'error'; message: string };
+
+const DETECTION_COMMANDS: Record<ManagedAgentType, string> = {
+  claude: 'detect_claude',
+  codex: 'detect_codex',
+  opencode: 'detect_opencode',
+  grok: 'detect_grok',
+  antigravity: 'detect_antigravity',
+};
+
 @Injectable({ providedIn: 'root' })
 export class AgentService {
   private readonly i18n = inject(I18nService);
@@ -86,6 +97,10 @@ export class AgentService {
   private readonly quotaLoadingState = signal(false);
   private readonly busyState = signal(false);
   private readonly errorState = signal<string | null>(null);
+  private readonly detectionState = signal<Partial<Record<ManagedAgentType, AgentDetectionState>>>(
+    {},
+  );
+  private readonly pendingDetections = new Map<ManagedAgentType, Promise<void>>();
   private initialized = false;
   private pendingOperations = 0;
   private pollingHandle: number | null = null;
@@ -105,6 +120,7 @@ export class AgentService {
   readonly quotaLoading = this.quotaLoadingState.asReadonly();
   readonly busy = this.busyState.asReadonly();
   readonly error = this.errorState.asReadonly();
+  readonly detectionStates = this.detectionState.asReadonly();
 
   constructor() {
     effect(() => {
@@ -144,54 +160,54 @@ export class AgentService {
     }, EVENT_POLL_INTERVAL_MS);
   }
 
-  async detectClaude(): Promise<void> {
-    if (!hasBackend()) {
-      this.installationState.set(this.browserInstallation('claude'));
-      return;
-    }
-    await this.run(async () => {
-      this.installationState.set(await invoke<AgentInstallation>('detect_claude'));
-    });
+  detectClaude(): Promise<void> {
+    return this.detectAgent('claude');
   }
 
-  async detectCodex(): Promise<void> {
-    if (!hasBackend()) {
-      this.codexInstallationState.set(this.browserInstallation('codex'));
-      return;
-    }
-    await this.run(async () => {
-      this.codexInstallationState.set(await invoke<AgentInstallation>('detect_codex'));
-    });
+  detectCodex(): Promise<void> {
+    return this.detectAgent('codex');
   }
 
-  async detectOpenCode(): Promise<void> {
-    if (!hasBackend()) {
-      this.openCodeInstallationState.set(this.browserInstallation('opencode'));
-      return;
-    }
-    await this.run(async () => {
-      this.openCodeInstallationState.set(await invoke<AgentInstallation>('detect_opencode'));
-    });
+  detectOpenCode(): Promise<void> {
+    return this.detectAgent('opencode');
   }
 
-  async detectGrok(): Promise<void> {
-    if (!hasBackend()) {
-      this.grokInstallationState.set(this.browserInstallation('grok'));
-      return;
-    }
-    await this.run(async () => {
-      this.grokInstallationState.set(await invoke<AgentInstallation>('detect_grok'));
-    });
+  detectGrok(): Promise<void> {
+    return this.detectAgent('grok');
   }
 
-  async detectAntigravity(): Promise<void> {
-    if (!hasBackend()) {
-      this.antigravityInstallationState.set(this.browserInstallation('antigravity'));
-      return;
-    }
-    await this.run(async () => {
-      this.antigravityInstallationState.set(await invoke<AgentInstallation>('detect_antigravity'));
-    });
+  detectAntigravity(): Promise<void> {
+    return this.detectAgent('antigravity');
+  }
+
+  /** Independent results keep one failed CLI probe from hiding the agents that are ready. */
+  detectAgent(agentType: ManagedAgentType): Promise<void> {
+    const pending = this.pendingDetections.get(agentType);
+    if (pending) return pending;
+    this.installationStates()[agentType].set(null);
+    this.detectionState.update((states) => ({ ...states, [agentType]: { status: 'checking' } }));
+    const operation = this.run(async () => {
+      try {
+        const installation = hasBackend()
+          ? await invoke<AgentInstallation>(DETECTION_COMMANDS[agentType])
+          : this.browserInstallation(agentType);
+        this.setInstallation(installation);
+      } catch (error) {
+        this.detectionState.update((states) => ({
+          ...states,
+          [agentType]: { status: 'error', message: this.errorMessage(error) },
+        }));
+        throw error;
+      }
+    }).finally(() => this.pendingDetections.delete(agentType));
+    this.pendingDetections.set(agentType, operation);
+    return operation;
+  }
+
+  async refreshInstallations(): Promise<void> {
+    await Promise.all(
+      (Object.keys(DETECTION_COMMANDS) as ManagedAgentType[]).map((type) => this.detectAgent(type)),
+    );
   }
 
   /**
@@ -646,8 +662,11 @@ export class AgentService {
 
   /** Records a freshly detected installation against the agent it belongs to. */
   private setInstallation(installation: AgentInstallation): void {
-    const state = this.installationStates()[installation.agentType as ManagedAgentType];
-    state?.set(installation);
+    const agentType = installation.agentType as ManagedAgentType;
+    const state = this.installationStates()[agentType];
+    if (!state) return;
+    state.set(installation);
+    this.detectionState.update((states) => ({ ...states, [agentType]: { status: 'complete' } }));
   }
 
   /** The signal holding each managed agent's installation, so neither lookup has to branch. */
@@ -674,11 +693,9 @@ export class AgentService {
   }
 
   private initializeBrowserPreview(): void {
-    this.installationState.set(this.browserInstallation('claude'));
-    this.codexInstallationState.set(this.browserInstallation('codex'));
-    this.openCodeInstallationState.set(this.browserInstallation('opencode'));
-    this.grokInstallationState.set(this.browserInstallation('grok'));
-    this.antigravityInstallationState.set(this.browserInstallation('antigravity'));
+    for (const type of Object.keys(DETECTION_COMMANDS) as ManagedAgentType[]) {
+      this.setInstallation(this.browserInstallation(type));
+    }
     if (this.modelProfileItems().length === 0) {
       this.modelProfileItems.set([
         {

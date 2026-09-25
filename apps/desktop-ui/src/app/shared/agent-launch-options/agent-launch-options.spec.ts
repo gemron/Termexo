@@ -18,6 +18,7 @@ const CODEX_INSTALLATION: AgentInstallation = {
 
 /** Only the installations the list reads; the real service reaches for the backend. */
 class AgentServiceStub {
+  readonly detectionStates = signal({});
   readonly installation = signal<AgentInstallation | null>(null);
   readonly codexInstallation = signal<AgentInstallation | null>(CODEX_INSTALLATION);
   readonly openCodeInstallation = signal<AgentInstallation | null>(null);
@@ -55,7 +56,7 @@ describe('AgentLaunchOptionsComponent', () => {
       root.querySelector(`button[data-agent="${type}"] small`)?.textContent;
 
     expect(hint('codex')).toBe('0.145.0');
-    expect(hint('claude')).toBe(i18n.t('common.notDetected'));
+    expect(hint('claude')).toBe(i18n.t('common.loading'));
   });
 
   it('emits the picked option', () => {

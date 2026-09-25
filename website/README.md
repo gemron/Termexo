@@ -67,7 +67,11 @@ node --test scripts/website-guide.test.mjs
 README 与官网共用这些素材，图中的连线表示工作组织和访问关系，不表示 Agent 自动编排。
 修改图中文字或布局后运行 `python scripts/build-workflow-illustrations.py`，并复核两种语言、两种布局。
 
-首页采用浅色冰蓝主题，动效由原生 CSS 与 `app.js` 驱动，无动画库或视频依赖。
+首页采用浅色冰蓝主题，界面动效由原生 CSS 与 `app.js` 驱动，无动画库依赖；演示视频仅在用户操作后播放。
+工作台段落嵌入一段可手动播放的 30 秒 MP4；首屏、社交预览和 README 共用从这段真实桌面录屏截出的封面。
+素材录制于 v0.10.6：两个真实 Antigravity 会话、完成提醒、返回会话、回复后继续执行和分屏结果。视频附中英字幕，明确标注等待片段已经剪去。
+视频使用 `preload="none"`，首屏只加载静态封面。
+原片信息、实际镜头、可复现的剪辑命令与首次体验验收步骤见 [demo-recording.md](demo-recording.md)。
 设计参考 CBDC 的玻璃材质与悬浮构图：
 https://dribbble.com/shots/24093396-CBDC-Web-Design-for-Digital-Currency-Website
 参考页视频受访问验证限制，本实现是基于封面构图重新设计的动效，不是逐帧复刻。

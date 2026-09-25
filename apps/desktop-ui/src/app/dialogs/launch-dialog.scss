@@ -233,3 +233,10 @@ app-icon.spinning {
     grid-column: auto;
   }
 }
+.launch-blocked-reason {
+  margin: 10px 0 0;
+  color: var(--color-warning);
+  font-size: 11px;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}

@@ -37,19 +37,17 @@ const translations = {
     navPrinciples: "Privacy",
     navGuide: "User guide",
     github: "GitHub",
-    eyebrow:
-      "WINDOWS WORKBENCH / SELF-HOSTED RELAY",
-    heroLine1:
-      "Start at your desk.",
-    heroLine2:
-      "Across networks.",
+    eyebrow: "WINDOWS / MULTI-AGENT WORKBENCH",
+    heroLine1: "Your agents, together.",
+    heroLine2: "Know when they need you.",
     heroLead:
-      "A local-first AI coding workbench that brings agents, models, and projects together, so development can continue securely between your computer and phone.",
+      "Run Claude Code, Codex, OpenCode and more in one Windows workspace. See which agent is working or waiting, resume native sessions, and return from your phone when needed.",
     heroRemoteNote:
-      "Keep your PC running. Use a reachable HTTPS relay and desktop access token, or connect directly over a trusted LAN or VPN.",
+      "Phone access is optional. Keep your PC running and use a reachable HTTPS relay plus a desktop access token, or connect directly over a trusted LAN or VPN.",
+    heroDownload: "Download for Windows",
+    heroDemo: "Watch the 30-second demo",
     heroRemoteGuide:
       "Set up remote relay access ↗",
-    heroRelease: "New in v0.10.6: OpenCode v2 proxy reliability and updated CLI install ↗",
     sceneHeading: "One workspace. Two ways in.",
     sceneDesktop: "RUN ON YOUR PC",
     sceneMobile: "CONTINUE ON YOUR PHONE",
@@ -67,7 +65,7 @@ const translations = {
     sceneContinue: "↳ Continuing on your PC…",
     sceneInput: "Send the next instruction",
     sceneCaption:
-      "Actual Termexo screenshots. Illustrative devices and connection, not a live session.",
+      "Real Termexo screenshots: desktop v0.10.6 and an earlier phone interface. Devices and connection are illustrative, not a live session.",
     runFromNpm: "Run it now",
     download: "Download installer",
     copyCommand: "Copy",
@@ -76,9 +74,13 @@ const translations = {
     metaLocal: "Local-first · MIT open source",
     metaNpm: "One command to start",
 
-    workbenchTitle: "Five agents. One screen.",
+    workbenchTitle: "See which agent needs you.",
     workbenchLead:
-      "Open as many terminals as you like, then choose which ones stay visible and arrange them in a grid that fits how you work. Switch to another project and back, and everything is exactly where you left it.",
+      "Run supported coding agents in real terminals. Their states stay visible across projects, so you can find the one waiting for your input and return to a native session later.",
+    demoAgents: "Antigravity · Two real sessions",
+    demoLabel: "30-second real recording · v0.10.6",
+    demoCaption:
+      "Two real Antigravity sessions in v0.10.6: completion notifications, returning to a session, replying, and split view. Waiting intervals are cut; bilingual captions are included.",
     metricTabsTitle: "Open as many as you want",
     metricTabsBody:
       "Every session stays alive in a tab. Show the ones you are watching right now.",
@@ -282,18 +284,17 @@ const translations = {
     navPrinciples: "隐私",
     navGuide: "使用说明",
     github: "GitHub",
-    eyebrow:
-      "WINDOWS 多 AGENT 工作台 / 自建中继访问",
-    heroLine1: "电脑上开工，",
-    heroLine2:
-      "跨网络接着用。",
+    eyebrow: "WINDOWS 多 AGENT 工作台",
+    heroLine1: "Agent 同时跑，",
+    heroLine2: "谁在等你，一眼看见。",
     heroLead:
-      "本地优先的 AI 编程工作台，统一管理多个 Agent、模型与项目，让开发工作在电脑与手机之间安全接续。",
+      "在一个 Windows 工作台运行 Claude Code、Codex、OpenCode 等工具。看清谁在执行、谁等你确认；原生恢复历史会话，需要时再从手机接回工作现场。",
     heroRemoteNote:
-      "电脑需保持运行。使用双方可达的 HTTPS 中继和桌面访问令牌，也可在可信局域网或 VPN 内直连。",
+      "手机访问按需开启：电脑需保持运行，使用双方可达的 HTTPS 中继与桌面访问令牌，也可在可信局域网或 VPN 内直连。",
+    heroDownload: "下载 Windows 版",
+    heroDemo: "看 30 秒新版实录",
     heroRemoteGuide:
       "了解如何配置中继访问 ↗",
-    heroRelease: "v0.10.6 修复 OpenCode v2 代理与重连，并更新 CLI 安装包 ↗",
     sceneHeading: "同一个工作台，电脑与手机接续操作。",
     sceneDesktop: "电脑运行 AGENT",
     sceneMobile: "手机远程接着操作",
@@ -309,7 +310,7 @@ const translations = {
     sceneInstruction: "› 运行测试，并汇总失败项。",
     sceneContinue: "↳ 正在电脑上继续执行…",
     sceneInput: "发送下一步指令",
-    sceneCaption: "真实 Termexo 界面截图，设备与连接为场景示意，非实时会话。",
+    sceneCaption: "真实 Termexo 界面截图：桌面为 v0.10.6，手机为早期版本；设备与连接为场景示意，非实时会话。",
     runFromNpm: "立即运行",
     download: "下载安装包",
     copyCommand: "复制",
@@ -318,9 +319,13 @@ const translations = {
     metaLocal: "本地优先 · MIT 开源",
     metaNpm: "一条命令启动",
 
-    workbenchTitle: "五个 Agent，一块屏幕。",
+    workbenchTitle: "谁需要你，一眼看见。",
     workbenchLead:
-      "想开多少终端就开多少，再挑出此刻要盯着的那几个，按你顺手的方式排成网格。切到别的项目再切回来，还是你离开时的样子。",
+      "支持的编程 Agent 在真实终端里运行。跨项目查看状态，找到正在等你输入或确认的终端，之后还能恢复各 CLI 的原生会话。",
+    demoAgents: "Antigravity · 两个真实会话",
+    demoLabel: "30 秒真实桌面录屏 · v0.10.6",
+    demoCaption:
+      "v0.10.6 的两个真实 Antigravity 会话：查看完成提醒、返回对应会话、回复后继续执行，再分屏查看结果。已剪去等待片段，附中英字幕。",
     metricTabsTitle: "想开多少开多少",
     metricTabsBody: "每个会话都留在标签里，只把你正在看的摆出来。",
     metricGridTitle: "网格自己排",
@@ -493,8 +498,8 @@ function setLanguage(language) {
   }
   document.title =
     language === "zh"
-      ? "Termexo — 电脑上开工，跨网络接着用"
-      : "Termexo — Your workbench, across networks";
+      ? "Termexo — Agent 同时跑，谁在等你，一眼看见"
+      : "Termexo — See which coding agent needs you";
 
   translatedElements.forEach((element) => {
     const value = dictionary[element.dataset.i18n];

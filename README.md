@@ -4,7 +4,7 @@
 
 <h1 align="center">Termexo</h1>
 
-<p align="center"><strong>Start on your desktop. Keep going across networks.</strong></p>
+<p align="center"><strong>Run your agents together. Know which one needs you.</strong></p>
 
 <p align="center">
   <strong>English</strong> · <a href="./README.cn.md">简体中文</a>
@@ -31,12 +31,15 @@
   <img src="website/assets/agent-grok.svg" alt="Grok Build" title="Grok Build" width="26" height="26">
 </p>
 
-**Termexo is building a local-first AI coding workbench that brings agents, models, and projects together, so development can continue securely between your computer and phone.**
+**Run multiple AI coding agents in one Windows workbench and see which one is working, waiting for approval, or done.**
 
-Today, it runs Claude Code, Codex, OpenCode, Antigravity, and Grok Build in one Windows workbench.
-Keep your agents running on your PC, then reconnect through your own relay from a phone or another computer's browser. Check output, answer an approval, or send the next instruction to the same live terminal across networks. Your desktop needs no public IP or router port forwarding.
+Termexo supports Claude Code, Codex, OpenCode, Antigravity, and Grok Build. Each agent still runs in a real terminal on your PC. Find the session that needs you, resume native history, and optionally reconnect to the same workbench from your phone through your own relay, a trusted LAN, or a VPN.
 
-![Termexo Windows workbench](website/assets/termexo-workbench.png)
+[![Two real Antigravity sessions in Termexo v0.10.6](website/assets/termexo-workbench-demo.png)](https://www.termexo.com/#workbench-demo)
+
+*Watch 30 seconds of real v0.10.6 desktop use: completion notifications, return to a session, reply, and review two Antigravity sessions side by side. Includes Chinese and English captions; waiting intervals are cut.*
+
+**[Download for Windows](https://github.com/gemron/Termexo/releases/latest)** · [Watch the demo](https://www.termexo.com/#workbench-demo) · [Share first-use feedback](https://github.com/gemron/Termexo/issues/new?template=first-use.yml)
 
 | See your agents together | Know who needs you | Continue from your phone |
 | --- | --- | --- |
@@ -66,7 +69,10 @@ Working across multiple AI coding tools and projects means scattered windows, pr
 
 ## Try it on Windows
 
-**[Download the Windows installer](https://github.com/gemron/Termexo/releases/latest)** — choose the EXE or MSI asset. No Rust or build tools needed.
+1. **[Download the Windows installer](https://github.com/gemron/Termexo/releases/latest)** — choose the EXE or MSI asset. No Rust or build tools needed.
+2. Open Termexo and create a workspace for a project folder on your PC.
+3. Start a terminal with an installed agent. If none is installed, check detection and install a CLI from Settings.
+4. Run a task and watch its status in the terminal tab and right panel. Enable phone access later if you need it.
 
 Already have Node.js 18.18+? Run:
 
@@ -119,7 +125,7 @@ Trying it for the first time? [Tell us what worked or where you got stuck](https
       row/column grid. Reorder tabs by dragging, close one with the middle mouse button, and drive the workbench from the
       keyboard. Each workspace remembers its folder, tabs, layout, model, and theme.
       <br><br>
-      <a href="website/assets/termexo-workbench.png"><img src="website/assets/termexo-workbench.png" alt="Termexo multi-agent workbench"></a>
+      <a href="https://www.termexo.com/#workbench-demo"><img src="website/assets/termexo-workbench-demo.png" alt="Two real Antigravity sessions in Termexo v0.10.6"></a>
     </td>
     <td width="50%" valign="top">
       <strong>Know when an agent needs you.</strong><br><br>
@@ -261,18 +267,11 @@ a local control plane that is observable, recoverable, and extensible.
 
 ## Current Boundaries
 
-- Claude Code and Codex both support native detection, account/model-aware launch, local session
-  discovery, resume, and lifecycle-driven terminal states. Their event vocabularies are not
-  identical, and compatible-provider model switching currently applies to Claude terminals.
-- When the app exits, terminated operating-system processes are not “fake restored.”
-  Termexo restores terminal configuration; historical Claude sessions must be resumed
-  explicitly from the session center.
-- Claude and Codex JSONL files are read-only. Termexo never edits, renames, or deletes them.
-- Snapshot surfaces remain hidden until their production backend is implemented. Git session
-  changes are repository deltas observed since terminal start; concurrent editors may contribute.
-- V0.5 migrates a redacted context package, not a provider's private native transcript. Automatic
-  permission approval, native transcript rewriting, and cross-agent batch model-switch transactions
-  remain outside the current release.
+- All five supported agents can be detected and launched on Windows, with native sessions discoverable and resumable from the session center. Status events and launch options vary by CLI; compatible-provider model switching currently applies to Claude terminals.
+- Termexo restores terminal configuration after an app restart. An exited operating-system process is not treated as still running; resume a historical agent session explicitly from the session center.
+- Native session files remain read-only. Cross-agent handoff uses a redacted context package rather than rewriting a provider's private transcript.
+- Git session changes are repository deltas observed since terminal start; concurrent editors or other terminals may contribute.
+- Cross-network phone access needs a running PC connected to a self-hosted relay. Shared workspaces, granular permissions, and centralized audit are long-term plans.
 
 See [Termexo.md](./Termexo.md) for the complete product plan and
 [V0.2 architecture](./docs/architecture/v0.2.md) for current technical boundaries.

@@ -1,6 +1,6 @@
 import { Component, computed, input, output } from '@angular/core';
 
-import { AccountProfile, terminalAccountName } from '../core/models/agent.models';
+import { AccountProfile, ManagedAgentType, terminalAccountName } from '../core/models/agent.models';
 import {
   AgentType,
   DEFAULT_TERMINAL_GRID_DIMENSION,
@@ -8,16 +8,15 @@ import {
   normalizeTerminalGridDimension,
   TerminalSession,
   TerminalStatus,
+  Workspace,
 } from '../core/models/workspace.models';
-import { TranslatePipe } from '../core/i18n/translate.pipe';
-import { AgentLaunchOptionsComponent } from '../shared/agent-launch-options/agent-launch-options';
-import { IconComponent } from '../shared/icon/icon';
+import { WorkspaceOnboardingComponent } from '../workspace/workspace-onboarding';
 import { DEFAULT_TERMINAL_FONT_NAME } from './terminal-font';
 import { TerminalPanelComponent } from './terminal-panel';
 
 @Component({
   selector: 'app-terminal-workbench',
-  imports: [AgentLaunchOptionsComponent, IconComponent, TerminalPanelComponent, TranslatePipe],
+  imports: [WorkspaceOnboardingComponent, TerminalPanelComponent],
   templateUrl: './terminal-workbench.html',
   styleUrl: './terminal-workbench.scss',
 })
@@ -25,6 +24,7 @@ export class TerminalWorkbenchComponent {
   readonly terminals = input.required<TerminalSession[]>();
   /** Passed to each panel so a reconnecting terminal can rebuild its launch environment. */
   readonly workspaceId = input('');
+  readonly workspace = input<Pick<Workspace, 'name' | 'projectPath'> | null>(null);
   readonly layout = input.required<LayoutMode>();
   readonly activeTerminalId = input<string | null>(null);
   readonly visibleTerminalIds = input<string[]>([]);
@@ -43,6 +43,7 @@ export class TerminalWorkbenchComponent {
   readonly terminalMaximizeRequested = output<string>();
   /** Which of the empty state's launch options was picked; the host opens it. */
   readonly launchRequested = output<AgentType>();
+  readonly installRequested = output<ManagedAgentType>();
   readonly terminalStatusChanged = output<{ terminalId: string; status: TerminalStatus }>();
   readonly terminalRenamed = output<{ terminalId: string; name: string }>();
   readonly linkOpenFailed = output<string>();
