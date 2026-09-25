@@ -200,9 +200,9 @@ const translations = {
       "Remote relay access",
     roadmap07Body:
       "Shipped in v0.10.0: self-hosted relay access, code or account enrollment, cascaded addresses, and v2 encrypted sessions. Your browser operates the terminals already running on your desktop.",
-    roadmap10Title: "Five agents, clearer progress",
+    roadmap10Title: "Start your first Agent",
     roadmap10Body:
-      "Grok Build joins the workbench. Session change counts and the Git view keep refreshing; terminals start quietly, and workspace rows can be dragged into order.",
+      "Choose a project, check which Agent CLIs are available, and configure a launch. Project creation waits for a successful save; failures keep your input and Agent choice for retry.",
 
     principlesTitle: "Your work.\nOn your computer.",
     principlesLead:
@@ -429,9 +429,9 @@ const translations = {
       "远程中继访问",
     roadmap07Body:
       "v0.10.0 已发布：自建中继、注册码或账号登记、级联访问地址与 v2 加密会话。浏览器操作的是桌面正在运行的同一批终端。",
-    roadmap10Title: "五个 Agent，进度更清楚",
+    roadmap10Title: "启动你的第一个 Agent",
     roadmap10Body:
-      "Grok Build 加入工作台；会话变更数量与 Git 视图持续刷新。终端安静启动，工作区条目可拖拽排序。",
+      "选择项目、查看可用的 Agent CLI，再配置启动。项目保存成功后才继续；保存失败会保留输入和 Agent 选择，方便重试。",
 
     principlesTitle: "你的工作，\n留在你的电脑。",
     principlesLead:
