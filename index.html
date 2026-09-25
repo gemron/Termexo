@@ -5,21 +5,21 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta
       name="description"
-      content="Run AI coding agents on Windows and reconnect across networks through your own relay. Use the same workbench from your phone; no public IP or port forwarding on the desktop."
+      content="Run Claude Code, Codex, OpenCode and more in one Windows workbench. See which agent is working or waiting, then return from your phone when needed."
     />
     <meta name="theme-color" content="#edf4f8" />
     <meta property="og:type" content="website" />
     <meta
       property="og:title"
-      content="Termexo — Your workbench, across networks"
+      content="Termexo — See which coding agent needs you"
     />
     <meta
       property="og:description"
-      content="Your agents run on Windows. Reconnect from your phone through a self-hosted HTTPS relay, with encrypted sessions and no router port forwarding on the desktop."
+      content="Run coding agents side by side on Windows, spot approvals and failures, and return to the same live workbench from your phone."
     />
     <meta
       property="og:image"
-      content="https://www.termexo.com/assets/termexo-phone.png"
+      content="https://www.termexo.com/assets/termexo-workbench-demo.png?v=d18956307ddd"
     />
     <meta property="og:url" content="https://www.termexo.com/" />
     <meta name="twitter:card" content="summary_large_image" />
@@ -29,16 +29,16 @@
     />
     <meta
       name="twitter:description"
-      content="Reach the same Windows AI workbench across networks through your own HTTPS relay. Encrypted sessions; no public IP or port forwarding on the desktop."
+      content="Run coding agents side by side on Windows. Know which one needs you, then return to the same live workbench from your phone."
     />
     <meta
       name="twitter:image"
-      content="https://www.termexo.com/assets/termexo-phone.png"
+      content="https://www.termexo.com/assets/termexo-workbench-demo.png?v=d18956307ddd"
     />
     <meta property="og:site_name" content="Termexo" />
     <meta
       property="og:image:alt"
-      content="Termexo desktop workbench and remote access from a phone"
+      content="Real Termexo v0.10.6 desktop recording with two Antigravity sessions"
     />
     <meta name="referrer" content="strict-origin-when-cross-origin" />
     <script type="application/ld+json">
@@ -58,14 +58,14 @@
           "https://www.npmjs.com/package/termexo"
         ],
         "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" },
-        "screenshot": "https://www.termexo.com/assets/termexo-workbench.png"
+        "screenshot": "https://www.termexo.com/assets/termexo-workbench-demo.png"
       }
     </script>
-    <title>Termexo — Your workbench, across networks</title>
+    <title>Termexo — See which coding agent needs you</title>
     <link rel="canonical" href="https://www.termexo.com/" />
     <link rel="icon" href="assets/termexo-mark.svg" type="image/svg+xml" />
-    <link rel="stylesheet" href="styles.css?v=ecf33f828974" />
-    <script src="app.js?v=d4c449c0b655" defer></script>
+    <link rel="stylesheet" href="styles.css?v=29df7df673f6" />
+    <script src="app.js?v=a6f5f5ce897b" defer></script>
     <script src="analytics.js" defer></script>
   </head>
   <body class="home-page">
@@ -136,14 +136,14 @@
           <div class="eyebrow">
             <span class="live-dot"></span>
             <span data-i18n="eyebrow"
-              >WINDOWS WORKBENCH / SELF-HOSTED RELAY</span
+              >WINDOWS / MULTI-AGENT WORKBENCH</span
             >
           </div>
           <h1>
-            <span data-i18n="heroLine1">Start at your desk.</span>
-            <em data-i18n="heroLine2">Across networks.</em>
+            <span data-i18n="heroLine1">Your agents, together.</span>
+            <em data-i18n="heroLine2">Know when they need you.</em>
           </h1>
-          <p class="hero-lead" data-i18n="heroLead">A local-first AI coding workbench that brings agents, models, and projects together, so development can continue securely between your computer and phone.</p>
+          <p class="hero-lead" data-i18n="heroLead">Run Claude Code, Codex, OpenCode and more in one Windows workspace. See which agent is working or waiting, resume native sessions, and return from your phone when needed.</p>
           <ul class="hero-agents" aria-label="Supported agents">
             <li>
               <img src="assets/agent-claude.svg" alt="" width="22" height="22" loading="lazy" />
@@ -166,28 +166,25 @@
               <span>Grok Build</span>
             </li>
           </ul>
-          <p class="hero-remote-note" data-i18n="heroRemoteNote">Keep your PC running. Use a reachable HTTPS relay and desktop access token, or connect directly over a trusted LAN or VPN.</p>
           <div class="hero-actions">
             <a
               class="button primary"
-              href="https://www.npmjs.com/package/termexo"
+              href="https://github.com/gemron/Termexo/releases/latest"
               target="_blank"
               rel="noreferrer"
             >
-              <span data-i18n="runFromNpm">Run it now</span>
+              <span data-i18n="heroDownload">Download for Windows</span>
               <svg viewBox="0 0 24 24" aria-hidden="true">
                 <path d="m9 7 5 5-5 5m7 0h3" />
               </svg>
             </a>
             <a
               class="button secondary"
-              href="https://github.com/gemron/Termexo/releases/latest"
-              target="_blank"
-              rel="noreferrer"
+              href="#workbench-demo"
             >
-              <span data-i18n="download">Download installer</span>
+              <span data-i18n="heroDemo">Watch the 30-second demo</span>
               <svg viewBox="0 0 24 24" aria-hidden="true">
-                <path d="M12 3v12m0 0 5-5m-5 5-5-5M4 20h16" />
+                <path d="m8 5 11 7-11 7V5Z" />
               </svg>
             </a>
           </div>
@@ -200,13 +197,13 @@
               >
             </button>
           </div>
+          <p class="hero-remote-note" data-i18n="heroRemoteNote">Phone access is optional. Keep your PC running and use a reachable HTTPS relay plus a desktop access token, or connect directly over a trusted LAN or VPN.</p>
           <a
             class="hero-guide-link"
             href="guide.en.html#remote"
             data-i18n="heroRemoteGuide"
             >Set up remote relay access ↗</a
           >
-          <a class="hero-release-link" href="https://github.com/gemron/Termexo/releases/tag/v0.10.6" target="_blank" rel="noopener noreferrer" data-i18n="heroRelease">New in v0.10.6: OpenCode v2 proxy reliability and updated CLI install ↗</a>
           <div class="hero-proof">
             <a
               class="product-hunt-badge"
@@ -299,9 +296,9 @@
                   <i class="monitor-camera" aria-hidden="true"></i>
                   <img
                     class="monitor-screen"
-                    src="assets/termexo-workbench.png"
-                    width="1800"
-                    height="1125"
+                    src="assets/termexo-workbench-demo.png?v=d18956307ddd"
+                    width="1440"
+                    height="1000"
                     alt="Termexo desktop workbench with project sidebar and two agent terminals"
                     fetchpriority="high"
                   />
@@ -362,8 +359,7 @@
           <figcaption id="scene-caption">
             <span class="scene-link-line" aria-hidden="true">↔</span
             ><span data-i18n="sceneCaption"
-              >Actual Termexo screenshots. Illustrative devices and connection,
-              not a live session.</span
+              >Real Termexo screenshots: desktop v0.10.6 and an earlier phone interface. Devices and connection are illustrative, not a live session.</span
             >
           </figcaption>
         </figure>
@@ -443,28 +439,22 @@
             <span class="section-index" data-i18n="indexWorkbench"
               >01 / WORKBENCH</span
             >
-            <h2 data-i18n="workbenchTitle">Five agents. One screen.</h2>
+            <h2 data-i18n="workbenchTitle">See which agent needs you.</h2>
           </div>
           <p data-i18n="workbenchLead">
-            Open as many terminals as you like, then choose which ones stay
-            visible and arrange them in a grid that fits how you work. Switch to
-            another project and back, and everything is exactly where you left
-            it.
+            Run supported coding agents in real terminals. Their states stay visible across projects, so you can find the one waiting for your input and return to a native session later.
           </p>
         </div>
 
-        <figure class="product-frame reveal">
+        <figure class="product-frame reveal" id="workbench-demo">
           <div class="frame-label">
-            <span><i></i> Claude Code + Codex CLI</span>
-            <small>2 × 2 grid · 3 projects open</small>
+            <span><i></i> <b data-i18n="demoAgents">Antigravity · Two real sessions</b></span>
+            <small data-i18n="demoLabel">30-second real recording · v0.10.6</small>
           </div>
-          <img
-            src="assets/termexo-workbench.png"
-            alt="Termexo with two terminals side by side in a grid, each showing its own command output"
-            width="1800"
-            height="1125"
-            loading="lazy"
-          />
+          <video controls playsinline preload="none" poster="assets/termexo-workbench-demo.png?v=d18956307ddd" aria-label="Real Termexo v0.10.6 desktop recording with two Antigravity sessions">
+            <source src="assets/termexo-workbench-demo.mp4?v=af71c333034d" type="video/mp4" />
+          </video>
+          <figcaption class="demo-caption" data-i18n="demoCaption">Two real Antigravity sessions in v0.10.6: completion notifications, returning to a session, replying, and split view. Waiting intervals are cut; bilingual captions are included.</figcaption>
         </figure>
 
         <div class="metrics-grid">

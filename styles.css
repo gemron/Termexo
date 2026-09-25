@@ -315,6 +315,7 @@ figure {
   margin-top: 6px;
   color: #34748e;
   font-style: normal;
+  text-wrap: balance;
 }
 html[lang="zh-CN"] .hero h1 {
   font-size: clamp(44px, 4.6vw, 68px);
@@ -351,7 +352,7 @@ html[lang="zh-CN"] .hero h1 {
 }
 .hero-remote-note {
   max-width: 500px;
-  margin: 17px 0 0;
+  margin: 13px 0 0;
   color: #536d7b;
   font-size: 14px;
   line-height: 1.7;
@@ -451,19 +452,6 @@ html[lang="zh-CN"] .hero h1 {
   text-underline-offset: 5px;
 }
 .hero-guide-link:hover {
-  text-decoration: underline;
-}
-.hero-release-link {
-  display: block;
-  width: fit-content;
-  max-width: 500px;
-  margin-top: 9px;
-  color: #176b57;
-  font-size: 13px;
-  line-height: 1.6;
-  text-underline-offset: 4px;
-}
-.hero-release-link:hover {
   text-decoration: underline;
 }
 .product-hunt-badge {
@@ -1046,6 +1034,9 @@ html:not(.motion-ready) .signal-strip,
     scale(var(--frame-scale, 1));
   transform-origin: center top;
 }
+#workbench-demo {
+  scroll-margin-top: 85px;
+}
 .frame-label {
   display: flex;
   min-height: 37px;
@@ -1068,10 +1059,22 @@ html:not(.motion-ready) .signal-strip,
   background: #538c98;
 }
 .product-frame img,
+.product-frame video,
 .settings-frame img {
   width: 100%;
   height: auto;
   border-radius: 10px;
+}
+.product-frame video {
+  display: block;
+  aspect-ratio: 36 / 25;
+  background: #10241e;
+}
+.demo-caption {
+  margin: 10px 13px 6px;
+  color: #587180;
+  font-size: 12px;
+  line-height: 1.55;
 }
 .metrics-grid {
   display: grid;
@@ -2489,9 +2492,6 @@ html:not(.motion-ready) *::after {
   .hero h1 {
     font-size: clamp(54px, 8.5vw, 76px);
   }
-  .hero h1 em {
-    white-space: nowrap;
-  }
   .hero-lead,
   .hero-remote-note {
     max-width: 510px;
@@ -2962,6 +2962,7 @@ html:not(.motion-ready) *::after {
     border-radius: 10px;
   }
   .product-frame img,
+  .product-frame video,
   .settings-frame img {
     border-radius: 5px;
   }
