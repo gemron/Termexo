@@ -569,6 +569,7 @@
             "
             [terminals]="workspace.terminals"
             [workspaceId]="workspace.id"
+            [workspace]="workspace"
             [layout]="renderedLayout(workspace.layout)"
             [activeTerminalId]="workspace.id === activeWorkspace.id ? activeTerminalId() : null"
             [visibleTerminalIds]="workspace.id === activeWorkspace.id ? visibleTerminalIds() : []"
@@ -584,6 +585,7 @@
             (terminalClosed)="requestCloseTerminal($event)"
             (terminalMaximizeRequested)="toggleTerminalMaximize($event)"
             (launchRequested)="launchAgent($event)"
+            (installRequested)="installAgent($event)"
             (terminalStatusChanged)="handleTerminalStatus($event)"
             (terminalRenamed)="state.renameTerminal($event.terminalId, $event.name)"
             (linkOpenFailed)="reportFailure($event)"
@@ -599,7 +601,11 @@
           Deferred: once a workspace exists it is never rendered again.
         -->
         @defer (on immediate) {
-          <app-workspace-onboarding (createRequested)="createWorkspaceOpen.set(true)" />
+          <app-workspace-onboarding
+            (createRequested)="createWorkspaceOpen.set(true)"
+            (launchRequested)="launchFromOnboarding($event)"
+            (installRequested)="installAgent($event)"
+          />
         }
       }
     </section>
@@ -685,8 +691,10 @@
 
 @if (createWorkspaceOpen()) {
   <app-create-workspace-dialog
+    [busy]="creatingWorkspace()"
+    [error]="createWorkspaceError()"
     (created)="createWorkspace($event)"
-    (cancelled)="createWorkspaceOpen.set(false)"
+    (cancelled)="cancelWorkspaceCreation()"
   />
 }
 

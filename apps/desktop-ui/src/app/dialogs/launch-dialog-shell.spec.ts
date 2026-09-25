@@ -108,6 +108,16 @@ describe('LaunchDialogShellComponent', () => {
     fixture.detectChanges();
 
     expect(root.querySelector('footer .primary')?.getAttribute('title')).toBe('未检测到 OpenCode');
+    expect(root.querySelector('#launch-blocked-reason')?.textContent?.trim()).toBe(
+      '未检测到 OpenCode',
+    );
+    expect(root.querySelector('footer .primary')?.getAttribute('aria-describedby')).toBe(
+      'launch-blocked-reason',
+    );
+
+    fixture.componentRef.setInput('installation', INSTALLATION);
+    fixture.detectChanges();
+    expect(root.querySelector('#launch-blocked-reason')).toBeNull();
   });
 
   /** A missing CLI used to leave the user to find the installer on their own. */

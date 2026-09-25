@@ -99,6 +99,12 @@ import { IconComponent } from '../shared/icon/icon';
         </label>
         <ng-content />
 
+        @if (!canLaunch() && blockedReason()) {
+          <p class="launch-blocked-reason" id="launch-blocked-reason" role="status">
+            {{ blockedReason() }}
+          </p>
+        }
+
         <footer>
           <button
             type="button"
@@ -113,6 +119,9 @@ import { IconComponent } from '../shared/icon/icon';
             class="primary btn btn-primary btn-sm"
             [disabled]="!canLaunch() || launching()"
             [attr.title]="blockedReason() || null"
+            [attr.aria-describedby]="
+              !canLaunch() && blockedReason() ? 'launch-blocked-reason' : null
+            "
             (click)="submit()"
           >
             @if (launching()) {
@@ -136,7 +145,7 @@ export class LaunchDialogShellComponent {
   readonly workingDirectory = input('');
   readonly canLaunch = input(false);
   readonly launching = input(false);
-  /** Why launching is blocked, surfaced as the disabled button's tooltip so it is never silent. */
+  /** Visible next to the action as well as on its tooltip, including for touch and keyboard users. */
   readonly blockedReason = input('');
   readonly launched = output<void>();
   readonly cancelled = output<void>();

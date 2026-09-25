@@ -276,11 +276,11 @@ export class AppStateService {
     this.activeTerminalId.set(terminalId);
   }
 
-  createWorkspace(name: string, projectPath: string): void {
+  async createWorkspace(name: string, projectPath: string): Promise<Workspace | null> {
     const normalizedName = name.trim();
     const normalizedPath = projectPath.trim();
     if (!normalizedName || !normalizedPath) {
-      return;
+      return null;
     }
 
     const workspace: Workspace = {
@@ -299,10 +299,13 @@ export class AppStateService {
       terminals: [],
     };
 
+    // A workspace must exist in storage before a terminal can be launched into it.
+    // Keep the current selection intact when the write fails so creation can be retried.
+    await this.repository.save(workspace);
     this.workspaceItems.update((items) => [...items, workspace]);
     this.activeWorkspaceId.set(workspace.id);
     this.activeTerminalId.set(null);
-    void this.repository.save(workspace);
+    return workspace;
   }
 
   async deleteWorkspace(workspaceId: string): Promise<Workspace | null> {

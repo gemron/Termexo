@@ -1,7 +1,7 @@
 import { Component, computed, inject, input, output } from '@angular/core';
 
 import { I18nService } from '../../core/i18n/i18n.service';
-import { AgentInstallation } from '../../core/models/agent.models';
+import { AgentInstallation, ManagedAgentType } from '../../core/models/agent.models';
 import { AGENT_ICONS, AgentType } from '../../core/models/workspace.models';
 import { AgentService } from '../../core/services/agent.service';
 import { IconComponent } from '../icon/icon';
@@ -174,35 +174,35 @@ export class AgentLaunchOptionsComponent {
         {
           type: 'claude',
           title: 'Claude Code',
-          hint: this.installationLabel(this.agents.installation()),
+          hint: this.installationLabel('claude', this.agents.installation()),
           icon: AGENT_ICONS.claude,
           tone: 'green',
         },
         {
           type: 'codex',
           title: 'Codex CLI',
-          hint: this.installationLabel(this.agents.codexInstallation()),
+          hint: this.installationLabel('codex', this.agents.codexInstallation()),
           icon: AGENT_ICONS.codex,
           tone: 'blue',
         },
         {
           type: 'opencode',
           title: 'OpenCode',
-          hint: this.installationLabel(this.agents.openCodeInstallation()),
+          hint: this.installationLabel('opencode', this.agents.openCodeInstallation()),
           icon: AGENT_ICONS.opencode,
           tone: 'amber',
         },
         {
           type: 'grok',
           title: 'Grok Build',
-          hint: this.installationLabel(this.agents.grokInstallation()),
+          hint: this.installationLabel('grok', this.agents.grokInstallation()),
           icon: AGENT_ICONS.grok,
           tone: 'blue',
         },
         {
           type: 'antigravity',
           title: 'Antigravity',
-          hint: this.installationLabel(this.agents.antigravityInstallation()),
+          hint: this.installationLabel('antigravity', this.agents.antigravityInstallation()),
           icon: AGENT_ICONS.antigravity,
           tone: 'purple',
         },
@@ -227,8 +227,14 @@ export class AgentLaunchOptionsComponent {
    * is not. One reading for all three, so a missing CLI is visible before the user picks it rather
    * than after the launch dialog opens.
    */
-  private installationLabel(installation: AgentInstallation | null): string {
-    if (!installation?.healthy) {
+  private installationLabel(
+    type: ManagedAgentType,
+    installation: AgentInstallation | null,
+  ): string {
+    const detection = this.agents.detectionStates()[type];
+    if (detection?.status === 'error') return detection.message;
+    if (detection?.status === 'checking' || !installation) return this.i18n.t('common.loading');
+    if (!installation.healthy) {
       return this.i18n.t('common.notDetected');
     }
     return installation.version ?? this.i18n.t('common.connected');

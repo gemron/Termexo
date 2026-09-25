@@ -350,6 +350,9 @@ export class App {
   /** True while the window is phone width; kept in step by `adaptLayoutToViewport`. */
   protected readonly phoneLayout = signal(window.innerWidth <= PHONE_LAYOUT_MAX_WIDTH);
   protected readonly createWorkspaceOpen = signal(false);
+  protected readonly creatingWorkspace = signal(false);
+  protected readonly createWorkspaceError = signal<string | null>(null);
+  private readonly pendingOnboardingAgent = signal<AgentType | null>(null);
   protected readonly workspaceView = signal<WorkspaceView>('terminal');
   protected readonly busyTodoTaskId = signal<string | null>(null);
   protected readonly editingWorkspaceId = signal<string | null>(null);
@@ -811,10 +814,24 @@ export class App {
     await this.agents.refreshProviderQuotas(this.state.activeWorkspace()?.id, force);
   }
 
-  /**
-   * Routes a pick from the shared launch list, so the tab strip's menu and the empty workspace
-   * open the same thing for the same option.
-   */
+  /** Keep the picked Agent while the first project is being created. */
+  protected launchFromOnboarding(agentType: AgentType): void {
+    if (this.state.activeWorkspace()) {
+      void this.launchAgent(agentType);
+      return;
+    }
+    this.pendingOnboardingAgent.set(agentType);
+    this.createWorkspaceOpen.set(true);
+  }
+
+  protected cancelWorkspaceCreation(): void {
+    if (this.creatingWorkspace()) return;
+    this.pendingOnboardingAgent.set(null);
+    this.createWorkspaceError.set(null);
+    this.createWorkspaceOpen.set(false);
+  }
+
+  /** The tab strip and onboarding both use the existing launch confirmation dialogs. */
   protected async launchAgent(agentType: AgentType): Promise<void> {
     switch (agentType) {
       case 'claude':
@@ -2217,13 +2234,27 @@ export class App {
     return isTerminalFontAvailable(normalized) ? normalized : DEFAULT_TERMINAL_FONT_NAME;
   }
 
-  protected createWorkspace(value: { name: string; projectPath: string }): void {
-    this.state.createWorkspace(value.name, value.projectPath);
-    const workspace = this.state.activeWorkspace();
-    if (workspace) this.todos.ensureWorkspace(workspace);
-    this.mountWorkspace(this.state.activeWorkspace()?.id);
+  protected async createWorkspace(value: { name: string; projectPath: string }): Promise<void> {
+    if (this.creatingWorkspace() || !value.name.trim() || !value.projectPath.trim()) return;
+    this.creatingWorkspace.set(true);
+    this.createWorkspaceError.set(null);
+    let workspace: Workspace | null;
+    try {
+      workspace = await this.state.createWorkspace(value.name, value.projectPath);
+    } catch (error) {
+      this.createWorkspaceError.set(this.errorMessage(error));
+      return;
+    } finally {
+      this.creatingWorkspace.set(false);
+    }
+    if (!workspace) return;
+    this.todos.ensureWorkspace(workspace);
+    this.mountWorkspace(workspace.id);
     this.createWorkspaceOpen.set(false);
-    this.showToast(this.i18n.t('workspace.created', { name: value.name }));
+    this.showToast(this.i18n.t('workspace.created', { name: workspace.name }));
+    const agentType = this.pendingOnboardingAgent();
+    this.pendingOnboardingAgent.set(null);
+    if (agentType) void this.launchAgent(agentType);
   }
 
   protected openWorkspaceDelete(workspaceId: string): void {

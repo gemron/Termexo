@@ -81,6 +81,46 @@ describe('AppStateService', () => {
     expect(service.activeTerminal()).toBeNull();
   });
 
+  it('makes a new workspace available only after it has been saved', async () => {
+    let finishSave!: () => void;
+    repository.save.mockReturnValueOnce(new Promise<void>((resolve) => (finishSave = resolve)));
+
+    const creating = service.createWorkspace('  First project  ', '  D:\\dev\\first  ');
+    expect(service.workspaces()).toEqual([]);
+    expect(service.activeWorkspace()).toBeNull();
+    expect(repository.save).toHaveBeenCalledWith(
+      expect.objectContaining({ name: 'First project', projectPath: 'D:\\dev\\first' }),
+    );
+
+    finishSave();
+    const workspace = await creating;
+    expect(workspace?.name).toBe('First project');
+    expect(service.workspaces()).toEqual([workspace]);
+    expect(service.activeWorkspace()).toEqual(workspace);
+    expect(service.activeTerminal()).toBeNull();
+  });
+
+  it('preserves the existing workspace on a failed creation and supports retry without duplicates', async () => {
+    const original = await service.createWorkspace('Existing project', 'D:\\dev\\existing');
+    repository.save.mockRejectedValueOnce(new Error('Disk is full'));
+
+    await expect(service.createWorkspace('New project', 'D:\\dev\\new')).rejects.toThrow(
+      'Disk is full',
+    );
+    expect(service.workspaces()).toEqual([original]);
+    expect(service.activeWorkspace()).toEqual(original);
+
+    const created = await service.createWorkspace('New project', 'D:\\dev\\new');
+    expect(service.workspaces()).toEqual([original, created]);
+    expect(service.activeWorkspace()).toEqual(created);
+  });
+
+  it('does not persist an empty project name or path', async () => {
+    expect(await service.createWorkspace(' ', 'D:\\dev\\first')).toBeNull();
+    expect(await service.createWorkspace('First project', ' ')).toBeNull();
+    expect(repository.save).not.toHaveBeenCalled();
+  });
+
   it('marks persisted terminals for automatic restart', async () => {
     repository.list.mockResolvedValueOnce([
       {
