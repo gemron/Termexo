@@ -2,6 +2,13 @@
 
 Release notes for every Termexo version, newest first. The current release is summarised in [README.md](README.md).
 
+## V0.10.7
+
+- **A clearer first run.** New and empty workspaces guide you through choosing a project, checking Agent CLIs, and opening launch configuration. Available CLIs appear first; detection failures, missing installations, and repair actions have distinct states and retry controls in all seven interface languages.
+- **Project creation finishes before Agent launch.** Termexo remembers the Agent you selected, waits for the project to save, and prevents duplicate submissions. A save failure keeps your inputs and selection so you can retry; cancelling clears the pending Agent choice.
+- **Launch problems explain the next step.** Blocked launch reasons are visible beside the action for keyboard and touch users.
+- **Updated product introduction and demo.** The website and bilingual READMEs focus on the Windows multi-Agent workflow and link to a real 30-second desktop recording. Media content hashes ensure returning visitors get the current video and poster.
+
 ## V0.10.6
 
 - **OpenCode v2 keeps the selected proxy.** Each Termexo session starts a private OpenCode server with its workspace proxy environment. Restored terminals rebuild the proxy and hook settings; existing saved commands gain the private-server flag when launched again.

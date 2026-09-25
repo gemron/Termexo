@@ -11,7 +11,7 @@
 </p>
 
 <p align="center">
-  <img alt="Version 0.10.6" src="https://img.shields.io/badge/version-0.10.6-58c7a0">
+  <img alt="Version 0.10.7" src="https://img.shields.io/badge/version-0.10.7-58c7a0">
   <img alt="Windows" src="https://img.shields.io/badge/platform-Windows-0078D4?logo=windows">
   <img alt="Tauri 2" src="https://img.shields.io/badge/Tauri-2-24C8DB?logo=tauri&logoColor=white">
   <img alt="Angular 22" src="https://img.shields.io/badge/Angular-22-DD0031?logo=angular">
@@ -103,7 +103,7 @@ Keep the token private. Closing Termexo or stopping the PC ends the running proc
 
 ## Latest release
 
-**[v0.10.6](https://github.com/gemron/Termexo/releases/tag/v0.10.6)** keeps workspace proxy settings effective in OpenCode v2 sessions, including after terminal restoration, and updates the OpenCode npm installer.
+**[v0.10.7](https://github.com/gemron/Termexo/releases/tag/v0.10.7)** guides you from project selection to your first Agent, shows CLI readiness and retry actions, and saves the project before opening launch configuration. Failed saves preserve your input and Agent choice.
 [Full changelog](CHANGELOG.md).
 
 If Termexo helps your workflow, a **Star on this repository** helps other developers discover it.
@@ -387,7 +387,8 @@ identifiers still use a legacy name. This does not affect the Termexo product na
 | V0.10.3 | Clean agent prompts with several viewers, Ctrl+click links, and copying from OpenCode | Released |
 | V0.10.4 | Grok Build, reliable Git changes, quieter terminals, and workspace ordering | Released |
 | V0.10.5 | Todo board persistence and snapshot transfer, and lightweight Antigravity quota queries | Released |
-| V0.10.6 | OpenCode v2 proxy reliability and current CLI installer | Current |
+| V0.10.6 | OpenCode v2 proxy reliability and current CLI installer | Shipped |
+| V0.10.7 | Guided first run, CLI readiness and reliable project creation | Current |
 | V1.0 | Stability, security hardening, and recovery experience | Planned |
 
 See [open issues](https://github.com/gemron/Termexo/issues) for ongoing work and

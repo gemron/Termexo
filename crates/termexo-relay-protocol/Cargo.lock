@@ -206,7 +206,7 @@ dependencies = [
 
 [[package]]
 name = "termexo-relay-protocol"
-version = "0.10.6"
+version = "0.10.7"
 dependencies = [
  "base64",
  "bytes",
