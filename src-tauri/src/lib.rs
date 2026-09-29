@@ -50,6 +50,10 @@ pub fn capture_codex_hook_event_from_cli() -> Result<(), String> {
     hooks::capture_codex_hook_event_from_cli().map_err(|error| error.to_string())
 }
 
+pub fn capture_grok_hook_event_from_cli() -> Result<(), String> {
+    hooks::capture_grok_hook_event_from_cli().map_err(|error| error.to_string())
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     // The library compiles as `termexo_lib`, so a `termexo=info` filter alone would drop every

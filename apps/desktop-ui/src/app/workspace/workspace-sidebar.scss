@@ -189,8 +189,7 @@ nav {
 .workspace-copy {
   min-width: 0;
 
-  strong,
-  small {
+  strong {
     display: block;
     overflow: hidden;
     text-overflow: ellipsis;
@@ -201,11 +200,72 @@ nav {
     font-size: 12px;
     font-weight: 620;
   }
+}
 
-  small {
-    margin-top: 3px;
-    color: var(--text-muted);
-    font: 10px/1.3 var(--mono);
+.workspace-agent-statuses {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 3px;
+  margin-top: 4px;
+}
+
+.workspace-agent-status {
+  display: inline-flex;
+  max-width: 100%;
+  min-width: 0;
+  align-items: center;
+  gap: 4px;
+  color: var(--text-muted);
+  font-size: 10px;
+
+  app-icon {
+    flex: 0 0 auto;
+  }
+
+  .agent-label {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .status-label {
+    flex: 0 0 auto;
+    white-space: nowrap;
+  }
+
+  &:is([data-status='RUNNING'], [data-status='THINKING']) {
+    color: var(--color-success);
+
+    app-icon:first-child {
+      animation: workspace-agent-working 1.2s ease-in-out infinite;
+    }
+  }
+
+  &:is(
+    [data-status='WAITING_INPUT'],
+    [data-status='WAITING_APPROVAL'],
+    [data-status='RATE_LIMITED'],
+    [data-status='FAILED'],
+    [data-status='DISCONNECTED']
+  ) {
+    color: var(--color-error);
+  }
+
+  &[data-status='COMPLETED'] {
+    color: var(--color-success);
+  }
+}
+
+@keyframes workspace-agent-working {
+  50% {
+    opacity: 0.2;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .workspace-agent-status app-icon:first-child {
+    animation: none;
   }
 }
 

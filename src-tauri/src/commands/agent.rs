@@ -588,9 +588,15 @@ pub fn prepare_grok_launch(
     database: State<'_, WorkspaceDatabase>,
     credentials: State<'_, CredentialStore>,
     launch_environment: State<'_, LaunchEnvironmentStore>,
+    hooks: State<'_, HookEventStore>,
 ) -> Result<AgentLaunchSpec, String> {
-    let environment =
+    let mut environment =
         network_environment(&database, &credentials, request.workspace_id.as_deref())?;
+    environment.extend(
+        hooks
+            .prepare_grok_runtime(&request.terminal_id)
+            .map_err(|error| error.to_string())?,
+    );
     launch_environment
         .put(request.terminal_id, environment)
         .map_err(|error| error.to_string())?;
@@ -929,6 +935,9 @@ fn opencode_launch_environment(
             terminal_id,
             session_id,
             std::env::var("OPENCODE_CONFIG_CONTENT").ok().as_deref(),
+            OpenCodeAdapter::new()
+                .plugin_api_version()
+                .map_err(|error| error.to_string())?,
         )
         .map_err(|error| error.to_string())?;
     environment.insert("OPENCODE_CONFIG_CONTENT".into(), runtime.config_content);
@@ -986,7 +995,15 @@ pub(crate) fn relaunch_environment(
             request.workspace_id,
             request.native_session_id,
         ),
-        "grok" => network_environment(database, credentials, request.workspace_id),
+        "grok" => {
+            let mut environment = network_environment(database, credentials, request.workspace_id)?;
+            environment.extend(
+                hooks
+                    .prepare_grok_runtime(request.terminal_id)
+                    .map_err(|error| error.to_string())?,
+            );
+            Ok(environment)
+        }
         "antigravity" => antigravity_launch_environment(
             database,
             credentials,
@@ -1780,12 +1797,19 @@ mod tests {
             Some("internal.example,localhost,127.0.0.1,::1")
         );
         assert_eq!(environment.get("no_proxy"), environment.get("NO_PROXY"));
-        assert!(environment.contains_key("OPENCODE_CONFIG_CONTENT"));
-        let plugin = std::fs::read_to_string(
+        let config: serde_json::Value =
+            serde_json::from_str(environment.get("OPENCODE_CONFIG_CONTENT").unwrap()).unwrap();
+        let plugin_path = if config.get("plugins").is_some() {
             directory
                 .join("runtime")
-                .join("opencode-terminal-1.plugin.js"),
-        );
+                .join("opencode-terminal-1.plugin")
+                .join("index.js")
+        } else {
+            directory
+                .join("runtime")
+                .join("opencode-terminal-1.plugin.js")
+        };
+        let plugin = std::fs::read_to_string(plugin_path);
         assert!(plugin.is_ok());
         assert!(plugin.unwrap().contains("ses_123"));
         drop(database);

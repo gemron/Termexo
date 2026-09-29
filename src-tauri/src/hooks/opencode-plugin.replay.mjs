@@ -56,7 +56,10 @@ const emit = (type, properties) => hooks.event({ event: { type, properties } });
 const status = (sessionID, type, details = {}) =>
   emit('session.status', { sessionID, status: { type, ...details } });
 const message = (sessionID, role, info = {}) =>
-  emit('message.updated', { sessionID, info: { id: `msg_${role}`, sessionID, role, ...info } });
+  emit('message.updated', {
+    sessionID,
+    info: { id: `msg_${role}`, sessionID, role, ...info },
+  });
 const part = (sessionID, fields) =>
   emit('message.part.updated', {
     sessionID,
@@ -163,7 +166,11 @@ async function answerPermission(sessionID, reply) {
   );
 
   // The agent stops to ask, and the tool that asks keeps running until the answer comes.
-  await emit('question.asked', { id: 'que_q1', sessionID: session, questions: [] });
+  await emit('question.asked', {
+    id: 'que_q1',
+    sessionID: session,
+    questions: [],
+  });
   await tool(session, 'prt_q1', 'question', 'running');
   await status(session, 'idle');
   await settle();
@@ -174,7 +181,11 @@ async function answerPermission(sessionID, reply) {
   check(count(recorded(), 'task.completed') === 0, 'waiting for a person was reported finished');
 
   // Answered, worked, and only then actually finished.
-  await emit('question.replied', { sessionID: session, requestID: 'que_q1', answers: [['red']] });
+  await emit('question.replied', {
+    sessionID: session,
+    requestID: 'que_q1',
+    answers: [['red']],
+  });
   await tool(session, 'prt_q1', 'question', 'completed');
   await status(session, 'busy');
   await status(session, 'idle');
@@ -237,7 +248,11 @@ async function answerPermission(sessionID, reply) {
   await submitPrompt(session);
   const error = {
     name: 'APIError',
-    data: { message: 'The requested model does not exist', statusCode: 400, isRetryable: false },
+    data: {
+      message: 'The requested model does not exist',
+      statusCode: 400,
+      isRetryable: false,
+    },
   };
   await emit('session.error', { sessionID: session, error });
   await status(session, 'idle');
@@ -383,7 +398,10 @@ async function answerPermission(sessionID, reply) {
   });
   await tool(session, 'prt_color', 'question', 'running');
   check(recorded().at(-1) === 'user.input.required', 'the question was not reported');
-  await emit('question.rejected', { sessionID: session, requestID: 'que_color' });
+  await emit('question.rejected', {
+    sessionID: session,
+    requestID: 'que_color',
+  });
   await tool(session, 'prt_color', 'question', 'error', 'The user dismissed this question');
   await finishToolStep(session);
   await goIdle(session);
@@ -396,6 +414,104 @@ async function answerPermission(sessionID, reply) {
 }
 
 await hooks.dispose();
+
+// OpenCode 2 wraps event payloads in `data` and invokes registered hooks directly. Exercise
+// that adapter as well as the V1 event interpreter above.
+{
+  const v2 = (await import(`${pathToFileURL(pluginFile).href}?v2`)).default;
+  const registered = {};
+  let releaseEvents;
+  const eventGate = new Promise((resolve) => {
+    releaseEvents = resolve;
+  });
+  const cleanup = await v2.setup({
+    session: {
+      hook: async (name, callback) => {
+        registered[name] = callback;
+      },
+    },
+    tool: {
+      hook: async (name, callback) => {
+        registered[name] = callback;
+      },
+    },
+    event: {
+      subscribe: async function* () {
+        await eventGate;
+        yield {
+          type: 'session.execution.started',
+          data: { sessionID: 'ses_v2' },
+        };
+        yield { type: 'session.created', data: { sessionID: 'ses_v2' } };
+        yield {
+          type: 'permission.asked',
+          data: { id: 'per_v2', sessionID: 'ses_v2', action: 'bash' },
+        };
+        yield {
+          type: 'permission.replied',
+          data: { requestID: 'per_v2', sessionID: 'ses_v2', reply: 'once' },
+        };
+        yield {
+          type: 'form.created',
+          data: {
+            form: { id: 'frm_v2', sessionID: 'ses_v2', title: 'Choose' },
+          },
+        };
+        yield {
+          type: 'form.replied',
+          data: { id: 'frm_v2', sessionID: 'ses_v2' },
+        };
+        yield {
+          type: 'session.execution.succeeded',
+          data: { sessionID: 'ses_v2' },
+        };
+        yield { type: 'session.created', data: { sessionID: 'ses_v2_failed' } };
+        yield {
+          type: 'session.execution.started',
+          data: { sessionID: 'ses_v2_failed' },
+        };
+        yield {
+          type: 'session.execution.failed',
+          data: {
+            sessionID: 'ses_v2_failed',
+            error: { name: 'ProviderError', message: 'failed' },
+          },
+        };
+        yield {
+          type: 'session.created',
+          data: { sessionID: 'ses_v2_cancelled' },
+        };
+        yield {
+          type: 'session.execution.started',
+          data: { sessionID: 'ses_v2_cancelled' },
+        };
+        yield {
+          type: 'session.execution.interrupted',
+          data: { sessionID: 'ses_v2_cancelled' },
+        };
+      },
+    },
+  });
+  const mark = recorded().length;
+  await registered.prompt({ sessionID: 'ses_v2' });
+  releaseEvents();
+  await settle();
+  const events = recordedSince(mark);
+  check(events.includes('agent.thinking'), `a V2 prompt did not start thinking (${events})`);
+  check(
+    events.includes('approval.required'),
+    `a V2 permission did not request approval (${events})`,
+  );
+  check(events.includes('user.input.required'), `a V2 form did not request input (${events})`);
+  check(events.includes('task.completed'), `V2 completion did not end the turn (${events})`);
+  check(
+    !events.slice(0, events.indexOf('task.completed')).includes('session.ready'),
+    `a delayed V2 session creation reset active work to idle (${events})`,
+  );
+  check(events.includes('agent.failed'), `V2 failure did not end the turn (${events})`);
+  check(events.at(-1) === 'agent.interrupted', `V2 interruption did not end the turn (${events})`);
+  cleanup();
+}
 
 if (failures.length > 0) {
   console.error(failures.join('\n'));

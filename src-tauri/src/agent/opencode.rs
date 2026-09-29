@@ -128,12 +128,15 @@ impl OpenCodeAdapter {
         (!version.is_empty()).then_some(version)
     }
 
-    fn supports_private_server(&self) -> Result<bool, OpenCodeError> {
+    pub fn plugin_api_version(&self) -> Result<u32, OpenCodeError> {
         self.read_version()
             .as_deref()
             .and_then(opencode_major_version)
-            .map(|major| major >= 2)
             .ok_or(OpenCodeError::VersionUnavailable)
+    }
+
+    fn supports_private_server(&self) -> Result<bool, OpenCodeError> {
+        self.plugin_api_version().map(|major| major >= 2)
     }
 
     /// Also upgrades commands persisted before Termexo added private V2 servers.

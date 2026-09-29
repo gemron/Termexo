@@ -46,6 +46,7 @@ describe('AppStateService', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    window.localStorage.removeItem('termexo.selectedTerminals.v1');
     repository.list.mockResolvedValue([]);
     repository.watchChanges.mockResolvedValue(() => undefined);
     gateway.liveTerminals.mockResolvedValue(new Map<string, number>());
@@ -337,6 +338,39 @@ describe('AppStateService', () => {
     expect(service.workspaces().map((workspace) => workspace.id)).toEqual(workspaceIds);
   });
 
+  it("restores each workspace's selected terminal when switching back", async () => {
+    await service.initialize();
+    const firstWorkspaceId = service.activeWorkspace()!.id;
+    const firstTerminal = service.createTerminal({ agentType: 'shell' })!;
+    const selectedTerminal = service.createTerminal({ agentType: 'claude' })!;
+    service.selectTerminal(firstTerminal.id);
+    const secondWorkspaceId = service.workspaces().at(-1)!.id;
+
+    service.selectWorkspace(secondWorkspaceId);
+    const secondTerminal = service.createTerminal({ agentType: 'codex' })!;
+    service.selectWorkspace(firstWorkspaceId);
+    expect(service.activeTerminal()?.id).toBe(firstTerminal.id);
+
+    service.selectTerminal(selectedTerminal.id);
+    service.selectWorkspace(secondWorkspaceId);
+    expect(service.activeTerminal()?.id).toBe(secondTerminal.id);
+    service.selectWorkspace(firstWorkspaceId);
+    expect(service.activeTerminal()?.id).toBe(selectedTerminal.id);
+    expect(JSON.parse(window.localStorage.getItem('termexo.selectedTerminals.v1')!)).toEqual(
+      expect.objectContaining({
+        [firstWorkspaceId]: selectedTerminal.id,
+        [secondWorkspaceId]: secondTerminal.id,
+      }),
+    );
+
+    repository.list.mockResolvedValueOnce(service.workspaces());
+    const reopened = TestBed.runInInjectionContext(() => new AppStateService());
+    await reopened.initialize();
+    expect(reopened.activeTerminal()?.id).toBe(selectedTerminal.id);
+    reopened.selectWorkspace(secondWorkspaceId);
+    expect(reopened.activeTerminal()?.id).toBe(secondTerminal.id);
+  });
+
   it('updates a running terminal after its workspace becomes inactive', async () => {
     await service.initialize();
     const terminal = service.createTerminal({ agentType: 'claude' })!;
@@ -450,11 +484,7 @@ describe('AppStateService', () => {
     const ids = service.workspaces().map((workspace) => workspace.id);
 
     expect(service.reorderWorkspace(ids[2], ids[0], 'before')).toBe(true);
-    expect(service.workspaces().map((workspace) => workspace.id)).toEqual([
-      ids[2],
-      ids[0],
-      ids[1],
-    ]);
+    expect(service.workspaces().map((workspace) => workspace.id)).toEqual([ids[2], ids[0], ids[1]]);
     expect(service.workspaces().map((workspace) => workspace.sortOrder)).toEqual([0, 1, 2]);
     expect(repository.saveAll).toHaveBeenCalledWith(service.workspaces());
 
@@ -865,6 +895,42 @@ describe('AppStateService', () => {
       atTime(base + 2_000, () => service.updateTerminalStatus(terminalId, 'THINKING'));
       service.applyAgentEvent(hookEvent('tool.started', base + 2_100));
       expect(statusOf()).toBe('RUNNING');
+    });
+
+    it('uses a delayed idle report only while the agent is still active', () => {
+      service.applyAgentEvent(hookEvent('agent.thinking', base + 1_000));
+      service.applyAgentEvent(hookEvent('agent.idle', base + 2_000));
+      expect(statusOf()).toBe('IDLE');
+
+      service.applyAgentEvent(hookEvent('task.completed', base + 3_000));
+      service.applyAgentEvent(hookEvent('agent.idle', base + 4_000));
+      expect(statusOf()).toBe('COMPLETED');
+
+      service.applyAgentEvent(hookEvent('agent.thinking', base + 5_000));
+      service.applyAgentEvent(hookEvent('agent.failed', base + 6_000));
+      service.applyAgentEvent(hookEvent('agent.idle', base + 7_000));
+      expect(statusOf()).toBe('FAILED');
+    });
+
+    it('ignores a Grok turn ending delivered after a newer prompt', () => {
+      const grokId = 'terminal-grok';
+      service.createTerminal({ id: grokId, agentType: 'grok' });
+      const grokEvent = (eventType: string, createdAt: number, promptId: string): AgentEvent => ({
+        ...hookEvent(eventType, createdAt, grokId),
+        agentType: 'grok',
+        detail: {
+          source: eventType === 'agent.thinking' ? 'UserPromptSubmit' : 'Stop',
+          prompt_id: promptId,
+        },
+      });
+
+      service.applyAgentEvent(grokEvent('agent.thinking', base + 1_000, 'first'));
+      service.applyAgentEvent(grokEvent('agent.thinking', base + 2_000, 'second'));
+      service.applyAgentEvent(grokEvent('task.completed', base + 3_000, 'first'));
+      expect(statusOf(grokId)).toBe('THINKING');
+
+      service.applyAgentEvent(grokEvent('task.completed', base + 4_000, 'second'));
+      expect(statusOf(grokId)).toBe('COMPLETED');
     });
 
     it('ignores hooks that arrive after the process exited, until the terminal is relaunched', () => {

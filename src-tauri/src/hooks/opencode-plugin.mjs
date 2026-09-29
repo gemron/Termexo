@@ -337,3 +337,148 @@ export const TermexoPlugin = async () => {
     },
   };
 };
+
+async function handleV2Event(hooks, event) {
+  const source = event?.type ?? 'unknown';
+  const data = event?.data ?? {};
+  const sessionID = data.sessionID ?? data.form?.sessionID;
+
+  if (source === 'session.created') {
+    if (data.parentID) {
+      childSessions.add(sessionID);
+      return;
+    }
+    const alreadyAnnounced = announcedSessionID === sessionID;
+    if ((await activate(sessionID, source, true)) && !alreadyAnnounced) {
+      await writeEvent('session.ready', sessionID, source);
+    }
+    return;
+  }
+  if (childSessions.has(sessionID)) return;
+
+  if (source === 'session.execution.started') {
+    if (!(await activate(sessionID, source))) return;
+    sessionStates.set(sessionID, 'busy');
+    resume(sessionID);
+    await writeEvent('agent.thinking', sessionID, source);
+    return;
+  }
+  if (source === 'session.execution.succeeded') {
+    if (!(await activate(sessionID, source))) return;
+    sessionStates.set(sessionID, 'idle');
+    endTurn(sessionID);
+    await writeEvent('task.completed', sessionID, source);
+    return;
+  }
+  if (source === 'session.execution.failed') {
+    if (!(await activate(sessionID, source))) return;
+    sessionStates.set(sessionID, 'idle');
+    endTurn(sessionID);
+    const message = errorMessage(data.error);
+    const classified = retryEventType(message);
+    await writeEvent(
+      classified === 'agent.thinking' ? 'agent.failed' : classified,
+      sessionID,
+      source,
+      {
+        message,
+      },
+    );
+    return;
+  }
+  if (source === 'session.execution.interrupted') {
+    if (!(await activate(sessionID, source))) return;
+    sessionStates.set(sessionID, 'idle');
+    endTurn(sessionID);
+    await writeEvent('agent.interrupted', sessionID, source);
+    return;
+  }
+  if (source === 'form.created') {
+    if (sessionID === 'global' || !(await activate(sessionID, source))) return;
+    awaitingReply.add(sessionID);
+    cancelIdle(sessionID);
+    await writeEvent('user.input.required', sessionID, source, {
+      request_id: data.form?.id,
+    });
+    return;
+  }
+  if (source === 'form.replied') {
+    if (!(await activate(sessionID, source))) return;
+    resume(sessionID);
+    await writeEvent('agent.thinking', sessionID, source);
+    return;
+  }
+  if (source === 'form.cancelled') {
+    if (!(await activate(sessionID, source))) return;
+    await decline(sessionID, source);
+    return;
+  }
+  if (source === 'permission.asked') {
+    await hooks.event({
+      event: { type: source, properties: { ...data, permission: data.action } },
+    });
+    return;
+  }
+  if (source === 'session.retry.scheduled') {
+    if (!(await activate(sessionID, source))) return;
+    const message = errorMessage(data.error);
+    await writeEvent(retryEventType(message), sessionID, source, { message });
+    return;
+  }
+  await hooks.event({ event: { type: source, properties: data } });
+}
+
+// OpenCode 2 loads a default-exported definition from a plugin directory. The older CLI calls
+// TermexoPlugin above. Keep the event interpretation in one place so both versions report the
+// same terminal states.
+export default {
+  id: 'termexo.status',
+  async setup(ctx) {
+    const hooks = await TermexoPlugin();
+    const controller = new AbortController();
+
+    await writeEvent('session.ready', activeSessionID, 'plugin.loaded');
+
+    await ctx.session.hook('prompt', async (event) => {
+      await hooks['chat.message']({ sessionID: event.sessionID });
+    });
+    await ctx.tool.hook('execute.before', async (event) => {
+      const sessionID = event.sessionID;
+      if (!(await activate(sessionID, 'tool.execute.before'))) return;
+      if (awaitingReply.has(sessionID) || turnIsOver(sessionID)) return;
+      cancelIdle(sessionID);
+      await writeEvent('tool.started', sessionID, 'tool.execute.before', {
+        tool_name: event.tool,
+      });
+    });
+    await ctx.tool.hook('execute.after', async (event) => {
+      const sessionID = event.sessionID;
+      if (!(await activate(sessionID, 'tool.execute.after'))) return;
+      if (awaitingReply.has(sessionID) || turnIsOver(sessionID)) return;
+      cancelIdle(sessionID);
+      await writeEvent(
+        event.status === 'error' ? 'tool.failed' : 'tool.completed',
+        sessionID,
+        'tool.execute.after',
+        { tool_name: event.tool },
+      );
+    });
+
+    void (async () => {
+      try {
+        for await (const event of ctx.event.subscribe({
+          signal: controller.signal,
+        })) {
+          await handleV2Event(hooks, event);
+        }
+      } catch (error) {
+        if (!controller.signal.aborted) console.error('Termexo status subscription ended', error);
+      }
+    })();
+
+    return () => {
+      controller.abort();
+      void hooks.dispose();
+    };
+  },
+};

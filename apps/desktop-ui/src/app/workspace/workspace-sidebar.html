@@ -39,8 +39,12 @@
         <li
           class="workspace-entry"
           [class.dragging]="draggedWorkspaceId() === workspace.id"
-          [class.drop-before]="dropTarget()?.workspaceId === workspace.id && dropTarget()?.position === 'before'"
-          [class.drop-after]="dropTarget()?.workspaceId === workspace.id && dropTarget()?.position === 'after'"
+          [class.drop-before]="
+            dropTarget()?.workspaceId === workspace.id && dropTarget()?.position === 'before'
+          "
+          [class.drop-after]="
+            dropTarget()?.workspaceId === workspace.id && dropTarget()?.position === 'after'
+          "
           [style.--workspace-color]="workspaceColor(workspace)"
           (dragover)="dragOverWorkspace($event, workspace.id)"
           (drop)="dropWorkspace($event, workspace.id)"
@@ -61,7 +65,23 @@
             </span>
             <span class="workspace-copy">
               <strong>{{ workspace.name }}</strong>
-              <small>{{ workspace.activeBranch }}</small>
+              @let agents = agentTerminals(workspace);
+              @if (agents.length) {
+                <span class="workspace-agent-statuses">
+                  @for (terminal of agents; track terminal.id) {
+                    <span class="workspace-agent-status" [attr.data-status]="terminal.status">
+                      <app-icon [name]="agentIcons[terminal.agentType]" [size]="12" />
+                      <span class="agent-label">{{ agentLabels[terminal.agentType] }}</span>
+                      <span class="status-label">{{
+                        statusMeta[terminal.status].labelKey | t
+                      }}</span>
+                      @if (terminal.status === 'COMPLETED') {
+                        <app-icon class="status-check" name="check" [size]="11" />
+                      }
+                    </span>
+                  }
+                </span>
+              }
             </span>
           </button>
           <button

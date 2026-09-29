@@ -568,7 +568,7 @@ export class TerminalPanelComponent implements AfterViewInit {
         this.startupVisible.set(true);
         this.startupTimer = window.setTimeout(() => this.startupVisible.set(false), 8_000);
       }
-      const { attached, cols, rows } = await this.gateway.start(
+      const { cols, rows } = await this.gateway.start(
         this.session(),
         Math.max(this.terminal.cols, 20),
         Math.max(this.terminal.rows, 5),
@@ -591,9 +591,9 @@ export class TerminalPanelComponent implements AfterViewInit {
       }
       // Only now, with the grid settled, is history worth writing.
       await this.gateway.replayInitial(this.session().id);
-      // Attaching to a PTY that was already running must not discard the state hook events have
-      // derived for it; only a fresh launch, or one still marked as starting, becomes RUNNING.
-      if (!attached || this.session().status === 'STARTING') {
+      // A startup hook can report that the agent has reached its prompt before the PTY returns.
+      // Keep that newer state rather than overwriting it with a generic running status.
+      if (this.session().status === 'STARTING') {
         this.statusChanged.emit({ terminalId: this.session().id, status: 'RUNNING' });
       }
       this.fitTerminal();

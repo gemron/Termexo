@@ -23,6 +23,7 @@ import { hasBackend, runtimeMode } from './tauri-runtime';
 import { WorkspaceRepository } from './workspace.repository';
 
 const DEFAULT_SHELL = 'powershell.exe';
+const SELECTED_TERMINALS_STORAGE_KEY = 'termexo.selectedTerminals.v1';
 
 /**
  * How long before this client loaded an adopted terminal's hook events still count.
@@ -77,6 +78,8 @@ export class AppStateService {
   private readonly workspaceItems = signal<Workspace[]>([]);
   private readonly activeWorkspaceId = signal<string | null>(null);
   private readonly activeTerminalId = signal<string | null>(null);
+  /** Local view state: each client can keep its own selected terminal without rewriting a workspace. */
+  private readonly selectedTerminalIds = this.loadSelectedTerminalIds();
   private unwatchWorkspaces?: UnlistenFn;
   /** Events created before this describe a process this client never saw start. */
   private readonly loadedAt = Date.now();
@@ -85,6 +88,8 @@ export class AppStateService {
    * overwrite it. Local writes are stamped with the clock, hook events with when they fired.
    */
   private readonly statusChangedAt = new Map<string, number>();
+  /** Grok may deliver the previous turn's ending after the next prompt has already started. */
+  private readonly grokPromptIds = new Map<string, string[]>();
   /** The runtime revision each terminal's process exited at; a relaunch moves past it. */
   private readonly exitedRevisions = new Map<string, number>();
 
@@ -161,7 +166,10 @@ export class AppStateService {
     this.workspaceItems.set(orderedWorkspaces);
     const firstWorkspace = orderedWorkspaces[0];
     this.activeWorkspaceId.set(firstWorkspace?.id ?? null);
-    this.activeTerminalId.set(firstWorkspace?.terminals[0]?.id ?? null);
+    this.setActiveTerminal(
+      firstWorkspace,
+      firstWorkspace ? this.rememberedTerminal(firstWorkspace) : null,
+    );
 
     await this.watchExternalChanges();
     if (attaching) {
@@ -183,7 +191,10 @@ export class AppStateService {
       null;
     this.activeWorkspaceId.set(activeWorkspace?.id ?? null);
     if (!activeWorkspace?.terminals.some((terminal) => terminal.id === this.activeTerminalId())) {
-      this.activeTerminalId.set(activeWorkspace?.terminals[0]?.id ?? null);
+      this.setActiveTerminal(
+        activeWorkspace,
+        activeWorkspace ? this.rememberedTerminal(activeWorkspace) : null,
+      );
     }
   }
 
@@ -216,7 +227,10 @@ export class AppStateService {
     if (!this.activeWorkspaceId()) {
       const firstWorkspace = orderedWorkspaces[0];
       this.activeWorkspaceId.set(firstWorkspace?.id ?? null);
-      this.activeTerminalId.set(firstWorkspace?.terminals[0]?.id ?? null);
+      this.setActiveTerminal(
+        firstWorkspace,
+        firstWorkspace ? this.rememberedTerminal(firstWorkspace) : null,
+      );
       return;
     }
     const activeWorkspace = this.activeWorkspace();
@@ -225,7 +239,7 @@ export class AppStateService {
       !workspace.terminals.some((terminal) => terminal.id === this.activeTerminalId())
     ) {
       // The other client closed the terminal this one was looking at.
-      this.activeTerminalId.set(workspace.terminals[0]?.id ?? null);
+      this.setActiveTerminal(workspace, this.rememberedTerminal(workspace));
     }
   }
 
@@ -241,6 +255,7 @@ export class AppStateService {
       workspaces.filter((workspace) => workspace.id !== workspaceId),
     );
     this.workspaceItems.set(remainingWorkspaces);
+    this.forgetWorkspaceTerminal(workspaceId);
     if (this.activeWorkspaceId() !== workspaceId) {
       return;
     }
@@ -248,7 +263,10 @@ export class AppStateService {
     const nextWorkspace =
       remainingWorkspaces[Math.min(removedIndex, remainingWorkspaces.length - 1)];
     this.activeWorkspaceId.set(nextWorkspace?.id ?? null);
-    this.activeTerminalId.set(nextWorkspace?.terminals[0]?.id ?? null);
+    this.setActiveTerminal(
+      nextWorkspace,
+      nextWorkspace ? this.rememberedTerminal(nextWorkspace) : null,
+    );
   }
 
   selectWorkspace(workspaceId: string): void {
@@ -261,19 +279,22 @@ export class AppStateService {
       // Persisting `lastOpenedAt` would write the whole row back, clobbering terminal state the
       // desktop window has changed but not yet flushed. Switching views is a local act anyway.
       this.activeWorkspaceId.set(workspaceId);
-      this.activeTerminalId.set(workspace.terminals[0]?.id ?? null);
+      this.setActiveTerminal(workspace, this.rememberedTerminal(workspace));
       return;
     }
 
     const updatedWorkspace = { ...workspace, lastOpenedAt: Date.now() };
     this.replaceWorkspace(updatedWorkspace);
     this.activeWorkspaceId.set(workspaceId);
-    this.activeTerminalId.set(updatedWorkspace.terminals[0]?.id ?? null);
+    this.setActiveTerminal(updatedWorkspace, this.rememberedTerminal(updatedWorkspace));
     void this.repository.save(updatedWorkspace);
   }
 
   selectTerminal(terminalId: string): void {
-    this.activeTerminalId.set(terminalId);
+    const workspace = this.activeWorkspace();
+    if (workspace?.terminals.some((terminal) => terminal.id === terminalId)) {
+      this.setActiveTerminal(workspace, terminalId);
+    }
   }
 
   async createWorkspace(name: string, projectPath: string): Promise<Workspace | null> {
@@ -304,7 +325,7 @@ export class AppStateService {
     await this.repository.save(workspace);
     this.workspaceItems.update((items) => [...items, workspace]);
     this.activeWorkspaceId.set(workspace.id);
-    this.activeTerminalId.set(null);
+    this.setActiveTerminal(workspace, null);
     return workspace;
   }
 
@@ -322,12 +343,16 @@ export class AppStateService {
     await this.repository.delete(workspaceId);
     await this.repository.saveAll(remainingWorkspaces);
     this.workspaceItems.set(remainingWorkspaces);
+    this.forgetWorkspaceTerminal(workspaceId);
 
     if (this.activeWorkspaceId() === workspaceId) {
       const nextWorkspace =
         remainingWorkspaces[Math.min(removedIndex, remainingWorkspaces.length - 1)];
       this.activeWorkspaceId.set(nextWorkspace?.id ?? null);
-      this.activeTerminalId.set(nextWorkspace?.terminals[0]?.id ?? null);
+      this.setActiveTerminal(
+        nextWorkspace,
+        nextWorkspace ? this.rememberedTerminal(nextWorkspace) : null,
+      );
     }
 
     return removedWorkspace;
@@ -377,6 +402,7 @@ export class AppStateService {
     const previouslyActiveWorkspaceId = this.activeWorkspaceId();
     const previouslyActiveTerminalId = this.activeTerminalId();
     this.workspaceItems.set(mergedWorkspaces);
+    this.forgetWorkspaceTerminal(sourceWorkspaceId);
     this.activeWorkspaceId.set(targetWorkspaceId);
     const preservesActiveTerminal =
       (previouslyActiveWorkspaceId === sourceWorkspaceId ||
@@ -384,10 +410,11 @@ export class AppStateService {
       normalizedMergedWorkspace.terminals.some(
         (terminal) => terminal.id === previouslyActiveTerminalId,
       );
-    this.activeTerminalId.set(
+    this.setActiveTerminal(
+      normalizedMergedWorkspace,
       preservesActiveTerminal
         ? previouslyActiveTerminalId
-        : (normalizedMergedWorkspace.terminals[0]?.id ?? null),
+        : this.rememberedTerminal(normalizedMergedWorkspace),
     );
 
     return normalizedMergedWorkspace;
@@ -476,7 +503,7 @@ export class AppStateService {
     };
     this.replaceWorkspace(updatedWorkspace);
     if (this.activeWorkspace()?.id === workspace.id) {
-      this.activeTerminalId.set(terminal.id);
+      this.setActiveTerminal(updatedWorkspace, terminal.id);
     }
     void this.repository.save(updatedWorkspace);
     return terminal;
@@ -497,7 +524,7 @@ export class AppStateService {
       // Falls through to the neighbour — the tab that slid into the closed one's place, or the
       // one before it at the end of the strip — rather than jumping back to the first tab.
       const neighbour = updatedTerminals[Math.min(closedIndex, updatedTerminals.length - 1)];
-      this.activeTerminalId.set(neighbour?.id ?? null);
+      this.setActiveTerminal(updatedWorkspace, neighbour?.id ?? null);
     }
     void this.repository.save(updatedWorkspace);
   }
@@ -652,9 +679,22 @@ export class AppStateService {
       return true;
     }
     const terminal = this.findTerminal(event.terminalId);
+    const promptId = event.detail?.['prompt_id'];
+    const grokPrompts = this.grokPromptIds.get(event.terminalId);
+    if (
+      event.agentType === 'grok' &&
+      typeof promptId === 'string' &&
+      !(event.eventType === 'agent.thinking' && event.detail?.['source'] === 'UserPromptSubmit') &&
+      grokPrompts?.includes(promptId) &&
+      grokPrompts.at(-1) !== promptId
+    ) {
+      return true;
+    }
     return (
       terminal !== undefined &&
       (this.isExitedLaunch(terminal) ||
+        (event.eventType === 'agent.idle' &&
+          ['COMPLETED', 'FAILED', 'STOPPED', 'DISCONNECTED'].includes(terminal.status)) ||
         (terminal.status === 'WAITING_APPROVAL' && event.eventType === TOOL_STARTED_EVENT_TYPE))
     );
   }
@@ -673,6 +713,17 @@ export class AppStateService {
       this.isSupersededAgentEvent(event)
     ) {
       return;
+    }
+
+    if (
+      event.agentType === 'grok' &&
+      event.eventType === 'agent.thinking' &&
+      event.detail?.['source'] === 'UserPromptSubmit' &&
+      typeof event.detail?.['prompt_id'] === 'string'
+    ) {
+      const prompts = this.grokPromptIds.get(event.terminalId) ?? [];
+      if (!prompts.includes(event.detail['prompt_id'])) prompts.push(event.detail['prompt_id']);
+      this.grokPromptIds.set(event.terminalId, prompts);
     }
 
     this.recordStatusChange(terminal.id, event.createdAt);
@@ -825,6 +876,60 @@ export class AppStateService {
     this.workspaceItems.update((items) =>
       items.map((item) => (item.id === workspace.id ? workspace : item)),
     );
+  }
+
+  private rememberedTerminal(workspace: Workspace): string | null {
+    const selectedId = this.selectedTerminalIds.get(workspace.id);
+    return (
+      workspace.terminals.find((terminal) => terminal.id === selectedId)?.id ??
+      workspace.terminals[0]?.id ??
+      null
+    );
+  }
+
+  private setActiveTerminal(
+    workspace: Workspace | null | undefined,
+    terminalId: string | null,
+  ): void {
+    this.activeTerminalId.set(terminalId);
+    if (!workspace) return;
+    if (terminalId) {
+      this.selectedTerminalIds.set(workspace.id, terminalId);
+    } else {
+      this.selectedTerminalIds.delete(workspace.id);
+    }
+    this.saveSelectedTerminalIds();
+  }
+
+  private forgetWorkspaceTerminal(workspaceId: string): void {
+    if (this.selectedTerminalIds.delete(workspaceId)) this.saveSelectedTerminalIds();
+  }
+
+  private loadSelectedTerminalIds(): Map<string, string> {
+    try {
+      const stored: unknown = JSON.parse(
+        window.localStorage.getItem(SELECTED_TERMINALS_STORAGE_KEY) ?? '{}',
+      );
+      if (!stored || typeof stored !== 'object' || Array.isArray(stored)) return new Map();
+      return new Map(
+        Object.entries(stored).filter(
+          (entry): entry is [string, string] => typeof entry[1] === 'string',
+        ),
+      );
+    } catch {
+      return new Map();
+    }
+  }
+
+  private saveSelectedTerminalIds(): void {
+    try {
+      window.localStorage.setItem(
+        SELECTED_TERMINALS_STORAGE_KEY,
+        JSON.stringify(Object.fromEntries(this.selectedTerminalIds)),
+      );
+    } catch {
+      // The current window still remembers the selection when storage is unavailable.
+    }
   }
 
   private buildTerminal(workspace: Workspace, input: CreateTerminalInput): TerminalSession {

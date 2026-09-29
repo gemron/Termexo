@@ -31,10 +31,14 @@ pub enum HookError {
     InvalidOpenCodePluginPath,
     #[error("无法合并 OPENCODE_CONFIG_CONTENT：{0}")]
     InvalidOpenCodeConfig(String),
+    #[error("Grok hook path is already used by another file: {0}")]
+    GrokHookPathOccupied(String),
 }
 
 const TERMEXO_ANTIGRAVITY_EVENT_FILE: &str = "TERMEXO_ANTIGRAVITY_EVENT_FILE";
 const TERMEXO_ANTIGRAVITY_TERMINAL_ID: &str = "TERMEXO_ANTIGRAVITY_TERMINAL_ID";
+const TERMEXO_GROK_EVENT_FILE: &str = "TERMEXO_GROK_EVENT_FILE";
+const TERMEXO_GROK_TERMINAL_ID: &str = "TERMEXO_GROK_TERMINAL_ID";
 
 /// What the status script prints back to the CLI, which renders it as the status line.
 ///
@@ -331,10 +335,23 @@ impl HookEventStore {
         terminal_id: &str,
         session_id: Option<&str>,
         existing_config: Option<&str>,
+        plugin_api_version: u32,
     ) -> Result<OpenCodeRuntimeSettings, HookError> {
-        let plugin_path = self
+        let v2 = plugin_api_version >= 2;
+        let plugin_directory = self
             .runtime_directory
-            .join(format!("opencode-{terminal_id}.plugin.js"));
+            .join(format!("opencode-{terminal_id}.plugin"));
+        let plugin_path = if v2 {
+            fs::create_dir_all(&plugin_directory)?;
+            fs::write(
+                plugin_directory.join("package.json"),
+                r#"{"type":"module","main":"index.js"}"#,
+            )?;
+            plugin_directory.join("index.js")
+        } else {
+            self.runtime_directory
+                .join(format!("opencode-{terminal_id}.plugin.js"))
+        };
         let plugin = OPENCODE_PLUGIN_TEMPLATE
             .replace(
                 "__EVENT_FILE__",
@@ -344,11 +361,34 @@ impl HookEventStore {
             .replace("__SESSION_ID__", &serde_json::to_string(&session_id)?);
         fs::write(&plugin_path, plugin)?;
 
-        let plugin_url = Url::from_file_path(&plugin_path)
+        let plugin_url = Url::from_file_path(if v2 { &plugin_directory } else { &plugin_path })
             .map_err(|_| HookError::InvalidOpenCodePluginPath)?
             .to_string();
-        let config_content = merge_opencode_plugin_config(existing_config, &plugin_url)?;
+        let config_content = merge_opencode_plugin_config(existing_config, &plugin_url, v2)?;
         Ok(OpenCodeRuntimeSettings { config_content })
+    }
+
+    /// Grok discovers global hook files at startup. The shared command does nothing outside a
+    /// Termexo terminal; these environment variables route each event to its own terminal.
+    pub fn prepare_grok_runtime(
+        &self,
+        terminal_id: &str,
+    ) -> Result<HashMap<String, String>, HookError> {
+        let home = env::var_os("GROK_HOME")
+            .map(PathBuf::from)
+            .or_else(|| env::var_os("USERPROFILE").map(|value| PathBuf::from(value).join(".grok")))
+            .or_else(|| env::var_os("HOME").map(|value| PathBuf::from(value).join(".grok")))
+            .ok_or(HookError::InvalidArguments)?;
+        let directory = home.join("hooks");
+        let executable = env::current_exe()?;
+        write_grok_hook_config(&directory, &executable)?;
+        Ok(HashMap::from([
+            (
+                TERMEXO_GROK_EVENT_FILE.into(),
+                self.event_file.to_string_lossy().into_owned(),
+            ),
+            (TERMEXO_GROK_TERMINAL_ID.into(), terminal_id.into()),
+        ]))
     }
 
     pub fn write_mcp_config(
@@ -467,6 +507,38 @@ pub fn capture_codex_hook_event_from_cli() -> Result<(), HookError> {
     append_stored_event(&event_file, terminal_id, "codex", payload)?;
     println!("{{}}");
     Ok(())
+}
+
+pub fn capture_grok_hook_event_from_cli() -> Result<(), HookError> {
+    // The hook file is global, but only a Grok process launched by Termexo has these variables.
+    let Some((event_file, terminal_id)) = env::var(TERMEXO_GROK_EVENT_FILE)
+        .ok()
+        .zip(env::var(TERMEXO_GROK_TERMINAL_ID).ok())
+    else {
+        return Ok(());
+    };
+    let mut input = String::new();
+    std::io::stdin().read_to_string(&mut input)?;
+    let incoming: Value = serde_json::from_str(&input)?;
+    let mut payload = serde_json::Map::new();
+    // Never spool the prompt, tool input, or assistant message sent to a Grok hook.
+    for field in [
+        "hook_event_name",
+        "hookEventName",
+        "sessionId",
+        "promptId",
+        "notificationType",
+        "notification_type",
+        "reason",
+        "error",
+        "toolName",
+        "subagentType",
+    ] {
+        if let Some(value) = incoming.get(field) {
+            payload.insert(field.into(), value.clone());
+        }
+    }
+    append_stored_event(&event_file, terminal_id, "grok", Value::Object(payload))
 }
 
 /// Records one Antigravity status update and prints the line the CLI should show.
@@ -813,6 +885,9 @@ fn map_hook_event(stored: StoredHookEvent) -> AgentEvent {
     if stored.agent_type.as_deref() == Some("opencode") {
         return map_opencode_event(stored);
     }
+    if stored.agent_type.as_deref() == Some("grok") {
+        return map_grok_event(stored);
+    }
 
     let hook_name = stored
         .payload
@@ -901,9 +976,64 @@ fn map_opencode_event(stored: StoredHookEvent) -> AgentEvent {
     }
 }
 
+fn map_grok_event(stored: StoredHookEvent) -> AgentEvent {
+    let payload = &stored.payload;
+    let hook = payload
+        .get("hook_event_name")
+        .and_then(Value::as_str)
+        .unwrap_or_default();
+    let notification = payload
+        .get("notificationType")
+        .or_else(|| payload.get("notification_type"))
+        .and_then(Value::as_str);
+    let event_type = if payload
+        .get("subagentType")
+        .and_then(Value::as_str)
+        .is_some_and(|value| !value.is_empty())
+    {
+        "agent.notification"
+    } else {
+        match hook {
+            "SessionStart" => "session.ready",
+            "UserPromptSubmit" => "agent.thinking",
+            "PreToolUse" => "tool.started",
+            "PostToolUse" => "tool.completed",
+            "PostToolUseFailure" => "tool.failed",
+            "Stop" if payload.get("reason").and_then(Value::as_str) == Some("end_turn") => {
+                "task.completed"
+            }
+            "Stop" => "agent.notification",
+            "StopFailure" => stop_failure_event_type(payload),
+            "StopCancelled" => "agent.interrupted",
+            "SessionEnd" => "session.ended",
+            "Notification" if notification == Some("permission_prompt") => "approval.required",
+            "Notification" if notification == Some("idle_prompt") => "agent.idle",
+            _ => "agent.notification",
+        }
+    };
+    AgentEvent {
+        event_key: stored.event_key,
+        agent_type: "grok".into(),
+        native_session_id: payload
+            .get("sessionId")
+            .and_then(Value::as_str)
+            .filter(|id| !id.is_empty())
+            .map(str::to_owned),
+        terminal_id: stored.terminal_id,
+        event_type: event_type.into(),
+        detail: json!({
+            "source": hook,
+            "prompt_id": payload.get("promptId"),
+            "tool_name": payload.get("toolName"),
+        }),
+        created_at: stored.received_at,
+    }
+}
+
 fn merge_opencode_plugin_config(
     existing_config: Option<&str>,
     plugin_url: &str,
+    v2: bool,
 ) -> Result<String, HookError> {
     let mut config = match existing_config.filter(|value| !value.trim().is_empty()) {
         Some(value) => serde_json::from_str::<Value>(value)
@@ -913,10 +1043,11 @@ fn merge_opencode_plugin_config(
     let object = config
         .as_object_mut()
         .ok_or_else(|| HookError::InvalidOpenCodeConfig("配置内容必须是 JSON 对象".into()))?;
-    let plugins = object.entry("plugin").or_insert_with(|| json!([]));
+    let field = if v2 { "plugins" } else { "plugin" };
+    let plugins = object.entry(field).or_insert_with(|| json!([]));
     let plugins = plugins
         .as_array_mut()
-        .ok_or_else(|| HookError::InvalidOpenCodeConfig("plugin 字段必须是数组".into()))?;
+        .ok_or_else(|| HookError::InvalidOpenCodeConfig(format!("{field} 字段必须是数组")))?;
     if !plugins.iter().any(|plugin| {
         plugin.as_str() == Some(plugin_url)
             || plugin
@@ -928,6 +1059,39 @@ fn merge_opencode_plugin_config(
         plugins.push(Value::String(plugin_url.into()));
     }
     serde_json::to_string(&config).map_err(HookError::from)
+}
+
+fn write_grok_hook_config(directory: &Path, executable: &Path) -> Result<(), HookError> {
+    fs::create_dir_all(directory)?;
+    let path = directory.join("termexo-status.json");
+    if path.exists() && !fs::read_to_string(&path)?.contains("grok-hook") {
+        return Err(HookError::GrokHookPathOccupied(path.display().to_string()));
+    }
+    let command = format!("{} grok-hook", command_quote(&executable.to_string_lossy()));
+    let hook = json!({"type": "command", "command": command, "timeout": 10});
+    let group = json!([{"hooks": [hook.clone()]}]);
+    let mut events = serde_json::Map::new();
+    for name in [
+        "SessionStart",
+        "UserPromptSubmit",
+        "PreToolUse",
+        "PostToolUse",
+        "PostToolUseFailure",
+        "Stop",
+        "StopFailure",
+        "StopCancelled",
+        "SessionEnd",
+    ] {
+        events.insert(name.into(), group.clone());
+    }
+    events.insert(
+        "Notification".into(),
+        json!([
+            {"matcher": "idle_prompt|permission_prompt", "hooks": [hook]}
+        ]),
+    );
+    fs::write(path, serde_json::to_vec(&json!({"hooks": events}))?)?;
+    Ok(())
 }
 
 const OPENCODE_PLUGIN_TEMPLATE: &str = include_str!("opencode-plugin.mjs");
@@ -1547,6 +1711,7 @@ mod tests {
                 "terminal-open",
                 Some("ses_open"),
                 Some(r#"{"theme":"system","plugin":["existing-plugin"]}"#),
+                1,
             )
             .unwrap();
         let config = serde_json::from_str::<Value>(&runtime.config_content).unwrap();
@@ -1565,6 +1730,121 @@ mod tests {
         assert!(!plugin.contains("__EVENT_FILE__"));
 
         fs::remove_dir_all(directory).unwrap();
+    }
+
+    #[test]
+    fn writes_an_opencode_v2_plugin_directory_with_the_v2_config_key() {
+        let directory = test_directory("opencode-v2-plugin");
+        let store = HookEventStore::new(&directory).unwrap();
+        let runtime = store
+            .prepare_opencode_runtime(
+                "terminal-v2",
+                None,
+                Some(r#"{"theme":"system","plugins":["existing-plugin"]}"#),
+                2,
+            )
+            .unwrap();
+        let config: Value = serde_json::from_str(&runtime.config_content).unwrap();
+        let plugins = config["plugins"].as_array().unwrap();
+        let plugin_url = plugins.last().and_then(Value::as_str).unwrap();
+        let plugin_directory = Url::parse(plugin_url).unwrap().to_file_path().unwrap();
+        assert!(plugin_directory.is_dir());
+        assert_eq!(config["theme"], "system");
+        assert_eq!(plugins[0], "existing-plugin");
+        assert_eq!(config.get("plugin"), None);
+        assert_eq!(
+            serde_json::from_slice::<Value>(
+                &fs::read(plugin_directory.join("package.json")).unwrap()
+            )
+            .unwrap()["main"],
+            "index.js"
+        );
+        let plugin = fs::read_to_string(plugin_directory.join("index.js")).unwrap();
+        assert!(plugin.contains("termexo.status"));
+        assert!(plugin.contains("ctx.event.subscribe"));
+        assert!(!plugin.contains("__EVENT_FILE__"));
+        fs::remove_dir_all(directory).unwrap();
+    }
+
+    #[test]
+    fn writes_grok_hooks_without_replacing_an_unrelated_file() {
+        let directory = test_directory("grok-hooks");
+        let hooks = directory.join("hooks");
+        let executable = directory.join("termexo.exe");
+        write_grok_hook_config(&hooks, &executable).unwrap();
+        let path = hooks.join("termexo-status.json");
+        let config: Value = serde_json::from_slice(&fs::read(&path).unwrap()).unwrap();
+        for event in [
+            "SessionStart",
+            "UserPromptSubmit",
+            "PreToolUse",
+            "PostToolUse",
+            "Stop",
+            "StopFailure",
+            "StopCancelled",
+            "SessionEnd",
+            "Notification",
+        ] {
+            assert!(config["hooks"][event].is_array(), "{event}");
+        }
+        assert!(config["hooks"]["Stop"][0]["hooks"][0]["command"]
+            .as_str()
+            .unwrap()
+            .contains("grok-hook"));
+        fs::write(&path, "user hook").unwrap();
+        assert!(matches!(
+            write_grok_hook_config(&hooks, &executable),
+            Err(HookError::GrokHookPathOccupied(_))
+        ));
+        assert_eq!(fs::read_to_string(&path).unwrap(), "user hook");
+        fs::remove_dir_all(directory).unwrap();
+    }
+
+    #[test]
+    fn maps_grok_lifecycle_to_terminal_states() {
+        for (hook, extra, expected) in [
+            ("SessionStart", json!({}), "session.ready"),
+            ("UserPromptSubmit", json!({}), "agent.thinking"),
+            ("PreToolUse", json!({}), "tool.started"),
+            ("PostToolUse", json!({}), "tool.completed"),
+            ("Stop", json!({"reason":"end_turn"}), "task.completed"),
+            ("Stop", json!({"reason":"shutdown"}), "agent.notification"),
+            (
+                "StopFailure",
+                json!({"error":"rate_limit"}),
+                "agent.rate_limited",
+            ),
+            ("StopCancelled", json!({}), "agent.interrupted"),
+            ("SessionEnd", json!({}), "session.ended"),
+            (
+                "Notification",
+                json!({"notificationType":"idle_prompt"}),
+                "agent.idle",
+            ),
+            (
+                "Notification",
+                json!({"notificationType":"permission_prompt"}),
+                "approval.required",
+            ),
+        ] {
+            let mut payload = json!({"hook_event_name": hook, "sessionId": "grok-session"});
+            payload
+                .as_object_mut()
+                .unwrap()
+                .extend(extra.as_object().unwrap().clone());
+            let event = map_hook_event(stored_event(Some("grok"), payload));
+            assert_eq!(event.event_type, expected, "{hook}");
+            assert_eq!(event.native_session_id.as_deref(), Some("grok-session"));
+        }
+        let child = map_hook_event(stored_event(
+            Some("grok"),
+            json!({
+                "hook_event_name": "StopCancelled",
+                "sessionId": "grok-session",
+                "subagentType": "explore"
+            }),
+        ));
+        assert_eq!(child.event_type, "agent.notification");
     }
 
     #[test]
@@ -2012,7 +2292,7 @@ mod tests {
         let settings = fs::read_to_string(&claude.settings_path).unwrap();
         fs::write(&claude.settings_path, retarget(&settings)).unwrap();
         let opencode = store
-            .prepare_opencode_runtime(HOOK_LAB_TERMINAL_ID, None, None)
+            .prepare_opencode_runtime(HOOK_LAB_TERMINAL_ID, None, None, 1)
             .unwrap();
 
         // Forwarding to the notify program the lab's Codex home configures, as a launch would.

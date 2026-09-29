@@ -11,7 +11,7 @@
 </p>
 
 <p align="center">
-  <img alt="Version 0.10.7" src="https://img.shields.io/badge/version-0.10.7-58c7a0">
+  <img alt="Version 0.10.8" src="https://img.shields.io/badge/version-0.10.8-58c7a0">
   <img alt="Windows" src="https://img.shields.io/badge/platform-Windows-0078D4?logo=windows">
   <img alt="Tauri 2" src="https://img.shields.io/badge/Tauri-2-24C8DB?logo=tauri&logoColor=white">
   <img alt="Angular 22" src="https://img.shields.io/badge/Angular-22-DD0031?logo=angular">
@@ -102,7 +102,7 @@ npx termexo@latest
 
 ## 最新版本
 
-**[v0.10.7](https://github.com/gemron/Termexo/releases/tag/v0.10.7)** 引导你从选择项目到启动第一个 Agent，展示 CLI 可用状态和重试入口，并在项目保存成功后打开启动配置。保存失败时保留输入和 Agent 选择。
+**[v0.10.8](https://github.com/gemron/Termexo/releases/tag/v0.10.8)** 改进五种 Agent 的状态报告，包括 OpenCode 2 和 Grok Build，并在工作区直接显示各 Agent 的实时状态。
 [完整更新记录](CHANGELOG.cn.md)。
 
 如果 Termexo 帮到了你，欢迎 **给仓库点一个 Star**，帮助更多开发者发现它。
@@ -369,7 +369,8 @@ flowchart LR
 | V0.10.4 | Grok Build、可靠的 Git 变更显示、安静的终端启动与工作区排序 | 已发布 |
 | V0.10.5 | 任务看板持久化与快照迁移、轻量快速的 Antigravity 余量查询 | 已发布 |
 | V0.10.6 | OpenCode v2 代理稳定生效与 CLI 安装更新 | 已发布 |
-| V0.10.7 | 首次使用引导、CLI 状态与可靠的项目创建 | 当前版本 |
+| V0.10.7 | 首次使用引导、CLI 状态与可靠的项目创建 | 已发布 |
+| V0.10.8 | Agent 状态修正与工作区状态提示 | 当前版本 |
 | V1.0 | 稳定性、安全加固与恢复体验 | 规划中 |
 
 进行中的工作见 [Issues](https://github.com/gemron/Termexo/issues)，实际交付内容见

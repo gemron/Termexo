@@ -2,6 +2,12 @@
 
 Release notes for every Termexo version, newest first. The current release is summarised in [README.md](README.md).
 
+## V0.10.8
+
+- **Agent status matches its real work.** Claude Code, Codex, OpenCode, Grok Build, and Antigravity status flows were checked against their installed CLIs and saved events. OpenCode 2 now loads the correct plugin API and reports execution, input requests, failures, and completion; Grok Build now reports lifecycle events through its hooks. Startup and delayed idle reports no longer overwrite newer states.
+- **Workspace rows show agents at a glance.** The Git branch line is replaced by each agent's name and state: idle is gray, running and thinking flash green, errors and approval requests are red, and completion has a green check mark.
+- **Closing an active terminal is clearer.** Its confirmation appears below the top toolbar with a short entrance animation.
+
 ## V0.10.7
 
 - **A clearer first run.** New and empty workspaces guide you through choosing a project, checking Agent CLIs, and opening launch configuration. Available CLIs appear first; detection failures, missing installations, and repair actions have distinct states and retry controls in all seven interface languages.

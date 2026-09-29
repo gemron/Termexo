@@ -30,6 +30,13 @@ fn main() {
             }
             return;
         }
+        Some("grok-hook") => {
+            if let Err(error) = termexo_lib::capture_grok_hook_event_from_cli() {
+                eprintln!("{error}");
+                std::process::exit(1);
+            }
+            return;
+        }
         _ => {}
     }
 

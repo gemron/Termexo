@@ -200,9 +200,9 @@ const translations = {
       "Remote relay access",
     roadmap07Body:
       "Shipped in v0.10.0: self-hosted relay access, code or account enrollment, cascaded addresses, and v2 encrypted sessions. Your browser operates the terminals already running on your desktop.",
-    roadmap10Title: "Start your first Agent",
+    roadmap10Title: "See every agent's status",
     roadmap10Body:
-      "Choose a project, check which Agent CLIs are available, and configure a launch. Project creation waits for a successful save; failures keep your input and Agent choice for retry.",
+      "Workspace rows now show each agent's state. OpenCode 2 and Grok Build report their activity through current integrations, so idle, working, waiting, and completed states stay in sync.",
 
     principlesTitle: "Your work.\nOn your computer.",
     principlesLead:
@@ -429,9 +429,9 @@ const translations = {
       "远程中继访问",
     roadmap07Body:
       "v0.10.0 已发布：自建中继、注册码或账号登记、级联访问地址与 v2 加密会话。浏览器操作的是桌面正在运行的同一批终端。",
-    roadmap10Title: "启动你的第一个 Agent",
+    roadmap10Title: "查看每个 Agent 的状态",
     roadmap10Body:
-      "选择项目、查看可用的 Agent CLI，再配置启动。项目保存成功后才继续；保存失败会保留输入和 Agent 选择，方便重试。",
+      "工作区直接显示各 Agent 的状态。OpenCode 2 和 Grok Build 接入当前版本的状态事件，空闲、运行、等待与完成更准确。",
 
     principlesTitle: "你的工作，\n留在你的电脑。",
     principlesLead:

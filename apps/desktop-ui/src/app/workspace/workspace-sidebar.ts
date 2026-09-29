@@ -1,6 +1,13 @@
 import { Component, computed, input, output, signal } from '@angular/core';
 
-import { normalizeWorkspaceThemeColor, Workspace } from '../core/models/workspace.models';
+import {
+  AGENT_ICONS,
+  AGENT_LABELS,
+  normalizeWorkspaceThemeColor,
+  TERMINAL_STATUS_META,
+  TerminalSession,
+  Workspace,
+} from '../core/models/workspace.models';
 import { TranslatePipe } from '../core/i18n/translate.pipe';
 import { IconComponent } from '../shared/icon/icon';
 
@@ -11,6 +18,9 @@ import { IconComponent } from '../shared/icon/icon';
   styleUrl: './workspace-sidebar.scss',
 })
 export class WorkspaceSidebarComponent {
+  protected readonly agentIcons = AGENT_ICONS;
+  protected readonly agentLabels = AGENT_LABELS;
+  protected readonly statusMeta = TERMINAL_STATUS_META;
   readonly workspaces = input.required<Workspace[]>();
   readonly activeWorkspaceId = input<string | null>(null);
   /** Empty in browser preview, where the footer is left out entirely. */
@@ -39,14 +49,16 @@ export class WorkspaceSidebarComponent {
   protected readonly visibleWorkspaces = computed(() => {
     const query = this.search().trim().toLocaleLowerCase();
     return this.workspaces().filter((workspace) =>
-      `${workspace.name} ${workspace.projectPath} ${workspace.activeBranch}`
-        .toLocaleLowerCase()
-        .includes(query),
+      `${workspace.name} ${workspace.projectPath}`.toLocaleLowerCase().includes(query),
     );
   });
 
   protected workspaceColor(workspace: Workspace): string {
     return normalizeWorkspaceThemeColor(workspace.themeColor);
+  }
+
+  protected agentTerminals(workspace: Workspace): TerminalSession[] {
+    return workspace.terminals.filter((terminal) => terminal.agentType !== 'shell');
   }
 
   protected startWorkspaceDrag(event: DragEvent, workspaceId: string): void {

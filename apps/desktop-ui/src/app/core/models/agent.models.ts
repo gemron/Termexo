@@ -686,6 +686,8 @@ export const EVENT_STATUS: Readonly<Record<string, TerminalStatus>> = {
   // The user interrupted the turn or rejected an approval: back at the prompt, neither failed nor
   // finished.
   'agent.interrupted': 'IDLE',
+  // Grok's delayed idle notification only settles a turn whose status is still active.
+  'agent.idle': 'IDLE',
   'session.ended': 'STOPPED',
 };
 
