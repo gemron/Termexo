@@ -143,6 +143,8 @@
   </div>
   <footer>
     <span>{{ session().workingDirectory }}</span>
-    <span>{{ session().branch }}</span>
+    @if (gitBranch(); as branch) {
+      <span>{{ branch }}</span>
+    }
   </footer>
 </section>

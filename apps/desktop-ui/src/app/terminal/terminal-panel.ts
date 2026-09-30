@@ -195,6 +195,8 @@ export class TerminalPanelComponent implements AfterViewInit {
   private touchPoint = { x: 0, y: 0 };
 
   readonly session = input.required<TerminalSession>();
+  /** The active terminal's current Git branch, supplied by the repository overview. */
+  readonly gitBranch = input('');
   /** Needed when reconnecting, to rebuild the workspace's proxy settings. */
   readonly workspaceId = input('');
   readonly active = input(false);

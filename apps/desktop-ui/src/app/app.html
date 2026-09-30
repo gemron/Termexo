@@ -572,6 +572,11 @@
             [workspace]="workspace"
             [layout]="renderedLayout(workspace.layout)"
             [activeTerminalId]="workspace.id === activeWorkspace.id ? activeTerminalId() : null"
+            [activeGitBranch]="
+              workspace.id === activeWorkspace.id && git.overview()?.available
+                ? (git.overview()?.branch ?? '')
+                : ''
+            "
             [visibleTerminalIds]="workspace.id === activeWorkspace.id ? visibleTerminalIds() : []"
             [terminalMaximized]="workspace.id === activeWorkspace.id && terminalMaximized()"
             [layoutRevision]="layoutRevision()"

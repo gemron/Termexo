@@ -2,6 +2,12 @@
 
 Release notes for every Termexo version, newest first. The current release is summarised in [README.md](README.md).
 
+## V0.10.9
+
+- **Workspace agent states fit in a compact row.** Agent icons keep terminal order and state colors without repeated labels. Hovering an icon shows its terminal's current name, including renames.
+- **Completed work can be acknowledged in its terminal.** A completed agent shows a Confirm completion button. Confirming clears its notice and returns a live terminal to idle, or marks an exited terminal stopped.
+- **Terminal branch names come from Git.** The selected terminal shows the branch reported for its launch directory by the repository overview. Until Git confirms a branch, and for other visible terminals, the footer leaves the branch blank instead of showing a saved guess.
+
 ## V0.10.8
 
 - **Agent status matches its real work.** Claude Code, Codex, OpenCode, Grok Build, and Antigravity status flows were checked against their installed CLIs and saved events. OpenCode 2 now loads the correct plugin API and reports execution, input requests, failures, and completion; Grok Build now reports lifecycle events through its hooks. Startup and delayed idle reports no longer overwrite newer states.

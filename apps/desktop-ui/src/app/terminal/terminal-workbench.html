@@ -12,6 +12,7 @@
         [class.workbench-hidden]="!isVisible(terminal.id)"
         [attr.aria-hidden]="!isVisible(terminal.id)"
         [session]="terminal"
+        [gitBranch]="terminal.id === activeTerminalId() ? activeGitBranch() : ''"
         [workspaceId]="workspaceId()"
         [active]="terminal.id === activeTerminalId()"
         [visible]="isVisible(terminal.id)"

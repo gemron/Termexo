@@ -27,6 +27,7 @@ export class TerminalWorkbenchComponent {
   readonly workspace = input<Pick<Workspace, 'name' | 'projectPath'> | null>(null);
   readonly layout = input.required<LayoutMode>();
   readonly activeTerminalId = input<string | null>(null);
+  readonly activeGitBranch = input('');
   readonly visibleTerminalIds = input<string[]>([]);
   readonly terminalMaximized = input(false);
   readonly layoutRevision = input(0);
