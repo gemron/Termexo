@@ -2,7 +2,6 @@ import { Component, computed, input, output, signal } from '@angular/core';
 
 import {
   AGENT_ICONS,
-  AGENT_LABELS,
   normalizeWorkspaceThemeColor,
   TERMINAL_STATUS_META,
   TerminalSession,
@@ -19,7 +18,6 @@ import { IconComponent } from '../shared/icon/icon';
 })
 export class WorkspaceSidebarComponent {
   protected readonly agentIcons = AGENT_ICONS;
-  protected readonly agentLabels = AGENT_LABELS;
   protected readonly statusMeta = TERMINAL_STATUS_META;
   readonly workspaces = input.required<Workspace[]>();
   readonly activeWorkspaceId = input<string | null>(null);

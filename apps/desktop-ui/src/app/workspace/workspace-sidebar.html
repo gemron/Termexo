@@ -69,14 +69,18 @@
               @if (agents.length) {
                 <span class="workspace-agent-statuses">
                   @for (terminal of agents; track terminal.id) {
-                    <span class="workspace-agent-status" [attr.data-status]="terminal.status">
-                      <app-icon [name]="agentIcons[terminal.agentType]" [size]="12" />
-                      <span class="agent-label">{{ agentLabels[terminal.agentType] }}</span>
-                      <span class="status-label">{{
-                        statusMeta[terminal.status].labelKey | t
-                      }}</span>
+                    <span
+                      class="workspace-agent-status"
+                      [attr.data-status]="terminal.status"
+                      [title]="terminal.name"
+                      role="img"
+                      [attr.aria-label]="
+                        terminal.name + ': ' + (statusMeta[terminal.status].labelKey | t)
+                      "
+                    >
+                      <app-icon [name]="agentIcons[terminal.agentType]" [size]="15" />
                       @if (terminal.status === 'COMPLETED') {
-                        <app-icon class="status-check" name="check" [size]="11" />
+                        <app-icon class="status-check" name="check" [size]="9" />
                       }
                     </span>
                   }

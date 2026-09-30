@@ -88,7 +88,8 @@ describe('WorkspaceSidebarComponent', () => {
 
     const status = root.querySelector<HTMLElement>('.workspace-agent-status')!;
     expect(status.getAttribute('data-status')).toBe('RUNNING');
-    expect(status.textContent).toContain('Claude Code');
+    expect(status.getAttribute('title')).toBe('Claude');
+    expect(status.querySelector('.agent-label, .status-label')).toBeNull();
     expect(root.querySelector('.workspace-copy small')).toBeNull();
 
     fixture.componentRef.setInput('workspaces', [
@@ -108,5 +109,48 @@ describe('WorkspaceSidebarComponent', () => {
     expect(status.getAttribute('data-status')).toBe('COMPLETED');
     expect(status.querySelector('.status-check')).not.toBeNull();
     expect(status.querySelector('.status-dot')).toBeNull();
+  });
+
+  it('keeps agent icons in window order and updates a renamed window tooltip', () => {
+    const claude: Workspace['terminals'][number] = {
+      id: 'claude-1',
+      name: 'First window',
+      workingDirectory: 'D:\\dev\\second',
+      shell: 'powershell.exe',
+      agentType: 'claude',
+      status: 'IDLE',
+      model: 'Claude Sonnet',
+      branch: 'main',
+    };
+    const shell = { ...claude, id: 'shell-1', name: 'Shell window', agentType: 'shell' as const };
+    const codex = {
+      ...claude,
+      id: 'codex-1',
+      name: 'Second window',
+      agentType: 'codex' as const,
+      status: 'THINKING' as const,
+    };
+    const workspace = { ...workspaces[1], terminals: [claude, shell, codex] };
+    fixture.componentRef.setInput('workspaces', [workspaces[0], workspace, workspaces[2]]);
+    fixture.detectChanges();
+
+    const indicators = root.querySelectorAll<HTMLElement>('.workspace-agent-status');
+    expect(Array.from(indicators, (indicator) => indicator.title)).toEqual([
+      'First window',
+      'Second window',
+    ]);
+    expect(Array.from(indicators, (indicator) => indicator.dataset['status'])).toEqual([
+      'IDLE',
+      'THINKING',
+    ]);
+
+    fixture.componentRef.setInput('workspaces', [
+      workspaces[0],
+      { ...workspace, terminals: [claude, shell, { ...codex, name: 'Renamed window' }] },
+      workspaces[2],
+    ]);
+    fixture.detectChanges();
+    expect(indicators[1].title).toBe('Renamed window');
+    expect(indicators[1].getAttribute('aria-label')).toContain('Renamed window');
   });
 });

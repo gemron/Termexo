@@ -205,33 +205,30 @@ nav {
 .workspace-agent-statuses {
   display: flex;
   flex-wrap: wrap;
-  gap: 3px;
+  gap: 4px;
   margin-top: 4px;
 }
 
 .workspace-agent-status {
+  position: relative;
   display: inline-flex;
-  max-width: 100%;
-  min-width: 0;
+  width: 18px;
+  height: 18px;
+  flex: 0 0 18px;
   align-items: center;
-  gap: 4px;
+  justify-content: center;
   color: var(--text-muted);
-  font-size: 10px;
 
   app-icon {
     flex: 0 0 auto;
   }
 
-  .agent-label {
-    min-width: 0;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
-
-  .status-label {
-    flex: 0 0 auto;
-    white-space: nowrap;
+  .status-check {
+    position: absolute;
+    right: -3px;
+    bottom: -2px;
+    border-radius: 50%;
+    background: var(--sidebar);
   }
 
   &:is([data-status='RUNNING'], [data-status='THINKING']) {
