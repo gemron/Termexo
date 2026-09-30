@@ -105,6 +105,11 @@ header {
   background: var(--surface-raised);
 }
 
+.completion-confirm {
+  flex: 0 0 auto;
+  color: var(--color-success);
+}
+
 .terminal-identity,
 .terminal-meta {
   display: flex;

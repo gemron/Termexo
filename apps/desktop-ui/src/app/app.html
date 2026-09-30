@@ -587,6 +587,7 @@
             (launchRequested)="launchAgent($event)"
             (installRequested)="installAgent($event)"
             (terminalStatusChanged)="handleTerminalStatus($event)"
+            (terminalCompletionConfirmed)="confirmTerminalCompletion($event)"
             (terminalRenamed)="state.renameTerminal($event.terminalId, $event.name)"
             (linkOpenFailed)="reportFailure($event)"
             (terminalModelSwitchRequested)="openSingleModelSwitch($event)"

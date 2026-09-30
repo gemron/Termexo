@@ -43,6 +43,15 @@
       <span class="status-label" aria-live="polite" [attr.data-status]="session().status">
         {{ statusLabel(session().status) }}
       </span>
+      @if (session().status === 'COMPLETED') {
+        <button
+          type="button"
+          class="completion-confirm btn btn-xs"
+          (click)="$event.stopPropagation(); completionConfirmed.emit(session().id)"
+        >
+          {{ 'terminal.confirmCompleted' | t }}
+        </button>
+      }
     </div>
     <div class="terminal-meta">
       @if (session().autoConfirm) {

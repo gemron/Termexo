@@ -210,6 +210,7 @@ export class TerminalPanelComponent implements AfterViewInit {
   readonly closeRequested = output<string>();
   readonly maximizeRequested = output<string>();
   readonly statusChanged = output<{ terminalId: string; status: TerminalStatus }>();
+  readonly completionConfirmed = output<string>();
   readonly renameRequested = output<{ terminalId: string; name: string }>();
   readonly modelSwitchRequested = output<string>();
   readonly accountSwitchRequested = output<string>();

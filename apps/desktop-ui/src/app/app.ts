@@ -2432,6 +2432,13 @@ export class App {
     );
   }
 
+  protected confirmTerminalCompletion(terminalId: string): void {
+    const notice = this.globalTerminalNotices().find(
+      (item) => item.terminalId === terminalId && item.status === 'COMPLETED',
+    );
+    if (notice) this.clearTerminalNotice(notice);
+  }
+
   /** Clears every notice at once, for a batch that has already been dealt with. */
   protected clearAllTerminalNotices(): void {
     for (const notice of this.globalTerminalNotices()) {
