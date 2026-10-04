@@ -141,6 +141,11 @@ export class WorkspaceRepository {
     }
   }
 
+  /** Lets automation acknowledge a workspace mutation only after its queued write finishes. */
+  async flush(): Promise<void> {
+    await this.mutationQueue;
+  }
+
   private async saveNow(workspace: Workspace): Promise<void> {
     if (hasBackend()) {
       await invoke('save_workspace', { workspace, originId: runtimeClientId() });

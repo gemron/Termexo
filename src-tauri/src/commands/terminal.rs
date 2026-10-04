@@ -1,5 +1,5 @@
 use serde::{Deserialize, Serialize};
-use tauri::{AppHandle, State};
+use tauri::{AppHandle, Manager, State};
 
 use crate::agent::OpenCodeAdapter;
 use crate::commands::agent::{relaunch_environment, RelaunchRequest};
@@ -128,6 +128,8 @@ pub fn create_terminal(
             .ensure_private_server(&mut request.command)
             .map_err(|error| error.to_string())?;
     }
+    app.state::<std::sync::Arc<crate::mcp::McpManager>>()
+        .prepare_agent_launch(&mut request, &mut environment)?;
     if let Err(error) = repositories.capture_baseline(
         request.workspace_id.as_deref(),
         &request.terminal_id,

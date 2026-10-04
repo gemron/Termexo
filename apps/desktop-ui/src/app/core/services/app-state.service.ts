@@ -510,7 +510,14 @@ export class AppStateService {
   }
 
   closeTerminal(terminalId: string): void {
-    const workspace = this.activeWorkspace();
+    this.removeTerminal(terminalId);
+  }
+
+  /** Closes a terminal by ID, including a background workspace reached through MCP. */
+  removeTerminal(terminalId: string): void {
+    const workspace = this.workspaceItems().find((item) =>
+      item.terminals.some((terminal) => terminal.id === terminalId),
+    );
     if (!workspace) {
       return;
     }
@@ -520,7 +527,7 @@ export class AppStateService {
     const updatedWorkspace = { ...workspace, terminals: updatedTerminals };
     this.replaceWorkspace(updatedWorkspace);
 
-    if (this.activeTerminalId() === terminalId) {
+    if (this.activeWorkspaceId() === workspace.id && this.activeTerminalId() === terminalId) {
       // Falls through to the neighbour — the tab that slid into the closed one's place, or the
       // one before it at the end of the strip — rather than jumping back to the first tab.
       const neighbour = updatedTerminals[Math.min(closedIndex, updatedTerminals.length - 1)];

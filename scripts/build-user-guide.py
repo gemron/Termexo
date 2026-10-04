@@ -6,6 +6,7 @@ Override fonts with --font / --bold-font when building on another platform.
 """
 
 import argparse
+import json
 from dataclasses import dataclass, field
 from html import escape
 from html.parser import HTMLParser
@@ -22,6 +23,7 @@ from reportlab.platypus import Image, PageBreak, Paragraph, SimpleDocTemplate
 
 ROOT = Path(__file__).resolve().parents[1]
 SITE = ROOT / "website"
+VERSION = json.loads((ROOT / "package.json").read_text(encoding="utf-8"))["version"]
 VOID = {"area", "base", "br", "col", "embed", "hr", "img", "input", "link", "meta", "param", "source", "track", "wbr"}
 
 
@@ -164,14 +166,14 @@ def build(output, regular_font, bold_font, language="zh"):
         canvas.line(46, 40, A4[0] - 46, 40)
         canvas.setFont("Guide", 8)
         canvas.setFillColor(colors.HexColor("#52685d"))
-        canvas.drawString(46, 26, f"{title} | V0.10.4")
+        canvas.drawString(46, 26, f"{title} | V{VERSION}")
         canvas.drawRightString(A4[0] - 46, 26, f"www.termexo.com  /  {doc.page}")
         canvas.restoreState()
 
     output.parent.mkdir(parents=True, exist_ok=True)
     document = GuideDocument(str(output), pagesize=A4, rightMargin=46, leftMargin=46,
-                             topMargin=38, bottomMargin=58, title=f"{title} V0.10.4",
-                             author="Termexo", subject="Setup, Agent sessions, model profiles and remote access" if english else "安装、Agent 会话、模型配置与远程访问")
+                             topMargin=38, bottomMargin=58, title=f"{title} V{VERSION}",
+                             author="Termexo", subject="Setup, Agent sessions, model profiles, MCP and remote access" if english else "安装、Agent 会话、模型配置、MCP 与远程访问")
     document.build(story, onFirstPage=page_chrome, onLaterPages=page_chrome)
     print(f"Built {output} ({output.stat().st_size:,} bytes)")
 

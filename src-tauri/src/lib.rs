@@ -7,6 +7,7 @@ mod database;
 mod fonts;
 mod git;
 mod hooks;
+mod mcp;
 mod network;
 mod notification;
 mod process;
@@ -52,6 +53,10 @@ pub fn capture_codex_hook_event_from_cli() -> Result<(), String> {
 
 pub fn capture_grok_hook_event_from_cli() -> Result<(), String> {
     hooks::capture_grok_hook_event_from_cli().map_err(|error| error.to_string())
+}
+
+pub fn run_mcp_proxy_from_cli() -> Result<(), String> {
+    mcp::run_proxy_from_cli()
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -140,9 +145,16 @@ pub fn run() {
             let remote = RemoteAccessManager::new(app.handle().clone(), events);
             app.manage(remote.clone());
             tauri::async_runtime::spawn(async move { remote.start_if_enabled().await });
+            let mcp = mcp::McpManager::new(app.handle().clone())?;
+            app.manage(mcp.clone());
+            tauri::async_runtime::spawn(async move { mcp.start_if_enabled().await });
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
+            commands::mcp::get_mcp_server_status,
+            commands::mcp::update_mcp_server_settings,
+            commands::mcp::regenerate_mcp_server_token,
+            commands::mcp::complete_mcp_tool,
             commands::agent::detect_claude,
             commands::agent::detect_codex,
             commands::agent::detect_opencode,

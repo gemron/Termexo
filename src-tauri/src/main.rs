@@ -2,6 +2,13 @@
 
 fn main() {
     match std::env::args().nth(1).as_deref() {
+        Some("mcp-proxy") => {
+            if let Err(error) = termexo_lib::run_mcp_proxy_from_cli() {
+                eprintln!("{error}");
+                std::process::exit(1);
+            }
+            return;
+        }
         Some("hook-event") => {
             if let Err(error) = termexo_lib::capture_hook_event_from_cli() {
                 eprintln!("{error}");

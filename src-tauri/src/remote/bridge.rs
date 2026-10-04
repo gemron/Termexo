@@ -134,6 +134,11 @@ pub const REMOTE_ALLOWED: &[&str] = &[
 
 /// Commands a remote client must never reach, with the reason each one is held back.
 pub const REMOTE_DENIED: &[&str] = &[
+    // MCP grants access to the desktop independently of a remote workbench session.
+    "get_mcp_server_status",
+    "update_mcp_server_settings",
+    "regenerate_mcp_server_token",
+    "complete_mcp_tool",
     // The path belongs to the desktop machine; remote users download their JSON in the browser.
     "write_todo_export",
     // Writes the status feed into the desktop machine's own Antigravity settings, which is a

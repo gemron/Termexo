@@ -11,7 +11,7 @@
 </p>
 
 <p align="center">
-  <img alt="Version 0.10.9" src="https://img.shields.io/badge/version-0.10.9-58c7a0">
+  <img alt="Version 0.10.10" src="https://img.shields.io/badge/version-0.10.10-58c7a0">
   <img alt="Windows" src="https://img.shields.io/badge/platform-Windows-0078D4?logo=windows">
   <img alt="Tauri 2" src="https://img.shields.io/badge/Tauri-2-24C8DB?logo=tauri&logoColor=white">
   <img alt="Angular 22" src="https://img.shields.io/badge/Angular-22-DD0031?logo=angular">
@@ -102,7 +102,7 @@ npx termexo@latest
 
 ## 最新版本
 
-**[v0.10.9](https://github.com/gemron/Termexo/releases/tag/v0.10.9)** 让工作区 Agent 状态更紧凑，可在终端中确认完成，并以 Git 实际信息显示当前终端的分支。
+**[v0.10.10](https://github.com/gemron/Termexo/releases/tag/v0.10.10)** 新增本地 MCP 服务，让 AI 按授权范围操控终端、任务和设置；启用后自动接入 Termexo 启动的五种 Agent。[开始使用 MCP](https://www.termexo.com/guide.html#ai-control)。
 [完整更新记录](CHANGELOG.cn.md)。
 
 如果 Termexo 帮到了你，欢迎 **给仓库点一个 Star**，帮助更多开发者发现它。
@@ -371,7 +371,8 @@ flowchart LR
 | V0.10.6 | OpenCode v2 代理稳定生效与 CLI 安装更新 | 已发布 |
 | V0.10.7 | 首次使用引导、CLI 状态与可靠的项目创建 | 已发布 |
 | V0.10.8 | Agent 状态修正与工作区状态提示 | 已发布 |
-| V0.10.9 | 紧凑状态图标、完成确认与准确的分支显示 | 当前版本 |
+| V0.10.9 | 紧凑状态图标、完成确认与准确的分支显示 | 已发布 |
+| V0.10.10 | 本地 MCP 操控与五种 Agent 自动接入 | 当前版本 |
 | V1.0 | 稳定性、安全加固与恢复体验 | 规划中 |
 
 进行中的工作见 [Issues](https://github.com/gemron/Termexo/issues)，实际交付内容见
@@ -389,6 +390,8 @@ Termexo/
 ```
 
 ## 开发与验证
+
+从 v0.10.10 起，在「设置 → AI 操控（MCP）」开启本地服务后，新启动的 Claude Code、Codex、OpenCode、Grok Build 和 Antigravity 默认自动连接。终端、任务和设置权限分别控制，已运行的 Agent 需重新启动。启用方式、外部客户端配置及 19 个工具见 [MCP 接入说明](./docs/mcp-server.md)，中英文在线说明及 PDF 见 [使用指南](https://www.termexo.com/guide.html#ai-control)。
 
 ```powershell
 npm run build

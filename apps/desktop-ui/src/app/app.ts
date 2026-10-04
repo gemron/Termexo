@@ -5,6 +5,7 @@ import {
   effect,
   HostListener,
   inject,
+  Injector,
   signal,
   untracked,
 } from '@angular/core';
@@ -148,6 +149,7 @@ import {
   DEFAULT_TERMINAL_FONT_NAME,
   isTerminalFontAvailable,
   normalizeTerminalFontName,
+  TERMINAL_FONT_NAME_STORAGE_KEY,
 } from './terminal/terminal-font';
 import { TerminalInputStatusTracker } from './terminal/terminal-input-status';
 import { AGENT_INTERRUPT_SEQUENCE, workbenchShortcut } from './terminal/terminal-key-sequences';
@@ -216,7 +218,6 @@ const QUOTA_RECENT_ACTIVITY_WINDOW_MS = 90_000;
  */
 const ACCOUNT_LOGIN_POLL_INTERVAL_MS = 4_000;
 const ACCOUNT_LOGIN_POLL_TIMEOUT_MS = 300_000;
-const TERMINAL_FONT_NAME_STORAGE_KEY = 'termexo.terminalFontName';
 /** The global notice button's summary, one count per kind of notice in this order. */
 const GLOBAL_NOTICE_SUMMARY_KEYS: ReadonlyArray<{ category: GlobalNoticeCategory; key: string }> = [
   { category: 'waiting', key: 'notice.waitingCount' },
@@ -306,6 +307,7 @@ function readStoredString(key: string, fallback: string): string {
   },
 })
 export class App {
+  private readonly injector = inject(Injector);
   protected readonly state = inject(AppStateService);
   protected readonly agents = inject(AgentService);
   protected readonly i18n = inject(I18nService);
@@ -1394,6 +1396,11 @@ export class App {
   }
 
   protected closeTerminal(terminalId: string): void {
+    void this.terminalGateway.close(terminalId).catch(() => undefined);
+    this.removeClosedTerminal(terminalId);
+  }
+
+  private removeClosedTerminal(terminalId: string): void {
     const workspace = this.state.activeWorkspace();
     if (
       this.terminalMaximized() &&
@@ -1404,8 +1411,7 @@ export class App {
     }
     this.agentStartup.cancel(terminalId);
     this.todos.handleTerminalStatus(terminalId, 'STOPPED');
-    void this.terminalGateway.close(terminalId).catch(() => undefined);
-    this.state.closeTerminal(terminalId);
+    this.state.removeTerminal(terminalId);
   }
 
   /**
@@ -1554,14 +1560,19 @@ export class App {
    * interrupt.
    */
   protected stopTodoTask(taskId: string): void {
+    void this.interruptTodoTask(taskId).catch((error: unknown) =>
+      this.showToast(this.errorMessage(error), 'attention'),
+    );
+  }
+
+  private async interruptTodoTask(taskId: string): Promise<void> {
     const task = this.todos.task(taskId);
     const terminalId = task?.terminalId;
     if (!this.todos.stopExecution(taskId) || !task) return;
     if (terminalId) {
       this.agentStartup.cancel(terminalId);
-      void this.writeToTerminal(terminalId, AGENT_INTERRUPT_SEQUENCE)
-        .then(() => this.recordInterruptStatus(terminalId))
-        .catch(() => undefined);
+      await this.writeToTerminal(terminalId, AGENT_INTERRUPT_SEQUENCE);
+      this.recordInterruptStatus(terminalId);
     }
     this.showToast(this.i18n.t('taskFlow.toast.stopped', { title: task.title }));
   }
@@ -3745,6 +3756,30 @@ export class App {
       this.showToast(this.i18n.t('prompt.recovered'));
     }
     void this.notifyWhenUpdateAvailable();
+    if (runtimeMode() === 'desktop') {
+      const { McpDesktopService, mcpPreferenceActions } = await import(
+        './core/services/mcp-desktop.service'
+      );
+      await this.injector.get(McpDesktopService).start({
+        terminalCreated: (workspaceId, terminalId) => {
+          this.selectWorkspace(workspaceId);
+          this.revealCreatedTerminal(terminalId);
+        },
+        terminalClosed: (terminalId) => this.removeClosedTerminal(terminalId),
+        selectTaskWorkspace: (workspaceId) => this.selectWorkspace(workspaceId),
+        taskLaunchBusy: () => !!this.busyTodoTaskId(),
+        executeTask: (taskId) => this.executeTodoTask(taskId),
+        resumeTask: (taskId) => this.resumeTodoTask(taskId),
+        stopTask: (taskId) => this.interruptTodoTask(taskId),
+        ...mcpPreferenceActions({
+          i18n: this.i18n,
+          terminalFontSize: this.terminalFontSize,
+          terminalFontName: this.terminalFontName,
+          inspectorOpen: this.inspectorOpen,
+          workspaceSidebarOpen: this.workspaceSidebarOpen,
+        }),
+      });
+    }
   }
 
   /**

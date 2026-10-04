@@ -668,6 +668,9 @@ impl PtyManager {
         for (key, value) in environment {
             command.env(key, value);
         }
+        // The xterm viewer supplies a real terminal even when Termexo was launched by a
+        // non-interactive host advertising TERM=dumb (for example an MCP client).
+        command.env("TERM", "xterm-256color");
         let initial_command = request.command.as_deref().filter(|value| !value.is_empty());
         let command_started_without_echo = configure_shell(
             &mut command,

@@ -15,7 +15,7 @@ from pypdf import PdfReader
 ROOT = Path(__file__).resolve().parents[1]
 # The page count each guide is expected to come to. Pinned rather than bounded so that a layout
 # that silently reflows is caught; update it deliberately when the guide's content changes.
-EXPECTED_PAGES = {"zh": 7, "en": 8}
+EXPECTED_PAGES = {"zh": 8, "en": 9}
 builder = runpy.run_path(str(ROOT / "scripts" / "build-user-guide.py"))
 Element, GuideParser = builder["Element"], builder["GuideParser"]
 
@@ -62,7 +62,7 @@ def verify(render_dir, language="zh"):
     expected = list(blocks(article))
     for index, block in enumerate(expected):
         assert normalize(block) in text, f"HTML block {index} is missing or corrupted in PDF"
-    assert len(reader.outline) == 8, "Each chapter needs a PDF bookmark"
+    assert len(reader.outline) == 9, "Each chapter needs a PDF bookmark"
     document = pymupdf.open(ROOT / "website" / "downloads" / filename)
     assert len(document) == EXPECTED_PAGES[language], (
         "Check unexpected pagination before publishing"
@@ -82,7 +82,7 @@ def verify(render_dir, language="zh"):
                     assert x0 >= 25 and y0 >= 20 and x1 <= page.rect.width - 25 and y1 <= page.rect.height - 15, f"Text outside page margins on page {index}"
         if render_dir:
             page.get_pixmap(matrix=pymupdf.Matrix(1.3, 1.3)).save(str(render_dir / f"page-{index:02d}.png"))
-    print(f"Verified {len(expected)} HTML text blocks, 8 bookmarks, {len(document)} PDF pages and page margins.")
+    print(f"Verified {len(expected)} HTML text blocks, 9 bookmarks, {len(document)} PDF pages and page margins.")
 
 
 if __name__ == "__main__":

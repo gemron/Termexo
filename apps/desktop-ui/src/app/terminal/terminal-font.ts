@@ -1,4 +1,5 @@
 export const DEFAULT_TERMINAL_FONT_NAME = 'Consolas';
+export const TERMINAL_FONT_NAME_STORAGE_KEY = 'termexo.terminalFontName';
 export const MAX_TERMINAL_FONT_NAME_LENGTH = 100;
 
 export const TERMINAL_FONT_PRESETS = [

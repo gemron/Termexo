@@ -46,10 +46,14 @@ import { IconComponent } from '../shared/icon/icon';
 import { RemoteAccessPanelComponent } from './remote-access-panel';
 import { AntigravityStatusToggleComponent } from './antigravity-status-toggle';
 import { StoragePanelComponent } from './storage-panel';
+import { McpServerPanelComponent } from './mcp-server-panel';
+import { registerMcpServerTranslations } from '../core/i18n/mcp-server.i18n';
 import { AGENT_ICONS } from '../core/models/workspace.models';
 
 export type SettingsTab =
-  'diagnostics' | 'cli' | 'accounts' | 'models' | 'mcp' | 'network' | 'remote' | 'storage';
+  'diagnostics' | 'cli' | 'accounts' | 'models' | 'mcp' | 'mcp-server' | 'network' | 'remote' | 'storage';
+
+registerMcpServerTranslations();
 
 interface ModelEditorDraft {
   modelName: string;
@@ -81,6 +85,7 @@ const DEFAULT_ALERT_THRESHOLD = 80;
     AntigravityStatusToggleComponent,
     RemoteAccessPanelComponent,
     StoragePanelComponent,
+    McpServerPanelComponent,
     TranslatePipe,
   ],
   template: `
@@ -1391,6 +1396,13 @@ const DEFAULT_ALERT_THRESHOLD = 80;
                 <section class="profile-editor"></section>
               }
             }
+            @case ('mcp-server') {
+              @defer (on immediate) {
+                <app-mcp-server-panel />
+              } @placeholder {
+                <section class="profile-editor"></section>
+              }
+            }
             @case ('remote') {
               @defer (on immediate) {
                 <app-remote-access-panel />
@@ -1496,7 +1508,10 @@ export class AgentSettingsDialogComponent {
     },
     {
       section: 'settings.sectionApp',
-      tabs: [{ id: 'storage', label: 'settings.tabStorage' }],
+      tabs: [
+        { id: 'mcp-server', label: 'mcpServer.tab' },
+        { id: 'storage', label: 'settings.tabStorage' },
+      ],
     },
   ];
   private readonly modelDrafts = new ProfileDrafts<ModelEditorDraft>();

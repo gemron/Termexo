@@ -1,0 +1,621 @@
+[
+  {
+    "name": "workspace_list",
+    "group": "workspace",
+    "description": "List workspaces and their project paths and terminal IDs.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {},
+      "required": [],
+      "additionalProperties": false
+    },
+    "annotations": {
+      "readOnlyHint": true,
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": false
+    }
+  },
+  {
+    "name": "terminal_list",
+    "group": "terminal",
+    "description": "List terminal sessions with status, workspace, agent and process availability.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "workspaceId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        }
+      },
+      "required": [],
+      "additionalProperties": false
+    },
+    "annotations": {
+      "readOnlyHint": true,
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": false
+    }
+  },
+  {
+    "name": "terminal_create",
+    "group": "terminal",
+    "description": "Create a shell terminal in a workspace. Optional command runs in that shell. Use task_execute to launch configured agents.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "workspaceId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        },
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 120
+        },
+        "workingDirectory": {
+          "type": "string"
+        },
+        "command": {
+          "type": "string"
+        }
+      },
+      "required": ["workspaceId"],
+      "additionalProperties": false
+    },
+    "annotations": {
+      "readOnlyHint": false,
+      "destructiveHint": true,
+      "idempotentHint": false,
+      "openWorldHint": true
+    }
+  },
+  {
+    "name": "terminal_read",
+    "group": "terminal",
+    "description": "Read the terminal's current screen and scrollback as plain text or ANSI. This is a snapshot, not a command completion signal.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "terminalId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        },
+        "format": {
+          "type": "string",
+          "enum": ["text", "ansi"]
+        },
+        "maxChars": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 100000
+        }
+      },
+      "required": ["terminalId"],
+      "additionalProperties": false
+    },
+    "annotations": {
+      "readOnlyHint": true,
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": false
+    }
+  },
+  {
+    "name": "terminal_write",
+    "group": "terminal",
+    "description": "Send literal text or control keys to a terminal. Set submit=true to append carriage return. Success means input was written, not that the command finished.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "terminalId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        },
+        "data": {
+          "type": "string",
+          "maxLength": 65536
+        },
+        "submit": {
+          "type": "boolean"
+        }
+      },
+      "required": ["terminalId", "data"],
+      "additionalProperties": false
+    },
+    "annotations": {
+      "readOnlyHint": false,
+      "destructiveHint": true,
+      "idempotentHint": false,
+      "openWorldHint": true
+    }
+  },
+  {
+    "name": "terminal_close",
+    "group": "terminal",
+    "description": "Close a terminal and terminate its process, updating the workspace and bound task.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "terminalId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        }
+      },
+      "required": ["terminalId"],
+      "additionalProperties": false
+    },
+    "annotations": {
+      "readOnlyHint": false,
+      "destructiveHint": true,
+      "idempotentHint": false,
+      "openWorldHint": true
+    }
+  },
+  {
+    "name": "task_list",
+    "group": "task",
+    "description": "List projects and tasks in a workspace, including execution and prompt delivery states.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "workspaceId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        }
+      },
+      "required": ["workspaceId"],
+      "additionalProperties": false
+    },
+    "annotations": {
+      "readOnlyHint": true,
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": false
+    }
+  },
+  {
+    "name": "task_create",
+    "group": "task",
+    "description": "Create a task on the workspace board. Use task_list for project IDs and settings_get for model profile IDs.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "workspaceId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        },
+        "projectId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        },
+        "title": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 500
+        },
+        "description": {
+          "type": "string"
+        },
+        "acceptanceCriteria": {
+          "type": "string"
+        },
+        "priority": {
+          "type": "string",
+          "enum": ["low", "medium", "high"]
+        },
+        "agentType": {
+          "type": "string",
+          "enum": ["claude", "codex", "opencode", "grok"]
+        },
+        "profileId": {
+          "type": "string"
+        },
+        "modelName": {
+          "type": "string"
+        },
+        "workingDirectory": {
+          "type": "string"
+        },
+        "preferredTerminalId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        },
+        "recurring": {
+          "type": "boolean"
+        }
+      },
+      "required": ["workspaceId", "projectId", "title", "agentType"],
+      "additionalProperties": false
+    },
+    "annotations": {
+      "readOnlyHint": false,
+      "destructiveHint": true,
+      "idempotentHint": false,
+      "openWorldHint": true
+    }
+  },
+  {
+    "name": "task_update",
+    "group": "task",
+    "description": "Update draft fields of a task. Running tasks must be stopped before editing.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "taskId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        },
+        "projectId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        },
+        "title": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 500
+        },
+        "description": {
+          "type": "string"
+        },
+        "acceptanceCriteria": {
+          "type": "string"
+        },
+        "priority": {
+          "type": "string",
+          "enum": ["low", "medium", "high"]
+        },
+        "agentType": {
+          "type": "string",
+          "enum": ["claude", "codex", "opencode", "grok"]
+        },
+        "profileId": {
+          "type": "string"
+        },
+        "modelName": {
+          "type": "string"
+        },
+        "workingDirectory": {
+          "type": "string"
+        },
+        "preferredTerminalId": {
+          "type": "string"
+        },
+        "recurring": {
+          "type": "boolean"
+        }
+      },
+      "required": ["taskId"],
+      "additionalProperties": false
+    },
+    "annotations": {
+      "readOnlyHint": false,
+      "destructiveHint": true,
+      "idempotentHint": false,
+      "openWorldHint": true
+    }
+  },
+  {
+    "name": "task_delete",
+    "group": "task",
+    "description": "Delete a task. Stop an executing task first.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "taskId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        }
+      },
+      "required": ["taskId"],
+      "additionalProperties": false
+    },
+    "annotations": {
+      "readOnlyHint": false,
+      "destructiveHint": true,
+      "idempotentHint": false,
+      "openWorldHint": true
+    }
+  },
+  {
+    "name": "task_execute",
+    "group": "task",
+    "description": "Execute a pending or failed task using the desktop's agent launch and prompt delivery workflow. Returns starting state; poll task_list for completion.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "taskId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        }
+      },
+      "required": ["taskId"],
+      "additionalProperties": false
+    },
+    "annotations": {
+      "readOnlyHint": false,
+      "destructiveHint": true,
+      "idempotentHint": false,
+      "openWorldHint": true
+    }
+  },
+  {
+    "name": "task_stop",
+    "group": "task",
+    "description": "Interrupt a running task while preserving its terminal and session for resumption.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "taskId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        }
+      },
+      "required": ["taskId"],
+      "additionalProperties": false
+    },
+    "annotations": {
+      "readOnlyHint": false,
+      "destructiveHint": true,
+      "idempotentHint": false,
+      "openWorldHint": true
+    }
+  },
+  {
+    "name": "task_resume",
+    "group": "task",
+    "description": "Resume a stopped task in its existing session.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "taskId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        }
+      },
+      "required": ["taskId"],
+      "additionalProperties": false
+    },
+    "annotations": {
+      "readOnlyHint": false,
+      "destructiveHint": true,
+      "idempotentHint": false,
+      "openWorldHint": true
+    }
+  },
+  {
+    "name": "task_complete",
+    "group": "task",
+    "description": "Mark an executing task as completed when its work is finished.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "taskId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        }
+      },
+      "required": ["taskId"],
+      "additionalProperties": false
+    },
+    "annotations": {
+      "readOnlyHint": false,
+      "destructiveHint": true,
+      "idempotentHint": false,
+      "openWorldHint": true
+    }
+  },
+  {
+    "name": "task_verify",
+    "group": "task",
+    "description": "Accept a completed task and record the validation note.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "taskId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        },
+        "note": {
+          "type": "string"
+        }
+      },
+      "required": ["taskId"],
+      "additionalProperties": false
+    },
+    "annotations": {
+      "readOnlyHint": false,
+      "destructiveHint": true,
+      "idempotentHint": false,
+      "openWorldHint": true
+    }
+  },
+  {
+    "name": "settings_get",
+    "group": "settings",
+    "description": "Read language, terminal display preferences and available model/network profiles. Credentials and MCP access tokens are excluded.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {},
+      "required": [],
+      "additionalProperties": false
+    },
+    "annotations": {
+      "readOnlyHint": true,
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": false
+    }
+  },
+  {
+    "name": "settings_update",
+    "group": "settings",
+    "description": "Change desktop language or terminal display preferences immediately.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "language": {
+          "type": "string",
+          "enum": ["system", "zh-CN", "en", "es", "fr", "de", "ja", "ko"]
+        },
+        "terminalFontSize": {
+          "type": "integer",
+          "minimum": 9,
+          "maximum": 24
+        },
+        "terminalFontName": {
+          "type": "string"
+        },
+        "inspectorOpen": {
+          "type": "boolean"
+        },
+        "workspaceSidebarOpen": {
+          "type": "boolean"
+        }
+      },
+      "required": [],
+      "additionalProperties": false
+    },
+    "annotations": {
+      "readOnlyHint": false,
+      "destructiveHint": true,
+      "idempotentHint": false,
+      "openWorldHint": true
+    }
+  },
+  {
+    "name": "model_profile_update",
+    "group": "settings",
+    "description": "Update an existing model profile without reading or changing its stored API key. Running agents keep their current launch settings.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "profileId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        },
+        "name": {
+          "type": "string"
+        },
+        "isDefault": {
+          "type": "boolean"
+        },
+        "claudeEnabled": {
+          "type": "boolean"
+        },
+        "claudeModel": {
+          "type": "string"
+        },
+        "claudeBaseUrl": {
+          "type": "string"
+        },
+        "claudeContext1m": {
+          "type": "boolean"
+        },
+        "claudeEffort": {
+          "type": "string",
+          "enum": ["", "low", "medium", "high", "max"]
+        },
+        "codexEnabled": {
+          "type": "boolean"
+        },
+        "codexModel": {
+          "type": "string"
+        },
+        "codexBaseUrl": {
+          "type": "string"
+        },
+        "codexReasoningEffort": {
+          "type": "string",
+          "enum": ["", "minimal", "low", "medium", "high", "xhigh"]
+        }
+      },
+      "required": ["profileId"],
+      "additionalProperties": false
+    },
+    "annotations": {
+      "readOnlyHint": false,
+      "destructiveHint": true,
+      "idempotentHint": false,
+      "openWorldHint": true
+    }
+  },
+  {
+    "name": "network_profile_update",
+    "group": "settings",
+    "description": "Update an existing network profile while preserving stored proxy credentials. Running terminals keep their launch environment; changes apply to future launches.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "profileId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        },
+        "name": {
+          "type": "string"
+        },
+        "enabled": {
+          "type": "boolean"
+        },
+        "isDefault": {
+          "type": "boolean"
+        },
+        "httpProxy": {
+          "type": "string"
+        },
+        "httpsProxy": {
+          "type": "string"
+        },
+        "allProxy": {
+          "type": "string"
+        },
+        "noProxy": {
+          "type": "string"
+        },
+        "npmRegistry": {
+          "type": "string"
+        },
+        "npmProxy": {
+          "type": "string"
+        },
+        "npmHttpsProxy": {
+          "type": "string"
+        },
+        "npmStrictSsl": {
+          "type": "boolean"
+        },
+        "npmCaPath": {
+          "type": "string"
+        }
+      },
+      "required": ["profileId"],
+      "additionalProperties": false
+    },
+    "annotations": {
+      "readOnlyHint": false,
+      "destructiveHint": true,
+      "idempotentHint": false,
+      "openWorldHint": false
+    }
+  }
+]

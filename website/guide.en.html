@@ -33,7 +33,7 @@
         </a>
         <nav aria-label="Guide navigation">
           <a href="./">Home</a>
-          <a class="guide-download" href="downloads/termexo-user-guide-en.pdf" download="Termexo-User-Guide-v0.10.4-en.pdf">Download PDF</a>
+          <a class="guide-download" href="downloads/termexo-user-guide-en.pdf" download="Termexo-User-Guide-v0.10.10-en.pdf">Download PDF</a>
         </nav>
         <div class="language-switch" role="group" aria-label="Guide language">
           <a href="guide.en.html" data-lang="en" lang="en" hreflang="en" aria-label="Read in English" aria-current="page" class="active">EN</a>
@@ -51,20 +51,21 @@
           <a href="#sessions">03　Resume sessions</a>
           <a href="#profiles">04　Accounts, models &amp; network</a>
           <a href="#tasks">05　Tasks, Git &amp; handoffs</a>
-          <a href="#remote">06　Mobile &amp; remote access</a>
-          <a href="#faq">07　FAQ</a>
-          <a href="#privacy">08　Data &amp; security</a>
+          <a href="#ai-control">06　AI control (MCP)</a>
+          <a href="#remote">07　Mobile &amp; remote access</a>
+          <a href="#faq">08　FAQ</a>
+          <a href="#privacy">09　Data &amp; security</a>
         </nav>
-        <p class="guide-sidebar-note">Windows desktop edition<br />V0.10.4 · English</p>
+        <p class="guide-sidebar-note">Windows desktop edition<br />V0.10.10 · English</p>
       </aside>
       <article id="guide-content" class="guide-content" lang="en">
         <header class="guide-intro">
           <p class="guide-label">TERMEXO / USER GUIDE</p>
           <h1>User guide</h1>
           <p class="guide-lead">Start with your first workspace. Keep your terminals, Agents and project progress together.</p>
-          <p class="guide-meta">For V0.10.4 · Updated 2026-09-20 · Windows 10/11 x64</p>
+          <p class="guide-meta">For V0.10.10 · Updated 2026-10-04 · Windows 10/11 x64</p>
           <div class="guide-actions" data-pdf-skip>
-            <a class="button primary" href="downloads/termexo-user-guide-en.pdf" download="Termexo-User-Guide-v0.10.4-en.pdf">Download English guide · PDF</a>
+            <a class="button primary" href="downloads/termexo-user-guide-en.pdf" download="Termexo-User-Guide-v0.10.10-en.pdf">Download English guide · PDF</a>
             <a class="button secondary" href="#quick-start">Start reading ↓</a>
           </div>
           <p class="guide-note" data-pdf-skip>The English PDF matches this page and works offline. Labels and button locations may vary by app language or version. The workbench screenshot shows the Chinese interface.</p>
@@ -115,6 +116,7 @@
             <li><strong>Completed / failed / stopped:</strong> inspect terminal output and file changes before accepting, troubleshooting or restarting. A status badge does not prove the code passed validation.</li>
           </ul>
           <p class="guide-callout">Automatic confirmation reduces approval prompts and expands what an Agent may execute without asking each time. Keep manual confirmation for unfamiliar or sensitive projects. An AUTO badge is not a security review.</p>
+          <p>Workspace Agent icons follow terminal order and use state colors; hover to see the latest window name. When an Agent finishes, Confirm completion clears its notice; it does not replace task verification. Git confirms the selected terminal's branch; an unconfirmed branch or a non-Git folder stays blank.</p>
         </section>
 
         <section id="sessions" class="guide-section" data-pdf-page>
@@ -138,7 +140,7 @@
             <li>Check that the protocol matches the selected Agent. A compatible Claude Code backend must support the relevant Anthropic API. An arbitrary model URL is not necessarily usable.</li>
             <li>Save the profile, select it when starting or resuming a terminal, and send a short test request. Before switching an existing terminal, read the app's notice and make sure the current task can be interrupted.</li>
           </ol>
-          <p>API keys are stored in Windows Credential Manager. The allowance panel shows reported quota for supported profiles, and Antigravity's is read through its own <code>/usage</code>. Grok Build's usage card recognizes an exhausted free allowance; an unavailable percentage is shown as unavailable, not as 0% used. Values marked as estimates or unavailable are not official billing data.</p>
+          <p>API keys are stored in Windows Credential Manager. The allowance panel shows reported quota for supported profiles, with Antigravity queried directly through its HTTP Quota endpoint. Grok Build's usage card recognizes an exhausted free allowance; an unavailable percentage is shown as unavailable, not as 0% used. Values marked as estimates or unavailable are not official billing data.</p>
           <h3>Antigravity's models and status feed</h3>
           <p>Antigravity does not use Termexo's model profiles. Its model and reasoning effort are chosen in the new-terminal dialog, from what the agy on this machine offers.</p>
           <p>It also has no per-launch configuration of any kind, so for a terminal to know whether it is thinking, running a tool or waiting for an answer, Termexo writes into the status line in agy's own settings. This is on by default and can be turned off in Settings, which puts back whatever status line you had. Termexo only recognises the block it wrote itself and never touches one of your own.</p>
@@ -167,8 +169,33 @@
           <p>Automatic redaction cannot guarantee removal of every secret. Before sharing, manually check for API keys, access tokens, internal addresses, customer data and source-code access restrictions. A handoff is a context document, not a lossless conversion of a native session file.</p>
         </section>
 
+        <section id="ai-control" class="guide-section" data-pdf-page>
+          <h2>06 / AI control (MCP)</h2>
+          <p>From v0.10.10, Termexo provides a local MCP server so AI clients can operate the running workbench. It is managed separately from external MCP profiles for Agents and starts disabled.</p>
+          <h3>Enable the server and automatic connection</h3>
+          <ol>
+            <li>In desktop Settings → AI control (MCP), enable the local MCP server. Its default port is <code>7421</code>.</li>
+            <li>Choose access scopes. Terminals and tasks are allowed by default; enable settings access separately if needed. Click Apply and confirm the server is Running.</li>
+            <li>Keep Automatically connect Agents launched by Termexo selected, then launch a terminal, restart a saved session or execute a task. Claude Code, Codex, OpenCode, Grok Build and Antigravity are supported.</li>
+            <li>Restart already running Agents. Keep the Termexo desktop window open during use; a Claude attach session needs its original process restarted.</li>
+          </ol>
+          <p>The automatic server is named <code>termexo-desktop</code>, preserving existing MCP profiles. Its command contains no token; the bridge reads the current port and system credential on every request.</p>
+          <h3>Make your first call</h3>
+          <p>Ask the newly launched Agent: “Call termexo-desktop's workspace_list to list workspaces; do not change anything yet.” Check for an actual tool call and result in the terminal before requesting changes.</p>
+          <ul>
+            <li><strong>Terminals:</strong> list, create, read output, send text or control keys, and close.</li>
+            <li><strong>Tasks:</strong> list, create, edit, execute, stop, resume, complete and verify. Task execution supports Claude Code, Codex, OpenCode and Grok Build.</li>
+            <li><strong>Settings:</strong> read configuration without credentials, change language and terminal preferences, and update existing model and network profiles. Requires settings access.</li>
+          </ul>
+          <p>A successful input call means text reached the terminal; successful task execution means a terminal was launched and bound to the task. Query <code>terminal_read</code> or <code>task_list</code> for progress. If a prompt still needs submission, use <code>terminal_write</code> with <code>submit: true</code> to send Enter.</p>
+          <h3>External clients and permissions</h3>
+          <p>Clients launched outside Termexo can copy the panel's JSON or TOML configuration. They need Streamable HTTP, <code>http://127.0.0.1:7421/mcp</code> and a Bearer token. After regenerating the token, update manual client configuration.</p>
+          <p>Grok and Antigravity use user-level MCP configuration, so clients outside Termexo using it also see the entry. Disabling automatic connection or the server and applying removes Termexo-owned entries while retaining other configuration. Custom entries with the same name or invalid configuration produce an error.</p>
+          <p class="guide-callout">Local MCP accepts connections only from this PC; remote workbench access does not expose it. Server permissions and Agent tool approvals both apply. Change an occupied port and apply again. After a timeout, query state before retrying. See the <a href="https://github.com/gemron/Termexo/blob/main/docs/mcp-server.md">MCP connection guide</a> for all 19 tools and configuration examples.</p>
+        </section>
+
         <section id="remote" class="guide-section" data-pdf-page>
-          <h2>06 / Mobile and remote access</h2>
+          <h2>07 / Mobile and remote access</h2>
           <p>Remote access is off by default. When enabled, a phone, tablet or another computer can operate the desktop's existing workspaces and terminals in a browser. You do not need to install the Agents on your phone.</p>
           <h3>Across networks: connect through your own relay</h3>
           <p>The desktop opens an outbound tunnel, so it needs no public IP or router port forwarding. Keep the PC on with Termexo running and connected. Terminal processes still run on the desktop.</p>
@@ -201,7 +228,7 @@
         </section>
 
         <section id="faq" class="guide-section" data-pdf-page>
-          <h2>07 / Frequently asked questions</h2>
+          <h2>08 / Frequently asked questions</h2>
           <h3>An Agent is not detected, or its command will not start.</h3>
           <p>Check its installation status in Settings, then confirm that the CLI can start in a system terminal. Run detection again after installation. Check PATH, Node/npm, the working folder and network settings. If npm cannot install it, try the vendor's own script instead, bearing in mind that the two install separate executables and PATH decides which one runs when both are present. Antigravity's command-line tool is not on PATH, and Termexo looks for it where its installer puts it. For sign-in failures, confirm that the selected isolated account has completed authorization.</p>
           <h3>History is missing, or resuming reports an invalid session.</h3>
@@ -215,7 +242,7 @@
         </section>
 
         <section id="privacy" class="guide-section" data-pdf-page>
-          <h2>08 / Data and security</h2>
+          <h2>09 / Data and security</h2>
           <ul>
             <li>Termexo works locally by default, with no Termexo account or mandatory cloud sync. Workspace state stays on the host, and API keys are stored in Windows Credential Manager.</li>
             <li>The Storage panel in Settings names the data directory, lists what is in it with the size of each file, and gives the running executable's own path and version. The database is the thing worth watching.</li>
@@ -229,7 +256,7 @@
       </article>
     </main>
     <footer class="guide-footer">
-      <div class="shell guide-footer-links"><span>Termexo User Guide · V0.10.4</span><a href="#guide-content">Back to top ↑</a><a href="downloads/termexo-user-guide-en.pdf" download="Termexo-User-Guide-v0.10.4-en.pdf">Download PDF</a></div>
+      <div class="shell guide-footer-links"><span>Termexo User Guide · V0.10.10</span><a href="#guide-content">Back to top ↑</a><a href="downloads/termexo-user-guide-en.pdf" download="Termexo-User-Guide-v0.10.10-en.pdf">Download PDF</a></div>
       <div class="shell site-counter">
         <p>Website visits (PV): <span id="busuanzi_value_site_pv" class="site-counter-value">—</span></p>
         <p>Third-party website statistics only; “—” means unavailable.</p>

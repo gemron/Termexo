@@ -153,7 +153,7 @@ nav {
   color: var(--text-secondary);
   text-align: left;
   background: transparent;
-  cursor: grab;
+  cursor: default;
   transition:
     color 140ms ease,
     background-color 140ms ease;
@@ -166,10 +166,6 @@ nav {
     .workspace-glyph {
       color: var(--workspace-color);
     }
-  }
-
-  &:active {
-    cursor: grabbing;
   }
 }
 

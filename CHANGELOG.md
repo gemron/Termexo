@@ -2,6 +2,13 @@
 
 Release notes for every Termexo version, newest first. The current release is summarised in [README.md](README.md).
 
+## V0.10.10
+
+- **Control the workbench through MCP.** Enable the local server in Settings → AI control (MCP), with separate terminal, task and settings permissions. Its 19 tools query workspaces, read and write terminals, manage and execute tasks, and update existing model and network profiles. The server starts disabled, listens only on localhost, and stores its independent token in Windows Credential Manager.
+- **Automatically connect Agents launched by Termexo.** With the server enabled, automatic connection defaults on for Claude Code, Codex, OpenCode, Grok Build and Antigravity. New terminals, restarted native sessions and task execution share the connection path. Existing MCP configuration is preserved and launch commands contain no token. Restart already running Agents; Grok and Antigravity use user-level configuration, with Termexo-owned entries removed when automatic connection is disabled.
+- **Verified the release MCP bridge with real clients.** The release stdio bridge completed a handshake, discovered 19 tools and queried workspaces. An automatically connected Codex task session actually called MCP; Grok discovered tools, a private OpenCode V2 server connected, and Antigravity recognized its configuration. See the [integration record](docs/mcp-live-test.md) for coverage and prompt-delivery limits.
+- **Updated the website and user guides.** Both languages and downloadable PDFs explain setup, automatic connection, permission controls, external clients and what a successful tool call means.
+
 ## V0.10.9
 
 - **Workspace agent states fit in a compact row.** Agent icons keep terminal order and state colors without repeated labels. Hovering an icon shows its terminal's current name, including renames.

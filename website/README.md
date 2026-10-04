@@ -44,7 +44,7 @@ GitHub Pages 从 `gh-pages` 分支根目录发布。仅修改 `main` 下的 `web
   从对应 HTML 重新生成 PDF；不要单独修改 PDF 内容。
 - 构建需要 Python 与 `reportlab`，中文默认使用 Windows 微软雅黑，英文使用 Arial，均嵌入字体子集；其他系统用
   `--font` / `--bold-font` 指定支持中文且允许嵌入的 TrueType 字体。
-- 版本变更时同时更新正文版本、下载文件名及脚本页脚版本；使用 `data-pdf-page` 控制 PDF 分页。
+- 版本变更时同时更新正文版本及下载文件名；PDF 页脚和元数据自动读取根目录 `package.json` 版本。使用 `data-pdf-page` 控制 PDF 分页。
 - 发布前将 PDF 每页渲染成图片检查中文与分页，并确认目录链接、下载文件、正文版本一致。
 - `scripts/verify-user-guide.py` 使用 `pypdf` 验证正文完整性、书签和中文文本，使用 `pymupdf`
   检查页面文字边界；传入 `--render-dir` 可渲染全部页面供人工检查。

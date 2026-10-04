@@ -9,7 +9,7 @@ const pdfs = { zh: 'termexo-user-guide.pdf', en: 'termexo-user-guide-en.pdf' };
 const locales = { zh: 'zh-CN', en: 'en' };
 const guides = Object.fromEntries(Object.entries(pages).map(([lang, name]) => [lang, readFileSync(new URL(name, site), 'utf8')]));
 const source = readFileSync(new URL('guide.js', site), 'utf8');
-const chapters = ['quick-start', 'workbench', 'sessions', 'profiles', 'tasks', 'remote', 'faq', 'privacy'];
+const chapters = ['quick-start', 'workbench', 'sessions', 'profiles', 'tasks', 'ai-control', 'remote', 'faq', 'privacy'];
 const attributes = (tag) => Object.fromEntries([...tag.matchAll(/([\w-]+)="([^"]*)"/g)].map((match) => [match[1], match[2]]));
 const languageLinks = (html) => [...html.matchAll(/<a\b[^>]*data-lang="[^"]+"[^>]*>/g)].map((match) => attributes(match[0]));
 
@@ -88,7 +88,7 @@ for (const lang of ['zh', 'en']) {
 test('English is a complete translated article, not just translated menus', () => {
   const sections = (html) => [...html.matchAll(/<section\b[^>]*>([\s\S]*?)<\/section>/g)].map((match) => match[1]);
   const chinese = sections(guides.zh), english = sections(guides.en);
-  assert.equal(english.length, 8);
+  assert.equal(english.length, 9);
   const structure = (section) => [...section.matchAll(/<(h2|h3|p|li|pre|figcaption)\b/g)].map((match) => match[1]);
   english.forEach((section, index) => {
     assert.deepEqual(structure(section), structure(chinese[index]));
@@ -126,13 +126,14 @@ test('disabled storage does not break native language navigation', () => {
   });
 });
 
-test('homepage language changes both guide links to the matching full translation', () => {
+test('homepage language changes guide and MCP links to the matching full translation', () => {
   const home = readFileSync(new URL('index.html', site), 'utf8');
-  const links = [...home.matchAll(/<a\b[^>]*data-i18n="navGuide"[^>]*>/g)].map((match) => ({
-    attrs: attributes(match[0]), dataset: { i18n: 'navGuide' }, setAttribute(key, value) { this.attrs[key] = value; },
+  const links = [...home.matchAll(/<a\b[^>]*data-i18n="(?:navGuide|mcpGuide)"[^>]*>/g)].map((match) => ({
+    attrs: attributes(match[0]), dataset: { i18n: attributes(match[0])['data-i18n'] }, setAttribute(key, value) { this.attrs[key] = value; },
   }));
-  assert.equal(links.length, 2);
-  links.forEach((link) => assert.equal(link.attrs.href, pages.en));
+  assert.equal(links.filter((link) => link.dataset.i18n === 'navGuide').length, 2);
+  assert.equal(links.filter((link) => link.dataset.i18n === 'mcpGuide').length, 1);
+  links.forEach((link) => assert.equal(link.attrs.href, pages.en + (link.dataset.i18n === 'mcpGuide' ? '#ai-control' : '')));
   const app = readFileSync(new URL('app.js', site), 'utf8').replace(/\r\n/g, '\n');
   const start = app.indexOf('\nlanguageButtons.forEach((button) => {\n  button.addEventListener');
   assert.ok(start > 0);
@@ -144,8 +145,9 @@ test('homepage language changes both guide links to the matching full translatio
   for (const lang of ['en', 'zh', 'en']) {
     vm.runInContext('setLanguage("' + lang + '")', context);
     links.forEach((link) => {
-      assert.equal(link.attrs.href, pages[lang]);
-      assert.equal(link.textContent, lang === 'zh' ? '使用说明' : 'User guide');
+      const mcp = link.dataset.i18n === 'mcpGuide';
+      assert.equal(link.attrs.href, pages[lang] + (mcp ? '#ai-control' : ''));
+      assert.equal(link.textContent, mcp ? (lang === 'zh' ? '开始使用 MCP →' : 'Set up MCP →') : (lang === 'zh' ? '使用说明' : 'User guide'));
     });
   }
 });
