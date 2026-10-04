@@ -33,7 +33,7 @@
         </a>
         <nav aria-label="文档导航">
           <a href="./">返回官网</a>
-          <a class="guide-download" href="downloads/termexo-user-guide.pdf" download="Termexo-使用说明-v0.10.4.pdf">下载 PDF</a>
+          <a class="guide-download" href="downloads/termexo-user-guide.pdf" download="Termexo-使用说明-v0.10.10.pdf">下载 PDF</a>
         </nav>
         <div class="language-switch" role="group" aria-label="文档语言">
           <a href="guide.en.html" data-lang="en" lang="en" hreflang="en" aria-label="Read in English">EN</a>
@@ -51,20 +51,21 @@
           <a href="#sessions">03　恢复会话</a>
           <a href="#profiles">04　账号、模型与网络</a>
           <a href="#tasks">05　任务、Git 与交接</a>
-          <a href="#remote">06　手机与远程访问</a>
-          <a href="#faq">07　常见问题</a>
-          <a href="#privacy">08　数据与安全</a>
+          <a href="#ai-control">06　AI 操控（MCP）</a>
+          <a href="#remote">07　手机与远程访问</a>
+          <a href="#faq">08　常见问题</a>
+          <a href="#privacy">09　数据与安全</a>
         </nav>
-        <p class="guide-sidebar-note">适用于 Windows 桌面版<br />V0.10.4 · 简体中文</p>
+        <p class="guide-sidebar-note">适用于 Windows 桌面版<br />V0.10.10 · 简体中文</p>
       </aside>
       <article id="guide-content" class="guide-content" lang="zh-CN">
         <header class="guide-intro">
           <p class="guide-label">TERMEXO / USER GUIDE</p>
           <h1>使用说明</h1>
           <p class="guide-lead">从第一个工作空间开始，把终端、Agent 和项目进度放在一起。</p>
-          <p class="guide-meta">适用版本 V0.10.4 · 更新日期 2026-09-20 · Windows 10/11 x64</p>
+          <p class="guide-meta">适用版本 V0.10.10 · 更新日期 2026-10-04 · Windows 10/11 x64</p>
           <div class="guide-actions" data-pdf-skip>
-            <a class="button primary" href="downloads/termexo-user-guide.pdf" download="Termexo-使用说明-v0.10.4.pdf">下载使用说明 · PDF</a>
+            <a class="button primary" href="downloads/termexo-user-guide.pdf" download="Termexo-使用说明-v0.10.10.pdf">下载使用说明 · PDF</a>
             <a class="button secondary" href="#quick-start">开始阅读 ↓</a>
           </div>
           <p class="guide-note" data-pdf-skip>PDF 与本页内容同步，可离线阅读。本文以中文界面为例；其他版本的按钮位置可能略有不同。</p>
@@ -115,6 +116,7 @@
             <li><strong>已完成 / 失败 / 已停止：</strong>检查终端输出和文件变更，决定验收、排错或重新启动。状态提示不等于代码已经验证通过。</li>
           </ul>
           <p class="guide-callout">自动确认会减少逐次授权提示，也会扩大 Agent 自动执行操作的范围。首次使用或处理敏感项目时，建议保留人工确认；不要把 AUTO 标记理解成安全审查。</p>
+          <p>工作区按终端顺序显示带状态颜色的 Agent 图标，悬停可查看最新窗口名称。Agent 已完成时，可在对应终端点击「确认完成」清除提醒；这不代替任务验收。当前选中终端的分支由 Git 确认，未确认或非 Git 目录时留空。</p>
         </section>
 
         <section id="sessions" class="guide-section" data-pdf-page>
@@ -138,7 +140,7 @@
             <li>确认协议与所选 Agent 相匹配。Claude Code 的兼容后端需要支持相应 Anthropic 接口；不是任意模型地址都能直接使用。</li>
             <li>保存后，在启动或恢复终端时选择 Profile，先发起一条简短请求验证。切换现有终端前，阅读界面提示并确认当前任务可以中断。</li>
           </ol>
-          <p>API Key 由 Windows 凭据管理器保存。余量面板按 Profile 显示支持查询的额度，Antigravity 的余量通过它自己的 <code>/usage</code> 读取。Grok Build 用量卡片可识别免费额度已用尽；若没有可用百分比，会显示无法查询，不会把未知额度当成 0% 已使用。界面标为估算或不可用的数据，不应当作官方账单。</p>
+          <p>API Key 由 Windows 凭据管理器保存。余量面板按 Profile 显示支持查询的额度，Antigravity 的余量直接通过 HTTP Quota 接口查询。Grok Build 用量卡片可识别免费额度已用尽；若没有可用百分比，会显示无法查询，不会把未知额度当成 0% 已使用。界面标为估算或不可用的数据，不应当作官方账单。</p>
           <h3>Antigravity 的模型与状态回传</h3>
           <p>Antigravity 不使用 Termexo 的模型 Profile。它的模型与推理强度在新建终端的对话框里选择，可选项由本机的 agy 自己提供。</p>
           <p>它也没有按次启动的配置方式，所以要让终端知道它在思考、在跑工具还是在等你回答，Termexo 需要写入 agy 自己设置里的状态行。这一项默认开启，可以在设置中关闭；关闭时会还原你原本的状态行。Termexo 只认自己写的那一段，不会动你自己配置的状态行。</p>
@@ -167,8 +169,33 @@
           <p>自动脱敏不能保证覆盖所有秘密。分享前人工检查 API Key、访问令牌、内部地址、客户数据和源代码权限。交接包是上下文文档，不是原生会话文件的无损转换。</p>
         </section>
 
+        <section id="ai-control" class="guide-section" data-pdf-page>
+          <h2>06 / AI 操控（MCP）</h2>
+          <p>从 v0.10.10 起，Termexo 提供本地 MCP 服务，让 AI 客户端调用工具操作正在运行的工作台。它与 Agent 的外部 MCP Profile 分开管理，服务默认关闭。</p>
+          <h3>开启并自动连接 Agent</h3>
+          <ol>
+            <li>在桌面「设置 → AI 操控（MCP）」勾选「启用本地 MCP 服务」。默认端口为 <code>7421</code>。</li>
+            <li>选择访问权限。默认允许终端和任务；需要读取或修改设置时，再单独开启设置访问。点击「应用」，确认服务状态为「运行中」。</li>
+            <li>保留默认勾选的「自动连接 Termexo 启动的 Agent」，然后启动新终端、重新启动历史会话或执行任务。支持 Claude Code、Codex、OpenCode、Grok Build 和 Antigravity。</li>
+            <li>已经运行的 Agent 需重新启动。连接期间保持 Termexo 桌面窗口打开；Claude 的 attach 会话需重启原进程。</li>
+          </ol>
+          <p>自动连接的服务名为 <code>termexo-desktop</code>，现有 MCP Profile 会保留。连接命令不包含令牌；桥接程序每次请求读取当前端口及系统凭据，修改后继续使用当前设置。</p>
+          <h3>第一次调用</h3>
+          <p>可以告诉新启动的 Agent：「调用 termexo-desktop 的 workspace_list，列出工作区；先不要修改任何内容。」确认终端中出现真实工具调用和结果后，再安排具体操作。</p>
+          <ul>
+            <li><strong>终端：</strong>查询、创建、读取输出、发送文字或控制按键、关闭终端。</li>
+            <li><strong>任务：</strong>查询、创建、编辑、执行、停止、继续、完成与验收；任务执行支持 Claude Code、Codex、OpenCode 和 Grok Build。</li>
+            <li><strong>设置：</strong>读取不含凭据的配置，修改语言和终端显示偏好，以及已有模型和网络配置。仅在设置权限开启后可用。</li>
+          </ul>
+          <p>发送输入成功表示写入终端；执行任务成功表示已启动并绑定终端，不代表任务已完成。随后调用 <code>terminal_read</code> 或 <code>task_list</code> 检查状态；尚未提交的提示词可通过 <code>terminal_write</code> 的 <code>submit: true</code> 补发回车。</p>
+          <h3>外部客户端与权限</h3>
+          <p>Termexo 外启动的 AI 客户端可复制设置面板生成的 JSON 或 TOML 配置。客户端需支持 Streamable HTTP，并使用 <code>http://127.0.0.1:7421/mcp</code> 和 Bearer 令牌。重新生成令牌后，手动连接的客户端需更新配置。</p>
+          <p>Grok 和 Antigravity 使用用户级 MCP 配置，同一配置下在 Termexo 外启动的客户端也能看到条目。关闭自动连接或服务并应用后，Termexo 移除自己添加的条目，保留其他配置。遇到同名自定义服务或无效配置时会报错。</p>
+          <p class="guide-callout">本地 MCP 只允许本机访问，远程工作台不提供此入口。服务权限与 Agent 的工具审批都生效；端口被占用时可修改后再次应用。超时后先查询状态，再决定是否重试。完整 19 个工具和配置示例见 <a href="https://github.com/gemron/Termexo/blob/main/docs/mcp-server.md">MCP 接入说明</a>。</p>
+        </section>
+
         <section id="remote" class="guide-section" data-pdf-page>
-          <h2>06 / 手机与远程访问</h2>
+          <h2>07 / 手机与远程访问</h2>
           <p>远程访问默认关闭。打开后，手机、平板或另一台电脑通过浏览器操作桌面端同一批工作空间和终端；不需要在手机上重新安装 Agent。</p>
           <h3>跨网络：通过自建中继连接</h3>
           <p>桌面主动连接中继，无需公网 IP 或路由器端口映射。电脑需保持开机、Termexo 运行并连接中继；手机操作的仍是电脑上的终端。</p>
@@ -201,7 +228,7 @@
         </section>
 
         <section id="faq" class="guide-section" data-pdf-page>
-          <h2>07 / 常见问题</h2>
+          <h2>08 / 常见问题</h2>
           <h3>提示未检测到 Agent，或命令无法启动？</h3>
           <p>先在设置中确认安装状态，再检查对应 CLI 是否能在系统终端启动。安装后重新检测；核对 PATH、Node/npm 环境、工作目录和网络配置。用 npm 装不上时可以改用厂商官方脚本，但两种方式装的是两份可执行文件，同时存在时实际运行哪一份由 PATH 决定。Antigravity 的命令行工具不在 PATH 上，Termexo 会到它安装器的固定位置去找。登录失败时，确认当前选择的隔离账号已完成授权。</p>
           <h3>会话中心找不到历史，或恢复时提示会话无效？</h3>
@@ -215,7 +242,7 @@
         </section>
 
         <section id="privacy" class="guide-section">
-          <h2>08 / 数据与安全</h2>
+          <h2>09 / 数据与安全</h2>
           <ul>
             <li>Termexo 默认本地工作，没有 Termexo 账号或强制云同步；工作空间等状态保存在本机，API Key 由 Windows 凭据管理器保存。</li>
             <li>设置里的「存储」面板说明数据目录在哪、里面有哪些文件、各占多大，以及当前运行的可执行文件路径与版本。数据库是最值得关注的一项。</li>
@@ -229,7 +256,7 @@
       </article>
     </main>
     <footer class="guide-footer">
-      <div class="shell guide-footer-links"><span>Termexo 使用说明 · V0.10.4</span><a href="#guide-content">回到顶部 ↑</a><a href="downloads/termexo-user-guide.pdf" download="Termexo-使用说明-v0.10.4.pdf">下载 PDF</a></div>
+      <div class="shell guide-footer-links"><span>Termexo 使用说明 · V0.10.10</span><a href="#guide-content">回到顶部 ↑</a><a href="downloads/termexo-user-guide.pdf" download="Termexo-使用说明-v0.10.10.pdf">下载 PDF</a></div>
       <div class="shell site-counter">
         <p><span>官网累计访问量（PV）：</span> <span id="busuanzi_value_site_pv" class="site-counter-value">—</span></p>
         <p>第三方统计仅记录官网访问；“—”表示暂不可用。</p>

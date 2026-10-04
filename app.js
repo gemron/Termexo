@@ -167,6 +167,9 @@ const translations = {
       "Reach your workbench across networks",
     featureRemoteBody:
       "A self-hosted relay connects your phone to the same desktop terminals. No public IP or router port forwarding on the desktop.",
+    featureMcpTitle: "Let an Agent operate the workbench",
+    featureMcpBody: "Enable local MCP to read and write terminals, manage tasks and change permitted settings. Five Agents launched by Termexo connect automatically; you choose the access scopes.",
+    mcpGuide: "Set up MCP →",
 
     remoteTitle:
       "Your workbench. Across networks.",
@@ -200,9 +203,11 @@ const translations = {
       "Remote relay access",
     roadmap07Body:
       "Shipped in v0.10.0: self-hosted relay access, code or account enrollment, cascaded addresses, and v2 encrypted sessions. Your browser operates the terminals already running on your desktop.",
-    roadmap10Title: "Start your first Agent",
+    roadmap10Title: "See every agent's status",
     roadmap10Body:
-      "Choose a project, check which Agent CLIs are available, and configure a launch. Project creation waits for a successful save; failures keep your input and Agent choice for retry.",
+      "Compact workspace icons show each agent's state and current window name. Confirm completed work in its terminal, with the selected terminal's branch checked against Git.",
+    roadmapMcpTitle: "Local MCP control, connected automatically",
+    roadmapMcpBody: "19 tools for terminals, tasks and settings. Enable the server, select permissions, then launch Claude Code, Codex, OpenCode, Grok Build or Antigravity. Restart existing Agents to connect.",
 
     principlesTitle: "Your work.\nOn your computer.",
     principlesLead:
@@ -398,6 +403,9 @@ const translations = {
       "跨网络接回工作台",
     featureRemoteBody:
       "通过自建中继，用手机连接桌面正在运行的同一批终端。桌面无需公网 IP，也无需路由器端口映射。",
+    featureMcpTitle: "让 Agent 操作工作台",
+    featureMcpBody: "开启本地 MCP 后，AI 可以读写终端、管理任务和修改获准的设置。Termexo 启动的五种 Agent 自动接入，访问范围由你选择。",
+    mcpGuide: "开始使用 MCP →",
 
     remoteTitle:
       "换个网络，接着用。",
@@ -429,9 +437,11 @@ const translations = {
       "远程中继访问",
     roadmap07Body:
       "v0.10.0 已发布：自建中继、注册码或账号登记、级联访问地址与 v2 加密会话。浏览器操作的是桌面正在运行的同一批终端。",
-    roadmap10Title: "启动你的第一个 Agent",
+    roadmap10Title: "查看每个 Agent 的状态",
     roadmap10Body:
-      "选择项目、查看可用的 Agent CLI，再配置启动。项目保存成功后才继续；保存失败会保留输入和 Agent 选择，方便重试。",
+      "工作区图标简洁显示 Agent 状态和当前窗口名称。可在终端中确认完成，当前终端的分支以 Git 信息为准。",
+    roadmapMcpTitle: "本地 MCP 操控，Agent 自动接入",
+    roadmapMcpBody: "19 个工具支持终端、任务和设置。开启服务并选择权限，再启动 Claude Code、Codex、OpenCode、Grok Build 或 Antigravity。已经运行的 Agent 需重启后接入。",
 
     principlesTitle: "你的工作，\n留在你的电脑。",
     principlesLead:
@@ -509,6 +519,9 @@ function setLanguage(language) {
         "href",
         language === "zh" ? "guide.html" : "guide.en.html",
       );
+    }
+    if (element.dataset.i18n === "mcpGuide") {
+      element.setAttribute("href", language === "zh" ? "guide.html#ai-control" : "guide.en.html#ai-control");
     }
     if (["heroRemoteGuide", "relaySetup"].includes(element.dataset.i18n)) {
       element.setAttribute(
