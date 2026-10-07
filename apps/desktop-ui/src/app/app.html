@@ -254,6 +254,7 @@
             (inspectorToggled)="toggleInspector()"
             (sessionCenterOpened)="openSessionCenter()"
             (settingsOpened)="openSettings()"
+            (remoteAccessOpened)="openSettings('remote')"
             (fullscreenFailed)="reportFailure($event)"
           />
         }
@@ -270,7 +271,10 @@
             <app-icon name="panel-right-open" [size]="15" />
           </button>
         }
-        <app-language-selector />
+        @defer (on immediate) {
+          <app-language-selector />
+          <app-remote-access-button (opened)="openSettings('remote')" />
+        }
         <button
           type="button"
           class="window-tool"
@@ -364,7 +368,9 @@
       (mergeRequested)="openWorkspaceMerge($event)"
       (deleteRequested)="openWorkspaceDelete($event)"
       (moveRequested)="state.moveWorkspace($event.workspaceId, $event.direction)"
-      (reorderRequested)="state.reorderWorkspace($event.workspaceId, $event.targetWorkspaceId, $event.position)"
+      (reorderRequested)="
+        state.reorderWorkspace($event.workspaceId, $event.targetWorkspaceId, $event.position)
+      "
       (createRequested)="createWorkspaceOpen.set(true)"
     />
     <!-- Dragging an edge needs a pointer; on a phone the panel floats and is either open or not. -->

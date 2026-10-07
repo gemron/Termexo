@@ -49,9 +49,18 @@ import { StoragePanelComponent } from './storage-panel';
 import { McpServerPanelComponent } from './mcp-server-panel';
 import { registerMcpServerTranslations } from '../core/i18n/mcp-server.i18n';
 import { AGENT_ICONS } from '../core/models/workspace.models';
+import { ProjectLinksComponent } from './project-links';
 
 export type SettingsTab =
-  'diagnostics' | 'cli' | 'accounts' | 'models' | 'mcp' | 'mcp-server' | 'network' | 'remote' | 'storage';
+  | 'diagnostics'
+  | 'cli'
+  | 'accounts'
+  | 'models'
+  | 'mcp'
+  | 'mcp-server'
+  | 'network'
+  | 'remote'
+  | 'storage';
 
 registerMcpServerTranslations();
 
@@ -86,6 +95,7 @@ const DEFAULT_ALERT_THRESHOLD = 80;
     RemoteAccessPanelComponent,
     StoragePanelComponent,
     McpServerPanelComponent,
+    ProjectLinksComponent,
     TranslatePipe,
   ],
   template: `
@@ -1414,6 +1424,7 @@ const DEFAULT_ALERT_THRESHOLD = 80;
             }
           }
         </div>
+        <app-project-links />
       </section>
     </div>
   `,

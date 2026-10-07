@@ -160,6 +160,7 @@ pub const REMOTE_DENIED: &[&str] = &[
     "open_release_page",
     "open_webview_download",
     "open_terminal_url",
+    "open_support_email",
     "open_terminal_path",
     "update_via_npm",
     // Describes the desktop window's own WebView2, which says nothing about the browser a

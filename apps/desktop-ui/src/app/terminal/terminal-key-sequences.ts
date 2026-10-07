@@ -32,28 +32,24 @@ export function cursorKeySequences(
 }
 
 /** A key on the touch keypad, which stands in for the keys a phone keyboard does not have. */
-export type QuickKey = 'escape' | 'tab' | 'shiftTab' | 'enter' | 'ctrlC' | CursorDirection;
-
-/** Every keypad key whose sequence does not depend on the terminal's modes. */
-const FIXED_QUICK_KEY_SEQUENCES: Readonly<Record<Exclude<QuickKey, CursorDirection>, string>> = {
-  escape: AGENT_INTERRUPT_SEQUENCE,
-  tab: '\t',
-  shiftTab: REVERSE_TAB_SEQUENCE,
-  enter: '\r',
-  // End of text: cancels the current input, and a second press quits an agent CLI.
-  ctrlC: '\x03',
-};
-
-function isCursorDirection(key: QuickKey): key is CursorDirection {
-  return key in CURSOR_KEY_SEQUENCES.normal;
-}
-
-/** The bytes a keypad key writes, matching what the same key on a real keyboard would send. */
-export function quickKeySequence(key: QuickKey, applicationCursorKeys: boolean): string {
-  return isCursorDirection(key)
-    ? cursorKeySequences(applicationCursorKeys)[key]
-    : FIXED_QUICK_KEY_SEQUENCES[key];
-}
+export type QuickKey =
+  | 'escape'
+  | 'tab'
+  | 'shiftTab'
+  | 'enter'
+  | 'ctrlC'
+  | 'ctrlO'
+  | 'ctrlR'
+  | 'ctrlT'
+  | 'ctrlP'
+  | 'ctrlL'
+  | 'ctrlJ'
+  | 'ctrlXThenM'
+  | 'pageUp'
+  | 'pageDown'
+  | 'home'
+  | 'end'
+  | CursorDirection;
 
 interface KeyLike {
   readonly type: string;

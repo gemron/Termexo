@@ -144,6 +144,7 @@ import { AgentLaunchOptionsComponent } from './shared/agent-launch-options/agent
 import { IconComponent } from './shared/icon/icon';
 import { LanguageSelectorComponent } from './shared/language-selector/language-selector';
 import { TopbarOverflowMenuComponent } from './shared/topbar-overflow-menu/topbar-overflow-menu';
+import { RemoteAccessButtonComponent } from './shared/remote-access-button';
 import { WorkspaceOnboardingComponent } from './workspace/workspace-onboarding';
 import {
   DEFAULT_TERMINAL_FONT_NAME,
@@ -272,6 +273,7 @@ function readStoredString(key: string, fallback: string): string {
     InspectorPanelComponent,
     LanguageSelectorComponent,
     TopbarOverflowMenuComponent,
+    RemoteAccessButtonComponent,
     WorkspaceOnboardingComponent,
     MergeWorkspaceDialogComponent,
     AccountSwitchDialogComponent,
@@ -3757,9 +3759,8 @@ export class App {
     }
     void this.notifyWhenUpdateAvailable();
     if (runtimeMode() === 'desktop') {
-      const { McpDesktopService, mcpPreferenceActions } = await import(
-        './core/services/mcp-desktop.service'
-      );
+      const { McpDesktopService, mcpPreferenceActions } =
+        await import('./core/services/mcp-desktop.service');
       await this.injector.get(McpDesktopService).start({
         terminalCreated: (workspaceId, terminalId) => {
           this.selectWorkspace(workspaceId);

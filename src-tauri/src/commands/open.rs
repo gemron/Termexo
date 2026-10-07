@@ -26,6 +26,12 @@ fn is_executable_extension(path: &Path) -> bool {
 /// than trusted to be harmless.
 const ALLOWED_URL_SCHEMES: &[&str] = &["http://", "https://"];
 
+/// Opens a draft to the fixed support address; no arbitrary protocol or recipient is accepted.
+#[tauri::command(async)]
+pub fn open_support_email() -> Result<(), String> {
+    super::update::open_url("mailto:gemron@foxmail.com")
+}
+
 /// Opens an address from terminal output in the default browser.
 #[tauri::command(async)]
 pub fn open_terminal_url(url: String) -> Result<(), String> {

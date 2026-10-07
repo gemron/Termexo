@@ -15,6 +15,9 @@ use url::Url;
 
 use crate::process::hidden_command;
 
+mod codex_rollout;
+use codex_rollout::CodexRolloutWatch;
+
 #[derive(Debug, Error)]
 pub enum HookError {
     #[error("hook event access failed: {0}")]
@@ -174,6 +177,7 @@ const DETAIL_FIELDS: [&str; 12] = [
 const DETAIL_VALUE_LIMIT: usize = 512;
 
 pub struct HookEventStore {
+    codex_rollouts: Mutex<HashMap<String, CodexRolloutWatch>>,
     event_file: PathBuf,
     /// Where the read position survives a restart, so the spool is never re-read from byte zero.
     cursor_file: PathBuf,
@@ -193,6 +197,7 @@ impl HookEventStore {
             .and_then(|value| value.trim().parse::<u64>().ok())
             .unwrap_or(0);
         Ok(Self {
+            codex_rollouts: Mutex::new(HashMap::new()),
             event_file: app_data_directory.join("claude-hook-events.jsonl"),
             cursor_file,
             runtime_directory,
@@ -417,6 +422,54 @@ impl HookEventStore {
     }
 
     pub fn read_new_events(&self) -> Result<Vec<AgentEvent>, HookError> {
+        let mut events = self.read_spooled_events()?;
+        let mut watches = self
+            .codex_rollouts
+            .lock()
+            .map_err(|_| HookError::LockPoisoned)?;
+        for event in &events {
+            if event.agent_type == "codex" && event.detail.get("hook_event_name").is_some() {
+                if let Some(watch) = watches.get_mut(&event.terminal_id) {
+                    watch.hook_seen = true;
+                    if event.event_type == "task.completed" {
+                        watch.last_hook_completion = Some(event.created_at);
+                    }
+                }
+            }
+        }
+        for (terminal_id, watch) in watches.iter_mut() {
+            match watch.read(terminal_id) {
+                Ok(batch) => events.extend(batch),
+                Err(error) => {
+                    tracing::warn!(terminal_id, %error, "Codex rollout status read failed")
+                }
+            }
+        }
+        events.sort_by_key(|event| event.created_at);
+        Ok(events)
+    }
+
+    pub fn watch_codex_rollout(
+        &self,
+        terminal_id: &str,
+        session_id: &str,
+        path: PathBuf,
+    ) -> Result<(), HookError> {
+        let watch = CodexRolloutWatch::new(path, session_id.into())?;
+        self.codex_rollouts
+            .lock()
+            .map_err(|_| HookError::LockPoisoned)?
+            .insert(terminal_id.into(), watch);
+        Ok(())
+    }
+
+    pub fn forget_codex_rollout(&self, terminal_id: &str) {
+        if let Ok(mut watches) = self.codex_rollouts.lock() {
+            watches.remove(terminal_id);
+        }
+    }
+
+    fn read_spooled_events(&self) -> Result<Vec<AgentEvent>, HookError> {
         if !self.event_file.exists() {
             return Ok(Vec::new());
         }
@@ -1067,7 +1120,7 @@ fn write_grok_hook_config(directory: &Path, executable: &Path) -> Result<(), Hoo
     if path.exists() && !fs::read_to_string(&path)?.contains("grok-hook") {
         return Err(HookError::GrokHookPathOccupied(path.display().to_string()));
     }
-    let command = format!("{} grok-hook", command_quote(&executable.to_string_lossy()));
+    let command = grok_hook_command(executable);
     let hook = json!({"type": "command", "command": command, "timeout": 10});
     let group = json!([{"hooks": [hook.clone()]}]);
     let mut events = serde_json::Map::new();
@@ -1092,6 +1145,22 @@ fn write_grok_hook_config(directory: &Path, executable: &Path) -> Result<(), Hoo
     );
     fs::write(path, serde_json::to_vec(&json!({"hooks": events}))?)?;
     Ok(())
+}
+
+fn grok_hook_command(executable: &Path) -> String {
+    #[cfg(windows)]
+    {
+        // Grok executes Windows hooks in PowerShell: a quoted path is only a string until
+        // the call operator invokes it. Literal quoting also protects $ and apostrophes.
+        format!(
+            "& '{}' grok-hook",
+            executable.to_string_lossy().replace('\'', "''")
+        )
+    }
+    #[cfg(not(windows))]
+    {
+        format!("{} grok-hook", command_quote(&executable.to_string_lossy()))
+    }
 }
 
 const OPENCODE_PLUGIN_TEMPLATE: &str = include_str!("opencode-plugin.mjs");
@@ -1258,7 +1327,102 @@ fn unix_timestamp_millis() -> i64 {
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn recovers_codex_completion_from_rollout_when_no_hook_spool_exists() {
+        let directory = test_directory("codex-rollout-fallback");
+        let store = HookEventStore::new(&directory).unwrap();
+        let rollout = directory.join("main-session.jsonl");
+        fs::write(&rollout, "").unwrap();
+        store
+            .watch_codex_rollout("terminal", "main-session", rollout.clone())
+            .unwrap();
+        fs::write(directory.join("side-session.jsonl"),
+            "{\"timestamp\":\"2026-10-07T10:23:11.208Z\",\"type\":\"event_msg\",\"payload\":{\"type\":\"task_complete\",\"turn_id\":\"side-turn\"}}\n").unwrap();
+        assert!(store.read_new_events().unwrap().is_empty());
+        fs::write(&rollout,
+            "{\"timestamp\":\"2026-10-07T10:23:11.208Z\",\"type\":\"event_msg\",\"payload\":{\"type\":\"task_complete\",\"turn_id\":\"main-turn\"}}\n").unwrap();
+        let events = store.read_new_events().unwrap();
+        assert_eq!(events.len(), 1);
+        assert_eq!(events[0].event_type, "task.completed");
+        assert_eq!(events[0].native_session_id.as_deref(), Some("main-session"));
+        assert!(store.read_new_events().unwrap().is_empty());
+        store.forget_codex_rollout("terminal");
+        assert!(store.codex_rollouts.lock().unwrap().is_empty());
+        fs::remove_dir_all(directory).unwrap();
+    }
+
+    #[test]
+    fn keeps_working_codex_hooks_primary_instead_of_announcing_completion_twice() {
+        let directory = test_directory("codex-rollout-hooks");
+        let store = HookEventStore::new(&directory).unwrap();
+        let rollout = directory.join("main-session.jsonl");
+        fs::write(&rollout, "").unwrap();
+        store
+            .watch_codex_rollout("terminal", "main-session", rollout.clone())
+            .unwrap();
+        append_stored_event(
+            &store.event_file.to_string_lossy(),
+            "terminal".into(),
+            "codex",
+            json!({"hook_event_name":"Stop","session_id":"main-session"}),
+        )
+        .unwrap();
+        fs::write(&rollout,
+            "{\"timestamp\":\"2026-10-07T10:23:11.208Z\",\"type\":\"event_msg\",\"payload\":{\"type\":\"task_complete\",\"turn_id\":\"main-turn\"}}\n").unwrap();
+        let events = store.read_new_events().unwrap();
+        assert_eq!(events.len(), 1);
+        assert_eq!(events[0].event_type, "task.completed");
+        assert_eq!(events[0].detail["hook_event_name"], "Stop");
+        fs::remove_dir_all(directory).unwrap();
+    }
     use super::*;
+
+    #[cfg(windows)]
+    #[test]
+    fn grok_hook_runs_in_powershell_with_special_paths_and_preserves_stdin() {
+        use std::process::Stdio;
+
+        let directory = std::env::temp_dir().join(format!(
+            "Termexo's $app & hooks-{}",
+            crate::remote::token::generate_token().unwrap()
+        ));
+        fs::create_dir_all(&directory).unwrap();
+        let executable = directory.join("termexo.cmd");
+        fs::write(
+            &executable,
+            "@echo off\r\nif not \"%~1\"==\"grok-hook\" exit /b 2\r\nset /p HOOK_PAYLOAD=\r\necho %HOOK_PAYLOAD%\r\n",
+        )
+        .unwrap();
+        write_grok_hook_config(&directory, &executable).unwrap();
+        let config: Value =
+            serde_json::from_slice(&fs::read(directory.join("termexo-status.json")).unwrap())
+                .unwrap();
+        let command = config["hooks"]["SessionStart"][0]["hooks"][0]["command"]
+            .as_str()
+            .unwrap();
+        let mut child = hidden_command("powershell.exe")
+            .args(["-NoProfile", "-NonInteractive", "-Command", command])
+            .stdin(Stdio::piped())
+            .stdout(Stdio::piped())
+            .stderr(Stdio::piped())
+            .spawn()
+            .unwrap();
+        let payload = br#"{"hook_event_name":"SessionStart","sessionId":"test-session"}"#;
+        child.stdin.take().unwrap().write_all(payload).unwrap();
+        let output = child.wait_with_output().unwrap();
+        assert!(
+            output.status.success(),
+            "{}",
+            String::from_utf8_lossy(&output.stderr)
+        );
+        assert_eq!(
+            serde_json::from_slice::<Value>(&output.stdout).unwrap(),
+            serde_json::from_slice::<Value>(payload).unwrap()
+        );
+        fs::remove_file(executable).unwrap();
+        fs::remove_file(directory.join("termexo-status.json")).unwrap();
+        fs::remove_dir(directory).unwrap();
+    }
 
     /// The Node this repository pins, which is the one its own scripts run.
     fn pinned_node() -> Option<PathBuf> {

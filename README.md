@@ -11,7 +11,7 @@
 </p>
 
 <p align="center">
-  <img alt="Version 0.10.10" src="https://img.shields.io/badge/version-0.10.10-58c7a0">
+  <img alt="Version 0.10.11" src="https://img.shields.io/badge/version-0.10.11-58c7a0">
   <img alt="Windows" src="https://img.shields.io/badge/platform-Windows-0078D4?logo=windows">
   <img alt="Tauri 2" src="https://img.shields.io/badge/Tauri-2-24C8DB?logo=tauri&logoColor=white">
   <img alt="Angular 22" src="https://img.shields.io/badge/Angular-22-DD0031?logo=angular">
@@ -103,7 +103,7 @@ Keep the token private. Closing Termexo or stopping the PC ends the running proc
 
 ## Latest release
 
-**[v0.10.10](https://github.com/gemron/Termexo/releases/tag/v0.10.10)** adds local MCP control of terminals, tasks and settings, with automatic connection for five Agents launched by Termexo. [Start using MCP](https://www.termexo.com/guide.en.html#ai-control).
+**[v0.10.11](https://github.com/gemron/Termexo/releases/tag/v0.10.11)** fixes Codex resume and completion states, Grok hooks and empty Antigravity MCP configuration. It also adds agent-specific mobile shortcuts, a remote-access setup entry, and clearer MCP instructions. [Start using MCP](https://www.termexo.com/guide.en.html#ai-control).
 [Full changelog](CHANGELOG.md).
 
 If Termexo helps your workflow, a **Star on this repository** helps other developers discover it.
@@ -391,7 +391,8 @@ identifiers still use a legacy name. This does not affect the Termexo product na
 | V0.10.7 | Guided first run, CLI readiness and reliable project creation | Released |
 | V0.10.8 | Accurate agent status and workspace state indicators | Released |
 | V0.10.9 | Compact agent states, completion confirmation, and verified branch display | Released |
-| V0.10.10 | Local MCP control and automatic connection for five Agents | Current |
+| V0.10.10 | Local MCP control and automatic connection for five Agents | Released |
+| V0.10.11 | Agent status and launch fixes, mobile shortcuts, and clearer setup | Current |
 | V1.0 | Stability, security hardening, and recovery experience | Planned |
 
 See [open issues](https://github.com/gemron/Termexo/issues) for ongoing work and
@@ -410,7 +411,13 @@ Termexo/
 
 ## Development and Verification
 
-From v0.10.10, enable the local server in Settings → AI control (MCP) to automatically connect newly launched Claude Code, Codex, OpenCode, Grok Build and Antigravity sessions. Terminal, task and settings permissions are separate; restart already running Agents. See the [MCP connection guide](./docs/mcp-server.md) for external-client setup and the 19 tools, or read the [online user guide](https://www.termexo.com/guide.en.html#ai-control) and download its PDF.
+MCP connects AI to Termexo: ask in everyday language and AI can open terminals, read results and manage tasks. Start in 3 steps:
+
+1. In Settings → AI control (MCP), enable the server, keep automatic connection checked, click Apply and look for Running.
+2. Open a new AI terminal in Termexo, or restart an existing AI session. Claude Code, Codex, OpenCode, Grok Build and Antigravity are supported.
+3. Ask AI: “Use Termexo MCP to list my workspaces and terminals, and tell me which are running. Do not change anything yet.” Check that it returns your actual workspace names and terminal states.
+
+Keep Termexo open. Automatic connection needs no address, token or configuration file. Find example messages, permissions and troubleshooting in the [online user guide](https://www.termexo.com/guide.en.html#ai-control), with a downloadable PDF. The [MCP reference](./docs/mcp-server.md) also covers manual setup and all tools.
 
 ```powershell
 npm run build

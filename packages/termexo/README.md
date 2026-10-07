@@ -33,6 +33,12 @@ termexo --help       Show command help
 Set `TERMEXO_PATH` to the full path of another `termexo.exe` to override the
 bundled executable.
 
+## Version 0.10.11
+
+Fixes Codex resume and completion states, Grok Windows status hooks, and empty
+Antigravity MCP configuration. Adds agent-specific mobile shortcuts, remote-access
+setup guidance, and clearer MCP instructions. Restart Agents after updating.
+
 ## Local MCP control
 
 Version 0.10.10 adds 19 MCP tools for terminals, tasks and permitted settings.

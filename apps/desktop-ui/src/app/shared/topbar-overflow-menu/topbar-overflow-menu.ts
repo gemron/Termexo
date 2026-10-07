@@ -72,6 +72,10 @@ registerFullscreenTranslations();
             <span><app-icon name="settings" [size]="14" /></span>
             <strong>{{ 'workspace.settings' | t }}</strong>
           </button>
+          <button type="button" role="menuitem" (click)="remoteAccessOpened.emit()">
+            <span><app-icon name="devices" [size]="14" /></span>
+            <strong>{{ 'settings.tabRemote' | t }}</strong>
+          </button>
           @if (fullscreenAvailable) {
             <button
               type="button"
@@ -210,6 +214,7 @@ export class TopbarOverflowMenuComponent {
   readonly inspectorToggled = output<void>();
   readonly sessionCenterOpened = output<void>();
   readonly settingsOpened = output<void>();
+  readonly remoteAccessOpened = output<void>();
   /** The browser refused full screen; carries the message the shell shows. */
   readonly fullscreenFailed = output<string>();
 
@@ -225,7 +230,9 @@ export class TopbarOverflowMenuComponent {
 
   constructor() {
     // Also catches leaving full screen by the system back gesture, which never passes through here.
-    inject(DestroyRef).onDestroy(watchPageFullscreen(() => this.fullscreen.set(isPageFullscreen())));
+    inject(DestroyRef).onDestroy(
+      watchPageFullscreen(() => this.fullscreen.set(isPageFullscreen())),
+    );
   }
 
   protected async toggleFullscreen(): Promise<void> {

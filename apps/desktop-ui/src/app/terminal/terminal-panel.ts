@@ -36,7 +36,6 @@ import { TerminalCompositionAnchor } from './terminal-composition-anchor';
 import { DEFAULT_TERMINAL_FONT_NAME, terminalFontFamily } from './terminal-font';
 import {
   type QuickKey,
-  quickKeySequence,
   terminalKeySequence,
   terminalPasteShortcut,
   workbenchShortcut,
@@ -50,6 +49,7 @@ import {
   TerminalRow,
 } from './terminal-links';
 import { TerminalReplayGate } from './terminal-replay-gate';
+import { terminalStatusAfterStart } from './terminal-startup-status';
 import {
   type ApprovalOption,
   isSubmission,
@@ -231,7 +231,10 @@ export class TerminalPanelComponent implements AfterViewInit {
    * doing what a typed one does — scrolling to the bottom, recording the prompt and moving the
    * status — and lets the arrows follow the cursor-key mode the agent asked for.
    */
-  protected sendQuickKey(key: QuickKey): void {
+  protected async sendQuickKey(key: QuickKey): Promise<void> {
+    // Touch-only encodings stay out of the desktop's initial bundle.
+    const { quickKeySequence } = await import('./terminal-quick-key-sequences');
+    if (this.destroyRef.destroyed) return;
     this.terminal.input(quickKeySequence(key, this.terminal.modes.applicationCursorKeysMode));
   }
 
@@ -596,8 +599,9 @@ export class TerminalPanelComponent implements AfterViewInit {
       await this.gateway.replayInitial(this.session().id);
       // A startup hook can report that the agent has reached its prompt before the PTY returns.
       // Keep that newer state rather than overwriting it with a generic running status.
-      if (this.session().status === 'STARTING') {
-        this.statusChanged.emit({ terminalId: this.session().id, status: 'RUNNING' });
+      const startedStatus = terminalStatusAfterStart(this.session());
+      if (startedStatus) {
+        this.statusChanged.emit({ terminalId: this.session().id, status: startedStatus });
       }
       this.fitTerminal();
     } catch (error) {

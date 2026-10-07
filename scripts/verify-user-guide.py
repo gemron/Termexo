@@ -15,7 +15,7 @@ from pypdf import PdfReader
 ROOT = Path(__file__).resolve().parents[1]
 # The page count each guide is expected to come to. Pinned rather than bounded so that a layout
 # that silently reflows is caught; update it deliberately when the guide's content changes.
-EXPECTED_PAGES = {"zh": 8, "en": 9}
+EXPECTED_PAGES = {"zh": 9, "en": 10}
 builder = runpy.run_path(str(ROOT / "scripts" / "build-user-guide.py"))
 Element, GuideParser = builder["Element"], builder["GuideParser"]
 

@@ -137,7 +137,10 @@
     -->
     @if (quickKeysEnabled && active()) {
       @defer (on immediate) {
-        <app-terminal-quick-keys (keyPressed)="sendQuickKey($event)" />
+        <app-terminal-quick-keys
+          [agentType]="session().agentType"
+          (keyPressed)="sendQuickKey($event)"
+        />
       }
     }
   </div>

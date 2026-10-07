@@ -33,7 +33,7 @@
         </a>
         <nav aria-label="文档导航">
           <a href="./">返回官网</a>
-          <a class="guide-download" href="downloads/termexo-user-guide.pdf" download="Termexo-使用说明-v0.10.10.pdf">下载 PDF</a>
+          <a class="guide-download" href="downloads/termexo-user-guide.pdf" download="Termexo-使用说明-v0.10.11.pdf">下载 PDF</a>
         </nav>
         <div class="language-switch" role="group" aria-label="文档语言">
           <a href="guide.en.html" data-lang="en" lang="en" hreflang="en" aria-label="Read in English">EN</a>
@@ -56,16 +56,16 @@
           <a href="#faq">08　常见问题</a>
           <a href="#privacy">09　数据与安全</a>
         </nav>
-        <p class="guide-sidebar-note">适用于 Windows 桌面版<br />V0.10.10 · 简体中文</p>
+        <p class="guide-sidebar-note">适用于 Windows 桌面版<br />V0.10.11 · 简体中文</p>
       </aside>
       <article id="guide-content" class="guide-content" lang="zh-CN">
         <header class="guide-intro">
           <p class="guide-label">TERMEXO / USER GUIDE</p>
           <h1>使用说明</h1>
           <p class="guide-lead">从第一个工作空间开始，把终端、Agent 和项目进度放在一起。</p>
-          <p class="guide-meta">适用版本 V0.10.10 · 更新日期 2026-10-04 · Windows 10/11 x64</p>
+          <p class="guide-meta">适用版本 V0.10.11 · 更新日期 2026-10-07 · Windows 10/11 x64</p>
           <div class="guide-actions" data-pdf-skip>
-            <a class="button primary" href="downloads/termexo-user-guide.pdf" download="Termexo-使用说明-v0.10.10.pdf">下载使用说明 · PDF</a>
+            <a class="button primary" href="downloads/termexo-user-guide.pdf" download="Termexo-使用说明-v0.10.11.pdf">下载使用说明 · PDF</a>
             <a class="button secondary" href="#quick-start">开始阅读 ↓</a>
           </div>
           <p class="guide-note" data-pdf-skip>PDF 与本页内容同步，可离线阅读。本文以中文界面为例；其他版本的按钮位置可能略有不同。</p>
@@ -171,27 +171,39 @@
 
         <section id="ai-control" class="guide-section" data-pdf-page>
           <h2>06 / AI 操控（MCP）</h2>
-          <p>从 v0.10.10 起，Termexo 提供本地 MCP 服务，让 AI 客户端调用工具操作正在运行的工作台。它与 Agent 的外部 MCP Profile 分开管理，服务默认关闭。</p>
-          <h3>开启并自动连接 Agent</h3>
+          <p><strong>MCP 是 AI 与 Termexo 之间的连接。</strong>连好后，你用日常语言提出要求，AI 就能帮你开终端、读结果、管理任务，不用写代码，也不用记工具名。比如：「在当前工作区开一个终端，运行 git status，并告诉我结果。」</p>
+          <h3>第一次用：只需 3 步</h3>
+          <p>先添加项目工作区，确认 Claude Code、Codex 等 AI 能正常启动并已登录。MCP 不会替你登录 AI 账号。</p>
           <ol>
-            <li>在桌面「设置 → AI 操控（MCP）」勾选「启用本地 MCP 服务」。默认端口为 <code>7421</code>。</li>
-            <li>选择访问权限。默认允许终端和任务；需要读取或修改设置时，再单独开启设置访问。点击「应用」，确认服务状态为「运行中」。</li>
-            <li>保留默认勾选的「自动连接 Termexo 启动的 Agent」，然后启动新终端、重新启动历史会话或执行任务。支持 Claude Code、Codex、OpenCode、Grok Build 和 Antigravity。</li>
-            <li>已经运行的 Agent 需重新启动。连接期间保持 Termexo 桌面窗口打开；Claude 的 attach 会话需重启原进程。</li>
+            <li><strong>开启：</strong>在桌面「设置 → AI 操控（MCP）」勾选「启用本地 MCP 服务」，保留「自动连接 Termexo 启动的 Agent」勾选。选择权限，点击「应用」，看到「运行中」。端口通常不用改。</li>
+            <li><strong>启动：</strong>在 Termexo 中新开一个 AI 终端，支持 Claude Code、Codex、OpenCode、Grok Build 和 Antigravity。已经打开的 AI 会话要重新启动；Claude attach 会话要重启原进程。</li>
+            <li><strong>说话：</strong>复制下方示例到刚启动的 AI 终端，按回车发送。AI 会自己选择工具。不要粘贴到普通 PowerShell 或 CMD 命令行。</li>
           </ol>
-          <p>自动连接的服务名为 <code>termexo-desktop</code>，现有 MCP Profile 会保留。连接命令不包含令牌；桥接程序每次请求读取当前端口及系统凭据，修改后继续使用当前设置。</p>
-          <h3>第一次调用</h3>
-          <p>可以告诉新启动的 Agent：「调用 termexo-desktop 的 workspace_list，列出工作区；先不要修改任何内容。」确认终端中出现真实工具调用和结果后，再安排具体操作。</p>
+          <p class="guide-callout">请通过 Termexo MCP 列出我的工作区和终端，告诉我哪些正在运行。先不要修改任何内容。</p>
+          <p><strong>成功标志：</strong>AI 实际调用 Termexo 工具，返回你电脑上的工作区名称和终端状态。只回答「我可以」还不能说明已连上；「运行中」也只表示服务已就绪。使用期间保持 Termexo 打开。自动连接无需填写地址、令牌或配置文件。</p>
+          <h3>连上后，可以这样说</h3>
           <ul>
-            <li><strong>终端：</strong>查询、创建、读取输出、发送文字或控制按键、关闭终端。</li>
-            <li><strong>任务：</strong>查询、创建、编辑、执行、停止、继续、完成与验收；任务执行支持 Claude Code、Codex、OpenCode 和 Grok Build。</li>
-            <li><strong>设置：</strong>读取不含凭据的配置，修改语言和终端显示偏好，以及已有模型和网络配置。仅在设置权限开启后可用。</li>
+            <li><strong>终端：</strong>「在当前工作区开一个普通终端，运行 git status，并告诉我结果。」需要终端权限，允许 AI 开关终端、发命令、读输出。</li>
+            <li><strong>任务：</strong>「创建一个 Claude Code 任务，标题是‘梳理项目结构’，先保存，不要执行。」需要任务权限；还可以要求执行、停止、继续任务。</li>
+            <li><strong>设置：</strong>「把 Termexo 的终端字号改为 18。」需要单独开启设置权限，才能修改语言、字号及已有模型 / 网络配置。</li>
           </ul>
-          <p>发送输入成功表示写入终端；执行任务成功表示已启动并绑定终端，不代表任务已完成。随后调用 <code>terminal_read</code> 或 <code>task_list</code> 检查状态；尚未提交的提示词可通过 <code>terminal_write</code> 的 <code>submit: true</code> 补发回车。</p>
-          <h3>外部客户端与权限</h3>
-          <p>Termexo 外启动的 AI 客户端可复制设置面板生成的 JSON 或 TOML 配置。客户端需支持 Streamable HTTP，并使用 <code>http://127.0.0.1:7421/mcp</code> 和 Bearer 令牌。重新生成令牌后，手动连接的客户端需更新配置。</p>
-          <p>Grok 和 Antigravity 使用用户级 MCP 配置，同一配置下在 Termexo 外启动的客户端也能看到条目。关闭自动连接或服务并应用后，Termexo 移除自己添加的条目，保留其他配置。遇到同名自定义服务或无效配置时会报错。</p>
-          <p class="guide-callout">本地 MCP 只允许本机访问，远程工作台不提供此入口。服务权限与 Agent 的工具审批都生效；端口被占用时可修改后再次应用。超时后先查询状态，再决定是否重试。完整 19 个工具和配置示例见 <a href="https://github.com/gemron/Termexo/blob/main/docs/mcp-server.md">MCP 接入说明</a>。</p>
+          <p>默认允许终端和任务，包含执行操作的能力。多个工作区或同名任务时，请说清具体名称。指定模型前，先在 Termexo 配好模型及账号。已发送、已启动不等于完成，可以继续说「请读取输出，确认是否成功」。</p>
+          <h3>没成功？先看这里</h3>
+          <ul>
+            <li><strong>AI 找不到工具：</strong>确认服务「运行中」、自动连接已勾选，再从 Termexo 重新启动 AI 会话。</li>
+            <li><strong>提示无权限：</strong>勾选对应权限，点击「应用」，重新连接 AI 以刷新工具列表；AI 客户端自己的工具审批也需要在那里处理。</li>
+            <li><strong>提示登录过期：</strong>Claude Code 输入 <code>/login</code>，按提示登录后再发消息。这是 AI 账号的问题。</li>
+            <li><strong>没结果或超时：</strong>让 AI 先读取终端输出或任务状态，再决定是否重试。提示词还在输入框时，需要提交回车。</li>
+          </ul>
+          <h3 data-pdf-page>进阶：连接 Termexo 外的 AI 应用</h3>
+          <p>仅当你使用这台电脑上、在 Termexo 外启动的 AI 应用时才需要手动配置。它须支持 Streamable HTTP MCP。浏览器里的云端 AI 不能直接访问这个本机地址。</p>
+          <ol>
+            <li>确认服务「运行中」，展开设置面板的「进阶」。默认地址是 <code>http://127.0.0.1:7421/mcp</code>；端口被占用时可修改，再点击「应用」。</li>
+            <li>在目标 AI 应用中找到 MCP 设置。接受 <code>mcpServers</code> JSON 的应用用「复制 JSON 配置」；Codex 的 <code>config.toml</code> 用「复制 TOML 配置」。合并 Termexo 条目，保留已有服务，不要粘贴到聊天输入框。</li>
+            <li>重新连接或重启该 AI 应用，发送上面的测试消息。复制内容已包含访问令牌，请妥善保管；修改端口或重新生成令牌后，手动配置需重新复制并更新。</li>
+          </ol>
+          <p>「AI 操控（MCP）」让 AI 操作 Termexo；「MCP Profile」给 AI 接入其他外部工具，两者独立。Grok 和 Antigravity 的自动连接会添加用户级配置条目，关闭自动连接或服务并应用后会移除 Termexo 自己添加的条目。</p>
+          <p class="guide-callout">本地 MCP 只供本机使用，远程工作台不提供此入口。完整工具和技术参考见 <a href="https://github.com/gemron/Termexo/blob/main/docs/mcp-server.md">MCP 使用说明</a>。</p>
         </section>
 
         <section id="remote" class="guide-section" data-pdf-page>
@@ -256,7 +268,7 @@
       </article>
     </main>
     <footer class="guide-footer">
-      <div class="shell guide-footer-links"><span>Termexo 使用说明 · V0.10.10</span><a href="#guide-content">回到顶部 ↑</a><a href="downloads/termexo-user-guide.pdf" download="Termexo-使用说明-v0.10.10.pdf">下载 PDF</a></div>
+      <div class="shell guide-footer-links"><span>Termexo 使用说明 · V0.10.11</span><a href="#guide-content">回到顶部 ↑</a><a href="downloads/termexo-user-guide.pdf" download="Termexo-使用说明-v0.10.11.pdf">下载 PDF</a></div>
       <div class="shell site-counter">
         <p><span>官网累计访问量（PV）：</span> <span id="busuanzi_value_site_pv" class="site-counter-value">—</span></p>
         <p>第三方统计仅记录官网访问；“—”表示暂不可用。</p>

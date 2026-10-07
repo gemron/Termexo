@@ -540,6 +540,14 @@ pub fn prepare_codex_launch(
         }
         exists
     });
+    hooks.forget_codex_rollout(&request.terminal_id);
+    if let Some(session_id) = session_id.as_deref() {
+        if let Ok(Some(path)) = adapter.session_transcript_path(session_id) {
+            if let Err(error) = hooks.watch_codex_rollout(&request.terminal_id, session_id, path) {
+                tracing::warn!(%error, "Could not watch Codex rollout status");
+            }
+        }
+    }
     adapter
         .build_launch_command(&CodexLaunchOptions {
             session_id,

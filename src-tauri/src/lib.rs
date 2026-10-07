@@ -231,6 +231,7 @@ pub fn run() {
             commands::todo::delete_todo_snapshot,
             commands::todo::write_todo_export,
             commands::open::open_terminal_url,
+            commands::open::open_support_email,
             commands::open::open_terminal_path,
             commands::storage::read_storage_overview,
             commands::storage::relocate_application_data,

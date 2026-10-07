@@ -1,11 +1,12 @@
 import {
   AGENT_INTERRUPT_SEQUENCE,
-  quickKeySequence,
+  type QuickKey,
   REVERSE_TAB_SEQUENCE,
   terminalKeySequence,
   terminalPasteShortcut,
   workbenchShortcut,
 } from './terminal-key-sequences';
+import { quickKeySequence } from './terminal-quick-key-sequences';
 
 describe('quickKeySequence', () => {
   it('sends the same bytes a keyboard would for the keys a phone lacks', () => {
@@ -74,11 +75,34 @@ describe('terminalKeySequence', () => {
 
 describe('terminalPasteShortcut', () => {
   it('recognizes Ctrl+V and Ctrl+Shift+V only on keydown', () => {
-    expect(terminalPasteShortcut(keyEvent({ key: 'v', ctrlKey: true, shiftKey: false }))).toBe(true);
+    expect(terminalPasteShortcut(keyEvent({ key: 'v', ctrlKey: true, shiftKey: false }))).toBe(
+      true,
+    );
     expect(terminalPasteShortcut(keyEvent({ key: 'V', ctrlKey: true }))).toBe(true);
     expect(terminalPasteShortcut(keyEvent({ key: 'v', ctrlKey: true, type: 'keyup' }))).toBe(false);
     expect(terminalPasteShortcut(keyEvent({ key: 'v', ctrlKey: true, altKey: true }))).toBe(false);
     expect(terminalPasteShortcut(keyEvent({ key: 'v', ctrlKey: false }))).toBe(false);
+  });
+
+  it('encodes agent shortcuts and leader combinations without inserting a submission', () => {
+    const shortcuts: Partial<Record<QuickKey, string>> = {
+      ctrlO: '\x0f',
+      ctrlR: '\x12',
+      ctrlT: '\x14',
+      ctrlP: '\x10',
+      ctrlL: '\x0c',
+      ctrlJ: '\n',
+      ctrlXThenM: '\x18m',
+      pageUp: '\x1b[5~',
+      pageDown: '\x1b[6~',
+      home: '\x1b[H',
+      end: '\x1b[F',
+    };
+    for (const [key, expected] of Object.entries(shortcuts)) {
+      expect(quickKeySequence(key as QuickKey, false)).toBe(expected);
+      expect(quickKeySequence(key as QuickKey, true)).toBe(expected);
+      expect(expected).not.toContain('\r');
+    }
   });
 });
 

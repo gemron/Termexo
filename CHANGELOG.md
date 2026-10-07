@@ -2,6 +2,14 @@
 
 Release notes for every Termexo version, newest first. The current release is summarised in [README.md](README.md).
 
+## V0.10.11
+
+- **Codex resumes idle and reports completion.** Restoring a saved session no longer treats process startup as active work. When lifecycle callbacks are missing, Termexo follows new main-session rollout events for thinking, completion and interruption, without replaying history or treating side conversations as completed tasks.
+- **Grok and Antigravity launch fixes.** Grok status hooks use correctly quoted PowerShell commands on Windows. Blank or BOM-only Antigravity MCP configuration can be initialized safely; malformed non-empty configuration remains untouched.
+- **Mobile shortcuts match the Agent.** The floating shortcut button opens a panel suited to Claude Code, Codex, OpenCode, Grok Build, Antigravity or a plain shell.
+- **Remote access is easier to find.** A top-bar entry explains LAN access and internet relay setup, links to self-hosting instructions, and offers free-relay test applications by email.
+- **Clearer MCP setup and project links.** Updated bilingual guides and PDFs walk through enabling MCP and making a first tool call. Settings provide homepage and GitHub Star links.
+
 ## V0.10.10
 
 - **Control the workbench through MCP.** Enable the local server in Settings → AI control (MCP), with separate terminal, task and settings permissions. Its 19 tools query workspaces, read and write terminals, manage and execute tasks, and update existing model and network profiles. The server starts disabled, listens only on localhost, and stores its independent token in Windows Credential Manager.

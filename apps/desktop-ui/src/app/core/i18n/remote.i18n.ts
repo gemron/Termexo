@@ -10,7 +10,7 @@ import { registerTranslations, type TranslationBundle } from './i18n.service';
 export const REMOTE_TRANSLATIONS: TranslationBundle = {
   en: {
     'remote.title': 'Remote access',
-    'remote.subtitle': 'Open this workspace from a browser on the same LAN or VPN.',
+    'remote.subtitle': 'Connect directly on a local network, or through a relay over the internet.',
     'remote.loading': 'Reading the remote access status…',
     'remote.loadFailed': 'Could not read the remote access status: {error}',
     'remote.saveFailed': 'Save failed: {error}',
@@ -137,7 +137,7 @@ export const REMOTE_TRANSLATIONS: TranslationBundle = {
   },
   'zh-CN': {
     'remote.title': '远程访问',
-    'remote.subtitle': '在同一局域网或 VPN 的浏览器里打开这个工作台',
+    'remote.subtitle': '局域网直接连接，跨网络通过中继访问。',
     'remote.loading': '正在读取远程访问状态…',
     'remote.loadFailed': '读取远程访问状态失败：{error}',
     'remote.saveFailed': '保存失败：{error}',
@@ -252,8 +252,7 @@ export const REMOTE_TRANSLATIONS: TranslationBundle = {
   },
   es: {
     'remote.title': 'Acceso remoto',
-    'remote.subtitle':
-      'Abre este espacio de trabajo desde un navegador en la misma red local o VPN.',
+    'remote.subtitle': 'Conecta directamente en la red local o mediante un relay por internet.',
     'remote.loading': 'Leyendo el estado del acceso remoto…',
     'remote.loadFailed': 'No se pudo leer el estado del acceso remoto: {error}',
     'remote.saveFailed': 'Error al guardar: {error}',
@@ -383,8 +382,7 @@ export const REMOTE_TRANSLATIONS: TranslationBundle = {
   },
   fr: {
     'remote.title': 'Accès à distance',
-    'remote.subtitle':
-      'Ouvrez cet espace de travail depuis un navigateur sur le même réseau local ou VPN.',
+    'remote.subtitle': 'Connexion directe en réseau local ou via un relais sur Internet.',
     'remote.loading': 'Lecture de l’état de l’accès à distance…',
     'remote.loadFailed': 'Impossible de lire l’état de l’accès à distance : {error}',
     'remote.saveFailed': 'Échec de l’enregistrement : {error}',
@@ -518,7 +516,7 @@ export const REMOTE_TRANSLATIONS: TranslationBundle = {
   },
   de: {
     'remote.title': 'Fernzugriff',
-    'remote.subtitle': 'Diesen Arbeitsbereich in einem Browser im selben LAN oder VPN öffnen.',
+    'remote.subtitle': 'Im lokalen Netzwerk direkt verbinden, über das Internet mit einem Relay.',
     'remote.loading': 'Status des Fernzugriffs wird gelesen…',
     'remote.loadFailed': 'Status des Fernzugriffs konnte nicht gelesen werden: {error}',
     'remote.saveFailed': 'Speichern fehlgeschlagen: {error}',
@@ -651,7 +649,7 @@ export const REMOTE_TRANSLATIONS: TranslationBundle = {
   },
   ja: {
     'remote.title': 'リモートアクセス',
-    'remote.subtitle': '同じ LAN や VPN 上のブラウザーからこのワークスペースを開きます。',
+    'remote.subtitle': 'ローカルネットワークでは直接、インターネットでは中継経由で接続します。',
     'remote.loading': 'リモートアクセスの状態を読み込んでいます…',
     'remote.loadFailed': 'リモートアクセスの状態を取得できませんでした：{error}',
     'remote.saveFailed': '保存に失敗しました：{error}',
@@ -781,7 +779,7 @@ export const REMOTE_TRANSLATIONS: TranslationBundle = {
   },
   ko: {
     'remote.title': '원격 접속',
-    'remote.subtitle': '같은 LAN 또는 VPN에 있는 브라우저에서 이 작업 공간을 엽니다.',
+    'remote.subtitle': '로컬 네트워크에서는 직접, 인터넷에서는 중계를 통해 접속합니다.',
     'remote.loading': '원격 접속 상태를 불러오는 중…',
     'remote.loadFailed': '원격 접속 상태를 불러오지 못했습니다: {error}',
     'remote.saveFailed': '저장 실패: {error}',

@@ -260,8 +260,18 @@ fn merge_antigravity(
     database: &Path,
     executable: Option<&Path>,
 ) -> Result<String, String> {
-    let mut config: Value = serde_json::from_str(text)
-        .map_err(|e| format!("Invalid Antigravity MCP config; left unchanged: {e}"))?;
+    // A newly created config may be empty or carry a UTF-8 BOM. Treat blank files like an
+    // absent config when installing, but leave them byte-for-byte unchanged during cleanup.
+    let contents = text.trim().trim_start_matches('\u{feff}').trim();
+    if contents.is_empty() && executable.is_none() {
+        return Ok(text.into());
+    }
+    let mut config: Value = if contents.is_empty() {
+        json!({})
+    } else {
+        serde_json::from_str(contents)
+            .map_err(|e| format!("Invalid Antigravity MCP config; left unchanged: {e}"))?
+    };
     let root = config
         .as_object_mut()
         .ok_or("Antigravity MCP config must be an object; left unchanged")?;
@@ -426,6 +436,48 @@ mod tests {
                 .unwrap(),
             original
         );
+    }
+
+    #[test]
+    fn antigravity_blank_configs_can_be_initialized_but_cleanup_leaves_them_unchanged() {
+        for text in ["", " \r\n\t", "\u{feff}", "\u{feff} \r\n"] {
+            let installed = merge_antigravity(text, &database(), Some(&executable())).unwrap();
+            let config: Value = serde_json::from_str(&installed).unwrap();
+            assert!(owned(&config["mcpServers"][SERVER], &database()));
+            assert_eq!(merge_antigravity(text, &database(), None).unwrap(), text);
+        }
+    }
+
+    #[test]
+    fn antigravity_bom_config_preserves_other_servers_and_settings() {
+        let original = json!({"otherSetting": true, "mcpServers": {"other": {"command": "other.exe"}}});
+        let text = format!("\u{feff}{original}");
+        let installed = merge_antigravity(&text, &database(), Some(&executable())).unwrap();
+        let removed = merge_antigravity(&installed, &database(), None).unwrap();
+        assert_eq!(serde_json::from_str::<Value>(&removed).unwrap(), original);
+    }
+
+    #[test]
+    fn antigravity_empty_file_is_initialized_but_truncated_json_is_not_overwritten() {
+        let directory = std::env::temp_dir().join(format!(
+            "termexo-mcp-config-{}",
+            crate::remote::token::generate_token().unwrap()
+        ));
+        fs::create_dir_all(&directory).unwrap();
+        let path = directory.join("mcp_config.json");
+        fs::write(&path, "").unwrap();
+        update_global("antigravity", &path, &database(), Some(&executable())).unwrap();
+        let config: Value = serde_json::from_str(&fs::read_to_string(&path).unwrap()).unwrap();
+        assert!(owned(&config["mcpServers"][SERVER], &database()));
+
+        let truncated = "{\"mcpServers\":";
+        fs::write(&path, truncated).unwrap();
+        for executable in [Some(executable()), None] {
+            assert!(update_global("antigravity", &path, &database(), executable.as_deref()).is_err());
+            assert_eq!(fs::read_to_string(&path).unwrap(), truncated);
+        }
+        fs::remove_file(path).unwrap();
+        fs::remove_dir(directory).unwrap();
     }
 
     #[test]

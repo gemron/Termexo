@@ -184,25 +184,28 @@ impl CodexCliAdapter {
     /// A rollout carries its session in its own file name, so this costs a directory walk
     /// rather than a parse of every session on the machine.
     pub fn session_exists(&self, session_id: &str) -> bool {
+        // An unreadable directory cannot prove that the resume is invalid.
+        self.session_transcript_path(session_id)
+            .map(|path| path.is_some())
+            .unwrap_or(true)
+    }
+
+    pub fn session_transcript_path(&self, session_id: &str) -> Result<Option<PathBuf>, CodexError> {
         let session_id = session_id.trim();
         if session_id.is_empty() {
-            return false;
+            return Ok(None);
         }
         let directory = self.codex_home().join("sessions");
         if !directory.exists() {
-            return false;
+            return Ok(None);
         }
         let mut rollouts = Vec::new();
-        if collect_rollouts(&directory, &mut rollouts).is_err() {
-            // An unreadable sessions directory says nothing about the session; refusing the
-            // resume over it would be worse than letting the CLI answer for itself.
-            return true;
-        }
-        rollouts.iter().any(|path| {
+        collect_rollouts(&directory, &mut rollouts)?;
+        Ok(rollouts.into_iter().find(|path| {
             path.file_stem()
                 .and_then(|stem| stem.to_str())
                 .is_some_and(|stem| stem.ends_with(session_id))
-        })
+        }))
     }
 
     /// The `notify` program this Codex home's config sets, as the argument list Codex would run.

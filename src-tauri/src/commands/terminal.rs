@@ -227,7 +227,9 @@ pub fn close_terminal(
     manager: State<'_, PtyManager>,
     repositories: State<'_, RepositoryManager>,
     watcher: State<'_, RepositoryWatcher>,
+    hooks: State<'_, HookEventStore>,
 ) -> Result<(), String> {
+    hooks.forget_codex_rollout(&terminal_id);
     let result = manager
         .close(&terminal_id)
         .map_err(|error| error.to_string());

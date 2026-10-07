@@ -33,7 +33,7 @@
         </a>
         <nav aria-label="Guide navigation">
           <a href="./">Home</a>
-          <a class="guide-download" href="downloads/termexo-user-guide-en.pdf" download="Termexo-User-Guide-v0.10.10-en.pdf">Download PDF</a>
+          <a class="guide-download" href="downloads/termexo-user-guide-en.pdf" download="Termexo-User-Guide-v0.10.11-en.pdf">Download PDF</a>
         </nav>
         <div class="language-switch" role="group" aria-label="Guide language">
           <a href="guide.en.html" data-lang="en" lang="en" hreflang="en" aria-label="Read in English" aria-current="page" class="active">EN</a>
@@ -56,16 +56,16 @@
           <a href="#faq">08　FAQ</a>
           <a href="#privacy">09　Data &amp; security</a>
         </nav>
-        <p class="guide-sidebar-note">Windows desktop edition<br />V0.10.10 · English</p>
+        <p class="guide-sidebar-note">Windows desktop edition<br />V0.10.11 · English</p>
       </aside>
       <article id="guide-content" class="guide-content" lang="en">
         <header class="guide-intro">
           <p class="guide-label">TERMEXO / USER GUIDE</p>
           <h1>User guide</h1>
           <p class="guide-lead">Start with your first workspace. Keep your terminals, Agents and project progress together.</p>
-          <p class="guide-meta">For V0.10.10 · Updated 2026-10-04 · Windows 10/11 x64</p>
+          <p class="guide-meta">For V0.10.11 · Updated 2026-10-07 · Windows 10/11 x64</p>
           <div class="guide-actions" data-pdf-skip>
-            <a class="button primary" href="downloads/termexo-user-guide-en.pdf" download="Termexo-User-Guide-v0.10.10-en.pdf">Download English guide · PDF</a>
+            <a class="button primary" href="downloads/termexo-user-guide-en.pdf" download="Termexo-User-Guide-v0.10.11-en.pdf">Download English guide · PDF</a>
             <a class="button secondary" href="#quick-start">Start reading ↓</a>
           </div>
           <p class="guide-note" data-pdf-skip>The English PDF matches this page and works offline. Labels and button locations may vary by app language or version. The workbench screenshot shows the Chinese interface.</p>
@@ -171,27 +171,39 @@
 
         <section id="ai-control" class="guide-section" data-pdf-page>
           <h2>06 / AI control (MCP)</h2>
-          <p>From v0.10.10, Termexo provides a local MCP server so AI clients can operate the running workbench. It is managed separately from external MCP profiles for Agents and starts disabled.</p>
-          <h3>Enable the server and automatic connection</h3>
+          <p><strong>MCP connects AI to Termexo.</strong> Once connected, ask in everyday language and AI can open terminals, read results and manage tasks. No code or tool names to memorize. For example: “Open a terminal in the current workspace, run git status and tell me the result.”</p>
+          <h3>First time? Follow these 3 steps</h3>
+          <p>Add a project workspace first. Make sure your AI, such as Claude Code or Codex, starts normally and is signed in. MCP does not sign you in to an AI account.</p>
           <ol>
-            <li>In desktop Settings → AI control (MCP), enable the local MCP server. Its default port is <code>7421</code>.</li>
-            <li>Choose access scopes. Terminals and tasks are allowed by default; enable settings access separately if needed. Click Apply and confirm the server is Running.</li>
-            <li>Keep Automatically connect Agents launched by Termexo selected, then launch a terminal, restart a saved session or execute a task. Claude Code, Codex, OpenCode, Grok Build and Antigravity are supported.</li>
-            <li>Restart already running Agents. Keep the Termexo desktop window open during use; a Claude attach session needs its original process restarted.</li>
+            <li><strong>Enable:</strong> In desktop Settings → AI control (MCP), select Enable local MCP server and keep automatic connection checked. Choose permissions, click Apply and look for Running. Usually, leave the port unchanged.</li>
+            <li><strong>Launch:</strong> Open a new AI terminal in Termexo. Claude Code, Codex, OpenCode, Grok Build and Antigravity are supported. Restart existing AI sessions; a Claude attach session needs its original process restarted.</li>
+            <li><strong>Ask:</strong> Paste the example below into that AI terminal and press Enter. AI chooses the tools for you. Do not paste it into a plain PowerShell or CMD shell.</li>
           </ol>
-          <p>The automatic server is named <code>termexo-desktop</code>, preserving existing MCP profiles. Its command contains no token; the bridge reads the current port and system credential on every request.</p>
-          <h3>Make your first call</h3>
-          <p>Ask the newly launched Agent: “Call termexo-desktop's workspace_list to list workspaces; do not change anything yet.” Check for an actual tool call and result in the terminal before requesting changes.</p>
+          <p class="guide-callout">Use Termexo MCP to list my workspaces and terminals, and tell me which are running. Do not change anything yet.</p>
+          <p><strong>Connected:</strong> AI calls Termexo tools and returns your actual workspace names and terminal states. Saying “I can do that” alone does not verify a connection; Running only means the server is ready. Keep Termexo open. Automatic connection needs no address, token or configuration file.</p>
+          <h3>Once connected, ask for what you need</h3>
           <ul>
-            <li><strong>Terminals:</strong> list, create, read output, send text or control keys, and close.</li>
-            <li><strong>Tasks:</strong> list, create, edit, execute, stop, resume, complete and verify. Task execution supports Claude Code, Codex, OpenCode and Grok Build.</li>
-            <li><strong>Settings:</strong> read configuration without credentials, change language and terminal preferences, and update existing model and network profiles. Requires settings access.</li>
+            <li><strong>Terminals:</strong> “Open a shell terminal in the current workspace, run git status and tell me the result.” Terminal access allows AI to open or close terminals, send commands and read output.</li>
+            <li><strong>Tasks:</strong> “Create a Claude Code task called ‘Review project structure’. Save it without starting it.” Requires task access; you can also ask AI to start, stop or resume tasks.</li>
+            <li><strong>Settings:</strong> “Set the Termexo terminal font size to 18.” Enable settings access separately to change language, font size and existing model/network profiles.</li>
           </ul>
-          <p>A successful input call means text reached the terminal; successful task execution means a terminal was launched and bound to the task. Query <code>terminal_read</code> or <code>task_list</code> for progress. If a prompt still needs submission, use <code>terminal_write</code> with <code>submit: true</code> to send Enter.</p>
-          <h3>External clients and permissions</h3>
-          <p>Clients launched outside Termexo can copy the panel's JSON or TOML configuration. They need Streamable HTTP, <code>http://127.0.0.1:7421/mcp</code> and a Bearer token. After regenerating the token, update manual client configuration.</p>
-          <p>Grok and Antigravity use user-level MCP configuration, so clients outside Termexo using it also see the entry. Disabling automatic connection or the server and applying removes Termexo-owned entries while retaining other configuration. Custom entries with the same name or invalid configuration produce an error.</p>
-          <p class="guide-callout">Local MCP accepts connections only from this PC; remote workbench access does not expose it. Server permissions and Agent tool approvals both apply. Change an occupied port and apply again. After a timeout, query state before retrying. See the <a href="https://github.com/gemron/Termexo/blob/main/docs/mcp-server.md">MCP connection guide</a> for all 19 tools and configuration examples.</p>
+          <p>Terminals and tasks are allowed by default, including execution. Name the workspace or task if several match. Configure the model and account in Termexo before requesting a particular model. Sent or started does not mean completed; follow up with “Read the output and check whether it succeeded.”</p>
+          <h3>Not working? Check these first</h3>
+          <ul>
+            <li><strong>AI cannot find tools:</strong> Check Running and automatic connection, then restart the AI session from Termexo.</li>
+            <li><strong>Permission denied:</strong> Enable the relevant permission, click Apply and reconnect AI to refresh its tools. Respond to tool approval prompts in that AI client too.</li>
+            <li><strong>Login expired:</strong> In Claude Code, enter <code>/login</code>, follow the sign-in prompts and resend your message. This concerns the AI account.</li>
+            <li><strong>No result or timeout:</strong> Ask AI to read the terminal output or task state before retrying. If a prompt remains in the input box, submit it with Enter.</li>
+          </ul>
+          <h3 data-pdf-page>Advanced: connect AI apps outside Termexo</h3>
+          <p>Manual setup is only needed for an AI app launched outside Termexo on this PC. It must support Streamable HTTP MCP. Browser-based cloud AI cannot directly reach this local address.</p>
+          <ol>
+            <li>Check Running, then expand Advanced in the settings panel. The default address is <code>http://127.0.0.1:7421/mcp</code>. If the port is in use, change it and click Apply.</li>
+            <li>Find the target app's MCP settings. Use Copy JSON configuration for apps accepting <code>mcpServers</code> JSON, or Copy TOML configuration for Codex <code>config.toml</code>. Merge the Termexo entry, retaining other servers. Do not paste it into chat.</li>
+            <li>Reconnect or restart that AI app, then send the example above. Copied configuration includes your access token; keep it private. After changing the port or regenerating the token, copy again and update manual configuration.</li>
+          </ol>
+          <p>AI control (MCP) lets AI operate Termexo; MCP profiles connect AI to other external tools. They are separate. Automatic connection for Grok and Antigravity adds a user-level entry; disabling automatic connection or the server and applying removes Termexo-owned entries.</p>
+          <p class="guide-callout">Local MCP is available only on this PC; remote workbench access does not expose it. See the <a href="https://github.com/gemron/Termexo/blob/main/docs/mcp-server.md">MCP user guide</a> for the full tool list and technical reference.</p>
         </section>
 
         <section id="remote" class="guide-section" data-pdf-page>
@@ -256,7 +268,7 @@
       </article>
     </main>
     <footer class="guide-footer">
-      <div class="shell guide-footer-links"><span>Termexo User Guide · V0.10.10</span><a href="#guide-content">Back to top ↑</a><a href="downloads/termexo-user-guide-en.pdf" download="Termexo-User-Guide-v0.10.10-en.pdf">Download PDF</a></div>
+      <div class="shell guide-footer-links"><span>Termexo User Guide · V0.10.11</span><a href="#guide-content">Back to top ↑</a><a href="downloads/termexo-user-guide-en.pdf" download="Termexo-User-Guide-v0.10.11-en.pdf">Download PDF</a></div>
       <div class="shell site-counter">
         <p>Website visits (PV): <span id="busuanzi_value_site_pv" class="site-counter-value">—</span></p>
         <p>Third-party website statistics only; “—” means unavailable.</p>

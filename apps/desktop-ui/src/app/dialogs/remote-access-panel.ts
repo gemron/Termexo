@@ -16,6 +16,7 @@ import type {
 import { RemoteAccessService } from '../core/services/remote-access.service';
 import { runtimeMode } from '../core/services/tauri-runtime';
 import { IconComponent } from '../shared/icon/icon';
+import { RemoteAccessGuideComponent } from './remote-access-guide';
 
 registerRemoteTranslations();
 
@@ -66,9 +67,10 @@ interface AddressOption {
 
 @Component({
   selector: 'app-remote-access-panel',
-  imports: [FormsModule, IconComponent, TranslatePipe],
+  imports: [FormsModule, IconComponent, TranslatePipe, RemoteAccessGuideComponent],
   template: `
     <div class="profile-editor remote-panel">
+      <app-remote-access-guide />
       @if (previewMode) {
         <p class="remote-notice" role="status">{{ 'preview.desktopOnly' | t }}</p>
       } @else if (loading()) {
