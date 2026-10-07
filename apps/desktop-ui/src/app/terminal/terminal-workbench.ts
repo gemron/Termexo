@@ -46,6 +46,7 @@ export class TerminalWorkbenchComponent {
   readonly launchRequested = output<AgentType>();
   readonly installRequested = output<ManagedAgentType>();
   readonly terminalStatusChanged = output<{ terminalId: string; status: TerminalStatus }>();
+  readonly terminalRuntimeAttached = output<{ terminalId: string; runtimeRevision: number }>();
   readonly terminalCompletionConfirmed = output<string>();
   readonly terminalRenamed = output<{ terminalId: string; name: string }>();
   readonly linkOpenFailed = output<string>();

@@ -151,7 +151,7 @@ export class AppStateService {
     ]);
     this.adoptedTerminals.set(new Set(live.keys()));
     const initialWorkspaces = attaching
-      ? storedWorkspaces
+      ? this.attachToRunningTerminals(storedWorkspaces, live)
       : storedWorkspaces.length > 0
         ? this.restartRestoredTerminals(storedWorkspaces, live)
         : // A real first run opens on the guide instead: the sample workspaces pointed at folders
@@ -183,7 +183,12 @@ export class AppStateService {
 
   /** Re-reads every workspace from the store, discarding whatever this client held. */
   async reloadFromRepository(): Promise<void> {
-    const workspaces = this.normalizeWorkspaceOrder(await this.repository.list());
+    const storedWorkspaces = await this.repository.list();
+    const workspaces = this.normalizeWorkspaceOrder(
+      this.isAttachedRuntime()
+        ? this.attachToRunningTerminals(storedWorkspaces, await this.gateway.liveTerminals())
+        : storedWorkspaces,
+    );
     this.workspaceItems.set(workspaces);
     const activeWorkspace =
       workspaces.find((workspace) => workspace.id === this.activeWorkspaceId()) ??
@@ -578,6 +583,23 @@ export class AppStateService {
       gridColumns: normalizeTerminalGridDimension(columns),
       gridRows: normalizeTerminalGridDimension(rows),
     }));
+  }
+
+  /** The backend's attachment result is authoritative; stale saved rows cannot select a PTY. */
+  adoptTerminalRuntime(terminalId: string, runtimeRevision: number): void {
+    if (!Number.isSafeInteger(runtimeRevision) || runtimeRevision < 0) return;
+    const current = this.findTerminal(terminalId);
+    if (!current || (current.runtimeRevision ?? 0) === runtimeRevision) return;
+    this.workspaceItems.update((workspaces) =>
+      workspaces.map((workspace) => ({
+        ...workspace,
+        terminals: workspace.terminals.map((terminal) =>
+          terminal.id === terminalId && (terminal.runtimeRevision ?? 0) !== runtimeRevision
+            ? { ...terminal, runtimeRevision }
+            : terminal,
+        ),
+      })),
+    );
   }
 
   updateTerminalStatus(terminalId: string, status: TerminalStatus): void {
@@ -1012,6 +1034,22 @@ export class AppStateService {
               }
             : { ...terminal, runtimeRevision: runningRevision };
         }),
+    }));
+  }
+
+  /** A remote view joins the PTY's actual revision, even if the stored row is out of date. */
+  private attachToRunningTerminals(
+    workspaces: Workspace[],
+    live: ReadonlyMap<string, number>,
+  ): Workspace[] {
+    return workspaces.map((workspace) => ({
+      ...workspace,
+      terminals: workspace.terminals.map((terminal) => {
+        const runningRevision = live.get(terminal.id);
+        return runningRevision === undefined
+          ? terminal
+          : { ...terminal, runtimeRevision: runningRevision };
+      }),
     }));
   }
 

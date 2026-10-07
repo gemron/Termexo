@@ -50,6 +50,7 @@ pub struct TerminalStartRequest {
 #[serde(rename_all = "camelCase")]
 pub struct TerminalStartResult {
     pub attached: bool,
+    pub runtime_revision: u64,
     pub cols: u16,
     pub rows: u16,
 }
@@ -67,37 +68,15 @@ pub fn create_terminal(
     hooks: State<'_, HookEventStore>,
     repositories: State<'_, RepositoryManager>,
 ) -> Result<TerminalStartResult, String> {
-    match manager
-        .runtime_revision(&request.terminal_id)
+    // Opening a viewer is never a request to replace a running process. A phone can hold an
+    // older workspace row, and treating its revision as a relaunch kills the desktop's agent
+    // and leaves its output subscription on the old revision. Explicit model/account switches
+    // already close the previous PTY before saving their new launch.
+    if let Some(attached) = manager
+        .attachment(&request.terminal_id)
         .map_err(|error| error.to_string())?
     {
-        // The same launch is already running — typically a second client opening the workbench.
-        // Consuming the stashed environment or resetting the Git baseline here would corrupt the
-        // running terminal's state, so attaching skips all of it.
-        Some(revision) if revision == request.runtime_revision => {
-            let size = manager
-                .size(&request.terminal_id)
-                .map_err(|error| error.to_string())?
-                .unwrap_or((request.cols, request.rows));
-            return Ok(TerminalStartResult {
-                attached: true,
-                cols: size.0,
-                rows: size.1,
-            });
-        }
-        // A newer revision means the terminal was relaunched (model switch, session resume); the
-        // previous process must be killed before the id is reused. Closing removes the session
-        // before it kills, so a failure here leaves nothing in the way of the new terminal —
-        // refusing to launch over it would strand the user with a terminal that cannot restart.
-        Some(_) => {
-            if let Err(error) = manager.close(&request.terminal_id) {
-                tracing::warn!(
-                    terminal_id = %request.terminal_id,
-                    "关闭上一个终端进程失败，继续启动新终端：{error}"
-                );
-            }
-        }
-        None => {}
+        return Ok(attached);
     }
 
     let mut environment = launch_environment
@@ -140,11 +119,21 @@ pub fn create_terminal(
     }
     let cols = request.cols;
     let rows = request.rows;
+    let runtime_revision = request.runtime_revision;
+    let terminal_id = request.terminal_id.clone();
     let started = manager
         .start(request, app, environment)
         .map_err(|error| error.to_string())?;
+    // Another viewer can win the start race while this one is preparing its launch.
+    if !started {
+        return manager
+            .attachment(&terminal_id)
+            .map_err(|error| error.to_string())?
+            .ok_or_else(|| format!("terminal {terminal_id} closed while attaching"));
+    }
     Ok(TerminalStartResult {
-        attached: !started,
+        attached: false,
+        runtime_revision,
         cols,
         rows,
     })

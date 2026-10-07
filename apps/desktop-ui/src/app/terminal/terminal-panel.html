@@ -102,10 +102,20 @@
       </button>
     </div>
   </header>
-  @if (runtimeNotice(); as notice) {
+  @if (connectionNotice() || runtimeNotice(); as notice) {
     <div class="runtime-alert" role="alert">
       <app-icon name="activity" [size]="13" />
       <span>{{ notice }}</span>
+      @if (connectionNotice()) {
+        <button
+          type="button"
+          class="btn btn-ghost btn-xs"
+          [disabled]="connectingRuntime()"
+          (click)="$event.stopPropagation(); retryConnection()"
+        >
+          {{ 'terminal.retryConnection' | t }}
+        </button>
+      }
       <button
         type="button"
         class="btn btn-square btn-ghost btn-xs"

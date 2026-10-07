@@ -11,7 +11,7 @@ use serde::Serialize;
 use tauri::{AppHandle, Emitter};
 use thiserror::Error;
 
-use crate::commands::terminal::TerminalStartRequest;
+use crate::commands::terminal::{TerminalStartRequest, TerminalStartResult};
 use crate::pty::colour_query::{ColourQueryResponder, InvalidColour, TerminalPalette};
 use crate::remote::{
     RemoteEventHub, EVENT_TERMINAL_EXIT, EVENT_TERMINAL_OUTPUT, EVENT_TERMINAL_RESIZED,
@@ -583,12 +583,21 @@ impl PtyManager {
         lock_recovering(&self.palettes).remove(terminal_id);
     }
 
-    /// Which launch of a terminal is currently running, or `None` when it is not.
-    pub fn runtime_revision(&self, terminal_id: &str) -> Result<Option<u64>, PtyError> {
+    /// Returns the running launch and its actual grid together, without changing the process.
+    pub fn attachment(&self, terminal_id: &str) -> Result<Option<TerminalStartResult>, PtyError> {
         let sessions = lock_recovering(&self.sessions);
-        Ok(sessions
-            .get(terminal_id)
-            .map(|session| session.runtime_revision))
+        Ok(sessions.get(terminal_id).map(|session| {
+            let viewport = session.applied_viewport.unwrap_or(TerminalViewport {
+                cols: DEFAULT_COLS,
+                rows: DEFAULT_ROWS,
+            });
+            TerminalStartResult {
+                attached: true,
+                runtime_revision: session.runtime_revision,
+                cols: viewport.cols,
+                rows: viewport.rows,
+            }
+        }))
     }
 
     /// Every terminal with a process still running, and which launch of it that is.
@@ -605,21 +614,6 @@ impl PtyManager {
                 runtime_revision: session.runtime_revision,
             })
             .collect())
-    }
-
-    /// The grid a terminal is currently running at, or `None` when it is not running.
-    ///
-    /// A client joining a terminal has to draw what the agent is already drawing for, which its own
-    /// window may not match.
-    pub fn size(&self, terminal_id: &str) -> Result<Option<(u16, u16)>, PtyError> {
-        let sessions = lock_recovering(&self.sessions);
-        Ok(sessions.get(terminal_id).map(|session| {
-            session
-                .active_viewport
-                .as_ref()
-                .map(|(_, viewport)| (viewport.cols, viewport.rows))
-                .unwrap_or((DEFAULT_COLS, DEFAULT_ROWS))
-        }))
     }
 
     /// Describes one terminal's screen, without holding the session map while doing it.
@@ -1079,6 +1073,64 @@ fn configure_shell(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[derive(Debug, Clone)]
+    struct AttachmentKiller;
+
+    impl ChildKiller for AttachmentKiller {
+        fn kill(&mut self) -> std::io::Result<()> {
+            panic!("attaching a viewer must not kill a running terminal");
+        }
+
+        fn clone_killer(&self) -> Box<dyn ChildKiller + Send + Sync> {
+            Box::new(self.clone())
+        }
+    }
+
+    #[test]
+    fn attachment_keeps_the_running_revision_and_grid_after_a_phone_disconnects() {
+        let manager = PtyManager::new(Arc::new(RemoteEventHub::new()));
+        let pair = native_pty_system()
+            .openpty(PtySize {
+                cols: 48,
+                rows: 20,
+                pixel_width: 0,
+                pixel_height: 0,
+            })
+            .unwrap();
+        let mut history = OutputHistory::new(48, 20);
+        history.push(b"still running");
+        lock_recovering(&manager.sessions).insert(
+            "shared".into(),
+            PtyProcess {
+                writer: Arc::new(Mutex::new(pair.master.take_writer().unwrap())),
+                master: pair.master,
+                killer: Box::new(AttachmentKiller),
+                runtime_revision: 0,
+                history: Arc::new(Mutex::new(history)),
+                // Disconnecting the driving viewer releases ownership, but does not resize the PTY.
+                active_viewport: None,
+                applied_viewport: Some(TerminalViewport { cols: 48, rows: 20 }),
+            },
+        );
+
+        for _ in 0..2 {
+            let attached = manager.attachment("shared").unwrap().unwrap();
+            assert!(attached.attached);
+            assert_eq!(attached.runtime_revision, 0);
+            assert_eq!((attached.cols, attached.rows), (48, 20));
+            assert_eq!(
+                serde_json::to_value(&attached).unwrap()["runtimeRevision"],
+                0
+            );
+        }
+        assert!(manager
+            .read_scrollback("shared")
+            .unwrap()
+            .data
+            .contains("still running"));
+        assert!(manager.attachment("absent").unwrap().is_none());
+    }
 
     #[test]
     fn a_character_split_across_two_reads_survives_whole() {

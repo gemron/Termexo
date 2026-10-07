@@ -45,6 +45,7 @@ export type QuickKey =
   | 'ctrlL'
   | 'ctrlJ'
   | 'ctrlXThenM'
+  | 'shiftLeft'
   | 'pageUp'
   | 'pageDown'
   | 'home'
@@ -79,12 +80,12 @@ export function terminalKeySequence(event: KeyLike): string | null {
 
 /** Clipboard paste belongs to the terminal input, including full-screen agent prompts. */
 export function terminalPasteShortcut(event: KeyLike): boolean {
+  if (event.type !== 'keydown' || event.altKey || event.metaKey) {
+    return false;
+  }
   return (
-    event.type === 'keydown' &&
-    event.ctrlKey &&
-    !event.altKey &&
-    !event.metaKey &&
-    event.key.toLowerCase() === 'v'
+    (event.ctrlKey && event.key.toLowerCase() === 'v') ||
+    (!event.ctrlKey && event.shiftKey && event.key === 'Insert')
   );
 }
 

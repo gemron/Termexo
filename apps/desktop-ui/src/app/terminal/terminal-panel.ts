@@ -28,6 +28,7 @@ import {
   TERMINAL_STATUS_META,
 } from '../core/models/workspace.models';
 import { primaryPointerIsTouch } from '../core/services/input-device';
+import { readClipboardText, writeClipboardText } from '../core/services/clipboard-text';
 import { PtyBackendService } from '../core/services/pty-backend.service';
 import { runtimeMode } from '../core/services/tauri-runtime';
 import { TerminalGatewayService } from '../core/services/terminal-gateway.service';
@@ -156,6 +157,9 @@ export class TerminalPanelComponent implements AfterViewInit {
   private activationFrame?: number;
   private compositionAnchor?: TerminalCompositionAnchor;
   private runtimeReady = false;
+  protected readonly connectingRuntime = signal(false);
+  protected readonly connectionNotice = signal<string | null>(null);
+  private retryAfterReconnect = false;
   protected readonly startupVisible = signal(false);
   private startupShownAt = 0;
   private startupTimer?: number;
@@ -212,14 +216,15 @@ export class TerminalPanelComponent implements AfterViewInit {
   readonly closeRequested = output<string>();
   readonly maximizeRequested = output<string>();
   readonly statusChanged = output<{ terminalId: string; status: TerminalStatus }>();
+  readonly runtimeAttached = output<{ terminalId: string; runtimeRevision: number }>();
   readonly completionConfirmed = output<string>();
   readonly renameRequested = output<{ terminalId: string; name: string }>();
   readonly modelSwitchRequested = output<string>();
   readonly accountSwitchRequested = output<string>();
   readonly inputCaptured = output<{ terminalId: string; data: string }>();
   readonly outputCaptured = output<{ terminalId: string; data: string }>();
-  /** A link that could not be opened, which the shell reports without touching the buffer. */
-  readonly openFailed = output<string>();
+  /** User actions that failed, reported by the shell without touching the terminal buffer. */
+  readonly interactionFailed = output<string>();
 
   protected readonly renaming = signal(false);
   protected readonly quickKeysEnabled = offersQuickKeys();
@@ -270,6 +275,15 @@ export class TerminalPanelComponent implements AfterViewInit {
   });
 
   constructor() {
+    const stopReconnect = this.gateway.onReconnected(() => {
+      if (!this.viewReady || this.destroyRef.destroyed || this.runtimeReady) return;
+      if (this.connectingRuntime()) {
+        this.retryAfterReconnect = true;
+      } else {
+        void this.initializeRuntime();
+      }
+    });
+    this.destroyRef.onDestroy(stopReconnect);
     effect(() => {
       this.terminal.options.fontSize = normalizeTerminalFontSize(this.fontSize());
       if (this.viewReady && this.visible()) {
@@ -514,6 +528,11 @@ export class TerminalPanelComponent implements AfterViewInit {
 
   protected dismissRuntimeNotice(): void {
     this.runtimeIssue.set(null);
+    this.connectionNotice.set(null);
+  }
+
+  protected retryConnection(): void {
+    void this.initializeRuntime();
   }
 
   protected statusLabel(status: TerminalStatus): string {
@@ -525,7 +544,12 @@ export class TerminalPanelComponent implements AfterViewInit {
   }
 
   private async initializeRuntime(): Promise<void> {
+    if (this.connectingRuntime() || this.destroyRef.destroyed) return;
+    this.connectingRuntime.set(true);
+    this.connectionNotice.set(null);
     let unlisten: (() => void) | undefined;
+    let stopResizeUpdates: (() => void) | undefined;
+    let startingProcess = false;
     try {
       const session = this.session();
       unlisten = await this.gateway.connect(
@@ -547,7 +571,7 @@ export class TerminalPanelComponent implements AfterViewInit {
       // The PTY is shared, so its size is negotiated across every attached client; the emulator
       // follows that rather than its own fit, or it would keep drawing columns the agent has
       // stopped refreshing.
-      const stopResizeUpdates = await this.gateway.onResized((event) => {
+      stopResizeUpdates = await this.gateway.onResized((event) => {
         if (event.terminalId !== this.session().id) {
           return;
         }
@@ -562,7 +586,7 @@ export class TerminalPanelComponent implements AfterViewInit {
         stopResizeUpdates();
         return;
       }
-      this.destroyRef.onDestroy(() => stopResizeUpdates());
+      this.destroyRef.onDestroy(() => stopResizeUpdates?.());
 
       if (this.session().agentType === 'codex' && this.session().command) {
         this.terminal.writeln(
@@ -574,12 +598,16 @@ export class TerminalPanelComponent implements AfterViewInit {
         this.startupVisible.set(true);
         this.startupTimer = window.setTimeout(() => this.startupVisible.set(false), 8_000);
       }
-      const { cols, rows } = await this.gateway.start(
+      startingProcess = true;
+      const { cols, rows, runtimeRevision } = await this.gateway.start(
         this.session(),
         Math.max(this.terminal.cols, 20),
         Math.max(this.terminal.rows, 5),
         this.workspaceId() || undefined,
       );
+      startingProcess = false;
+      if (this.destroyRef.destroyed) return;
+      this.runtimeAttached.emit({ terminalId: this.session().id, runtimeRevision });
       this.runtimeReady = true;
       // The PTY runs at one grid, set by the desktop window. A client whose own window differs —
       // a phone, or the desktop joining a terminal a phone started — has to draw that grid rather
@@ -597,10 +625,11 @@ export class TerminalPanelComponent implements AfterViewInit {
       }
       // Only now, with the grid settled, is history worth writing.
       await this.gateway.replayInitial(this.session().id);
+      if (this.destroyRef.destroyed) return;
       // A startup hook can report that the agent has reached its prompt before the PTY returns.
       // Keep that newer state rather than overwriting it with a generic running status.
       const startedStatus = terminalStatusAfterStart(this.session());
-      if (startedStatus) {
+      if (startedStatus && runtimeMode() !== 'remote') {
         this.statusChanged.emit({ terminalId: this.session().id, status: startedStatus });
       }
       this.fitTerminal();
@@ -612,10 +641,28 @@ export class TerminalPanelComponent implements AfterViewInit {
       await this.gateway.replayInitial(this.session().id).catch(() => undefined);
       unlisten?.();
       unlisten = undefined;
-      this.statusChanged.emit({ terminalId: this.session().id, status: 'FAILED' });
-      this.terminal.writeln(
-        `\u001b[38;2;224;108;117m${this.i18n.t('terminal.startFailed', { error: this.errorMessage(error) })}\u001b[0m`,
-      );
+      stopResizeUpdates?.();
+      stopResizeUpdates = undefined;
+      this.runtimeReady = false;
+      if (this.destroyRef.destroyed) return;
+      if (runtimeMode() === 'desktop' && startingProcess) {
+        // Only the desktop owns process startup. A phone's failed attachment says nothing
+        // about whether the shared agent is working, and must never overwrite its status.
+        this.statusChanged.emit({ terminalId: this.session().id, status: 'FAILED' });
+        this.terminal.writeln(
+          `\u001b[38;2;224;108;117m${this.i18n.t('terminal.startFailed', { error: this.errorMessage(error) })}\u001b[0m`,
+        );
+      } else {
+        this.connectionNotice.set(
+          this.i18n.t('terminal.connectFailed', { error: this.errorMessage(error) }),
+        );
+      }
+    } finally {
+      this.connectingRuntime.set(false);
+      if (this.retryAfterReconnect) {
+        this.retryAfterReconnect = false;
+        if (!this.runtimeReady && !this.destroyRef.destroyed) void this.initializeRuntime();
+      }
     }
   }
 
@@ -975,21 +1022,33 @@ export class TerminalPanelComponent implements AfterViewInit {
   /**
    * Puts what a program copies through `OSC 52` on this viewer's clipboard.
    *
-   * A replayed copy is history, not a request. A window without focus is refused by the browser,
-   * which is what keeps a background viewer's clipboard from following the one in use.
+   * History and background viewers must not replace the clipboard the user is working with.
    */
   private readonly copyForProgram = (payload: string): boolean => {
-    const text = this.replayGate.replaying ? null : readClipboardWrite(payload);
+    const text =
+      this.replayGate.replaying || !document.hasFocus() ? null : readClipboardWrite(payload);
     if (text !== null) {
-      this.writeClipboard(text);
+      // Program-initiated copies have no user action to report an error against.
+      void writeClipboardText(text).catch(() => undefined);
     }
     return true;
   };
 
-  private writeClipboard(text: string): void {
-    // Clipboard access needs a secure context and a focused window, which a remote client or a
-    // background window may not have; nothing else can reach the clipboard, so it stays silent.
-    void navigator.clipboard?.writeText(text).catch(() => undefined);
+  private async copySelection(text: string): Promise<void> {
+    try {
+      await writeClipboardText(text);
+      this.terminal.clearSelection();
+    } catch (error) {
+      this.reportClipboardFailure('copy', error);
+    }
+  }
+
+  private reportClipboardFailure(action: 'copy' | 'paste', error: unknown): void {
+    this.zone.run(() =>
+      this.interactionFailed.emit(
+        this.i18n.t(`terminal.${action}Failed`, { error: this.errorMessage(error) }),
+      ),
+    );
   }
 
   /**
@@ -1085,7 +1144,7 @@ export class TerminalPanelComponent implements AfterViewInit {
         : this.gateway.openPath(text, this.session().workingDirectory));
     } catch (error) {
       this.zone.run(() =>
-        this.openFailed.emit(
+        this.interactionFailed.emit(
           this.i18n.t('terminal.openFailed', {
             target: text,
             error: this.errorMessage(error),
@@ -1105,27 +1164,24 @@ export class TerminalPanelComponent implements AfterViewInit {
     event.preventDefault();
     const selection = this.terminal.getSelection();
     if (selection) {
-      this.writeClipboard(selection);
-      this.terminal.clearSelection();
+      void this.copySelection(selection);
       return;
     }
     void this.pasteFromClipboard();
   };
 
   /**
-   * Writes clipboard text straight to the PTY.
-   *
-   * `terminal.paste()` would echo the text locally as well as sending it, so the agent would
-   * see it once and the screen would show it twice.
+   * Writes clipboard text once through the shared keyboard and context-menu paste path.
+   * The handlers suppress the WebView's default paste before calling this method.
    */
   private async pasteFromClipboard(): Promise<void> {
     try {
-      const text = await navigator.clipboard?.readText();
+      const text = await readClipboardText();
       if (text) {
         await this.gateway.write(this.session(), text);
       }
-    } catch {
-      // Clipboard access can be denied; typing still works, so this stays silent.
+    } catch (error) {
+      this.reportClipboardFailure('paste', error);
     }
   }
 

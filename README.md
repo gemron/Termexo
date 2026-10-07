@@ -11,7 +11,7 @@
 </p>
 
 <p align="center">
-  <img alt="Version 0.10.11" src="https://img.shields.io/badge/version-0.10.11-58c7a0">
+  <img alt="Version 0.10.12" src="https://img.shields.io/badge/version-0.10.12-58c7a0">
   <img alt="Windows" src="https://img.shields.io/badge/platform-Windows-0078D4?logo=windows">
   <img alt="Tauri 2" src="https://img.shields.io/badge/Tauri-2-24C8DB?logo=tauri&logoColor=white">
   <img alt="Angular 22" src="https://img.shields.io/badge/Angular-22-DD0031?logo=angular">
@@ -133,7 +133,7 @@ Keep the token private. Closing Termexo or stopping the PC ends the running proc
 
 ## Latest release
 
-**[v0.10.11](https://github.com/gemron/Termexo/releases/tag/v0.10.11)** fixes Codex resume and completion states, Grok hooks and empty Antigravity MCP configuration. It also adds agent-specific mobile shortcuts, a remote-access setup entry, and clearer MCP instructions. [Start using MCP](https://www.termexo.com/guide.en.html#ai-control).
+**[v0.10.12](https://github.com/gemron/Termexo/releases/tag/v0.10.12)** keeps desktop terminals responsive during phone reconnections, fixes Windows clipboard paste, adds Codex’s mobile ⇧← queued-input shortcut, and makes global Agent failures red. [Start using MCP](https://www.termexo.com/guide.en.html#ai-control).
 [Full changelog](CHANGELOG.md).
 
 If Termexo helps your workflow, a **Star on this repository** helps other developers discover it.
@@ -423,7 +423,8 @@ identifiers still use a legacy name. This does not affect the Termexo product na
 | V0.10.8 | Accurate agent status and workspace state indicators | Released |
 | V0.10.9 | Compact agent states, completion confirmation, and verified branch display | Released |
 | V0.10.10 | Local MCP control and automatic connection for five Agents | Released |
-| V0.10.11 | Agent status and launch fixes, mobile shortcuts, and clearer setup | Current |
+| V0.10.11 | Agent status and launch fixes, mobile shortcuts, and clearer setup | Released |
+| V0.10.12 | Responsive terminals, Windows paste, and Codex mobile shortcuts | Current |
 | V1.0 | Stability, security hardening, and recovery experience | Planned |
 
 See [open issues](https://github.com/gemron/Termexo/issues) for ongoing work and

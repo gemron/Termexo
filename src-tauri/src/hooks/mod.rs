@@ -294,16 +294,19 @@ impl HookEventStore {
 
     pub fn codex_hook_configs(&self) -> Result<Vec<String>, HookError> {
         let executable = std::env::current_exe()?;
-        let command = format!(
-            "{} codex-hook-event",
-            command_quote(&executable.to_string_lossy()),
-        );
+        Self::codex_hook_configs_for_executable(&executable)
+    }
+
+    fn codex_hook_configs_for_executable(executable: &Path) -> Result<Vec<String>, HookError> {
+        let command = codex_hook_command(executable);
         let command = toml_literal(&command)?;
+        // This command is already platform-specific. Repeating it in command_windows
+        // needlessly consumes the npm shim's limited Windows command-line length.
         Ok(CODEX_HOOK_EVENTS
             .iter()
             .map(|event| {
                 format!(
-                    "hooks.{event}=[{{hooks=[{{type='command',command={command},command_windows={command},timeout=10}}]}}]"
+                    "hooks.{event}=[{{hooks=[{{type='command',command={command},timeout=10}}]}}]"
                 )
             })
             .collect())
@@ -1311,6 +1314,36 @@ fn command_quote(value: &str) -> String {
     format!("\"{}\"", value.replace('"', "\\\""))
 }
 
+fn codex_hook_command(executable: &Path) -> String {
+    #[cfg(windows)]
+    {
+        use base64::{engine::general_purpose::STANDARD, Engine};
+
+        // PowerShell and the npm .cmd shim strip nested double quotes from -c values.
+        // Encode only the hook script so the whole TOML override remains one argument,
+        // including when Termexo is installed under Program Files or a Unicode path.
+        let script = format!(
+            "& '{}' codex-hook-event; exit $LASTEXITCODE",
+            executable.to_string_lossy().replace('\'', "''")
+        );
+        let bytes = script
+            .encode_utf16()
+            .flat_map(u16::to_le_bytes)
+            .collect::<Vec<_>>();
+        format!(
+            "powershell.exe -NoLogo -NoProfile -NonInteractive -EncodedCommand {}",
+            STANDARD.encode(bytes)
+        )
+    }
+    #[cfg(not(windows))]
+    {
+        format!(
+            "{} codex-hook-event",
+            command_quote(&executable.to_string_lossy())
+        )
+    }
+}
+
 /// Wraps a value as a TOML literal string, which survives the Windows npm `.cmd` shim intact.
 pub(crate) fn toml_literal(value: &str) -> Result<String, HookError> {
     (!value.contains("'''"))
@@ -1845,12 +1878,22 @@ mod tests {
             .iter()
             .any(|config| config.starts_with("hooks.Interrupt=")));
         assert!(configs.iter().all(|config| config.contains("command=")));
-        assert!(configs
-            .iter()
-            .all(|config| config.contains("command_windows=")));
-        assert!(configs
-            .iter()
-            .all(|config| config.contains("codex-hook-event")));
+        for config in &configs {
+            let value: toml::Value = toml::from_str(config).unwrap();
+            let event = config
+                .split_once('=')
+                .unwrap()
+                .0
+                .strip_prefix("hooks.")
+                .unwrap();
+            let handler = &value["hooks"][event][0]["hooks"][0];
+            assert_eq!(handler["type"].as_str(), Some("command"));
+            assert_eq!(handler["timeout"].as_integer(), Some(10));
+            assert_eq!(
+                handler["command"].as_str().unwrap(),
+                codex_hook_command(&std::env::current_exe().unwrap())
+            );
+        }
         assert_eq!(
             environment
                 .get(TERMEXO_CODEX_TERMINAL_ID)
@@ -1862,6 +1905,79 @@ mod tests {
             Some(store.event_file.clone())
         );
 
+        fs::remove_dir_all(directory).unwrap();
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn codex_hooks_survive_the_npm_shim_and_preserve_hook_stdin() {
+        let directory = test_directory("Program Files Termexo's $app & 中文");
+        fs::create_dir_all(&directory).unwrap();
+        let executable = directory.join("termexo.cmd");
+        fs::write(
+            &executable,
+            "@echo off\r\nif not \"%~1\"==\"codex-hook-event\" exit /b 2\r\nset /p HOOK_PAYLOAD=\r\necho %HOOK_PAYLOAD%\r\n",
+        )
+        .unwrap();
+        let shim = directory.join("codex.cmd");
+        fs::write(
+            &shim,
+            "@echo off\r\n:args\r\nif \"%~1\"==\"\" exit /b 0\r\nif not \"%~1\"==\"-c\" exit /b 2\r\necho %~2\r\nshift\r\nshift\r\ngoto args\r\n",
+        )
+        .unwrap();
+        let configs = HookEventStore::codex_hook_configs_for_executable(&executable).unwrap();
+        let arguments = configs
+            .iter()
+            .map(|config| format!("-c '{}'", config.replace('\'', "''")))
+            .collect::<Vec<_>>()
+            .join(" ");
+        let launch = format!(
+            "& '{}' {arguments}",
+            shim.to_string_lossy().replace('\'', "''"),
+        );
+        let output = hidden_command("powershell.exe")
+            .args(["-NoProfile", "-NonInteractive", "-Command", &launch])
+            .output()
+            .unwrap();
+        assert!(
+            output.status.success(),
+            "{}",
+            String::from_utf8_lossy(&output.stderr)
+        );
+        let received = String::from_utf8(output.stdout).unwrap();
+        assert_eq!(received.lines().collect::<Vec<_>>(), configs);
+
+        let config = &configs[0];
+        let value: toml::Value = toml::from_str(config).unwrap();
+        let command = value["hooks"]["SessionStart"][0]["hooks"][0]["command"]
+            .as_str()
+            .unwrap();
+        let mut child = hidden_command("cmd.exe")
+            .args(["/D", "/S", "/C", command])
+            .stdin(Stdio::piped())
+            .stdout(Stdio::piped())
+            .stderr(Stdio::piped())
+            .spawn()
+            .unwrap();
+        let payload = br#"{"hook_event_name":"SessionStart","session_id":"test-session"}"#;
+        child.stdin.take().unwrap().write_all(payload).unwrap();
+        let output = child.wait_with_output().unwrap();
+        assert!(
+            output.status.success(),
+            "{}",
+            String::from_utf8_lossy(&output.stderr)
+        );
+        assert_eq!(
+            serde_json::from_slice::<Value>(&output.stdout).unwrap(),
+            serde_json::from_slice::<Value>(payload).unwrap()
+        );
+
+        fs::write(&executable, "@echo off\r\nexit /b 23\r\n").unwrap();
+        let output = hidden_command("cmd.exe")
+            .args(["/D", "/S", "/C", command])
+            .output()
+            .unwrap();
+        assert_eq!(output.status.code(), Some(23));
         fs::remove_dir_all(directory).unwrap();
     }
 
@@ -2472,8 +2588,7 @@ mod tests {
             "eventFile": store.event_file,
             "claudeSettings": claude.settings_path,
             "codexNotifyOverride": retarget(&codex_notify),
-            "codexHookOverrides": store
-                .codex_hook_configs()
+            "codexHookOverrides": HookEventStore::codex_hook_configs_for_executable(Path::new(&executable))
                 .unwrap()
                 .iter()
                 .map(|value| retarget(value))

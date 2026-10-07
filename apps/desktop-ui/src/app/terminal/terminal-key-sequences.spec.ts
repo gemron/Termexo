@@ -74,6 +74,18 @@ describe('terminalKeySequence', () => {
 });
 
 describe('terminalPasteShortcut', () => {
+  it('recognizes Shift+Insert without consuming other Insert combinations or keyup', () => {
+    expect(terminalPasteShortcut(keyEvent({ key: 'Insert' }))).toBe(true);
+    for (const modifier of [
+      { shiftKey: false },
+      { ctrlKey: true },
+      { altKey: true },
+      { metaKey: true },
+      { type: 'keyup' },
+    ]) {
+      expect(terminalPasteShortcut(keyEvent({ key: 'Insert', ...modifier }))).toBe(false);
+    }
+  });
   it('recognizes Ctrl+V and Ctrl+Shift+V only on keydown', () => {
     expect(terminalPasteShortcut(keyEvent({ key: 'v', ctrlKey: true, shiftKey: false }))).toBe(
       true,

@@ -542,6 +542,20 @@ app-inspector-panel {
     white-space: nowrap;
   }
 
+  &[data-status='FAILED'] {
+    background: color-mix(in srgb, var(--color-error) 5%, transparent);
+
+    > i {
+      background: var(--color-error);
+      box-shadow: 0 0 8px color-mix(in srgb, var(--color-error) 58%, transparent);
+    }
+
+    em {
+      color: var(--color-error);
+      background: color-mix(in srgb, var(--color-error) 11%, transparent);
+    }
+  }
+
   &[data-tone='attention'] {
     background: color-mix(in srgb, var(--color-warning) 5%, transparent);
 

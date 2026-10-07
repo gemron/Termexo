@@ -598,6 +598,9 @@
             (launchRequested)="launchAgent($event)"
             (installRequested)="installAgent($event)"
             (terminalStatusChanged)="handleTerminalStatus($event)"
+            (terminalRuntimeAttached)="
+              state.adoptTerminalRuntime($event.terminalId, $event.runtimeRevision)
+            "
             (terminalCompletionConfirmed)="confirmTerminalCompletion($event)"
             (terminalRenamed)="state.renameTerminal($event.terminalId, $event.name)"
             (linkOpenFailed)="reportFailure($event)"
@@ -734,14 +737,16 @@
   />
 }
 
-@if (workspacePendingMerge(); as workspace) {
-  <app-merge-workspace-dialog
-    [sourceWorkspace]="workspace"
-    [workspaces]="state.workspaces()"
-    [merging]="mergingWorkspace()"
-    (confirmed)="confirmWorkspaceMerge($event)"
-    (cancelled)="closeWorkspaceMerge()"
-  />
+@defer (when workspacePendingMerge()) {
+  @if (workspacePendingMerge(); as workspace) {
+    <app-merge-workspace-dialog
+      [sourceWorkspace]="workspace"
+      [workspaces]="state.workspaces()"
+      [merging]="mergingWorkspace()"
+      (confirmed)="confirmWorkspaceMerge($event)"
+      (cancelled)="closeWorkspaceMerge()"
+    />
+  }
 }
 
 @if (claudeLaunchOpen()) {

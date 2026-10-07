@@ -27,6 +27,7 @@ export const AGENT_QUICK_KEY_LAYOUTS: Readonly<Record<AgentType, readonly QuickK
   claude: [mode, key('ctrlO', 'Ctrl+O', 'transcript'), history, complete, newline, cancel],
   codex: [
     key('shiftTab', '⇧Tab', 'plan'),
+    key('shiftLeft', '⇧←', 'editQueued'),
     key('ctrlT', 'Ctrl+T', 'transcript'),
     history,
     key('tab', 'Tab', 'queue'),

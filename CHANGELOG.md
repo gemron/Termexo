@@ -2,6 +2,13 @@
 
 Release notes for every Termexo version, newest first. The current release is summarised in [README.md](README.md).
 
+## V0.10.12
+
+- **Desktop and mobile terminal control stay in sync.** Reconnecting or switching between phone and desktop views no longer leaves the desktop terminal stuck without input or scrolling.
+- **Windows clipboard paste works in the terminal.** Ctrl+V, Ctrl+Shift+V, Shift+Insert and the context menu send clipboard text to the active Agent.
+- **Mobile shortcuts follow the selected Agent.** The Codex keypad includes ⇧← to edit queued input; each Agent keeps its own shortcut panel.
+- **Agent failure notices are clearer.** Global failure popups now use red styling.
+
 ## V0.10.11
 
 - **Codex resumes idle and reports completion.** Restoring a saved session no longer treats process startup as active work. When lifecycle callbacks are missing, Termexo follows new main-session rollout events for thinking, completion and interruption, without replaying history or treating side conversations as completed tasks.

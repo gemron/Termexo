@@ -32,6 +32,7 @@ export interface TerminalExitEvent {
 /** What `create_terminal` reports back: whether it adopted a PTY that was already running. */
 export interface TerminalStartResult {
   attached: boolean;
+  runtimeRevision: number;
   /** The grid the PTY is running at, which a joining client must draw rather than its own fit. */
   cols: number;
   rows: number;
@@ -194,7 +195,12 @@ export class TerminalGatewayService {
     };
     this.connections.set(terminalId, connection);
 
-    await this.ensureOutputListener();
+    try {
+      await this.ensureOutputListener();
+    } catch (error) {
+      if (this.connections.get(terminalId) === connection) this.connections.delete(terminalId);
+      throw error;
+    }
 
     return () => {
       if (this.connections.get(terminalId) === connection) {
@@ -248,12 +254,18 @@ export class TerminalGatewayService {
     // Outside Angular: an agent writing output would otherwise run change detection over the whole
     // workbench for every chunk it produces. What the output does move on screen is flushed once a
     // frame by `scheduleUiSync`.
-    this.outputListener ??= this.zone.runOutsideAngular(() =>
+    const pending = (this.outputListener ??= this.zone.runOutsideAngular(() =>
       listen<TerminalOutputEvent>(TERMINAL_OUTPUT_EVENT, (event) =>
         this.handleOutput(event.payload),
       ),
-    );
-    await this.outputListener;
+    ));
+    try {
+      await pending;
+    } catch (error) {
+      // A failed first subscription must not poison every later reconnect with the same rejection.
+      if (this.outputListener === pending) this.outputListener = undefined;
+      throw error;
+    }
   }
 
   /**
@@ -300,6 +312,11 @@ export class TerminalGatewayService {
     return listen<TerminalResizedEvent>(TERMINAL_RESIZED_EVENT, (event) => handler(event.payload));
   }
 
+  /** A view whose initial attachment failed can try again when the bridge returns. */
+  onReconnected(handler: () => void): UnlistenFn {
+    return this.remoteConnection.onReconnected(handler);
+  }
+
   async start(
     session: TerminalSession,
     cols: number,
@@ -326,9 +343,23 @@ export class TerminalGatewayService {
     };
 
     if (hasBackend()) {
+      const connection = this.connections.get(session.id);
       const result = await invoke<TerminalStartResult>('create_terminal', { request });
+      const runtimeRevision = result?.runtimeRevision ?? request.runtimeRevision;
+      if (
+        connection &&
+        this.connections.get(session.id) === connection &&
+        connection.runtimeRevision !== runtimeRevision
+      ) {
+        connection.runtimeRevision = runtimeRevision;
+        connection.lastSequence = 0;
+        connection.buffered = connection.buffered.filter(
+          (event) => event.runtimeRevision === runtimeRevision,
+        );
+      }
       return {
         attached: result?.attached === true,
+        runtimeRevision,
         cols: result?.cols || cols,
         rows: result?.rows || rows,
       };
@@ -346,7 +377,7 @@ export class TerminalGatewayService {
         prompt,
       ].join('\r\n'),
     );
-    return { attached: false, cols, rows };
+    return { attached: false, runtimeRevision: request.runtimeRevision, cols, rows };
   }
 
   async write(session: TerminalSession, data: string): Promise<void> {
@@ -529,6 +560,7 @@ export class TerminalGatewayService {
           terminalId: connection.id,
         }),
       );
+      if (this.connections.get(connection.id) !== connection) return;
       // A snapshot from a PTY this view has already replaced would draw someone else's output.
       if (scrollback.runtimeRevision === connection.runtimeRevision && scrollback.data) {
         if (clearScreen) {
@@ -541,10 +573,11 @@ export class TerminalGatewayService {
       console.warn('Unable to replay terminal scrollback.', error);
     } finally {
       connection.replaying = false;
-      for (const payload of connection.buffered.splice(0)) {
-        this.deliver(connection, payload);
+      const buffered = connection.buffered.splice(0);
+      if (this.connections.get(connection.id) === connection) {
+        for (const payload of buffered) this.deliver(connection, payload);
+        this.scheduleUiSync();
       }
-      this.scheduleUiSync();
     }
   }
 

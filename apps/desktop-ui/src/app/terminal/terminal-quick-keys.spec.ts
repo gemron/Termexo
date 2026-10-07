@@ -38,11 +38,13 @@ describe('TerminalQuickKeysComponent', () => {
     expect(root.textContent).toContain('Claude Code');
     expect(button('ctrlO')?.textContent).toContain('Transcript');
     expect(button('ctrlT')).toBeNull();
+    expect(button('shiftLeft')).toBeNull();
     selectAgent('codex');
     expect(root.textContent).toContain('Codex CLI');
     expect(button('ctrlO')).toBeNull();
     expect(button('ctrlT')?.textContent).toContain('Transcript');
     expect(button('shiftTab')?.textContent).toContain('Plan mode');
+    expect(button('shiftLeft')?.textContent).toContain('Edit queued input');
   });
 
   it('uses Grok meanings for shared shortcuts and does not advertise Esc as interruption', () => {
@@ -108,7 +110,7 @@ describe('TerminalQuickKeysComponent', () => {
           AGENT_LABELS[agent],
         );
         expect(root.textContent).not.toContain('quickKeys.');
-        expect(root.querySelectorAll('[data-key]')).toHaveLength(12);
+        expect(root.querySelectorAll('[data-key]')).toHaveLength(agent === 'codex' ? 13 : 12);
         for (const key of root.querySelectorAll('[data-key]')) {
           expect(key.getAttribute('aria-label')).toBeTruthy();
           expect(key.getAttribute('aria-label')).not.toContain('quickKeys.');

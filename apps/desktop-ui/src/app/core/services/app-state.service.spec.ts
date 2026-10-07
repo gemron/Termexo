@@ -42,6 +42,7 @@ describe('AppStateService', () => {
 
   afterEach(() => {
     delete runtime['__TAURI_INTERNALS__'];
+    document.querySelectorAll('meta[name="termexo-remote"]').forEach((node) => node.remove());
   });
 
   beforeEach(() => {
@@ -59,6 +60,56 @@ describe('AppStateService', () => {
     });
     createdAfter = Date.now();
     service = TestBed.inject(AppStateService);
+  });
+
+  it('attaches a phone to the live revision without saving or restarting other terminals', async () => {
+    const marker = document.createElement('meta');
+    marker.name = 'termexo-remote';
+    marker.content = JSON.stringify({ version: '0.10.11', secure: false });
+    document.head.append(marker);
+    const stored = externalWorkspace('workspace-1', 0);
+    stored.terminals = [
+      {
+        id: 'live-1',
+        name: 'Agent',
+        agentType: 'claude',
+        shell: 'powershell.exe',
+        workingDirectory: stored.projectPath,
+        status: 'THINKING',
+        model: '',
+        branch: '',
+        runtimeRevision: 7,
+      },
+    ];
+    repository.list.mockResolvedValue([stored]);
+    gateway.liveTerminals.mockResolvedValue(new Map([['live-1', 0]]));
+    await service.initialize();
+    expect(service.activeTerminal()).toEqual(
+      expect.objectContaining({
+        runtimeRevision: 0,
+        status: 'THINKING',
+      }),
+    );
+    await service.reloadFromRepository();
+    expect(service.activeTerminal()?.runtimeRevision).toBe(0);
+    expect(repository.saveAll).not.toHaveBeenCalled();
+    expect(repository.save).not.toHaveBeenCalled();
+  });
+
+  it('uses an attachment result to repair a desktop subscription after a stale workspace event', async () => {
+    await service.initialize();
+    const terminal = service.createTerminal({ agentType: 'shell' })!;
+    const workspace = service.activeWorkspace()!;
+    service.applyExternalWorkspace({
+      ...workspace,
+      terminals: [{ ...terminal, runtimeRevision: 1 }],
+    });
+    repository.save.mockClear();
+    service.adoptTerminalRuntime(terminal.id, 0);
+    expect(service.activeTerminal()?.runtimeRevision).toBe(0);
+    expect(repository.save).not.toHaveBeenCalled();
+    service.adoptTerminalRuntime(terminal.id, -1);
+    expect(service.activeTerminal()?.runtimeRevision).toBe(0);
   });
 
   it('seeds sample workspaces for the browser preview', async () => {

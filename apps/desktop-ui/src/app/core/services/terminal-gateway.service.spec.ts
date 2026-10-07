@@ -129,6 +129,41 @@ describe('TerminalGatewayService attachment', () => {
     expect(outputListenCount).toBe(1);
   });
 
+  it('can subscribe again after the first event bridge attempt fails', async () => {
+    const internals = runtime['__TAURI_INTERNALS__'] as {
+      invoke: (command: string, args: Record<string, unknown>) => Promise<unknown>;
+    };
+    const invoke = internals.invoke;
+    let failOnce = true;
+    internals.invoke = (command, args) => {
+      if (command === 'plugin:event|listen' && args['event'] === 'terminal-output' && failOnce) {
+        failOnce = false;
+        return Promise.reject(new Error('Bridge closed'));
+      }
+      return invoke(command, args);
+    };
+    await expect(service.connect('terminal-1', 3, () => undefined)).rejects.toThrow(
+      'Bridge closed',
+    );
+    const writes: string[] = [];
+    await service.connect('terminal-1', 3, (data) => writes.push(data));
+    commandHandler = () => Promise.resolve({ data: 'history', runtimeRevision: 3, sequence: 1 });
+    await service.replayInitial('terminal-1');
+    emitOutput('live again', 2);
+    expect(writes).toEqual(['history', 'live again']);
+  });
+
+  it('does not redraw a disposed view when its snapshot arrives late', async () => {
+    const writes: string[] = [];
+    const stop = await service.connect('terminal-1', 3, (data) => writes.push(data));
+    const replaying = service.replayInitial('terminal-1');
+    emitOutput('buffered', 9);
+    stop();
+    resolveScrollback?.({ data: 'late snapshot', runtimeRevision: 3, sequence: 8 });
+    await replaying;
+    expect(writes).toEqual([]);
+  });
+
   it('marks replayed history so the output readers skip it', async () => {
     const writes: Array<{ data: string; replayed: boolean }> = [];
     await service.connect('terminal-1', 3, (data, replayed) => writes.push({ data, replayed }));
@@ -292,6 +327,7 @@ describe('TerminalGatewayService attachment', () => {
 
     await expect(service.start(startableSession(), 80, 24)).resolves.toEqual({
       attached: true,
+      runtimeRevision: 3,
       cols: 120,
       rows: 30,
     });
@@ -334,8 +370,48 @@ describe('TerminalGatewayService attachment', () => {
 
     await expect(service.start(startableSession(), 80, 24)).resolves.toEqual({
       attached: false,
+      runtimeRevision: 3,
       cols: 80,
       rows: 24,
     });
+  });
+
+  for (const actualRevision of [0, 4]) {
+    it(`follows the actual PTY revision ${actualRevision} when a saved row is stale`, async () => {
+      const writes: string[] = [];
+      await service.connect('terminal-1', 3, (data) => writes.push(data));
+      commandHandler = (command) =>
+        Promise.resolve(
+          command === 'create_terminal'
+            ? { attached: true, runtimeRevision: actualRevision, cols: 48, rows: 20 }
+            : { data: 'current screen', runtimeRevision: actualRevision, sequence: 2 },
+        );
+      const attached = await service.start(startableSession(), 120, 30);
+      expect(attached.runtimeRevision).toBe(actualRevision);
+      await service.replayInitial('terminal-1');
+      emitOutput('typed on phone', 3, actualRevision);
+      emitOutput('desktop input echo', 4, actualRevision);
+      emitOutput('delayed old process', 100, 3);
+      expect(writes).toEqual(['current screen', 'typed on phone', 'desktop input echo']);
+    });
+  }
+
+  it('does not retarget a replacement view when an earlier attachment finishes late', async () => {
+    let finishStart!: (value: unknown) => void;
+    commandHandler = () =>
+      new Promise((resolve) => {
+        finishStart = resolve;
+      });
+    await service.connect('terminal-1', 3, () => undefined);
+    const starting = service.start(startableSession(), 120, 30);
+    const writes: string[] = [];
+    await service.connect('terminal-1', 4, (data) => writes.push(data));
+    finishStart({ attached: true, runtimeRevision: 0, cols: 48, rows: 20 });
+    await starting;
+    commandHandler = () =>
+      Promise.resolve({ data: 'new process', runtimeRevision: 4, sequence: 1 });
+    await service.replayInitial('terminal-1');
+    emitOutput('fresh', 2, 4);
+    expect(writes).toEqual(['new process', 'fresh']);
   });
 });

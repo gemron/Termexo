@@ -7,7 +7,9 @@ import {
 } from './terminal-key-sequences';
 
 /** Every keypad key whose sequence does not depend on the terminal's modes. */
-const FIXED_QUICK_KEY_SEQUENCES: Readonly<Record<Exclude<QuickKey, CursorDirection>, string>> = {
+const FIXED_QUICK_KEY_SEQUENCES: Readonly<
+  Record<Exclude<QuickKey, CursorDirection | 'shiftLeft'>, string>
+> = {
   escape: AGENT_INTERRUPT_SEQUENCE,
   tab: '\t',
   shiftTab: REVERSE_TAB_SEQUENCE,
@@ -34,6 +36,8 @@ function isCursorDirection(key: QuickKey): key is CursorDirection {
 
 /** The bytes a keypad key writes, matching what the same key on a real keyboard would send. */
 export function quickKeySequence(key: QuickKey, applicationCursorKeys: boolean): string {
+  // A modifier turns this into CSI even while application cursor keys are enabled.
+  if (key === 'shiftLeft') return '\x1b[1;2D';
   return isCursorDirection(key)
     ? cursorKeySequences(applicationCursorKeys)[key]
     : FIXED_QUICK_KEY_SEQUENCES[key];

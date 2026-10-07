@@ -1,6 +1,6 @@
 # 用 MCP 操控五种 Agent：Termexo 使用说明
 
-本说明以 Termexo v0.10.11 为准；本地 MCP 功能从 v0.10.10 开始提供。简明上手步骤也收录在[官网中文使用说明](https://www.termexo.com/guide.html#ai-control)和[英文使用说明](https://www.termexo.com/guide.en.html#ai-control)，两份指南均提供 PDF。
+本说明以 Termexo v0.10.12 为准；本地 MCP 功能从 v0.10.10 开始提供。简明上手步骤也收录在[官网中文使用说明](https://www.termexo.com/guide.html#ai-control)和[英文使用说明](https://www.termexo.com/guide.en.html#ai-control)，两份指南均提供 PDF。
 
 **MCP 是 AI 与 Termexo 之间的连接。连好以后，你可以让一个 AI 操作另一个 Agent 的终端：查找终端、发送提示词、提交回车，再读取实际回复。你用日常语言提出要求，不用写代码，也不用记工具名。**
 
