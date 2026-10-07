@@ -4,7 +4,7 @@
 
 <h1 align="center">Termexo</h1>
 
-<p align="center"><strong>Agent 同时跑，谁在等你，一眼看见</strong></p>
+<p align="center"><strong>让一个 AI 操控其他编程 Agent</strong></p>
 
 <p align="center">
   <a href="./README.md">English</a> · <strong>简体中文</strong>
@@ -31,9 +31,11 @@
   <img src="website/assets/agent-grok.svg" alt="Grok Build" title="Grok Build" width="26" height="26">
 </p>
 
-**在一个 Windows 工作台运行多个 AI 编程 Agent，集中查看执行、等待确认和完成状态。**
+**让 AI 通过 MCP 操控 Claude Code、Codex、OpenCode、Grok Build 和 Antigravity 的终端。**
 
-支持 Claude Code、Codex、OpenCode、Antigravity 和 Grok Build。每个 Agent 仍在本机真实终端运行；你可以按项目找到需要处理的那个终端，恢复原生会话。需要离开电脑时，再通过自建中继、可信局域网或 VPN 从手机接回同一个工作台。
+对一个已连接的 AI 说一句话，它就能通过 Termexo 找到另一个 Agent 的终端，发送提示词、提交回车，再读回实际回复。你可以随时在同一个 Windows 工作台查看过程、接手操作，集中查看执行、等待确认和完成状态。
+
+五种 Agent 都在本机真实终端运行。Termexo 还按项目组织工作区、恢复原生会话；需要离开电脑时，可通过自建中继、可信局域网或 VPN 从手机接回同一个工作台。
 
 [![Termexo v0.10.6 中的两个真实 Antigravity 会话](website/assets/termexo-workbench-demo.png)](https://www.termexo.com/#workbench-demo)
 
@@ -41,13 +43,13 @@
 
 **[下载 Windows 安装包](https://github.com/gemron/Termexo/releases/latest)** · [观看演示](https://www.termexo.com/#workbench-demo) · [首次试用反馈](https://github.com/gemron/Termexo/issues/new?template=first-use.yml)
 
-| 同时看清多个 Agent | 知道谁在等你 | 手机上接着操作 |
+| 让 AI 操作其他 Agent | 知道谁在等你 | 手机上接着操作 |
 | --- | --- | --- |
-| 按项目组织真实终端，并排显示。 | 区分运行中、等待输入和等待审批。 | 通过自建中继跨网络连接，也支持可信局域网或 VPN。 |
+| 通过 MCP 找到终端、发指令、提交并读回回复。 | 按项目并排查看真实终端，区分运行中、等待输入和等待审批。 | 通过自建中继跨网络连接，也支持可信局域网或 VPN。 |
 
 ## 解决什么问题
 
-同时使用多个 AI 编程工具处理多个项目时，窗口容易分散、执行状态难追踪、切换任务需要反复交代背景，离开电脑后又难以继续操作。Termexo 用工作区组织项目和终端，集中呈现 Agent 状态，通过原生会话恢复与交接包接续任务，再把同一个运行中的工作台延伸到手机或另一台电脑。
+同时使用多个 AI 编程工具时，你常常要在窗口之间发需求、查进度、复制回复。Termexo 的本地 MCP 让已连接的 AI 接手这些终端操作；工作区、任务看板和状态提醒帮助你跟踪过程，原生会话恢复与交接包接续任务，手机远程访问让你离开电脑后也能继续。
 
 <picture>
   <source media="(max-width: 600px)" srcset="website/assets/termexo-workflow-zh-mobile.svg">
@@ -83,6 +85,34 @@ npx termexo@latest
 需要 Windows 10 build 17763+ 和 WebView2 Chromium 111+。
 使用 Agent 需安装相应 CLI 并配置模型服务；Termexo 不包含模型订阅。
 **MIT 开源，无需注册 Termexo 账号。**
+
+## 让一个 AI 操控另一个：三步开始
+
+MCP 是 AI 与 Termexo 之间的连接。**你用日常语言提出要求，不用记工具名，也不用写代码。** 先安装并登录要用的 Agent CLI，然后：
+
+1. 打开「设置 → AI 操控（MCP）」，启用本地服务，保留自动连接，开启终端权限；要创建和执行任务时再开启任务权限。点击「应用」，确认显示「运行中」。
+2. 在 Termexo 新开或重新启动一个 Agent 终端。Claude Code、Codex、OpenCode、Grok Build 和 Antigravity CLI 都支持自动接入，无需复制地址、令牌或配置文件。
+3. 把下面这句话发给 **AI 终端**，确认它返回你电脑上的实际工作区和终端：
+
+> 请通过 Termexo MCP 列出我的工作区和终端，告诉我哪些正在运行。先不要修改任何内容。
+
+![Termexo MCP：查找终端、发送指令、提交回车、读取结果](website/assets/termexo-mcp-control-flow-v0.10.11.png)
+
+*按已实现工具绘制的操作流程，非软件截图。使用期间保持 Termexo 桌面运行。*
+
+第一次可以先在 Termexo 打开一个 OpenCode 终端，再对已连接的 AI 说：
+
+> 请通过 Termexo MCP 找到当前工作区中正在运行的 OpenCode 终端，发送 hi 并提交回车，然后读取它的回复。如果有多个匹配的终端，先列出名称让我选择。
+
+通过后，再试一个项目任务：
+
+> 请通过 Termexo MCP，在当前项目创建一个 Claude Code 任务，标题是“梳理项目结构”。使用已配置的默认模型，先只阅读项目，说明主要目录、运行方法和测试入口，不修改文件。启动后查看终端，确认提示词已提交，再把实际输出整理给我。
+
+**已有终端的交互适用于五种 Agent；任务看板执行支持 Claude Code、Codex、OpenCode 和 Grok Build。** Antigravity 请先在工作台中启动，再通过 MCP 操作它的终端。普通终端创建工具创建的是 Shell。
+
+“已发送”和“已启动”都不代表任务完成，要继续读取输出、查看任务状态，并按任务需要检查代码和测试结果。MCP 默认关闭，仅供本机使用；它与手机远程访问独立，Agent 自身的工具审批仍生效。
+
+[完整 MCP 使用说明与排查](./docs/mcp-server.md) · [在线图文指南](https://www.termexo.com/guide.html#ai-control)
 
 ## 通过自建中继，从电脑接到手机
 
@@ -218,6 +248,7 @@ Termexo 以 **Workspace** 为组织单位，把这些信息集中到一个可观
 | 新建 Agent 会话    | 按目录启动 Claude/Codex/OpenCode/Antigravity/Grok Build，并选择对应 CLI 可用的账号、模型和确认选项 |
 | Agent 会话中心     | 只读发现 Claude/Codex/OpenCode/Antigravity/Grok Build 会话，支持搜索、Workspace 过滤、原生恢复，以及接管 CLI 仍持有的 Claude 后台会话 |
 | Agent 状态识别     | 为每个终端生成隔离 Hooks 设置，识别思考、工具调用、权限确认、用户输入和完成状态   |
+| MCP 操控 Agent     | 五种 Agent 自动接入本地 MCP；让已连接的 AI 查询真实终端、发送提示词或控制按键并读取输出，任务工具支持 Claude Code、Codex、OpenCode 和 Grok Build |
 | 模型与 MCP Profile | 管理模型、Endpoint、API Key 与 MCP 配置；Claude CLI 可切换 Anthropic 兼容后端     |
 | 网络与 npm Profile | 按全局/Workspace 管理 HTTP/HTTPS/SOCKS 与 npm 配置，测试连通性并在启动时注入      |
 | 多账号管理         | 管理多个隔离 Claude 与 ChatGPT/Codex 登录、默认账号、认证状态和启动时选择         |
@@ -391,14 +422,6 @@ Termexo/
 ```
 
 ## 开发与验证
-
-MCP 是 AI 与 Termexo 之间的连接：你用日常语言提出要求，AI 就能开终端、读结果、管理任务。第一次用只需 3 步：
-
-1. 在「设置 → AI 操控（MCP）」勾选启用，保留自动连接，点击「应用」，看到「运行中」。
-2. 在 Termexo 中新开一个 AI 终端；已运行的 AI 会话需要重新启动。支持 Claude Code、Codex、OpenCode、Grok Build 和 Antigravity。
-3. 发给 AI：「请通过 Termexo MCP 列出我的工作区和终端，告诉我哪些正在运行。先不要修改任何内容。」确认返回实际工作区和终端状态。
-
-使用期间保持 Termexo 打开，自动连接无需填写地址、令牌或配置文件。更多可直接复制的例句、权限选择及常见问题见 [MCP 使用说明](./docs/mcp-server.md)，中英文在线指南和 PDF 见 [使用指南](https://www.termexo.com/guide.html#ai-control)。
 
 ```powershell
 npm run build

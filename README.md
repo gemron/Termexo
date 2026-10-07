@@ -4,7 +4,7 @@
 
 <h1 align="center">Termexo</h1>
 
-<p align="center"><strong>Run your agents together. Know which one needs you.</strong></p>
+<p align="center"><strong>Let one AI operate your other coding agents.</strong></p>
 
 <p align="center">
   <strong>English</strong> · <a href="./README.cn.md">简体中文</a>
@@ -31,9 +31,11 @@
   <img src="website/assets/agent-grok.svg" alt="Grok Build" title="Grok Build" width="26" height="26">
 </p>
 
-**Run multiple AI coding agents in one Windows workbench and see which one is working, waiting for approval, or done.**
+**Use MCP to let AI operate Claude Code, Codex, OpenCode, Grok Build, and Antigravity terminals.**
 
-Termexo supports Claude Code, Codex, OpenCode, Antigravity, and Grok Build. Each agent still runs in a real terminal on your PC. Find the session that needs you, resume native history, and optionally reconnect to the same workbench from your phone through your own relay, a trusted LAN, or a VPN.
+Give a connected AI an instruction. Through Termexo, it can find another agent's terminal, send a prompt, submit it, and read the actual reply. Watch the process or take over in the same Windows workbench, with working, approval, and completion states in view.
+
+All five agents run in real terminals on your PC. Termexo also organizes projects into workspaces, resumes native sessions, and lets you reconnect from your phone through your own relay, a trusted LAN, or a VPN.
 
 [![Two real Antigravity sessions in Termexo v0.10.6](website/assets/termexo-workbench-demo.png)](https://www.termexo.com/#workbench-demo)
 
@@ -41,13 +43,13 @@ Termexo supports Claude Code, Codex, OpenCode, Antigravity, and Grok Build. Each
 
 **[Download for Windows](https://github.com/gemron/Termexo/releases/latest)** · [Watch the demo](https://www.termexo.com/#workbench-demo) · [Share first-use feedback](https://github.com/gemron/Termexo/issues/new?template=first-use.yml)
 
-| See your agents together | Know who needs you | Continue from your phone |
+| Let AI operate other agents | Know who needs you | Continue from your phone |
 | --- | --- | --- |
-| Arrange real terminals side by side, grouped by project. | Spot an agent waiting for input or approval. | Connect across networks through a self-hosted relay, or directly over a trusted LAN or VPN. |
+| Find terminals, send prompts, submit them, and read replies through MCP. | View real terminals side by side, grouped by project, and spot an agent waiting for input or approval. | Connect across networks through a self-hosted relay, or directly over a trusted LAN or VPN. |
 
 ## The problem it solves
 
-Working across multiple AI coding tools and projects means scattered windows, progress that is hard to track, repeated context when switching tasks, and work you cannot easily continue away from your desk. Termexo organizes projects and terminals into workspaces, brings agent status into view, helps resume work through native sessions and handoff packages, and extends the same running workbench to your phone or another computer.
+With several AI coding tools running, you spend time sending requests, checking progress, and copying replies between windows. Termexo's local MCP lets a connected AI handle those terminal operations. Workspaces, the task board, and status alerts help you follow the process; native sessions and handoff packages help you resume work, and remote access lets you continue away from your desk.
 
 <picture>
   <source media="(max-width: 600px)" srcset="website/assets/termexo-workflow-en-mobile.svg">
@@ -83,6 +85,34 @@ npx termexo@latest
 Requires Windows 10 build 17763+ and WebView2 Chromium 111+.
 Install and configure your chosen agent CLI and model access; Termexo does not include a model subscription.
 **MIT licensed. No Termexo account required.**
+
+## Let one AI operate another: start in three steps
+
+MCP connects AI to Termexo. **Ask in everyday language; no tool names or code required.** Install and sign in to the agent CLIs you want to use, then:
+
+1. Open **Settings → AI control (MCP)**. Enable the local server, keep automatic connection checked, and allow terminal access; also allow task access if you want to create and execute tasks. Click Apply and check for Running.
+2. Start a new agent terminal in Termexo, or restart an existing one. Claude Code, Codex, OpenCode, Grok Build, and Antigravity CLI support automatic connection, with no address, token, or configuration file to copy.
+3. Send this to the **AI terminal** and check that it returns the actual workspaces and terminals on your PC:
+
+> Use Termexo MCP to list my workspaces and terminals, and tell me which are running. Do not change anything yet.
+
+![One instruction, five agent types: Termexo MCP](website/assets/termexo-mcp-control-cover-en-v0.10.11.png)
+
+*A diagram of implemented capabilities, not a software screenshot. Keep the Termexo desktop running during use.*
+
+For a first exchange, open an OpenCode terminal in Termexo, then tell the connected AI:
+
+> Use Termexo MCP to find the running OpenCode terminal in the current workspace. Send hi, submit Enter, and read its reply. If several terminals match, list their names so I can choose.
+
+After that, try a project task:
+
+> Use Termexo MCP to create a Claude Code task in the current project titled “Map the project.” Use its configured default model. Read the project and explain its main folders, how to run it, and its test entry points without changing files. Start the task, inspect the terminal to confirm the prompt was submitted, and summarize the actual output.
+
+**Existing-terminal interaction works with all five agent types. Task-board execution supports Claude Code, Codex, OpenCode, and Grok Build.** Start Antigravity in the workbench first, then operate its terminal through MCP. The terminal creation tool creates a Shell.
+
+“Sent” and “started” do not mean “finished.” Continue reading output and task status, and check code changes and test results as the task requires. MCP is off by default and available only on the host PC; phone remote access is a separate feature, and the agent's own tool approvals still apply.
+
+[Online illustrated guide](https://www.termexo.com/guide.en.html#ai-control) · [MCP reference and troubleshooting](./docs/mcp-server.md)
 
 ## From your desk to your phone, through your own relay
 
@@ -229,6 +259,7 @@ a local control plane that is observable, recoverable, and extensible.
 | Start agent sessions     | Launch Claude, Codex, OpenCode, Antigravity, or Grok Build with a working directory and the available account, model, and confirmation options for that CLI |
 | Session center           | Read-only discovery of Claude/Codex/OpenCode/Antigravity/Grok Build sessions, search, workspace filtering, native resume, and reclaim of a Claude session the CLI still holds open |
 | Agent status tracking    | Isolated hooks per terminal for thinking, tool use, approval, user input, completion, and failure states           |
+| MCP agent control        | Automatic local MCP connection for all five agents; a connected AI can find real terminals, send prompts or control keys, and read output. Task tools support Claude Code, Codex, OpenCode, and Grok Build |
 | Model and MCP profiles   | Manage endpoints, keys, and MCP configuration; switch Claude CLI across Anthropic-compatible backends              |
 | Network and npm profiles | Scope HTTP/HTTPS/SOCKS and npm settings globally or per workspace, test reachability, and inject them at launch    |
 | Account management       | Manage multiple isolated Claude and ChatGPT/Codex logins, defaults, authentication status, and launch-time choice  |
@@ -410,14 +441,6 @@ Termexo/
 ```
 
 ## Development and Verification
-
-MCP connects AI to Termexo: ask in everyday language and AI can open terminals, read results and manage tasks. Start in 3 steps:
-
-1. In Settings → AI control (MCP), enable the server, keep automatic connection checked, click Apply and look for Running.
-2. Open a new AI terminal in Termexo, or restart an existing AI session. Claude Code, Codex, OpenCode, Grok Build and Antigravity are supported.
-3. Ask AI: “Use Termexo MCP to list my workspaces and terminals, and tell me which are running. Do not change anything yet.” Check that it returns your actual workspace names and terminal states.
-
-Keep Termexo open. Automatic connection needs no address, token or configuration file. Find example messages, permissions and troubleshooting in the [online user guide](https://www.termexo.com/guide.en.html#ai-control), with a downloadable PDF. The [MCP reference](./docs/mcp-server.md) also covers manual setup and all tools.
 
 ```powershell
 npm run build

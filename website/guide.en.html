@@ -18,7 +18,7 @@
     <link rel="alternate" hreflang="zh-CN" href="https://www.termexo.com/guide.html" />
     <link rel="alternate" hreflang="x-default" href="https://www.termexo.com/guide.en.html" />
     <link rel="icon" href="assets/termexo-mark.svg" type="image/svg+xml" />
-    <link rel="stylesheet" href="styles.css?v=29df7df673f6" />
+    <link rel="stylesheet" href="styles.css?v=c64af7392e7e" />
     <link rel="stylesheet" href="guide.css?v=79fe4d5a9f4f" />
     <script src="guide.js" defer></script>
     <script src="analytics.js" defer></script>
@@ -171,31 +171,35 @@
 
         <section id="ai-control" class="guide-section" data-pdf-page>
           <h2>06 / AI control (MCP)</h2>
-          <p><strong>MCP connects AI to Termexo.</strong> Once connected, ask in everyday language and AI can open terminals, read results and manage tasks. No code or tool names to memorize. For example: “Open a terminal in the current workspace, run git status and tell me the result.”</p>
+          <p><strong>Let one AI operate another and spend less time carrying messages.</strong> MCP connects AI to Termexo. A connected Agent can find another terminal, send a prompt, submit Enter and read the reply. This works with Claude Code, Codex, OpenCode, Grok Build and Antigravity CLI. Use everyday language; no code or tool names to memorize.</p>
           <h3>First time? Follow these 3 steps</h3>
-          <p>Add a project workspace first. Make sure your AI, such as Claude Code or Codex, starts normally and is signed in. MCP does not sign you in to an AI account.</p>
+          <p>Add a project workspace, install and sign in to the Agent CLIs you want to use, and confirm they start normally. MCP does not replace their accounts, models or allowances. Keep Termexo running.</p>
           <ol>
-            <li><strong>Enable:</strong> In desktop Settings → AI control (MCP), select Enable local MCP server and keep automatic connection checked. Choose permissions, click Apply and look for Running. Usually, leave the port unchanged.</li>
-            <li><strong>Launch:</strong> Open a new AI terminal in Termexo. Claude Code, Codex, OpenCode, Grok Build and Antigravity are supported. Restart existing AI sessions; a Claude attach session needs its original process restarted.</li>
+            <li><strong>Enable:</strong> In desktop Settings → AI control (MCP), enable the local server, keep automatic connection checked and allow terminal access. Check task access if you need the task board. Click Apply and look for Running. Usually, leave the port unchanged.</li>
+            <li><strong>Restart the Agent:</strong> Open or restart an AI terminal in Termexo so it loads the connection settings. All 5 Agents support automatic connection; a Claude attach session needs its original process restarted.</li>
             <li><strong>Ask:</strong> Paste the example below into that AI terminal and press Enter. AI chooses the tools for you. Do not paste it into a plain PowerShell or CMD shell.</li>
           </ol>
           <p class="guide-callout">Use Termexo MCP to list my workspaces and terminals, and tell me which are running. Do not change anything yet.</p>
-          <p><strong>Connected:</strong> AI calls Termexo tools and returns your actual workspace names and terminal states. Saying “I can do that” alone does not verify a connection; Running only means the server is ready. Keep Termexo open. Automatic connection needs no address, token or configuration file.</p>
-          <h3>Once connected, ask for what you need</h3>
+          <p><strong>Connected:</strong> AI calls Termexo tools and returns your actual workspaces and terminals. Saying “I can do that” alone does not verify a connection; Running only means the server is ready. Automatic connection needs no address, token or configuration file entered by hand.</p>
+          <h3>Your first Agent-to-Agent action: send hi</h3>
+          <p>Open an OpenCode terminal in Termexo and wait until it can accept a message. Send this to Codex, Claude Code or another Agent already connected to MCP:</p>
+          <p class="guide-callout">Use Termexo MCP to find the running OpenCode terminal in my current workspace, send hi and submit Enter, then read its reply. If several terminals match, list their names so I can choose.</p>
+          <p>Replace OpenCode with another Agent name to operate its existing terminal. Text reaching the input box only means delivery. Submit Enter and read the actual output; “sent” or “started” does not mean “completed”.</p>
+          <h3>More requests to try</h3>
           <ul>
             <li><strong>Terminals:</strong> “Open a shell terminal in the current workspace, run git status and tell me the result.” Terminal access allows AI to open or close terminals, send commands and read output.</li>
             <li><strong>Tasks:</strong> “Create a Claude Code task called ‘Review project structure’. Save it without starting it.” Requires task access; you can also ask AI to start, stop or resume tasks.</li>
             <li><strong>Settings:</strong> “Set the Termexo terminal font size to 18.” Enable settings access separately to change language, font size and existing model/network profiles.</li>
           </ul>
-          <p>Terminals and tasks are allowed by default, including execution. Name the workspace or task if several match. Configure the model and account in Termexo before requesting a particular model. Sent or started does not mean completed; follow up with “Read the output and check whether it succeeded.”</p>
-          <h3>Not working? Check these first</h3>
+          <p>Terminal and task access allow execution by default. The task board runs Claude Code, Codex, OpenCode and Grok Build. Antigravity accepts messages through an existing terminal but is not a task executor. Creating a plain terminal opens a Shell, not a configured Agent. Name the target if several match, and configure the account and model before requesting a particular model.</p>
+          <h3 data-pdf-page>Not working? Check these first</h3>
           <ul>
             <li><strong>AI cannot find tools:</strong> Check Running and automatic connection, then restart the AI session from Termexo.</li>
             <li><strong>Permission denied:</strong> Enable the relevant permission, click Apply and reconnect AI to refresh its tools. Respond to tool approval prompts in that AI client too.</li>
             <li><strong>Login expired:</strong> In Claude Code, enter <code>/login</code>, follow the sign-in prompts and resend your message. This concerns the AI account.</li>
             <li><strong>No result or timeout:</strong> Ask AI to read the terminal output or task state before retrying. If a prompt remains in the input box, submit it with Enter.</li>
           </ul>
-          <h3 data-pdf-page>Advanced: connect AI apps outside Termexo</h3>
+          <h3>Advanced: connect AI apps outside Termexo</h3>
           <p>Manual setup is only needed for an AI app launched outside Termexo on this PC. It must support Streamable HTTP MCP. Browser-based cloud AI cannot directly reach this local address.</p>
           <ol>
             <li>Check Running, then expand Advanced in the settings panel. The default address is <code>http://127.0.0.1:7421/mcp</code>. If the port is in use, change it and click Apply.</li>

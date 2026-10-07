@@ -43,8 +43,10 @@ test("desktop and phone workflow have complete bilingual copy and honest boundar
     assert.match(dictionaries[lang].demoCaption, /Antigravity/);
     assert.match(dictionaries[lang].demoCaption, /Waiting intervals are cut|已剪去等待片段/);
   }
-  assert.match(dictionaries.zh.heroLine2, /等你/);
-  assert.match(dictionaries.en.heroLine2, /need you/);
+  assert.match(dictionaries.zh.heroLine1, /AI.*Agent/);
+  assert.match(dictionaries.en.heroLine1, /AI.*agents/);
+  assert.match(dictionaries.zh.heroLine2, /读回结果/);
+  assert.match(dictionaries.en.heroLine2, /Read results/);
   assert.match(hero, /data-i18n="heroDownload"/);
   assert.match(hero, /href="#workbench-demo"/);
   assert.doesNotMatch(
@@ -94,8 +96,8 @@ test("remote guide follows language changes and preserves the remote chapter", (
     assert.equal(
       context.document.title,
       lang === "zh"
-        ? "Termexo — Agent 同时跑，谁在等你，一眼看见"
-        : "Termexo — See which coding agent needs you",
+        ? "Termexo — 通过 MCP，让 AI 操控五种 Agent"
+        : "Termexo — Let AI operate your coding agents through MCP",
     );
     const guide = readFileSync(
       new URL(link.attrs.href.split("#")[0], site),
