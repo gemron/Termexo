@@ -206,6 +206,8 @@ const translations = {
     roadmap10Title: "See every agent's status",
     roadmap10Body:
       "Compact workspace icons show each agent's state and current window name. Confirm completed work in its terminal, with the selected terminal's branch checked against Git.",
+    roadmapPatchTitle: "Reliable status and easier setup",
+    roadmapPatchBody: "Codex resume and completion fixes, Grok and Antigravity launch repairs, agent-specific mobile shortcuts, and clearer remote-access and MCP setup.",
     roadmapMcpTitle: "Local MCP control, connected automatically",
     roadmapMcpBody: "19 tools for terminals, tasks and settings. Enable the server, select permissions, then launch Claude Code, Codex, OpenCode, Grok Build or Antigravity. Restart existing Agents to connect.",
 
@@ -440,6 +442,8 @@ const translations = {
     roadmap10Title: "查看每个 Agent 的状态",
     roadmap10Body:
       "工作区图标简洁显示 Agent 状态和当前窗口名称。可在终端中确认完成，当前终端的分支以 Git 信息为准。",
+    roadmapPatchTitle: "状态更可靠，设置更清楚",
+    roadmapPatchBody: "修复 Codex 恢复与完成状态、Grok 和 Antigravity 启动问题，增加按 Agent 区分的移动快捷键及更清楚的远程访问和 MCP 引导。",
     roadmapMcpTitle: "本地 MCP 操控，Agent 自动接入",
     roadmapMcpBody: "19 个工具支持终端、任务和设置。开启服务并选择权限，再启动 Claude Code、Codex、OpenCode、Grok Build 或 Antigravity。已经运行的 Agent 需重启后接入。",
 
