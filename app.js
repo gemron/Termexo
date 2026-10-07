@@ -1,5 +1,29 @@
 const translations = {
   en: {
+    navMcp: "MCP control",
+    mcpIndex: "MCP / AGENTS IN CONTROL",
+    mcpTitle: "Stop carrying messages between agents.",
+    mcpLead: "MCP is the connection that lets an AI use Termexo's tools. You describe the next step; your connected agent can find another terminal, send input and read its output.",
+    mcpSourceLabel: "YOU ASK A CONNECTED AI",
+    mcpSourceTitle: "One clear instruction",
+    mcpSourceBody: "Tell the agent what to send and which reply to bring back.",
+    mcpHubLabel: "THE LOCAL CONNECTION",
+    mcpHubBody: "Find the terminal → send input → submit Enter → read output",
+    mcpLocal: "Runs on your Windows PC",
+    mcpTargetLabel: "FIVE KINDS OF AGENT TERMINALS",
+    mcpFlowCaption: "How the connection works. The target terminal must be running; a reply comes from its actual output.",
+    mcpStep1Title: "Prepare your workspace",
+    mcpStep1Body: "Open Termexo and a project. Make sure your agent CLI is installed and signed in, and keep Termexo running.",
+    mcpStep2Title: "Enable the connection",
+    mcpStep2Body: "In Settings → AI Control (MCP), enable the local service and automatic connection, choose permissions and Apply. Once the service shows Running, start or restart your agent in Termexo.",
+    mcpStep3Title: "Check it with one sentence",
+    mcpStep3Body: "Paste the read-only check below into your connected agent. A real tool call returning your workspaces and terminals confirms the connection.",
+    mcpCheckLabel: "FIRST, CHECK THE CONNECTION",
+    mcpCheckPrompt: "Use Termexo MCP to list my workspaces and terminals, and tell me which are running. Do not change anything yet.",
+    mcpTryLabel: "THEN, TRY AN EXISTING OPENCODE TERMINAL",
+    mcpTryPrompt: "Use Termexo MCP to find the running OpenCode terminal in my current workspace, send hi, submit Enter and read its reply. If several terminals match, list their names and let me choose.",
+    mcpBoundary: "All five support interaction with existing terminals. Task-board execution supports Claude Code, Codex, OpenCode and Grok Build. Sending input or starting a task does not mean it has finished.",
+    mcpFullGuide: "Open the step-by-step MCP guide →",
     navSolutions: "Use cases",
     solutionsIndex: "DIRECTION / USE CASES",
     solutionsTitle: "Keep your AI development work connected.",
@@ -37,15 +61,16 @@ const translations = {
     navPrinciples: "Privacy",
     navGuide: "User guide",
     github: "GitHub",
-    eyebrow: "WINDOWS / MULTI-AGENT WORKBENCH",
-    heroLine1: "Your agents, together.",
-    heroLine2: "Know when they need you.",
+    eyebrow: "WINDOWS / MCP AGENT CONTROL",
+    heroLine1: "Let AI operate your agents.",
+    heroLine2: "Send work. Read results.",
     heroLead:
-      "Run Claude Code, Codex, OpenCode and more in one Windows workspace. See which agent is working or waiting, resume native sessions, and return from your phone when needed.",
+      "Connect an AI to Termexo MCP. Ask it to find a Claude Code, Codex, OpenCode, Grok Build or Antigravity terminal, send an instruction and read the real reply. Keep tasks, sessions and optional phone access in one Windows workspace.",
     heroRemoteNote:
       "Phone access is optional. Keep your PC running and use a reachable HTTPS relay plus a desktop access token, or connect directly over a trusted LAN or VPN.",
     heroDownload: "Download for Windows",
-    heroDemo: "Watch the 30-second demo",
+    heroMcp: "See how MCP works",
+    heroDemo: "Watch the 30-second workbench demo →",
     heroRemoteGuide:
       "Set up remote relay access ↗",
     sceneHeading: "One workspace. Two ways in.",
@@ -167,8 +192,8 @@ const translations = {
       "Reach your workbench across networks",
     featureRemoteBody:
       "A self-hosted relay connects your phone to the same desktop terminals. No public IP or router port forwarding on the desktop.",
-    featureMcpTitle: "Let an Agent operate the workbench",
-    featureMcpBody: "Enable local MCP to read and write terminals, manage tasks and change permitted settings. Five Agents launched by Termexo connect automatically; you choose the access scopes.",
+    featureMcpTitle: "Let one agent operate another",
+    featureMcpBody: "Connect through local MCP to send instructions to existing terminals for all five supported agents and read their output. Manage tasks or permitted settings too; choose access scopes yourself.",
     mcpGuide: "Set up MCP →",
 
     remoteTitle:
@@ -254,6 +279,30 @@ const translations = {
     relayCompatibility: "Relay: Linux / macOS / Windows, x64 / arm64 and containers. Desktop app: Windows 10 / 11.",
   },
   zh: {
+    navMcp: "MCP 操控",
+    mcpIndex: "MCP / 让 AI 操控 AGENT",
+    mcpTitle: "不用再给 Agent 来回复制消息。",
+    mcpLead: "MCP 就是让 AI 使用 Termexo 工具的连接。你说出下一步，接入的 Agent 就能找到另一个终端、发送指令，再把它的实际输出读回来。",
+    mcpSourceLabel: "你告诉已接入的 AI",
+    mcpSourceTitle: "一句清楚的指令",
+    mcpSourceBody: "说明要发给哪个 Agent，以及需要读回什么结果。",
+    mcpHubLabel: "本地连接",
+    mcpHubBody: "找到终端 → 发送指令 → 提交回车 → 读取输出",
+    mcpLocal: "运行在你的 Windows 电脑上",
+    mcpTargetLabel: "五种 AGENT 终端",
+    mcpFlowCaption: "连接流程示意。目标终端需保持运行，回复来自终端的真实输出。",
+    mcpStep1Title: "准备好工作台",
+    mcpStep1Body: "打开 Termexo 和项目，确认 Agent CLI 已安装、已登录，并保持 Termexo 运行。",
+    mcpStep2Title: "打开 MCP 连接",
+    mcpStep2Body: "进入「设置 → AI 操控（MCP）」，开启本地服务和自动接入，选择权限并应用。服务显示「运行中」后，启动或重启 Termexo 里的 Agent。",
+    mcpStep3Title: "用一句话检查连接",
+    mcpStep3Body: "把下面的只读检查发给已接入的 Agent。看到真实工具调用返回你的工作区和终端，就说明接好了。",
+    mcpCheckLabel: "第一次：先确认连接成功",
+    mcpCheckPrompt: "请通过 Termexo MCP 列出我的工作区和终端，告诉我哪些正在运行。先不要修改任何内容。",
+    mcpTryLabel: "然后：操作已有的 OPENCODE 终端",
+    mcpTryPrompt: "请通过 Termexo MCP 找到当前工作区中正在运行的 OpenCode 终端，发送 hi 并提交回车，然后读取它的回复。如果有多个匹配的终端，先列出名称让我选择。",
+    mcpBoundary: "五种 Agent 都支持已有终端交互。任务看板执行支持 Claude Code、Codex、OpenCode 和 Grok Build；发送成功或任务启动成功，不代表已经完成。",
+    mcpFullGuide: "打开 MCP 逐步使用说明 →",
     navSolutions: "使用场景",
     solutionsIndex: "项目方向 / 解决方案场景",
     solutionsTitle: "让 AI 开发工作连起来。",
@@ -291,15 +340,16 @@ const translations = {
     navPrinciples: "隐私",
     navGuide: "使用说明",
     github: "GitHub",
-    eyebrow: "WINDOWS 多 AGENT 工作台",
-    heroLine1: "Agent 同时跑，",
-    heroLine2: "谁在等你，一眼看见。",
+    eyebrow: "WINDOWS / MCP 操控 AGENT",
+    heroLine1: "让 AI 操控你的 Agent。",
+    heroLine2: "发出指令，读回结果。",
     heroLead:
-      "在一个 Windows 工作台运行 Claude Code、Codex、OpenCode 等工具。看清谁在执行、谁等你确认；原生恢复历史会话，需要时再从手机接回工作现场。",
+      "通过 Termexo MCP，让 AI 找到 Claude Code、Codex、OpenCode、Grok Build 或 Antigravity 终端，发送指令，再读回真实回复。任务、会话和可选的手机访问，都在同一个 Windows 工作台里。",
     heroRemoteNote:
       "手机访问按需开启：电脑需保持运行，使用双方可达的 HTTPS 中继与桌面访问令牌，也可在可信局域网或 VPN 内直连。",
     heroDownload: "下载 Windows 版",
-    heroDemo: "看 30 秒新版实录",
+    heroMcp: "了解 MCP 怎么用",
+    heroDemo: "看 30 秒工作台实录 →",
     heroRemoteGuide:
       "了解如何配置中继访问 ↗",
     sceneHeading: "同一个工作台，电脑与手机接续操作。",
@@ -405,8 +455,8 @@ const translations = {
       "跨网络接回工作台",
     featureRemoteBody:
       "通过自建中继，用手机连接桌面正在运行的同一批终端。桌面无需公网 IP，也无需路由器端口映射。",
-    featureMcpTitle: "让 Agent 操作工作台",
-    featureMcpBody: "开启本地 MCP 后，AI 可以读写终端、管理任务和修改获准的设置。Termexo 启动的五种 Agent 自动接入，访问范围由你选择。",
+    featureMcpTitle: "让一个 Agent 操控另一个",
+    featureMcpBody: "通过本地 MCP，向五种 Agent 的已有终端发送指令并读取输出，也能管理任务和修改获准的设置。访问范围由你选择。",
     mcpGuide: "开始使用 MCP →",
 
     remoteTitle:
@@ -512,8 +562,8 @@ function setLanguage(language) {
   }
   document.title =
     language === "zh"
-      ? "Termexo — Agent 同时跑，谁在等你，一眼看见"
-      : "Termexo — See which coding agent needs you";
+      ? "Termexo — 通过 MCP，让 AI 操控五种 Agent"
+      : "Termexo — Let AI operate your coding agents through MCP";
 
   translatedElements.forEach((element) => {
     const value = dictionary[element.dataset.i18n];
@@ -524,7 +574,7 @@ function setLanguage(language) {
         language === "zh" ? "guide.html" : "guide.en.html",
       );
     }
-    if (element.dataset.i18n === "mcpGuide") {
+    if (["mcpGuide", "mcpFullGuide"].includes(element.dataset.i18n)) {
       element.setAttribute("href", language === "zh" ? "guide.html#ai-control" : "guide.en.html#ai-control");
     }
     if (["heroRemoteGuide", "relaySetup"].includes(element.dataset.i18n)) {

@@ -939,6 +939,119 @@ html:not(.motion-ready) .signal-strip,
 .section {
   padding-block: 115px;
 }
+.hero-demo-link {
+  display: inline-block;
+  margin-top: 16px;
+  color: var(--text-soft);
+  font-size: 14px;
+  text-underline-offset: 4px;
+}
+.hero-demo-link:hover { color: var(--green); }
+.mcp-section { scroll-margin-top: 90px; }
+.mcp-flow {
+  margin: 0;
+  overflow: hidden;
+  border: 1px solid #c9dce6;
+  border-radius: 24px;
+  background: linear-gradient(125deg, #fff, #edf6fa);
+  box-shadow: 0 16px 45px #315b710a;
+}
+.mcp-flow-grid {
+  display: grid;
+  grid-template-columns: 1fr auto 1.15fr auto 1fr;
+  align-items: center;
+  gap: 18px;
+  padding: 36px;
+}
+.mcp-flow-stage { min-width: 0; }
+.mcp-flow-label {
+  display: block;
+  color: #476d80;
+  font: 600 11px/1.6 var(--mono);
+  letter-spacing: .04em;
+}
+.mcp-flow-stage strong {
+  display: block;
+  margin-top: 12px;
+  font-size: clamp(22px, 2.2vw, 30px);
+  line-height: 1.3;
+  letter-spacing: -.03em;
+}
+.mcp-flow-stage p {
+  margin: 14px 0 0;
+  color: var(--text-soft);
+  font-size: 15px;
+  line-height: 1.8;
+}
+.mcp-flow-hub {
+  padding: 28px 24px;
+  border: 1px solid #bbd7dd;
+  border-radius: 18px;
+  background: #e6f3f3;
+}
+.mcp-flow-hub strong { color: #226c69; }
+.mcp-local-badge {
+  display: inline-block;
+  margin-top: 22px;
+  padding: 5px 9px;
+  border-radius: 6px;
+  background: #fff9;
+  color: #376563;
+  font-size: 11px;
+  line-height: 1.6;
+}
+.mcp-flow-arrow { color: #7c9ead; font-size: 26px; }
+.mcp-targets {
+  display: grid;
+  gap: 10px;
+  list-style: none;
+  margin: 16px 0 0;
+  padding: 0;
+}
+.mcp-targets li { display: flex; align-items: center; gap: 10px; font-size: 15px; }
+.mcp-targets img { flex-shrink: 0; }
+.mcp-flow figcaption {
+  padding: 16px 24px;
+  border-top: 1px solid #c9dce6;
+  color: var(--text-soft);
+  font-size: 13px;
+  line-height: 1.7;
+}
+.mcp-steps {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 30px;
+  list-style: none;
+  margin: 42px 0;
+  padding: 0;
+}
+.mcp-step-number { color: #7595a6; font: 15px/1 var(--mono); }
+.mcp-steps h3 { margin: 16px 0 10px; font-size: 22px; line-height: 1.4; letter-spacing: -.03em; }
+.mcp-steps p { margin: 0; color: var(--text-soft); font-size: 15px; line-height: 1.85; }
+.mcp-prompts { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 22px; }
+.mcp-prompts article {
+  padding: 26px;
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  background: #ffffffb3;
+}
+.mcp-prompts blockquote { margin: 14px 0 0; font-size: 17px; line-height: 1.85; }
+.mcp-section-footer { display: flex; align-items: center; gap: 40px; margin-top: 26px; }
+.mcp-section-footer p { flex: 1; margin: 0; color: var(--text-soft); font-size: 13px; line-height: 1.8; }
+.mcp-section-footer .button { flex-shrink: 0; font-size: 13px; }
+@media (max-width: 900px) {
+  .mcp-flow-grid { grid-template-columns: 1fr; gap: 18px; padding: 26px; }
+  .mcp-flow-arrow { justify-self: center; transform: rotate(90deg); }
+  .mcp-targets { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .mcp-section-footer { align-items: flex-start; flex-direction: column; gap: 20px; }
+}
+@media (max-width: 640px) {
+  .mcp-steps, .mcp-prompts { grid-template-columns: 1fr; }
+  .mcp-steps { gap: 28px; }
+  .mcp-prompts article { padding: 22px; }
+  .mcp-flow-grid { padding: 24px; }
+  .mcp-flow-hub { padding: 24px; }
+}
 .workflow-figure {
   overflow: hidden;
   border: 1px solid var(--line);

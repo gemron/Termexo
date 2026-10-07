@@ -61,6 +61,13 @@ node --test scripts/website-guide.test.mjs
 
 ## 校验与发布命令
 
+首页首屏与 `#ai-control` 以 MCP 操控为核心：接入的 AI → 本地 Termexo MCP → 五种 Agent 的已有终端。
+流程图由 HTML/CSS 绘制，手机端自动纵向排列；图注明确它是连接示意，回复来自实际终端输出。
+上手步骤为准备项目与 CLI、在设置启用 MCP 后启动或重启 Agent、发送只读检查；后续示例明确发送 `hi`、提交回车及读取回复。
+中英文文案维护在 `app.js`，新增 MCP 完整指南入口也随语言切换到对应的 `#ai-control` 章节。
+五种 Agent 支持已有终端交互；任务看板执行仅支持 Claude Code、Codex、OpenCode 和 Grok Build。
+发送或启动成功不等于任务完成。新增内容不得把旧工作台实录标成 MCP 操控实录。
+
 首页 `#solutions` 展示项目方向、个人与企业研发场景，以及现有能力和长期规划的边界。
 中英文文案维护在 `app.js`；语言切换同时更新配图和替代文本。
 `assets/termexo-workflow-{zh,en}.svg` 为横版流程图，`-mobile.svg` 为手机竖版；

@@ -18,7 +18,7 @@
     <link rel="alternate" hreflang="zh-CN" href="https://www.termexo.com/guide.html" />
     <link rel="alternate" hreflang="x-default" href="https://www.termexo.com/guide.en.html" />
     <link rel="icon" href="assets/termexo-mark.svg" type="image/svg+xml" />
-    <link rel="stylesheet" href="styles.css?v=29df7df673f6" />
+    <link rel="stylesheet" href="styles.css?v=c64af7392e7e" />
     <link rel="stylesheet" href="guide.css?v=79fe4d5a9f4f" />
     <script src="guide.js" defer></script>
     <script src="analytics.js" defer></script>
@@ -171,31 +171,35 @@
 
         <section id="ai-control" class="guide-section" data-pdf-page>
           <h2>06 / AI 操控（MCP）</h2>
-          <p><strong>MCP 是 AI 与 Termexo 之间的连接。</strong>连好后，你用日常语言提出要求，AI 就能帮你开终端、读结果、管理任务，不用写代码，也不用记工具名。比如：「在当前工作区开一个终端，运行 git status，并告诉我结果。」</p>
+          <p><strong>让一个 AI 操作另一个 AI，少做传话和复制粘贴。</strong>MCP 是 AI 与 Termexo 之间的连接。连好后，你在一个 Agent 中说出要求，它就能找到其他终端、发送消息、提交回车并读取回复。支持 Claude Code、Codex、OpenCode、Grok Build 和 Antigravity CLI 这 5 种 Agent；日常使用不用写代码，也不用记工具名。</p>
           <h3>第一次用：只需 3 步</h3>
-          <p>先添加项目工作区，确认 Claude Code、Codex 等 AI 能正常启动并已登录。MCP 不会替你登录 AI 账号。</p>
+          <p>先添加项目工作区，安装并登录 Agent CLI，确认它能正常启动。MCP 不代替 Agent 的账号、模型或额度。使用期间保持 Termexo 运行。</p>
           <ol>
-            <li><strong>开启：</strong>在桌面「设置 → AI 操控（MCP）」勾选「启用本地 MCP 服务」，保留「自动连接 Termexo 启动的 Agent」勾选。选择权限，点击「应用」，看到「运行中」。端口通常不用改。</li>
-            <li><strong>启动：</strong>在 Termexo 中新开一个 AI 终端，支持 Claude Code、Codex、OpenCode、Grok Build 和 Antigravity。已经打开的 AI 会话要重新启动；Claude attach 会话要重启原进程。</li>
+            <li><strong>开启：</strong>在桌面「设置 → AI 操控（MCP）」开启本地服务，保留自动连接，勾选终端权限；需要任务看板时再确认任务权限。点击「应用」，看到「运行中」。通常不用改端口。</li>
+            <li><strong>重启 Agent：</strong>在 Termexo 中新开或重新启动 AI 终端，让它读取连接配置。以上 5 种 Agent 均支持自动连接；Claude attach 会话要重启原进程。</li>
             <li><strong>说话：</strong>复制下方示例到刚启动的 AI 终端，按回车发送。AI 会自己选择工具。不要粘贴到普通 PowerShell 或 CMD 命令行。</li>
           </ol>
           <p class="guide-callout">请通过 Termexo MCP 列出我的工作区和终端，告诉我哪些正在运行。先不要修改任何内容。</p>
-          <p><strong>成功标志：</strong>AI 实际调用 Termexo 工具，返回你电脑上的工作区名称和终端状态。只回答「我可以」还不能说明已连上；「运行中」也只表示服务已就绪。使用期间保持 Termexo 打开。自动连接无需填写地址、令牌或配置文件。</p>
-          <h3>连上后，可以这样说</h3>
+          <p><strong>成功标志：</strong>AI 调用 Termexo 工具，返回你电脑上的真实工作区和终端。只回答「我可以」还不能说明已连接；「运行中」只表示服务就绪。自动连接无需手填地址、令牌或配置文件。</p>
+          <h3>第一次操控另一个 Agent：发送 hi</h3>
+          <p>先在 Termexo 打开一个 OpenCode 终端，等待它能接收消息。再把下面的话发给已连接 MCP 的 Codex、Claude Code 或其他 Agent：</p>
+          <p class="guide-callout">请通过 Termexo MCP 找到当前工作区中正在运行的 OpenCode 终端，发送 hi 并提交回车，然后读取它的回复。如果有多个匹配的终端，先列出名称让我选择。</p>
+          <p>把 OpenCode 换成其他 Agent 名称，就能操作对应的已有终端。提示词进入输入框只是送达；提交回车后还要读取真实输出，不能把「已发送」或「已启动」当作「已完成」。</p>
+          <h3>还可以这样说</h3>
           <ul>
             <li><strong>终端：</strong>「在当前工作区开一个普通终端，运行 git status，并告诉我结果。」需要终端权限，允许 AI 开关终端、发命令、读输出。</li>
             <li><strong>任务：</strong>「创建一个 Claude Code 任务，标题是‘梳理项目结构’，先保存，不要执行。」需要任务权限；还可以要求执行、停止、继续任务。</li>
             <li><strong>设置：</strong>「把 Termexo 的终端字号改为 18。」需要单独开启设置权限，才能修改语言、字号及已有模型 / 网络配置。</li>
           </ul>
-          <p>默认允许终端和任务，包含执行操作的能力。多个工作区或同名任务时，请说清具体名称。指定模型前，先在 Termexo 配好模型及账号。已发送、已启动不等于完成，可以继续说「请读取输出，确认是否成功」。</p>
-          <h3>没成功？先看这里</h3>
+          <p>终端和任务权限默认允许执行。任务看板支持 Claude Code、Codex、OpenCode、Grok Build；Antigravity 可通过已有终端收发消息，但不是任务执行器。新建普通终端得到 Shell，不会自动变成已配置的 Agent。多个匹配时说清名称；指定模型前先配好账号和模型。</p>
+          <h3 data-pdf-page>没成功？先看这里</h3>
           <ul>
             <li><strong>AI 找不到工具：</strong>确认服务「运行中」、自动连接已勾选，再从 Termexo 重新启动 AI 会话。</li>
             <li><strong>提示无权限：</strong>勾选对应权限，点击「应用」，重新连接 AI 以刷新工具列表；AI 客户端自己的工具审批也需要在那里处理。</li>
             <li><strong>提示登录过期：</strong>Claude Code 输入 <code>/login</code>，按提示登录后再发消息。这是 AI 账号的问题。</li>
             <li><strong>没结果或超时：</strong>让 AI 先读取终端输出或任务状态，再决定是否重试。提示词还在输入框时，需要提交回车。</li>
           </ul>
-          <h3 data-pdf-page>进阶：连接 Termexo 外的 AI 应用</h3>
+          <h3>进阶：连接 Termexo 外的 AI 应用</h3>
           <p>仅当你使用这台电脑上、在 Termexo 外启动的 AI 应用时才需要手动配置。它须支持 Streamable HTTP MCP。浏览器里的云端 AI 不能直接访问这个本机地址。</p>
           <ol>
             <li>确认服务「运行中」，展开设置面板的「进阶」。默认地址是 <code>http://127.0.0.1:7421/mcp</code>；端口被占用时可修改，再点击「应用」。</li>

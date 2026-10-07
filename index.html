@@ -5,17 +5,17 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta
       name="description"
-      content="Run Claude Code, Codex, OpenCode and more in one Windows workbench. See which agent is working or waiting, then return from your phone when needed."
+      content="Let one AI operate Claude Code, Codex, OpenCode, Grok Build and Antigravity terminals through Termexo MCP. Send instructions, read real output and keep your Windows workbench in view."
     />
     <meta name="theme-color" content="#edf4f8" />
     <meta property="og:type" content="website" />
     <meta
       property="og:title"
-      content="Termexo — See which coding agent needs you"
+      content="Termexo — Let AI operate your coding agents through MCP"
     />
     <meta
       property="og:description"
-      content="Run coding agents side by side on Windows, spot approvals and failures, and return to the same live workbench from your phone."
+      content="Connect an AI to Termexo MCP, send instructions to five kinds of coding agent terminals and read their real replies. A local Windows workbench with optional phone access."
     />
     <meta
       property="og:image"
@@ -25,11 +25,11 @@
     <meta name="twitter:card" content="summary_large_image" />
     <meta
       name="twitter:title"
-      content="Termexo — Claude Code, Codex, OpenCode, Grok Build and Antigravity in one Windows workspace"
+      content="Termexo — One AI, five kinds of agent terminals, connected through MCP"
     />
     <meta
       name="twitter:description"
-      content="Run coding agents side by side on Windows. Know which one needs you, then return to the same live workbench from your phone."
+      content="Ask your connected AI to find a terminal, send an instruction and read the reply. Supports Claude Code, Codex, OpenCode, Grok Build and Antigravity."
     />
     <meta
       name="twitter:image"
@@ -48,7 +48,7 @@
         "name": "Termexo",
         "softwareVersion": "0.10.11",
         "url": "https://www.termexo.com/",
-        "description": "A local-first Windows AI coding workbench with self-hosted remote relay access, encrypted sessions, real terminals and session recovery.",
+        "description": "A local-first Windows workbench whose MCP server lets a connected AI read and operate Claude Code, Codex, OpenCode, Grok Build and Antigravity terminals and manage tasks. The workbench also offers native session recovery and optional remote access.",
         "applicationCategory": "DeveloperApplication",
         "operatingSystem": "Windows 10, Windows 11",
         "license": "https://github.com/gemron/Termexo/blob/main/LICENSE",
@@ -61,11 +61,11 @@
         "screenshot": "https://www.termexo.com/assets/termexo-workbench-demo.png"
       }
     </script>
-    <title>Termexo — See which coding agent needs you</title>
+    <title>Termexo — Let AI operate your coding agents through MCP</title>
     <link rel="canonical" href="https://www.termexo.com/" />
     <link rel="icon" href="assets/termexo-mark.svg" type="image/svg+xml" />
-    <link rel="stylesheet" href="styles.css?v=29df7df673f6" />
-    <script src="app.js?v=9631391db850" defer></script>
+    <link rel="stylesheet" href="styles.css?v=c64af7392e7e" />
+    <script src="app.js?v=7b6259aa7f46" defer></script>
     <script src="analytics.js" defer></script>
   </head>
   <body class="home-page">
@@ -87,11 +87,11 @@
           aria-label="Main navigation"
           data-nav
         >
-          <a href="#remote-relay" data-i18n="navRelay">Remote relay</a>
+          <a href="#ai-control" data-i18n="navMcp">MCP control</a>
           <a href="#workbench" data-i18n="navWorkbench">Workbench</a>
+          <a href="#remote-relay" data-i18n="navRelay">Remote relay</a>
           <a href="#solutions" data-i18n="navSolutions">Use cases</a>
           <a href="#capabilities" data-i18n="navCapabilities">Features</a>
-          <a href="#roadmap" data-i18n="navRoadmap">Roadmap</a>
           <a href="#principles" data-i18n="navPrinciples">Privacy</a>
           <a href="guide.en.html" data-i18n="navGuide">User guide</a>
         </nav>
@@ -136,14 +136,14 @@
           <div class="eyebrow">
             <span class="live-dot"></span>
             <span data-i18n="eyebrow"
-              >WINDOWS / MULTI-AGENT WORKBENCH</span
+              >WINDOWS / MCP AGENT CONTROL</span
             >
           </div>
           <h1>
-            <span data-i18n="heroLine1">Your agents, together.</span>
-            <em data-i18n="heroLine2">Know when they need you.</em>
+            <span data-i18n="heroLine1">Let AI operate your agents.</span>
+            <em data-i18n="heroLine2">Send work. Read results.</em>
           </h1>
-          <p class="hero-lead" data-i18n="heroLead">Run Claude Code, Codex, OpenCode and more in one Windows workspace. See which agent is working or waiting, resume native sessions, and return from your phone when needed.</p>
+          <p class="hero-lead" data-i18n="heroLead">Connect an AI to Termexo MCP. Ask it to find a Claude Code, Codex, OpenCode, Grok Build or Antigravity terminal, send an instruction and read the real reply. Keep tasks, sessions and optional phone access in one Windows workspace.</p>
           <ul class="hero-agents" aria-label="Supported agents">
             <li>
               <img src="assets/agent-claude.svg" alt="" width="22" height="22" loading="lazy" />
@@ -180,14 +180,15 @@
             </a>
             <a
               class="button secondary"
-              href="#workbench-demo"
+              href="#ai-control"
             >
-              <span data-i18n="heroDemo">Watch the 30-second demo</span>
+              <span data-i18n="heroMcp">See how MCP works</span>
               <svg viewBox="0 0 24 24" aria-hidden="true">
                 <path d="m8 5 11 7-11 7V5Z" />
               </svg>
             </a>
           </div>
+          <a class="hero-demo-link" href="#workbench-demo" data-i18n="heroDemo">Watch the 30-second workbench demo →</a>
           <div class="install-command" aria-label="npm command">
             <span>PS</span>
             <code>npx termexo@latest</code>
@@ -388,6 +389,78 @@
           ><span>Multi-account</span><i></i><span>DeepSeek</span><i></i
           ><span>MiniMax</span><i></i><span>GLM</span><i></i><span>MCP</span
           ><i></i><span>Native PTY</span>
+        </div>
+      </section>
+
+      <section class="section shell mcp-section" id="ai-control" aria-labelledby="mcp-title">
+        <div class="section-heading reveal">
+          <div>
+            <span class="section-index" data-i18n="mcpIndex">MCP / AGENTS IN CONTROL</span>
+            <h2 id="mcp-title" data-i18n="mcpTitle">Stop carrying messages between agents.</h2>
+          </div>
+          <p data-i18n="mcpLead">MCP is the connection that lets an AI use Termexo's tools. You describe the next step; your connected agent can find another terminal, send input and read its output.</p>
+        </div>
+
+        <figure class="mcp-flow reveal" aria-labelledby="mcp-flow-caption">
+          <div class="mcp-flow-grid">
+            <div class="mcp-flow-stage">
+              <span class="mcp-flow-label" data-i18n="mcpSourceLabel">YOU ASK A CONNECTED AI</span>
+              <strong data-i18n="mcpSourceTitle">One clear instruction</strong>
+              <p data-i18n="mcpSourceBody">Tell the agent what to send and which reply to bring back.</p>
+            </div>
+            <span class="mcp-flow-arrow" aria-hidden="true">→</span>
+            <div class="mcp-flow-stage mcp-flow-hub">
+              <span class="mcp-flow-label" data-i18n="mcpHubLabel">THE LOCAL CONNECTION</span>
+              <strong>Termexo MCP</strong>
+              <p data-i18n="mcpHubBody">Find the terminal → send input → submit Enter → read output</p>
+              <span class="mcp-local-badge" data-i18n="mcpLocal">Runs on your Windows PC</span>
+            </div>
+            <span class="mcp-flow-arrow" aria-hidden="true">⇄</span>
+            <div class="mcp-flow-stage">
+              <span class="mcp-flow-label" data-i18n="mcpTargetLabel">FIVE KINDS OF AGENT TERMINALS</span>
+              <ul class="mcp-targets" aria-label="Agent terminals">
+                <li><img src="assets/agent-claude.svg" alt="" width="20" height="20" loading="lazy" />Claude Code</li>
+                <li><img src="assets/agent-codex.svg" alt="" width="20" height="20" loading="lazy" />Codex CLI</li>
+                <li><img src="assets/agent-opencode.svg" alt="" width="20" height="20" loading="lazy" />OpenCode</li>
+                <li><img src="assets/agent-grok.svg" alt="" width="20" height="20" loading="lazy" />Grok Build</li>
+                <li><img src="assets/agent-antigravity.svg" alt="" width="20" height="20" loading="lazy" />Antigravity</li>
+              </ul>
+            </div>
+          </div>
+          <figcaption id="mcp-flow-caption" data-i18n="mcpFlowCaption">How the connection works. The target terminal must be running; a reply comes from its actual output.</figcaption>
+        </figure>
+
+        <ol class="mcp-steps">
+          <li class="reveal">
+            <span class="mcp-step-number" aria-hidden="true">01</span>
+            <h3 data-i18n="mcpStep1Title">Prepare your workspace</h3>
+            <p data-i18n="mcpStep1Body">Open Termexo and a project. Make sure your agent CLI is installed and signed in, and keep Termexo running.</p>
+          </li>
+          <li class="reveal" data-delay="1">
+            <span class="mcp-step-number" aria-hidden="true">02</span>
+            <h3 data-i18n="mcpStep2Title">Enable the connection</h3>
+            <p data-i18n="mcpStep2Body">In Settings → AI Control (MCP), enable the local service and automatic connection, choose permissions and Apply. Once the service shows Running, start or restart your agent in Termexo.</p>
+          </li>
+          <li class="reveal" data-delay="2">
+            <span class="mcp-step-number" aria-hidden="true">03</span>
+            <h3 data-i18n="mcpStep3Title">Check it with one sentence</h3>
+            <p data-i18n="mcpStep3Body">Paste the read-only check below into your connected agent. A real tool call returning your workspaces and terminals confirms the connection.</p>
+          </li>
+        </ol>
+
+        <div class="mcp-prompts reveal">
+          <article>
+            <span class="mcp-flow-label" data-i18n="mcpCheckLabel">FIRST, CHECK THE CONNECTION</span>
+            <blockquote data-i18n="mcpCheckPrompt">Use Termexo MCP to list my workspaces and terminals, and tell me which are running. Do not change anything yet.</blockquote>
+          </article>
+          <article>
+            <span class="mcp-flow-label" data-i18n="mcpTryLabel">THEN, TRY AN EXISTING OPENCODE TERMINAL</span>
+            <blockquote data-i18n="mcpTryPrompt">Use Termexo MCP to find the running OpenCode terminal in my current workspace, send hi, submit Enter and read its reply. If several terminals match, list their names and let me choose.</blockquote>
+          </article>
+        </div>
+        <div class="mcp-section-footer">
+          <p data-i18n="mcpBoundary">All five support interaction with existing terminals. Task-board execution supports Claude Code, Codex, OpenCode and Grok Build. Sending input or starting a task does not mean it has finished.</p>
+          <a class="button secondary" href="guide.en.html#ai-control" data-i18n="mcpFullGuide">Open the step-by-step MCP guide →</a>
         </div>
       </section>
 
@@ -877,8 +950,8 @@
             <article class="bento reveal" data-delay="1">
               <span class="card-tag now" data-i18n="now">WORKS TODAY</span>
               <div class="card-icon green" aria-hidden="true">⌘</div>
-              <h3 data-i18n="featureMcpTitle">Let an Agent operate the workbench</h3>
-              <p data-i18n="featureMcpBody">Enable local MCP to read and write terminals, manage tasks and change permitted settings. Five Agents launched by Termexo connect automatically; you choose the access scopes.</p>
+              <h3 data-i18n="featureMcpTitle">Let one agent operate another</h3>
+              <p data-i18n="featureMcpBody">Connect through local MCP to send instructions to existing terminals for all five supported agents and read their output. Manage tasks or permitted settings too; choose access scopes yourself.</p>
               <a href="guide.en.html#ai-control" data-i18n="mcpGuide">Set up MCP →</a>
             </article>
           </div>
