@@ -917,6 +917,7 @@ fn opencode_launch_environment(
     // profile omitted NO_PROXY, while keeping every bypass the user already configured.
     let existing = environment
         .get("NO_PROXY")
+        .or_else(|| environment.get("no_proxy"))
         .cloned()
         .or_else(|| std::env::var("NO_PROXY").ok())
         .or_else(|| std::env::var("no_proxy").ok())
@@ -936,8 +937,7 @@ fn opencode_launch_environment(
         }
     }
     let no_proxy = exclusions.join(",");
-    environment.insert("NO_PROXY".into(), no_proxy.clone());
-    environment.insert("no_proxy".into(), no_proxy);
+    network::insert_no_proxy_env(&mut environment, no_proxy);
     let runtime = hooks
         .prepare_opencode_runtime(
             terminal_id,
@@ -1804,7 +1804,11 @@ mod tests {
             environment.get("NO_PROXY").map(String::as_str),
             Some("internal.example,localhost,127.0.0.1,::1")
         );
-        assert_eq!(environment.get("no_proxy"), environment.get("NO_PROXY"));
+        if crate::network::should_emit_lowercase_proxy_vars() {
+            assert_eq!(environment.get("no_proxy"), environment.get("NO_PROXY"));
+        } else {
+            assert!(!environment.contains_key("no_proxy"));
+        }
         let config: serde_json::Value =
             serde_json::from_str(environment.get("OPENCODE_CONFIG_CONTENT").unwrap()).unwrap();
         let plugin_path = if config.get("plugins").is_some() {

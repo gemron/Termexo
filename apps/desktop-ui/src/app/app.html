@@ -427,7 +427,11 @@
                 (click)="selectTerminal(terminal.id)"
                 (auxclick)="closeTerminalOnMiddleClick($event, terminal.id)"
               >
-                <i [attr.data-tone]="statusTone(terminal.status)"></i>
+                @if (terminal.status === 'COMPLETED') {
+                  <app-icon class="tab-done" name="check" [size]="12" />
+                } @else {
+                  <i [attr.data-tone]="statusTone(terminal.status)"></i>
+                }
                 <app-icon [name]="agentIcons[terminal.agentType]" [size]="12" />
                 <span>{{ terminal.name }}</span>
               </button>

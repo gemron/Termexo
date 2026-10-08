@@ -796,10 +796,12 @@ app-inspector-panel {
       box-shadow: inset 0 -2px 0 var(--color-error);
     }
 
-    &[data-tone='success'] {
+    // Completed never takes the bottom bar: that line belongs to selection alone. A finished
+    // tab reads as tint plus check mark instead, so it cannot be mistaken for the active one —
+    // when the completed tab itself is active, `.active` keeps the accent bar.
+    &[data-tone='success']:not(.active) {
       color: color-mix(in srgb, var(--color-success) 80%, var(--text));
       background: color-mix(in srgb, var(--color-success) 8%, var(--surface-raised));
-      box-shadow: inset 0 -2px 0 var(--color-success);
     }
 
     &:hover {
@@ -840,6 +842,12 @@ app-inspector-panel {
     app-icon {
       flex: 0 0 auto;
       opacity: 0.7;
+    }
+
+    /* Completion mark: shape plus colour, never the selection's underline. */
+    .tab-done {
+      color: var(--color-success);
+      opacity: 1;
     }
 
     span {

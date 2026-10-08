@@ -2,6 +2,14 @@
 
 Release notes for every Termexo version, newest first. The current release is summarised in [README.md](README.md).
 
+## V0.10.13
+
+- **Cleaner proxy environment on Windows.** Only the uppercase `HTTP_PROXY`, `HTTPS_PROXY`, `ALL_PROXY` and `NO_PROXY` forms are injected there, instead of two casings fighting over one system variable. Unix keeps both spellings.
+- **Every terminal gets the default network profile.** Tasks, new terminals, MCP-created terminals and remote terminals all launch with the same proxy; plain shells no longer miss it.
+- **Older OpenCode CLIs scan again.** Session queries retry once without `--pure` when the installed CLI predates the flag, instead of failing the whole scan.
+- **Codex session titles lose instruction markup.** Titles no longer show raw AGENTS.md instruction text; markup-only titles fall back to the default session name.
+- **Completed tabs read apart from the selected one.** Finished terminals show a check mark instead of a bottom bar, which now belongs to selection alone.
+
 ## V0.10.12
 
 - **Desktop and mobile terminal control stay in sync.** Reconnecting or switching between phone and desktop views no longer leaves the desktop terminal stuck without input or scrolling.

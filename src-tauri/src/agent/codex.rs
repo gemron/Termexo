@@ -351,8 +351,9 @@ fn read_session_titles(path: &Path) -> HashMap<String, String> {
         .filter_map(|line| serde_json::from_str::<Value>(&line).ok())
         .filter_map(|value| {
             let id = value.get("id")?.as_str()?.trim();
-            let title = value.get("thread_name")?.as_str()?.trim();
-            (!id.is_empty() && !title.is_empty()).then(|| (id.to_owned(), title.to_owned()))
+            let title = value.get("thread_name")?.as_str()?;
+            let title = sanitize_title(title);
+            (!id.is_empty() && !title.is_empty()).then(|| (id.to_owned(), title))
         })
         .collect()
 }
@@ -427,8 +428,10 @@ fn parse_session(
                     message_count = message_count.saturating_add(1);
                 }
                 if role == Some("user") && first_user_message.is_none() {
-                    first_user_message =
-                        extract_codex_message(&value).map(|text| truncate_title(&text));
+                    // Sanitized before truncating, so markup does not eat the visible budget
+                    // and an all-markup prompt falls through to the default title below.
+                    first_user_message = extract_codex_message(&value)
+                        .map(|text| truncate_title(&sanitize_title(&text)));
                 }
             }
             _ => {}
@@ -499,6 +502,57 @@ fn truncate_title(value: &str) -> String {
     } else {
         title
     }
+}
+
+/// Strips prompt-instruction markup out of a session title.
+///
+/// Task-launched sessions open with an injected prompt carrying AGENTS.md instructions, so
+/// both Codex's own `thread_name` summary and the first user message can read as raw
+/// instruction text (`# headings`, `<INSTRUCTIONS>`, `<!-- comments -->`). Titles are for
+/// humans, so markup goes and only the words stay; an all-markup title counts as no title
+/// and the caller falls through to the next source.
+fn sanitize_title(value: &str) -> String {
+    strip_xml_tags(&strip_xml_comments(value))
+        .split_whitespace()
+        // Markdown header markers, not content: `## CodeGraph` reads as `CodeGraph`.
+        // Kept attached (`C#`, `#hashtag`) they are content and stay.
+        .filter(|word| !word.chars().all(|character| character == '#'))
+        .collect::<Vec<_>>()
+        .join(" ")
+}
+
+/// Removes `<!-- ... -->` spans; an unterminated comment drops whatever follows it.
+fn strip_xml_comments(value: &str) -> String {
+    let mut result = String::with_capacity(value.len());
+    let mut rest = value;
+    while let Some(start) = rest.find("<!--") {
+        result.push_str(&rest[..start]);
+        rest = match rest[start..].find("-->") {
+            Some(end) => &rest[start + end + 3..],
+            None => return result,
+        };
+    }
+    result.push_str(rest);
+    result
+}
+
+/// Removes `<tag>` spans, keeping the words around them apart.
+fn strip_xml_tags(value: &str) -> String {
+    let mut result = String::with_capacity(value.len());
+    let mut rest = value;
+    while let Some(start) = rest.find('<') {
+        match rest[start..].find('>') {
+            Some(end) => {
+                result.push_str(&rest[..start]);
+                result.push(' ');
+                rest = &rest[start + end + 1..];
+            }
+            // A bare `<` with no closer is text (as in `a < b`), not markup.
+            None => break,
+        }
+    }
+    result.push_str(rest);
+    result
 }
 
 fn short_id(session_id: &str) -> &str {
@@ -645,6 +699,61 @@ mod tests {
         assert_eq!(sessions[0].model_name.as_deref(), Some("gpt-5.6-sol"));
         assert_eq!(sessions[0].message_count, 1);
         assert_eq!(fs::read_to_string(&transcript).unwrap(), original);
+
+        fs::remove_dir_all(directory).unwrap();
+    }
+
+    #[test]
+    fn strips_instruction_markup_from_session_titles() {
+        assert_eq!(
+            sanitize_title(
+                "# AGENTS.md instructions for D:\\devlop\\Termexo <INSTRUCTIONS> <!-- CODEGRAPH_START --> ## CodeGraph"
+            ),
+            "AGENTS.md instructions for D:\\devlop\\Termexo CodeGraph"
+        );
+        assert_eq!(sanitize_title("<!-- CODEGRAPH_START -->"), "");
+        assert_eq!(sanitize_title("<INSTRUCTIONS>"), "");
+        // A bare `<` with no closer is text, not markup.
+        assert_eq!(sanitize_title("a < b"), "a < b");
+        // Attached hashes are content.
+        assert_eq!(sanitize_title("Fix C# build"), "Fix C# build");
+        // A normal title passes through untouched.
+        assert_eq!(
+            sanitize_title("Implement Codex adapter"),
+            "Implement Codex adapter"
+        );
+    }
+
+    #[test]
+    fn all_markup_titles_fall_back_to_the_default() {
+        let directory = test_directory("markup-title");
+        let sessions = directory.join("sessions");
+        fs::create_dir_all(&sessions).unwrap();
+        fs::write(
+            directory.join("session_index.jsonl"),
+            r#"{"id":"019f9978-f46b-7d50-93b6-927b7eefcb1f","thread_name":"<!-- CODEGRAPH_START -->"}"#,
+        )
+        .unwrap();
+        let transcript = sessions.join("rollout-019f9978-f46b-7d50-93b6-927b7eefcb1f.jsonl");
+        let mut file = File::create(&transcript).unwrap();
+        writeln!(
+            file,
+            r#"{{"type":"session_meta","payload":{{"id":"019f9978-f46b-7d50-93b6-927b7eefcb1f","cwd":"D:\\dev\\Termexo"}}}}"#
+        )
+        .unwrap();
+        writeln!(
+            file,
+            r#"{{"type":"response_item","payload":{{"type":"message","role":"user","content":[{{"type":"input_text","text":"<INSTRUCTIONS>"}}]}}}}"#
+        )
+        .unwrap();
+
+        let executable = directory.join(if cfg!(windows) { "codex.cmd" } else { "codex" });
+        fs::write(&executable, "").unwrap();
+        let adapter = CodexCliAdapter::with_paths(executable, directory.clone());
+        let sessions = adapter.list_sessions(None).unwrap();
+
+        assert_eq!(sessions.len(), 1);
+        assert_eq!(sessions[0].title, "Codex 会话 019f9978");
 
         fs::remove_dir_all(directory).unwrap();
     }

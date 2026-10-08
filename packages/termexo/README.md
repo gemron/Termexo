@@ -35,11 +35,11 @@ termexo --help       Show command help
 Set `TERMEXO_PATH` to the full path of another `termexo.exe` to override the
 bundled executable.
 
-## Version 0.10.12
+## Version 0.10.13
 
-Keeps desktop terminals responsive during phone reconnections, fixes Windows
-clipboard paste, and adds Codex's mobile ⇧← shortcut for editing queued input.
-Global Agent failure notices now appear red. Restart Agents after updating.
+Cleans up the Windows proxy environment, applies the default network profile to
+every terminal, rescues session scans on older OpenCode CLIs, and strips
+instruction markup from Codex session titles. Restart Agents after updating.
 
 ## Let one AI operate another through MCP
 

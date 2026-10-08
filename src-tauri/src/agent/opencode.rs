@@ -111,12 +111,27 @@ impl OpenCodeAdapter {
     }
 
     /// Runs a read-only OpenCode query, bounded so a stuck CLI cannot hang the caller.
+    ///
+    /// Older CLIs predate `--pure` and fail every query with `Unrecognized flag`. Rather than
+    /// probing for support up front, the first such failure retries once without the flag —
+    /// one extra spawn only on old installs, none on current ones.
     fn run(&self, arguments: &[&str], timeout: Duration) -> Result<Output, OpenCodeError> {
         let executable = self.find_executable().ok_or(OpenCodeError::NotInstalled)?;
         let mut command = query_command(&executable);
         command.arg(PURE_MODE_FLAG).args(arguments);
-        run_with_timeout(&mut command, timeout)
-            .map_err(|error| OpenCodeError::CommandFailed(error.to_string()))
+        let output = run_with_timeout(&mut command, timeout)
+            .map_err(|error| OpenCodeError::CommandFailed(error.to_string()))?;
+        if !output.status.success()
+            && String::from_utf8_lossy(&output.stderr)
+                .to_ascii_lowercase()
+                .contains("unrecognized flag")
+        {
+            let mut fallback = query_command(&executable);
+            fallback.args(arguments);
+            return run_with_timeout(&mut fallback, timeout)
+                .map_err(|error| OpenCodeError::CommandFailed(error.to_string()));
+        }
+        Ok(output)
     }
 
     fn read_version(&self) -> Option<String> {
@@ -405,6 +420,117 @@ mod tests {
         ));
         assert_eq!(saved.unwrap(), "& 'opencode' --continue");
         fs::remove_dir_all(directory).unwrap();
+    }
+
+    /// A fixture CLI that predates `--pure`: it rejects the flag the way old releases do and
+    /// answers plainly without it. Every run appends to `marker`, so a test can tell one spawn
+    /// from a retry.
+    fn test_pure_rejecting_executable(marker: &Path, version: &str) -> (PathBuf, PathBuf) {
+        let unique = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_nanos();
+        let directory = env::temp_dir().join(format!("termexo-opencode-pure-{unique}"));
+        fs::create_dir_all(&directory).unwrap();
+        let executable = directory.join(if cfg!(windows) {
+            "opencode.cmd"
+        } else {
+            "opencode"
+        });
+        let marker = marker.to_string_lossy();
+        if cfg!(windows) {
+            fs::write(
+                &executable,
+                format!(
+                    "@echo off\r\necho x>> \"{marker}\"\r\nif \"%1\"==\"--pure\" (\r\necho ERROR Unrecognized flag: --pure in command opencode 1>&2\r\nexit /b 1\r\n)\r\necho {version}\r\n"
+                ),
+            )
+            .unwrap();
+        } else {
+            fs::write(
+                &executable,
+                format!(
+                    "#!/bin/sh\necho x >> \"{marker}\"\nif [ \"$1\" = \"--pure\" ]; then echo \"ERROR Unrecognized flag: --pure in command opencode\" >&2; exit 1; fi\necho \"{version}\"\n"
+                ),
+            )
+            .unwrap();
+            #[cfg(unix)]
+            {
+                use std::os::unix::fs::PermissionsExt;
+                fs::set_permissions(&executable, fs::Permissions::from_mode(0o755)).unwrap();
+            }
+        }
+        (directory, executable)
+    }
+
+    fn invocation_count(marker: &Path) -> usize {
+        fs::read_to_string(marker)
+            .map(|contents| contents.lines().count())
+            .unwrap_or_default()
+    }
+
+    #[test]
+    fn falls_back_when_the_cli_predates_pure_mode() {
+        let unique = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_nanos();
+        let marker = env::temp_dir().join(format!("termexo-opencode-marker-{unique}"));
+        let (directory, executable) = test_pure_rejecting_executable(&marker, "1.9.0");
+        let adapter = OpenCodeAdapter::with_executable(executable);
+
+        // The first spawn carries `--pure` and fails; the retry without it reads the version.
+        assert_eq!(adapter.read_version().as_deref(), Some("1.9.0"));
+        assert_eq!(invocation_count(&marker), 2);
+
+        fs::remove_dir_all(directory).unwrap();
+        fs::remove_file(marker).ok();
+    }
+
+    #[test]
+    fn does_not_retry_failures_unrelated_to_pure_mode() {
+        let unique = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_nanos();
+        let directory = env::temp_dir().join(format!("termexo-opencode-boom-{unique}"));
+        fs::create_dir_all(&directory).unwrap();
+        let executable = directory.join(if cfg!(windows) {
+            "opencode.cmd"
+        } else {
+            "opencode"
+        });
+        let marker = env::temp_dir().join(format!("termexo-opencode-boom-marker-{unique}"));
+        let marker_text = marker.to_string_lossy();
+        if cfg!(windows) {
+            fs::write(
+                &executable,
+                format!("@echo off\r\necho x>> \"{marker_text}\"\r\necho boom 1>&2\r\nexit /b 1\r\n"),
+            )
+            .unwrap();
+        } else {
+            fs::write(
+                &executable,
+                format!("#!/bin/sh\necho x >> \"{marker_text}\"\necho boom >&2\nexit 1\n"),
+            )
+            .unwrap();
+            #[cfg(unix)]
+            {
+                use std::os::unix::fs::PermissionsExt;
+                fs::set_permissions(&executable, fs::Permissions::from_mode(0o755)).unwrap();
+            }
+        }
+        let adapter = OpenCodeAdapter::with_executable(executable);
+
+        let error = adapter
+            .list_sessions(None)
+            .expect_err("a failing CLI cannot list sessions");
+        assert!(matches!(error, OpenCodeError::SessionCommand(message) if message == "boom"));
+        // A real failure surfaces at once instead of spawning a second probe.
+        assert_eq!(invocation_count(&marker), 1);
+
+        fs::remove_dir_all(directory).unwrap();
+        fs::remove_file(marker).ok();
     }
 
     #[test]

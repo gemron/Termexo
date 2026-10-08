@@ -125,8 +125,7 @@ pub fn profile_environment(
         proxy_password,
     )?;
     if let Some(value) = trimmed(profile.no_proxy.as_deref()) {
-        environment.insert("NO_PROXY".into(), value.into());
-        environment.insert("no_proxy".into(), value.into());
+        insert_no_proxy_env(&mut environment, value.into());
         // npm reads NO_PROXY too, but its own `noproxy` config wins when both are present —
         // leaving it unset would let an explicit NPM_CONFIG_PROXY capture excluded hosts. npm's
         // format is narrower than Windows/system bypass lists, so translate it independently.
@@ -505,10 +504,66 @@ fn insert_proxy_pair(
 ) -> Result<(), String> {
     if let Some(value) = trimmed(value) {
         let resolved = proxy_url_with_credentials(value, username, password)?;
-        environment.insert(uppercase_key.into(), resolved.clone());
-        environment.insert(lowercase_key.into(), resolved);
+        insert_proxy_env(environment, uppercase_key, lowercase_key, resolved);
     }
     Ok(())
+}
+
+/// Inserts one proxy value under the casing each platform expects.
+///
+/// Windows environment variables are case-insensitive but case-preserving: injecting both
+/// `HTTP_PROXY` and `http_proxy` creates two entries in the launch map for one OS variable,
+/// and which one the child sees depends on HashMap order. Only the uppercase form is
+/// injected there. Linux/macOS keep both forms because Unix tools read either spelling.
+pub(crate) fn insert_proxy_env(
+    environment: &mut HashMap<String, String>,
+    uppercase_key: &str,
+    lowercase_key: &str,
+    value: String,
+) {
+    insert_proxy_env_with_flag(environment, uppercase_key, lowercase_key, value,
+        should_emit_lowercase_proxy_vars())
+}
+
+fn insert_proxy_env_with_flag(
+    environment: &mut HashMap<String, String>,
+    uppercase_key: &str,
+    lowercase_key: &str,
+    value: String,
+    emit_lowercase: bool,
+) {
+    environment.insert(uppercase_key.into(), value.clone());
+    if emit_lowercase {
+        environment.insert(lowercase_key.into(), value);
+    }
+}
+
+/// Inserts the bypass list under the casing each platform expects; see [`insert_proxy_env`].
+pub(crate) fn insert_no_proxy_env(environment: &mut HashMap<String, String>, value: String) {
+    insert_no_proxy_env_with_flag(environment, value, should_emit_lowercase_proxy_vars())
+}
+
+fn insert_no_proxy_env_with_flag(
+    environment: &mut HashMap<String, String>,
+    value: String,
+    emit_lowercase: bool,
+) {
+    environment.insert("NO_PROXY".into(), value.clone());
+    if emit_lowercase {
+        environment.insert("no_proxy".into(), value);
+    }
+}
+
+/// Windows gets the single uppercase form; every other platform keeps both spellings.
+#[cfg(windows)]
+pub(crate) fn should_emit_lowercase_proxy_vars() -> bool {
+    false
+}
+
+/// Windows gets the single uppercase form; every other platform keeps both spellings.
+#[cfg(not(windows))]
+pub(crate) fn should_emit_lowercase_proxy_vars() -> bool {
+    true
 }
 
 fn insert_npm_proxy(
@@ -632,9 +687,73 @@ mod tests {
             environment.get("HTTPS_PROXY").map(String::as_str),
             Some("http://proxy.corp.example:8080")
         );
+        if should_emit_lowercase_proxy_vars() {
+            assert_eq!(
+                environment.get("http_proxy").map(String::as_str),
+                Some("http://proxy.corp.example:8080")
+            );
+        } else {
+            assert!(!environment.contains_key("http_proxy"));
+            assert!(!environment.contains_key("https_proxy"));
+            assert!(!environment.contains_key("no_proxy"));
+        }
+    }
+
+    #[test]
+    fn proxy_env_casing_follows_the_platform_rule() {
+        // Windows injects the single uppercase form; Unix keeps both spellings.
+        let mut uppercase_only = HashMap::new();
+        insert_proxy_env_with_flag(
+            &mut uppercase_only,
+            "HTTP_PROXY",
+            "http_proxy",
+            "http://proxy.example:8080".into(),
+            false,
+        );
         assert_eq!(
-            environment.get("http_proxy").map(String::as_str),
-            Some("http://proxy.corp.example:8080")
+            uppercase_only.get("HTTP_PROXY").map(String::as_str),
+            Some("http://proxy.example:8080")
+        );
+        assert!(!uppercase_only.contains_key("http_proxy"));
+
+        let mut dual = HashMap::new();
+        insert_proxy_env_with_flag(
+            &mut dual,
+            "HTTP_PROXY",
+            "http_proxy",
+            "http://proxy.example:8080".into(),
+            true,
+        );
+        assert_eq!(
+            dual.get("HTTP_PROXY").map(String::as_str),
+            Some("http://proxy.example:8080")
+        );
+        assert_eq!(
+            dual.get("http_proxy").map(String::as_str),
+            Some("http://proxy.example:8080")
+        );
+
+        let mut bypass_uppercase_only = HashMap::new();
+        insert_no_proxy_env_with_flag(
+            &mut bypass_uppercase_only,
+            "localhost".into(),
+            false,
+        );
+        assert_eq!(
+            bypass_uppercase_only.get("NO_PROXY").map(String::as_str),
+            Some("localhost")
+        );
+        assert!(!bypass_uppercase_only.contains_key("no_proxy"));
+
+        let mut bypass_dual = HashMap::new();
+        insert_no_proxy_env_with_flag(&mut bypass_dual, "localhost".into(), true);
+        assert_eq!(
+            bypass_dual.get("NO_PROXY").map(String::as_str),
+            Some("localhost")
+        );
+        assert_eq!(
+            bypass_dual.get("no_proxy").map(String::as_str),
+            Some("localhost")
         );
     }
 

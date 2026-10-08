@@ -2,7 +2,7 @@ use serde::{Deserialize, Serialize};
 use tauri::{AppHandle, Manager, State};
 
 use crate::agent::OpenCodeAdapter;
-use crate::commands::agent::{relaunch_environment, RelaunchRequest};
+use crate::commands::agent::{network_environment, relaunch_environment, RelaunchRequest};
 use crate::config::{CredentialStore, LaunchEnvironmentStore};
 use crate::database::WorkspaceDatabase;
 use crate::git::watch::RepositoryWatcher;
@@ -100,6 +100,19 @@ pub fn create_terminal(
                     workspace_id: request.workspace_id.as_deref(),
                 },
             )?;
+        }
+    }
+    // Unified default network injection: every PTY spawn applies the effective profile, so
+    // shell terminals (UI new, MCP terminal_create, remote) get the same proxy as agent tasks.
+    // prepare_*_launch already carries it; only missing keys are filled, never overwriting.
+    match network_environment(&database, &credentials, request.workspace_id.as_deref()) {
+        Ok(default_env) => {
+            for (key, value) in default_env {
+                environment.entry(key).or_insert(value);
+            }
+        }
+        Err(error) => {
+            tracing::warn!(terminal_id = %request.terminal_id, "无法应用默认网络配置：{error}");
         }
     }
     if request.agent_type.as_deref() == Some("opencode") {

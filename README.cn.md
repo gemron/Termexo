@@ -11,7 +11,7 @@
 </p>
 
 <p align="center">
-  <img alt="Version 0.10.12" src="https://img.shields.io/badge/version-0.10.12-58c7a0">
+  <img alt="Version 0.10.13" src="https://img.shields.io/badge/version-0.10.13-58c7a0">
   <img alt="Windows" src="https://img.shields.io/badge/platform-Windows-0078D4?logo=windows">
   <img alt="Tauri 2" src="https://img.shields.io/badge/Tauri-2-24C8DB?logo=tauri&logoColor=white">
   <img alt="Angular 22" src="https://img.shields.io/badge/Angular-22-DD0031?logo=angular">
@@ -132,7 +132,7 @@ MCP 是 AI 与 Termexo 之间的连接。**你用日常语言提出要求，不�
 
 ## 最新版本
 
-**[v0.10.12](https://github.com/gemron/Termexo/releases/tag/v0.10.12)** 修复手机重连后桌面终端输入和滚动失去响应的问题，恢复 Windows 终端粘贴，并为 Codex 手机快捷键新增 ⇧← 编辑排队输入；全局 Agent 失败提示也改为红色。[开始使用 MCP](https://www.termexo.com/guide.html#ai-control)。
+**[v0.10.13](https://github.com/gemron/Termexo/releases/tag/v0.10.13)** 清理 Windows 代理环境变量，所有终端统一应用默认网络配置，旧版 OpenCode 也能扫描会话，Codex 会话标题去掉指令杂质，完成态与选中态不再混淆。[开始使用 MCP](https://www.termexo.com/guide.html#ai-control)。
 [完整更新记录](CHANGELOG.cn.md)。
 
 如果 Termexo 帮到了你，欢迎 **给仓库点一个 Star**，帮助更多开发者发现它。
@@ -405,7 +405,8 @@ flowchart LR
 | V0.10.9 | 紧凑状态图标、完成确认与准确的分支显示 | 已发布 |
 | V0.10.10 | 本地 MCP 操控与五种 Agent 自动接入 | 已发布 |
 | V0.10.11 | Agent 状态与启动修复、移动快捷键和更清楚的设置引导 | 已发布 |
-| V0.10.12 | 桌面终端响应、Windows 粘贴和 Codex 手机快捷键 | 当前版本 |
+| V0.10.12 | 桌面终端响应、Windows 粘贴和 Codex 手机快捷键 | 已发布 |
+| V0.10.13 | 代理清理、旧版 OpenCode 扫描、干净标题、可区分的完成态 | 当前版本 |
 | V1.0 | 稳定性、安全加固与恢复体验 | 规划中 |
 
 进行中的工作见 [Issues](https://github.com/gemron/Termexo/issues)，实际交付内容见
