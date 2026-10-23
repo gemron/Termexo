@@ -154,6 +154,15 @@ impl McpManager {
         request: &mut crate::commands::terminal::TerminalStartRequest,
         environment: &mut HashMap<String, String>,
     ) -> Result<(), String> {
+        // The One Ring coordinator owns its workflow and approval, including after restore.
+        if request.agent_type.as_deref() == Some("codex")
+            && request
+                .command
+                .as_deref()
+                .is_some_and(|command| command.contains("mcp_servers.one_ring="))
+        {
+            return Ok(());
+        }
         let _configs = self.agent_configs.lock().unwrap_or_else(|e| e.into_inner());
         let settings = self.settings();
         if !settings.enabled || !settings.auto_connect_agents {

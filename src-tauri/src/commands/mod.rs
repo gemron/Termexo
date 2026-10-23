@@ -8,6 +8,7 @@ pub mod hooks;
 pub mod mcp;
 pub mod network_export;
 pub mod notification;
+pub mod one_ring;
 pub mod open;
 pub mod quota;
 pub mod remote;

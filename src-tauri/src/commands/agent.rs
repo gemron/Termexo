@@ -275,6 +275,8 @@ pub struct PrepareClaudeLaunchRequest {
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct PrepareCodexLaunchRequest {
+    #[serde(default)]
+    pub one_ring: Option<crate::one_ring::CoordinatorRequest>,
     pub terminal_id: String,
     pub workspace_id: Option<String>,
     pub session_id: Option<String>,
@@ -534,6 +536,11 @@ pub fn prepare_codex_launch(
         .filter(|value| !value.trim().is_empty())
         .or_else(|| profile.as_ref().map(|profile| profile.codex_model.clone()));
     let mut provider_configs = codex_provider_configs(profile.as_ref())?;
+    let one_ring =
+        crate::one_ring::coordinator_config(&database, &request.terminal_id, request.one_ring)?;
+    if let Some((config, _)) = &one_ring {
+        provider_configs.push(config.clone());
+    }
     if let (Some(profile), Some(model)) = (profile.as_ref(), effective_model.as_deref()) {
         if let Some(metadata) = codex_model_metadata(profile, model) {
             let catalog_path = hooks
@@ -588,12 +595,17 @@ pub fn prepare_codex_launch(
     }
     adapter
         .build_launch_command(&CodexLaunchOptions {
+            initial_prompt: if session_id.is_none() {
+                one_ring.as_ref().map(|(_, prompt)| prompt.clone())
+            } else {
+                None
+            },
             session_id,
             model: effective_model,
             notify_config: Some(notify_config),
             hook_configs,
             provider_configs,
-            auto_confirm: request.auto_confirm,
+            auto_confirm: request.auto_confirm && one_ring.is_none(),
         })
         .map_err(|error| error.to_string())
 }

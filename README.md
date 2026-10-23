@@ -144,6 +144,8 @@ Trying it for the first time? [Tell us what worked or where you got stuck](https
 <details>
 <summary><strong>More features and screenshots</strong></summary>
 
+For the optional One Ring orchestration preview and Windows validation steps, see the [integration guide](docs/one-ring-integration.md) (Chinese).
+
 ## What Works Today
 
 <table>
