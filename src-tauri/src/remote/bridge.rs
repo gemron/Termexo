@@ -51,6 +51,8 @@ pub const REMOTE_EVENTS: &[&str] = &[
 /// [`REMOTE_DENIED`]; `every_registered_command_is_classified` fails the build's test run when a
 /// newly added command is left unclassified.
 pub const REMOTE_ALLOWED: &[&str] = &[
+    "get_one_ring_connection",
+    "inspect_one_ring",
     "detect_claude",
     "detect_codex",
     "detect_opencode",
@@ -137,6 +139,8 @@ pub const REMOTE_ALLOWED: &[&str] = &[
 
 /// Commands a remote client must never reach, with the reason each one is held back.
 pub const REMOTE_DENIED: &[&str] = &[
+    // Selects executable local plugin code on the desktop host.
+    "connect_one_ring",
     // MCP grants access to the desktop independently of a remote workbench session.
     "get_mcp_server_status",
     "update_mcp_server_settings",

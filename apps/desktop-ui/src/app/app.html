@@ -101,6 +101,17 @@
           type="button"
           role="tab"
           class="tool-button"
+          data-testid="one-ring-toggle"
+          [class.active]="workspaceView() === 'one-ring'"
+          [attr.aria-selected]="workspaceView() === 'one-ring'"
+          (click)="workspaceView.set('one-ring')"
+        >
+          <span>One Ring</span>
+        </button>
+        <button
+          type="button"
+          role="tab"
+          class="tool-button"
           data-testid="git-view-toggle"
           [class.active]="workspaceView() === 'git'"
           [attr.aria-selected]="workspaceView() === 'git'"
@@ -535,6 +546,15 @@
 
     <section class="workbench-area" [class.board-active]="workspaceView() !== 'terminal'">
       @if (state.activeWorkspace(); as activeWorkspace) {
+        @defer (when workspaceView() === 'one-ring') {
+          @if (workspaceView() === 'one-ring') {
+            <app-one-ring-panel
+              [root]="activeWorkspace.projectPath"
+              (coordinatorRequested)="openOneRingCoordinator($event)"
+              (terminalRequested)="workspaceView.set('terminal')"
+            />
+          }
+        }
         @defer (when workspaceView() === 'tasks') {
           @if (workspaceView() === 'tasks') {
             <app-todo-board
@@ -771,6 +791,7 @@
 
 @if (codexLaunchOpen()) {
   <app-codex-launch-dialog
+    [oneRing]="pendingOneRing() !== null"
     [installation]="agents.codexInstallation()"
     [profiles]="agents.modelProfiles()"
     [accountProfiles]="agents.accountProfiles()"

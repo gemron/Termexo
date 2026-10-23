@@ -34,7 +34,7 @@ export interface CodexLaunchDialogValue {
   template: `
     <app-launch-dialog-shell
       [icon]="agentIcon"
-      [heading]="'launch.newCodex' | t"
+      [heading]="oneRing() ? 'One Ring · Codex Coordinator' : ('launch.newCodex' | t)"
       [detecting]="'launch.detectingCodex' | t"
       [installation]="installation()"
       [workingDirectory]="workingDirectory()"
@@ -47,6 +47,9 @@ export interface CodexLaunchDialogValue {
       (directoryChangeRequested)="directoryChangeRequested.emit()"
     >
       <div class="form-grid">
+        @if (oneRing()) {
+          <p class="wide">此会话通过 One Ring 编排任务。计划、修复和交付需要单独确认。</p>
+        }
         <label class="wide session-name-field">
           <span>{{ 'launch.sessionName' | t }}</span>
           <input
@@ -137,17 +140,19 @@ export interface CodexLaunchDialogValue {
             }
           </select>
         </label>
-        <label class="wide checkbox-control auto-confirm-control">
-          <input
-            type="checkbox"
-            [ngModel]="autoConfirm()"
-            (ngModelChange)="autoConfirm.set($event)"
-          />
-          <span>
-            <strong>{{ 'launch.autoConfirm' | t }}</strong>
-            <small>{{ 'launch.autoConfirmHelp' | t }}</small>
-          </span>
-        </label>
+        @if (!oneRing()) {
+          <label class="wide checkbox-control auto-confirm-control">
+            <input
+              type="checkbox"
+              [ngModel]="autoConfirm()"
+              (ngModelChange)="autoConfirm.set($event)"
+            />
+            <span>
+              <strong>{{ 'launch.autoConfirm' | t }}</strong>
+              <small>{{ 'launch.autoConfirmHelp' | t }}</small>
+            </span>
+          </label>
+        }
       </div>
     </app-launch-dialog-shell>
   `,
@@ -166,6 +171,7 @@ export class CodexLaunchDialogComponent {
   readonly accountProfiles = input<AccountProfile[]>([]);
   readonly workingDirectory = input('');
   readonly launching = input(false);
+  readonly oneRing = input(false);
   readonly launched = output<CodexLaunchDialogValue>();
   readonly cancelled = output<void>();
 

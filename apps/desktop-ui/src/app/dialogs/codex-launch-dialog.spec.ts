@@ -74,6 +74,13 @@ describe('CodexLaunchDialogComponent', () => {
     expect(root.querySelector<HTMLInputElement>('.model-field input')?.value).toBe('MiniMax-M3');
   });
 
+  it('identifies One Ring coordination and hides automatic confirmation', () => {
+    fixture.componentRef.setInput('oneRing', true);
+    fixture.detectChanges();
+    expect(root.textContent).toContain('One Ring · Codex Coordinator');
+    expect(root.querySelector('.auto-confirm-control')).toBeNull();
+  });
+
   it('replaces a third-party model when the official profile is selected', async () => {
     const profile = root.querySelector<HTMLSelectElement>('.profile-field select')!;
     profile.value = 'openai';

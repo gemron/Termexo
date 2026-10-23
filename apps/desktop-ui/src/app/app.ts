@@ -164,11 +164,13 @@ import {
 import { TerminalToolbarComponent } from './terminal/terminal-toolbar';
 import { TerminalWorkbenchComponent } from './terminal/terminal-workbench';
 import { TodoBoardComponent } from './todo/todo-board';
+import { OneRingPanelComponent } from './one-ring/one-ring-panel';
+import { sameOneRingRoot, type OneRingCoordinatorRequest } from './core/models/one-ring.models';
 import { WorkspaceSidebarComponent } from './workspace/workspace-sidebar';
 import { GitWorkbenchComponent } from './git/git-workbench';
 
 type SidebarResizeTarget = 'workspace' | 'inspector';
-type WorkspaceView = 'terminal' | 'tasks' | 'git';
+type WorkspaceView = 'terminal' | 'tasks' | 'git' | 'one-ring';
 
 /** How a resume should proceed once the CLI's hold on the session has been dealt with. */
 interface BackgroundReclaim {
@@ -288,6 +290,7 @@ function readStoredString(key: string, fallback: string): string {
     TerminalToolbarComponent,
     TerminalWorkbenchComponent,
     TodoBoardComponent,
+    OneRingPanelComponent,
     TranslatePipe,
     WebviewUpgradeDialogComponent,
     WorkspaceSidebarComponent,
@@ -361,6 +364,7 @@ export class App {
   protected readonly createWorkspaceError = signal<string | null>(null);
   private readonly pendingOnboardingAgent = signal<AgentType | null>(null);
   protected readonly workspaceView = signal<WorkspaceView>('terminal');
+  protected readonly pendingOneRing = signal<OneRingCoordinatorRequest | null>(null);
   protected readonly busyTodoTaskId = signal<string | null>(null);
   protected readonly editingWorkspaceId = signal<string | null>(null);
   protected readonly claudeLaunchOpen = signal(false);
@@ -909,6 +913,7 @@ export class App {
   }
 
   protected async openCodexLaunch(): Promise<void> {
+    this.pendingOneRing.set(null);
     this.agentMenuOpen.set(false);
     const workingDirectory = this.state.activeWorkspace()?.projectPath;
     if (!workingDirectory) {
@@ -1170,8 +1175,13 @@ export class App {
 
   protected async launchCodex(value: CodexLaunchDialogValue): Promise<void> {
     const workspace = this.state.activeWorkspace();
-    const workingDirectory = this.selectedTerminalDirectory();
+    const oneRing = this.pendingOneRing();
+    const workingDirectory = oneRing?.root ?? this.selectedTerminalDirectory();
     if (!workspace || !workingDirectory || this.launchingCodex()) {
+      return;
+    }
+    if (oneRing && !sameOneRingRoot(oneRing.root, workspace.projectPath)) {
+      this.showToast('当前项目已切换，请关闭对话框后重新发起 One Ring 任务。', 'attention');
       return;
     }
 
@@ -1191,18 +1201,19 @@ export class App {
         ? this.agents.modelProfiles().find((item) => item.id === value.profileId)
         : undefined;
       const launch = await this.agents.prepareCodexLaunch({
+        oneRing: oneRing ?? undefined,
         terminalId,
         workspaceId: workspace.id,
         model: value.model,
         profileId: value.profileId,
         accountProfileId: value.accountProfileId,
-        autoConfirm: value.autoConfirm,
+        autoConfirm: oneRing ? false : value.autoConfirm,
         reasoningEffort: value.reasoningEffort,
       });
       const terminal = this.state.createTerminal({
         id: terminalId,
         agentType: 'codex',
-        name: value.name || undefined,
+        name: oneRing ? `One Ring · ${value.name || 'Coordinator'}` : value.name || undefined,
         command: launch.command,
         model:
           (profile ? profileModel(profile, 'codex') : undefined) ??
@@ -1211,9 +1222,10 @@ export class App {
         workingDirectory,
         profileId: value.profileId,
         accountProfileId: value.accountProfileId,
-        autoConfirm: value.autoConfirm,
+        autoConfirm: oneRing ? false : value.autoConfirm,
       });
       this.codexLaunchOpen.set(false);
+      this.pendingOneRing.set(null);
       this.selectedTerminalDirectory.set(null);
       if (terminal) {
         this.armStartupDialogs(terminal.id);
@@ -1228,8 +1240,18 @@ export class App {
   }
 
   protected closeCodexLaunch(): void {
+    this.pendingOneRing.set(null);
     this.codexLaunchOpen.set(false);
     this.selectedTerminalDirectory.set(null);
+  }
+
+  protected async openOneRingCoordinator(request: OneRingCoordinatorRequest): Promise<void> {
+    if (this.launchingCodex() || this.codexLaunchOpen()) return;
+    await this.openCodexLaunch();
+    if (this.codexLaunchOpen()) {
+      this.pendingOneRing.set(request);
+      this.selectedTerminalDirectory.set(request.root);
+    }
   }
 
   protected async launchClaude(value: ClaudeLaunchDialogValue): Promise<void> {

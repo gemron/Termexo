@@ -10,6 +10,7 @@ mod hooks;
 mod mcp;
 mod network;
 mod notification;
+mod one_ring;
 mod process;
 mod pty;
 mod quota;
@@ -181,6 +182,9 @@ pub fn run() {
             commands::agent::inspect_claude_background_session,
             commands::agent::stop_claude_background_session,
             commands::agent::prepare_codex_launch,
+            commands::one_ring::get_one_ring_connection,
+            commands::one_ring::connect_one_ring,
+            commands::one_ring::inspect_one_ring,
             commands::agent::prepare_opencode_launch,
             commands::agent::prepare_grok_launch,
             commands::agent::prepare_pi_launch,
