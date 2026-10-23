@@ -625,6 +625,7 @@ pub fn prepare_opencode_launch(
         &request.terminal_id,
         request.workspace_id.as_deref(),
         request.session_id.as_deref(),
+        &OpenCodeAdapter::new(),
     )?;
     log_proxy_environment(&environment);
     launch_environment
@@ -988,6 +989,7 @@ fn opencode_launch_environment(
     terminal_id: &str,
     workspace_id: Option<&str>,
     session_id: Option<&str>,
+    adapter: &OpenCodeAdapter,
 ) -> Result<HashMap<String, String>, String> {
     let mut environment = network_environment(database, credentials, workspace_id)?;
     // The CLI talks to its private server over loopback. Exclude it even when the selected
@@ -1020,7 +1022,7 @@ fn opencode_launch_environment(
             terminal_id,
             session_id,
             std::env::var("OPENCODE_CONFIG_CONTENT").ok().as_deref(),
-            OpenCodeAdapter::new()
+            adapter
                 .plugin_api_version()
                 .map_err(|error| error.to_string())?,
         )
@@ -1070,6 +1072,22 @@ pub(crate) fn relaunch_environment(
     hooks: &HookEventStore,
     request: &RelaunchRequest<'_>,
 ) -> Result<HashMap<String, String>, String> {
+    relaunch_environment_with_opencode_adapter(
+        database,
+        credentials,
+        hooks,
+        request,
+        &OpenCodeAdapter::new(),
+    )
+}
+
+fn relaunch_environment_with_opencode_adapter(
+    database: &WorkspaceDatabase,
+    credentials: &CredentialStore,
+    hooks: &HookEventStore,
+    request: &RelaunchRequest<'_>,
+    opencode: &OpenCodeAdapter,
+) -> Result<HashMap<String, String>, String> {
     match request.agent_type {
         "claude" | "codex" => model_agent_relaunch_environment(database, credentials, request),
         "opencode" => opencode_launch_environment(
@@ -1079,6 +1097,7 @@ pub(crate) fn relaunch_environment(
             request.terminal_id,
             request.workspace_id,
             request.native_session_id,
+            opencode,
         ),
         "pi" => {
             hooks
@@ -1841,6 +1860,27 @@ mod tests {
         std::fs::create_dir_all(&directory).unwrap();
         let database = WorkspaceDatabase::open(directory.join("termexo.db")).unwrap();
         let hooks = HookEventStore::new(&directory).unwrap();
+        // Exercise restoration against a controlled CLI rather than a developer's installation.
+        let executable = directory.join(if cfg!(windows) {
+            "opencode.cmd"
+        } else {
+            "opencode"
+        });
+        std::fs::write(
+            &executable,
+            if cfg!(windows) {
+                "@echo off\r\necho 2.0.0\r\n"
+            } else {
+                "#!/bin/sh\necho 2.0.0\n"
+            },
+        )
+        .unwrap();
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            std::fs::set_permissions(&executable, std::fs::Permissions::from_mode(0o755)).unwrap();
+        }
+        let adapter = OpenCodeAdapter::with_executable(executable);
         database
             .save_network_profile(&NetworkProfile {
                 id: "proxy".into(),
@@ -1864,7 +1904,7 @@ mod tests {
             })
             .unwrap();
 
-        let environment = relaunch_environment(
+        let environment = relaunch_environment_with_opencode_adapter(
             &database,
             &CredentialStore,
             &hooks,
@@ -1876,6 +1916,7 @@ mod tests {
                 model_profile_id: None,
                 workspace_id: Some("workspace-1"),
             },
+            &adapter,
         )
         .unwrap();
 

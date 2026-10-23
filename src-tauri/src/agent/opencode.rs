@@ -66,7 +66,7 @@ impl OpenCodeAdapter {
     }
 
     #[cfg(test)]
-    fn with_executable(executable: PathBuf) -> Self {
+    pub(crate) fn with_executable(executable: PathBuf) -> Self {
         Self {
             executable_override: Some(executable),
         }

@@ -365,7 +365,8 @@ mod tests {
         fn write_session(&self, id: &str, cwd: &str, timestamp: &str) -> PathBuf {
             let path = self
                 .root
-                .join("sessions/project")
+                .join("sessions")
+                .join("project")
                 .join(format!("{id}.jsonl"));
             let records = [
                 json!({"type":"session","version":3,"id":id,"cwd":cwd,"timestamp":timestamp}),
