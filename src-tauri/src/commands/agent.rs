@@ -255,6 +255,8 @@ pub struct PrepareClaudeLaunchRequest {
     pub session_id: Option<String>,
     pub name: Option<String>,
     pub profile_id: Option<String>,
+    /// Explicit official model selected without a saved provider profile.
+    pub model: Option<String>,
     pub mcp_profile_id: Option<String>,
     pub account_profile_id: Option<String>,
     #[serde(default)]
@@ -399,9 +401,15 @@ pub fn prepare_claude_launch(
         &CLAUDE_EFFORT_LEVELS,
     );
     let model = claude_launch_model(
-        profile
-            .as_ref()
-            .map_or("", |profile| profile.claude_model.as_str()),
+        request
+            .model
+            .as_deref()
+            .filter(|model| !model.trim().is_empty())
+            .unwrap_or_else(|| {
+                profile
+                    .as_ref()
+                    .map_or("", |profile| profile.claude_model.as_str())
+            }),
         context_1m,
     );
 
@@ -1145,10 +1153,10 @@ pub fn prepare_account_login(
         &credentials,
         request.workspace_id.as_deref(),
     )?);
+    let (command, executable_path) = account::login_spec(&profile)?;
     launch_environment
         .put(request.terminal_id, environment)
         .map_err(|error| error.to_string())?;
-    let (command, executable_path) = account::login_spec(&profile)?;
     Ok(AgentLaunchSpec {
         command,
         executable_path,
@@ -1231,8 +1239,12 @@ fn append_proxy_diagnostic(line: &str) {
     }
 }
 
-/// Resolves the same app data directory Tauri uses for `dev.agentdock.desktop`.
+/// Resolves the app data directory: Tauri's for `dev.agentdock.desktop` on Windows, the
+/// `Application Support/Termexo` one on macOS.
 fn dirs_app_data() -> Option<PathBuf> {
+    #[cfg(target_os = "macos")]
+    return crate::platform::macos_data_dir();
+    #[cfg(not(target_os = "macos"))]
     std::env::var_os("APPDATA").map(|base| PathBuf::from(base).join("dev.agentdock.desktop"))
 }
 
@@ -1346,6 +1358,11 @@ fn select_profile(
     requested_id: Option<&str>,
     serves_agent: impl Fn(&ModelProfile) -> bool,
 ) -> Option<ModelProfile> {
+    // Native launches deliberately bypass every saved provider, including a custom default.
+    // This marker is kept on the terminal so restore/account changes retain the same routing.
+    if requested_id == Some("__termexo_cli_native__") {
+        return None;
+    }
     let usable = |profile: &&ModelProfile| serves_agent(profile);
     requested_id
         .and_then(|profile_id| {
@@ -1759,6 +1776,26 @@ mod tests {
             .unwrap()
             .contains(&"sandbox_mode='workspace-write'".into()));
         assert!(codex_worker_configs("coordinator").is_err());
+    }
+
+    #[test]
+    fn official_model_selection_cannot_fall_back_to_custom_default_credentials_or_provider() {
+        let mut custom = profile("custom-default", "custom");
+        custom.is_default = true;
+        let profiles = vec![custom];
+        assert!(select_profile(&profiles, Some("__termexo_cli_native__"), |_| true).is_none());
+        assert_eq!(
+            codex_provider_configs(None).unwrap(),
+            vec![format!(
+                "model_provider={}",
+                toml_literal("openai").unwrap()
+            )]
+        );
+        assert!(claude_profile_environment(None, false).is_empty());
+        let request: PrepareClaudeLaunchRequest = serde_json::from_value(json!({
+            "terminalId": "official-terminal", "profileId": "__termexo_cli_native__", "model": "claude-current"
+        })).unwrap();
+        assert_eq!(request.model.as_deref(), Some("claude-current"));
     }
 
     /// A provider serving both agents, which is how the presets configure one.
@@ -2191,6 +2228,15 @@ mod tests {
 
     #[test]
     fn restores_opencode_proxy_and_terminal_plugin() {
+        // The relaunch probes the real CLI's version, so the test needs one installed.
+        let installed = std::env::var_os("PATH").is_some_and(|path| {
+            std::env::split_paths(&path).any(|directory| directory.join("opencode").is_file())
+                || std::env::split_paths(&path)
+                    .any(|directory| directory.join("opencode.exe").is_file())
+        });
+        if !installed {
+            return;
+        }
         let directory = std::env::temp_dir().join(format!(
             "termexo-opencode-relaunch-{}",
             std::time::SystemTime::now()

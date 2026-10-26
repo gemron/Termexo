@@ -36,13 +36,13 @@
               "budgets": [
                 {
                   "type": "initial",
-                  "maximumWarning": "1450kB",
-                  "maximumError": "1622kB"
+                  "maximumWarning": "1700kB",
+                  "maximumError": "1900kB"
                 },
                 {
                   "type": "anyComponentStyle",
-                  "maximumWarning": "20kB",
-                  "maximumError": "24kB"
+                  "maximumWarning": "26kB",
+                  "maximumError": "30kB"
                 }
               ],
               "outputHashing": "all"
@@ -51,6 +51,29 @@
               "optimization": false,
               "extractLicenses": false,
               "sourceMap": true
+            },
+            "macos": {
+              "budgets": [
+                {
+                  "type": "initial",
+                  "maximumWarning": "1700kB",
+                  "maximumError": "1900kB"
+                },
+                {
+                  "type": "anyComponentStyle",
+                  "maximumWarning": "26kB",
+                  "maximumError": "30kB"
+                }
+              ],
+              "outputHashing": "all",
+              "optimization": {
+                "scripts": true,
+                "styles": {
+                  "minify": true,
+                  "inlineCritical": false
+                },
+                "fonts": false
+              }
             }
           },
           "defaultConfiguration": "production"

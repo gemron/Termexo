@@ -2,8 +2,8 @@
 
 This package runs the official Windows desktop executable for
 [Termexo](https://www.termexo.com/). Let a connected AI use MCP to operate
-Claude Code, Codex, OpenCode, Grok Build, and Antigravity terminals: find a
-terminal, send a prompt, submit it, and read the actual reply. All five agents
+Claude Code, Codex, OpenCode, Pi Agent, Grok Build, and Antigravity terminals: find a
+terminal, send a prompt, submit it, and read the actual reply. All six agents
 run in a local Windows workbench you can view and take over.
 
 ## Install
@@ -35,11 +35,11 @@ termexo --help       Show command help
 Set `TERMEXO_PATH` to the full path of another `termexo.exe` to override the
 bundled executable.
 
-## Version 0.10.13
+## Version 0.10.15
 
-Cleans up the Windows proxy environment, applies the default network profile to
-every terminal, rescues session scans on older OpenCode CLIs, and strips
-instruction markup from Codex session titles. Restart Agents after updating.
+Adds workspace folders, tags and icons, account login choices, model discovery and
+upgrade suggestions, and confirmation before closing active Agent terminals.
+Restart Termexo and Agent terminals after updating.
 
 ## Let one AI operate another through MCP
 
@@ -48,7 +48,7 @@ Install and sign in to the agent CLIs you want to use, then:
 1. In **Settings → AI control (MCP)**, enable the local server, keep automatic
    connection enabled, allow terminal access, and click Apply. Also allow task
    access if you want to create and execute tasks. Check for Running.
-2. Start or restart an agent terminal in Termexo. All five supported agents
+2. Start or restart an agent terminal in Termexo. All six supported agents
    connect automatically as `termexo-desktop`; no address or token to copy.
 3. Send this to the AI terminal and check for your actual workspaces and terminals:
 
@@ -58,8 +58,8 @@ Open an OpenCode terminal in the workbench, then try this from the connected AI:
 
 > Use Termexo MCP to find the running OpenCode terminal in the current workspace. Send hi, submit Enter, and read its reply. If several terminals match, list their names so I can choose.
 
-Existing-terminal interaction works with all five agent types. Task-board
-execution supports Claude Code, Codex, OpenCode, and Grok Build; start
+Existing-terminal interaction works with all six agent types. Task-board
+execution supports Claude Code, Codex, OpenCode, Pi Agent, and Grok Build; start
 Antigravity in the workbench first, then operate its terminal. The terminal
 creation tool creates a Shell. Input delivery and task startup do not mean
 completion: keep reading output and task status to check the actual result.

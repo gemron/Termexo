@@ -1,3 +1,4 @@
+use crate::platform::shell_quote;
 use std::env;
 use std::path::{Path, PathBuf};
 use std::process::Command;
@@ -29,15 +30,11 @@ pub(super) fn query_command(executable: &Path) -> Command {
     hidden_command(executable)
 }
 
-pub(super) fn powershell_quote(value: &str) -> String {
-    format!("'{}'", value.replace('\'', "''"))
-}
-
 pub(super) fn append_option(command: &mut String, flag: &str, value: Option<&str>) {
     if let Some(value) = value.filter(|value| !value.trim().is_empty()) {
         command.push(' ');
         command.push_str(flag);
         command.push(' ');
-        command.push_str(&powershell_quote(value));
+        command.push_str(&shell_quote(value));
     }
 }

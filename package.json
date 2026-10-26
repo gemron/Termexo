@@ -1,6 +1,6 @@
 {
   "name": "termexo",
-  "version": "0.10.13",
+  "version": "0.10.15",
   "description": "Local-first workspace for AI coding agents, models, and terminals",
   "private": true,
   "license": "MIT",
@@ -17,7 +17,9 @@
     "npm:publish": "npm publish ./packages/termexo --access public",
     "npm:test": "npm --prefix packages/termexo test",
     "tauri:dev": "scripts\\tauri-msvc.cmd dev",
-    "tauri:build": "scripts\\tauri-msvc.cmd build"
+    "tauri:build": "scripts\\tauri-msvc.cmd build",
+    "tauri:dev:mac": "npm --prefix apps/desktop-ui run tauri:dev --",
+    "tauri:build:mac": "npm --prefix apps/desktop-ui run tauri:build --"
   },
   "engines": {
     "node": "^22.22.3 || ^24.15.0 || >=26.0.0"

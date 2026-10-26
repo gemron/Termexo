@@ -1,3 +1,6 @@
+import { WechatNotificationsService } from './wechat-notifications.service';
+import { ProjectPreviewService } from './project-preview.service';
+import { CommonActionsService } from './common-actions.service';
 import { DestroyRef, inject, Injectable, InjectionToken, type WritableSignal } from '@angular/core';
 
 import { I18nService, type LanguagePreference } from '../i18n/i18n.service';
@@ -93,6 +96,9 @@ export function terminalPlainText(data: string): string {
 @Injectable({ providedIn: 'root' })
 export class McpDesktopService {
   private readonly state = inject(AppStateService);
+  private readonly commonActions = inject(CommonActionsService);
+  private readonly preview = inject(ProjectPreviewService);
+  private readonly wechat = inject(WechatNotificationsService);
   private readonly agents = inject(AgentService);
   private readonly todos = inject(TodoService);
   private readonly gateway = inject(TerminalGatewayService);
@@ -142,6 +148,76 @@ export class McpDesktopService {
     const actions = this.actions;
     if (!actions) throw new Error('Desktop MCP actions are not ready');
     switch (name) {
+      case 'wechat_notification_status':
+        await this.wechat.refresh();
+        return { settings: this.wechat.settings(), history: this.wechat.history() };
+      case 'wechat_notification_probe':
+        await this.wechat.refresh();
+        return this.wechat.probe(this.wechat.settings().target);
+      case 'wechat_notify':
+        return this.wechat.send({
+          workspaceId: String(args['workspaceId']),
+          eventKey: String(args['eventKey']),
+          kind: args['kind'] as 'completed' | 'error' | 'approval' | 'input',
+          terminalId: args['terminalId'] as string | undefined,
+          taskTitle: args['taskTitle'] as string | undefined,
+        });
+      case 'project_preview_open': {
+        const workspace = this.workspace(String(args['workspaceId']));
+        actions.selectTaskWorkspace(workspace.id);
+        const tab = await this.preview.openFile(
+          workspace.id,
+          String(args['path']),
+          undefined,
+          Number(args['line'] ?? 1),
+          Number(args['column'] ?? 1),
+          args['tabId'] as string | undefined,
+        );
+        return {
+          opened: true,
+          tabId: tab.id,
+          path: tab.file()?.path ?? tab.directory()?.path,
+          readOnly: true,
+        };
+      }
+      case 'web_preview_open': {
+        const workspace = this.workspace(String(args['workspaceId']));
+        actions.selectTaskWorkspace(workspace.id);
+        const tab = this.preview.openUrl(String(args['url']), workspace.id, args['tabId'] as string | undefined);
+        return {
+          opened: true,
+          tabId: tab.id,
+          url: tab.url(),
+          note: '网站可能禁止嵌入，请在面板中查看；未验证跨域网页是否成功显示。',
+        };
+      }
+      case 'common_action_list': {
+        const workspace = this.workspace(String(args['workspaceId']));
+        return {
+          actions: workspace.commonActions ?? [],
+          review: this.commonActions.reviews()[workspace.id] ?? null,
+        };
+      }
+      case 'common_action_propose':
+        return this.commonActions.propose(
+          String(args['workspaceId']),
+          String(args['requestId']),
+          String(args['actionsJson']),
+        );
+      case 'common_action_run':
+      case 'common_action_restart': {
+        const workspace = this.workspace(String(args['workspaceId']));
+        const terminalId = await this.commonActions.run(
+          workspace.id,
+          String(args['actionId']),
+          name === 'common_action_restart',
+        );
+        actions.terminalCreated(workspace.id, terminalId);
+        return { terminalId };
+      }
+      case 'common_action_stop':
+        await this.commonActions.stop(String(args['workspaceId']), String(args['actionId']));
+        return { stopped: true };
       case 'workspace_list':
         return this.state.workspaces().map(({ id, name, projectPath, terminals }) => ({
           id,

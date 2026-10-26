@@ -1255,6 +1255,7 @@ mod tests {
         assert_eq!(changes[1].path, "new name.rs");
     }
 
+    #[cfg(windows)]
     #[test]
     fn rejects_paths_outside_the_worktree() {
         assert!(validate_relative_path("src/main.rs").is_ok());
@@ -1363,7 +1364,13 @@ mod tests {
             return;
         }
 
-        assert_eq!(repository_root(&terminal_directory).unwrap(), Some(project));
+        // Normalize both paths: macOS temp directories may be symlinks, while Windows
+        // canonicalization adds a verbatim prefix that Git's output does not include.
+        let project = project.canonicalize().unwrap();
+        let discovered = repository_root(&terminal_directory)
+            .unwrap()
+            .map(|path| path.canonicalize().unwrap());
+        assert_eq!(discovered, Some(project));
         fs::remove_dir_all(&terminal_directory).ok();
     }
 

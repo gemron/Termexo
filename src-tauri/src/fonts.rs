@@ -133,7 +133,49 @@ mod platform {
     }
 }
 
-#[cfg(not(windows))]
+/// Core Text lists the families macOS itself offers in its font panels; their names are the
+/// strings CSS `font-family` resolves against in WKWebView.
+#[cfg(target_os = "macos")]
+mod platform {
+    use std::ffi::c_void;
+    use std::ptr;
+
+    use objc2_core_foundation::CFString;
+    use objc2_core_text::{CTFont, CTFontManagerCopyAvailableFontFamilyNames, CTFontSymbolicTraits};
+
+    use super::SystemFont;
+
+    /// Only the traits of the face are read, so any size will do.
+    const PROBE_POINT_SIZE: f64 = 12.0;
+
+    pub fn enumerate() -> Result<Vec<SystemFont>, String> {
+        // SAFETY: the call takes no arguments and returns an owned array of CFStrings.
+        let families = unsafe { CTFontManagerCopyAvailableFontFamilyNames() };
+        let mut fonts = Vec::with_capacity(families.count() as usize);
+        for index in 0..families.count() {
+            // SAFETY: `index` is within the array's bounds and the documented element type is
+            // CFString, which outlives this iteration because the array is still held.
+            let family = unsafe {
+                let value: *const c_void = families.value_at_index(index);
+                match (value as *const CFString).as_ref() {
+                    Some(family) => family,
+                    None => continue,
+                }
+            };
+            // SAFETY: `family` is a valid CFString and a null matrix means no transform.
+            let font = unsafe { CTFont::with_name(family, PROBE_POINT_SIZE, ptr::null()) };
+            // SAFETY: `font` was just created and is valid.
+            let traits = unsafe { font.symbolic_traits() };
+            fonts.push(SystemFont {
+                name: family.to_string(),
+                monospaced: traits.contains(CTFontSymbolicTraits::MonoSpaceTrait),
+            });
+        }
+        Ok(fonts)
+    }
+}
+
+#[cfg(not(any(windows, target_os = "macos")))]
 mod platform {
     use super::SystemFont;
 
@@ -169,6 +211,15 @@ mod tests {
         assert!(!is_usable_family_name("Bad\"Font"));
         assert!(!is_usable_family_name("Consolas, monospace"));
         assert!(!is_usable_family_name("Bad\nFont"));
+    }
+
+    #[cfg(target_os = "macos")]
+    #[test]
+    fn lists_macos_families_with_monospaced_ones_flagged() {
+        let fonts = list_system_fonts().expect("system font enumeration should succeed");
+
+        assert!(fonts.iter().any(|font| font.name == "Menlo" && font.monospaced));
+        assert!(fonts.iter().any(|font| font.name == "Helvetica" && !font.monospaced));
     }
 
     #[cfg(windows)]

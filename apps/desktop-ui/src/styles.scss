@@ -143,373 +143,6 @@
   }
 }
 
-.cli-manager {
-  height: 100%;
-  min-height: 0;
-  overflow: auto;
-}
-
-.cli-manager-intro {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 18px;
-  padding-bottom: 14px;
-  border-bottom: 1px solid var(--border);
-
-  strong,
-  span {
-    display: block;
-  }
-
-  strong {
-    font-size: 11px;
-  }
-
-  div > span {
-    margin-top: 5px;
-    color: var(--text-muted);
-    font-size: 10px;
-    line-height: 1.55;
-  }
-}
-
-.cli-agent-selector {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 9px;
-  margin-top: 14px;
-
-  button {
-    display: grid;
-    grid-template-columns: 30px 1fr;
-    grid-template-rows: auto auto;
-    gap: 2px 9px;
-    min-width: 0;
-    padding: 11px;
-    border: 1px solid var(--border);
-    border-radius: var(--radius-field);
-    color: var(--text-secondary);
-    text-align: left;
-    background: var(--surface-raised);
-
-    > span {
-      display: grid;
-      grid-row: 1 / 3;
-      place-items: center;
-      width: 30px;
-      height: 30px;
-      border-radius: var(--radius-selector);
-      color: var(--accent);
-      background: var(--primary-soft);
-    }
-
-    strong {
-      overflow: hidden;
-      font-size: 11px;
-      text-overflow: ellipsis;
-      white-space: nowrap;
-    }
-
-    small {
-      overflow: hidden;
-      color: var(--text-muted);
-      font: 10px/1.35 var(--mono);
-      text-overflow: ellipsis;
-      white-space: nowrap;
-    }
-
-    &:hover:not(.active) {
-      border-color: var(--border-strong);
-      color: var(--text);
-    }
-
-    // The selected CLI drives every field below, so it carries a ring rather than only a tint.
-    &.active {
-      border-color: color-mix(in srgb, var(--accent) 58%, var(--border));
-      color: var(--text);
-      background: var(--primary-soft);
-      box-shadow: 0 0 0 1px color-mix(in srgb, var(--accent) 38%, transparent);
-    }
-  }
-}
-
-.cli-version-row {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  align-items: end;
-  gap: 10px;
-  margin-top: 14px;
-
-  button {
-    min-height: 29px;
-  }
-}
-
-.cli-plan {
-  margin-top: 14px;
-  padding: 12px;
-  border: 1px solid color-mix(in oklab, var(--color-success) 42%, var(--border));
-  border-radius: var(--radius-box);
-  background: var(--success-soft);
-
-  // A plan that cannot run keeps its warning palette throughout, so the heading icon and the
-  // target-version badge never suggest the install is ready.
-  &.unavailable {
-    border-color: color-mix(in oklab, var(--color-warning) 42%, var(--border));
-    background: var(--warning-soft);
-
-    .cli-plan-heading > span {
-      color: var(--color-warning);
-      background: var(--warning-soft);
-    }
-
-    .cli-plan-heading > code {
-      color: var(--color-warning);
-    }
-  }
-
-  dl {
-    display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 8px 14px;
-    margin: 12px 0;
-
-    div {
-      min-width: 0;
-    }
-
-    dt {
-      color: var(--text-muted);
-      font-size: 10px;
-    }
-
-    dd {
-      overflow: hidden;
-      margin: 3px 0 0;
-      color: var(--text-secondary);
-      font: 10px/1.4 var(--mono);
-      text-overflow: ellipsis;
-      white-space: nowrap;
-    }
-  }
-}
-
-.cli-plan-heading {
-  display: grid;
-  grid-template-columns: 28px minmax(0, 1fr) auto;
-  align-items: center;
-  gap: 9px;
-
-  > span {
-    display: grid;
-    place-items: center;
-    width: 28px;
-    height: 28px;
-    border-radius: var(--radius-selector);
-    color: var(--color-success);
-    background: var(--success-soft);
-  }
-
-  strong,
-  small {
-    display: block;
-  }
-
-  strong {
-    font-size: 11px;
-  }
-
-  small {
-    margin-top: 3px;
-    color: var(--text-muted);
-    font-size: 10px;
-  }
-
-  > code {
-    color: var(--color-success);
-    font: 10px/1 var(--mono);
-  }
-}
-
-// An already-current CLI is a success state, not a pending action.
-.cli-plan.up-to-date {
-  border-color: color-mix(in oklab, var(--color-info) 42%, var(--border));
-  background: var(--info-soft);
-
-  .cli-plan-heading > span {
-    color: var(--color-info);
-    background: var(--info-soft);
-  }
-
-  .cli-plan-heading > code {
-    color: var(--color-info);
-  }
-}
-
-.cli-spinner {
-  display: inline-block;
-  width: 11px;
-  height: 11px;
-  margin-right: 6px;
-  border: 2px solid color-mix(in srgb, currentcolor 30%, transparent);
-  border-top-color: currentcolor;
-  border-radius: 50%;
-  animation: cli-spin 640ms linear infinite;
-  vertical-align: -1px;
-}
-
-@keyframes cli-spin {
-  to {
-    transform: rotate(360deg);
-  }
-}
-
-// npm gives no completion percentage, so the bar shows activity rather than progress.
-.cli-progress {
-  position: relative;
-  height: 3px;
-  margin-top: 10px;
-  overflow: hidden;
-  border-radius: 999px;
-  background: var(--surface-inset);
-
-  > i {
-    position: absolute;
-    top: 0;
-    bottom: 0;
-    width: 34%;
-    border-radius: inherit;
-    background: var(--color-primary);
-    animation: cli-progress-slide 1.35s ease-in-out infinite;
-  }
-}
-
-@keyframes cli-progress-slide {
-  0% {
-    left: -34%;
-  }
-  100% {
-    left: 100%;
-  }
-}
-
-.cli-progress-note {
-  display: block;
-  margin-top: 6px;
-  color: var(--text-muted);
-  font-size: 10px;
-}
-
-.cli-command-preview {
-  display: block;
-  overflow: auto;
-  padding: 9px 10px;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-field);
-  color: color-mix(in oklab, var(--text) 82%, var(--color-primary));
-  background: var(--surface-inset);
-  font: 10px/1.5 var(--mono);
-  white-space: nowrap;
-}
-
-.cli-confirmation {
-  margin-top: 12px;
-}
-
-.cli-actions {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  margin-top: 10px;
-
-  > span {
-    color: var(--text-muted);
-    font-size: 10px;
-  }
-}
-
-.cli-empty-state {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-  min-height: 120px;
-  margin-top: 14px;
-  border: 1px dashed var(--border-strong);
-  border-radius: var(--radius-box);
-  color: var(--text-muted);
-  font-size: 10px;
-}
-
-.cli-result {
-  display: flex;
-  align-items: flex-start;
-  gap: 9px;
-  margin-top: 12px;
-  padding: 10px;
-  border: 1px solid color-mix(in oklab, var(--color-success) 42%, var(--border));
-  border-radius: var(--radius-box);
-  color: var(--color-success);
-  background: var(--success-soft);
-
-  strong,
-  small,
-  code {
-    display: block;
-  }
-
-  strong {
-    font-size: 10px;
-  }
-
-  small {
-    margin-top: 3px;
-    color: var(--text-muted);
-    font: 10px/1.4 var(--mono);
-  }
-
-  code {
-    max-height: 80px;
-    margin-top: 7px;
-    overflow: auto;
-    color: var(--color-warning);
-    font: 10px/1.45 var(--mono);
-    white-space: pre-wrap;
-  }
-
-  &.unavailable {
-    border-color: color-mix(in oklab, var(--color-warning) 42%, var(--border));
-    color: var(--color-warning);
-    background: var(--warning-soft);
-  }
-}
-
-// The dialog stops being full width around 900px, where the paired columns get too tight for
-// the monospace values they hold.
-@media (max-width: 900px) {
-  .cli-plan dl {
-    grid-template-columns: 1fr;
-  }
-}
-
-@media (max-width: 720px) {
-  .cli-agent-selector {
-    grid-template-columns: 1fr;
-  }
-
-  .cli-version-row {
-    grid-template-columns: 1fr;
-  }
-
-  .cli-actions {
-    flex-direction: column;
-    align-items: stretch;
-    gap: 9px;
-  }
-}
-
 * {
   box-sizing: border-box;
 }
@@ -682,12 +315,29 @@ summary:focus-visible,
  * survives is badge counts, keyboard glyphs and code-metadata rows. Component styles should
  * reach for these tokens instead of writing pixel sizes of their own.
  */
-.text-2xs { font-size: 10px; }
-.text-xs { font-size: 11px; line-height: 1.45; }
-.text-sm { font-size: 12px; line-height: 1.45; }
-.text-md { font-size: 13px; line-height: 1.5; }
-.text-lg { font-size: 15px; line-height: 1.4; }
-.text-xl { font-size: 17px; line-height: 1.35; }
+.text-2xs {
+  font-size: 10px;
+}
+.text-xs {
+  font-size: 11px;
+  line-height: 1.45;
+}
+.text-sm {
+  font-size: 12px;
+  line-height: 1.45;
+}
+.text-md {
+  font-size: 13px;
+  line-height: 1.5;
+}
+.text-lg {
+  font-size: 15px;
+  line-height: 1.4;
+}
+.text-xl {
+  font-size: 17px;
+  line-height: 1.35;
+}
 
 ::selection {
   color: var(--color-primary-content);
@@ -799,13 +449,5 @@ app-terminal-panel .terminal-host .xterm-viewport {
     transition-duration: 0.01ms !important;
     animation-duration: 0.01ms !important;
     animation-iteration-count: 1 !important;
-  }
-
-  // A frozen progress bar reads as a hung install, so it becomes a static fill instead of
-  // stopping mid-slide.
-  .cli-progress > i {
-    position: static;
-    width: 100%;
-    opacity: 0.55;
   }
 }

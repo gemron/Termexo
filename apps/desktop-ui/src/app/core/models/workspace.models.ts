@@ -34,6 +34,23 @@ export const MAX_TERMINAL_FONT_SIZE = 24;
 export const DEFAULT_TERMINAL_FONT_SIZE = 12;
 export const DEFAULT_WORKSPACE_THEME_COLOR = '#58c7a0';
 
+/** Existing icon names offered when a workspace gets a personal mark. */
+export const WORKSPACE_ICON_OPTIONS = [
+  'folder',
+  'terminal',
+  'git-branch',
+  'bot',
+  'boxes',
+  'command',
+  'package',
+  'server',
+  'grid',
+  'cloud',
+  'wrench',
+  'sparkles',
+  'layout',
+] as const;
+
 export const WORKSPACE_THEME_PRESETS = [
   { name: '翡翠', color: '#58c7a0' },
   { name: '海蓝', color: '#68a9e8' },
@@ -67,7 +84,17 @@ export function normalizeWorkspaceThemeColor(value: string | undefined): string 
     : DEFAULT_WORKSPACE_THEME_COLOR;
 }
 
+export interface CommonAction {
+  id: string;
+  name: string;
+  command: string;
+  workingDirectory: string;
+  description: string;
+  terminalId?: string;
+}
+
 export interface TerminalSession {
+  commonActionId?: string;
   id: string;
   name: string;
   workingDirectory: string;
@@ -77,6 +104,8 @@ export interface TerminalSession {
   model: string;
   branch: string;
   command?: string;
+  /** Authentication commands keep the account home but do not load agent integrations. */
+  accountLogin?: boolean;
   nativeSessionId?: string;
   profileId?: string;
   mcpProfileId?: string;
@@ -99,13 +128,16 @@ export interface Workspace {
   gridColumns?: number;
   gridRows?: number;
   terminals: TerminalSession[];
+  commonActions?: CommonAction[];
 }
 
 export interface CreateTerminalInput {
+  commonActionId?: string;
   id?: string;
   agentType: AgentType;
   name?: string;
   command?: string;
+  accountLogin?: boolean;
   model?: string;
   nativeSessionId?: string;
   workingDirectory?: string;

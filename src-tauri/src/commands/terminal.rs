@@ -22,6 +22,9 @@ pub struct TerminalStartRequest {
     pub command: Option<String>,
     #[serde(default)]
     pub hide_initial_command: bool,
+    /// Authentication subcommands must not receive chat-only CLI flags or MCP configuration.
+    #[serde(default)]
+    pub account_login: bool,
     pub cols: u16,
     pub rows: u16,
     /// Which client these dimensions describe, so several viewers can share one PTY.

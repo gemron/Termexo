@@ -11,7 +11,11 @@ import {
 } from '../core/models/agent.models';
 import { I18nService } from '../core/i18n/i18n.service';
 import { TranslatePipe } from '../core/i18n/translate.pipe';
-import { RepositoryChange, RepositoryOverview, repositoryChangeStatus } from '../core/models/git.models';
+import {
+  RepositoryChange,
+  RepositoryOverview,
+  repositoryChangeStatus,
+} from '../core/models/git.models';
 import {
   AGENT_ICONS,
   AGENT_LABELS,
@@ -84,6 +88,24 @@ const HOUR_MINUTES = 60;
 const DAY_MINUTES = 24 * HOUR_MINUTES;
 /** Keeps the minute-precision countdown honest without re-rendering every second. */
 const COUNTDOWN_TICK_MS = 20_000;
+
+/** Explanations the backend writes for an allowance it cannot show, and the wording replacing each. */
+const QUOTA_DIAGNOSTIC_KEYS: Readonly<Record<string, string>> = {
+  'Claude Code is using your own status line, so Termexo cannot read the allowance from it.':
+    'quota.diagnostic.ownStatusLine',
+  'No allowance reported yet. It appears after Claude Code answers in a Termexo terminal (Pro and Max plans).':
+    'quota.diagnostic.noAllowanceYet',
+};
+
+/** Allowance line names the backend writes, and the wording that replaces each. */
+const QUOTA_LABEL_KEYS: Readonly<Record<string, string>> = {
+  每周额度: 'quota.window.weekly',
+  周额度: 'quota.window.weekly',
+  'Opus 额度': 'quota.window.opus',
+  订阅额度: 'quota.window.subscription',
+  可用余额: 'quota.window.balance',
+  额外点数余额: 'quota.window.extraCredits',
+};
 
 @Component({
   selector: 'app-inspector-panel',
@@ -410,6 +432,25 @@ export class InspectorPanelComponent {
   protected resetTooltip(timestamp?: number): string {
     if (!timestamp) return '';
     return this.i18n.t('quota.resetAt', { time: this.i18n.formatDateTime(timestamp) });
+  }
+
+  /**
+   * The backend names allowance lines in Chinese, so the ones it is known to produce are shown
+   * in the interface language. Anything else is a provider's own wording and passes through.
+   */
+  protected quotaLabel(label: string): string {
+    const hours = /^(\d+) 小时窗口$/.exec(label);
+    if (hours) return this.i18n.t('quota.window.hours', { count: hours[1] });
+    const days = /^(\d+) 天窗口$/.exec(label);
+    if (days) return this.i18n.t('quota.window.days', { count: days[1] });
+    const key = QUOTA_LABEL_KEYS[label];
+    return key ? this.i18n.t(key) : label;
+  }
+
+  /** A diagnostic the backend is known to write is shown in the interface language. */
+  protected quotaDiagnostic(text: string): string {
+    const key = QUOTA_DIAGNOSTIC_KEYS[text];
+    return key ? this.i18n.t(key) : text;
   }
 
   protected usedLabel(percent: number): string {

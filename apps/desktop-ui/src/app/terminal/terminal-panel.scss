@@ -430,6 +430,24 @@ footer {
     text-overflow: ellipsis;
     white-space: nowrap;
   }
+
+  .terminal-path {
+    min-width: 0;
+    overflow: hidden;
+    padding: 0;
+    border: 0;
+    color: inherit;
+    background: transparent;
+    font: inherit;
+    text-align: left;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+
+    &:enabled:hover {
+      color: var(--accent);
+      text-decoration: underline;
+    }
+  }
 }
 
 @container terminal-panel (max-width: 480px) {

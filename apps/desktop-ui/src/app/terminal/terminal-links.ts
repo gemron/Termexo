@@ -15,6 +15,8 @@ export type TerminalLinkKind = 'url' | 'path';
 
 export interface TerminalLink {
   readonly kind: TerminalLinkKind;
+  readonly line?: number;
+  readonly column?: number;
   /** What to open: the address, or the path with any `:line:column` suffix removed. */
   readonly text: string;
   /** Half-open range of the whole match in the line, the suffix included. */
@@ -110,7 +112,14 @@ function addPath(
   }
   const text = matched.replace(LINE_SUFFIX, '');
   if (text) {
-    links.push({ kind: 'path', text, start, end });
+    const location = /:(\d+)(?::(\d+))?$/.exec(matched);
+    links.push({
+      kind: 'path',
+      text,
+      start,
+      end,
+      ...(location ? { line: Number(location[1]), column: Number(location[2] ?? 1) } : {}),
+    });
   }
 }
 

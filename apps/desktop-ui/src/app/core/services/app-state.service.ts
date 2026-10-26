@@ -4,6 +4,7 @@ import { AgentEvent, EVENT_STATUS, TOOL_STARTED_EVENT_TYPE } from '../models/age
 import { createId } from '../models/identifiers';
 import {
   AGENT_LABELS,
+  CommonAction,
   AgentType,
   CreateTerminalInput,
   DEFAULT_TERMINAL_GRID_DIMENSION,
@@ -21,6 +22,7 @@ import { RemoteConnectionService } from './remote-connection.service';
 import { TerminalGatewayService } from './terminal-gateway.service';
 import { hasBackend, runtimeMode } from './tauri-runtime';
 import { WorkspaceRepository } from './workspace.repository';
+import { WorkspaceOrganizationService } from './workspace-organization.service';
 
 const DEFAULT_SHELL = 'powershell.exe';
 const SELECTED_TERMINALS_STORAGE_KEY = 'termexo.selectedTerminals.v1';
@@ -61,6 +63,7 @@ async function loadPreviewWorkspaces(): Promise<Workspace[]> {
 @Injectable({ providedIn: 'root' })
 export class AppStateService {
   private readonly repository = inject(WorkspaceRepository);
+  private readonly workspaceOrganization = inject(WorkspaceOrganizationService);
   private readonly remoteConnection = inject(RemoteConnectionService);
   private readonly gateway = inject(TerminalGatewayService);
   /**
@@ -94,6 +97,7 @@ export class AppStateService {
   private readonly exitedRevisions = new Map<string, number>();
 
   readonly workspaces = this.workspaceItems.asReadonly();
+  readonly organization = this.workspaceOrganization.organization;
   readonly activeWorkspace = computed(
     () => this.workspaceItems().find((item) => item.id === this.activeWorkspaceId()) ?? null,
   );
@@ -163,6 +167,7 @@ export class AppStateService {
           : await loadPreviewWorkspaces();
 
     const orderedWorkspaces = this.normalizeWorkspaceOrder(initialWorkspaces);
+    this.workspaceOrganization.initialize(orderedWorkspaces);
     this.workspaceItems.set(orderedWorkspaces);
     const firstWorkspace = orderedWorkspaces[0];
     this.activeWorkspaceId.set(firstWorkspace?.id ?? null);
@@ -189,7 +194,10 @@ export class AppStateService {
         ? this.attachToRunningTerminals(storedWorkspaces, await this.gateway.liveTerminals())
         : storedWorkspaces,
     );
-    this.workspaceItems.set(workspaces);
+    this.workspaceOrganization.ensureWorkspaces(workspaces);
+    this.workspaceItems.set(
+      this.normalizeWorkspaceOrder(this.workspaceOrganization.orderWorkspaces(workspaces)),
+    );
     const activeWorkspace =
       workspaces.find((workspace) => workspace.id === this.activeWorkspaceId()) ??
       workspaces[0] ??
@@ -227,7 +235,10 @@ export class AppStateService {
           (right.sortOrder ?? Number.MAX_SAFE_INTEGER),
       ),
     );
-    this.workspaceItems.set(orderedWorkspaces);
+    this.workspaceOrganization.ensureWorkspaces(orderedWorkspaces);
+    this.workspaceItems.set(
+      this.normalizeWorkspaceOrder(this.workspaceOrganization.orderWorkspaces(orderedWorkspaces)),
+    );
 
     if (!this.activeWorkspaceId()) {
       const firstWorkspace = orderedWorkspaces[0];
@@ -259,7 +270,10 @@ export class AppStateService {
     const remainingWorkspaces = this.normalizeWorkspaceOrder(
       workspaces.filter((workspace) => workspace.id !== workspaceId),
     );
-    this.workspaceItems.set(remainingWorkspaces);
+    this.workspaceOrganization.ensureWorkspaces(remainingWorkspaces);
+    this.workspaceItems.set(
+      this.normalizeWorkspaceOrder(this.workspaceOrganization.orderWorkspaces(remainingWorkspaces)),
+    );
     this.forgetWorkspaceTerminal(workspaceId);
     if (this.activeWorkspaceId() !== workspaceId) {
       return;
@@ -329,6 +343,8 @@ export class AppStateService {
     // Keep the current selection intact when the write fails so creation can be retried.
     await this.repository.save(workspace);
     this.workspaceItems.update((items) => [...items, workspace]);
+    this.workspaceOrganization.ensureWorkspaces(this.workspaceItems());
+    this.applyWorkspaceOrganizationOrder();
     this.activeWorkspaceId.set(workspace.id);
     this.setActiveTerminal(workspace, null);
     return workspace;
@@ -347,7 +363,10 @@ export class AppStateService {
     );
     await this.repository.delete(workspaceId);
     await this.repository.saveAll(remainingWorkspaces);
-    this.workspaceItems.set(remainingWorkspaces);
+    this.workspaceOrganization.ensureWorkspaces(remainingWorkspaces);
+    this.workspaceItems.set(
+      this.normalizeWorkspaceOrder(this.workspaceOrganization.orderWorkspaces(remainingWorkspaces)),
+    );
     this.forgetWorkspaceTerminal(workspaceId);
 
     if (this.activeWorkspaceId() === workspaceId) {
@@ -406,7 +425,10 @@ export class AppStateService {
 
     const previouslyActiveWorkspaceId = this.activeWorkspaceId();
     const previouslyActiveTerminalId = this.activeTerminalId();
-    this.workspaceItems.set(mergedWorkspaces);
+    this.workspaceOrganization.ensureWorkspaces(mergedWorkspaces);
+    this.workspaceItems.set(
+      this.normalizeWorkspaceOrder(this.workspaceOrganization.orderWorkspaces(mergedWorkspaces)),
+    );
     this.forgetWorkspaceTerminal(sourceWorkspaceId);
     this.activeWorkspaceId.set(targetWorkspaceId);
     const preservesActiveTerminal =
@@ -437,21 +459,13 @@ export class AppStateService {
   }
 
   moveWorkspace(workspaceId: string, direction: -1 | 1): boolean {
-    const workspaces = [...this.workspaceItems()];
-    const currentIndex = workspaces.findIndex((workspace) => workspace.id === workspaceId);
-    const targetIndex = currentIndex + direction;
-    if (currentIndex < 0 || targetIndex < 0 || targetIndex >= workspaces.length) {
-      return false;
-    }
-
-    [workspaces[currentIndex], workspaces[targetIndex]] = [
-      workspaces[targetIndex],
-      workspaces[currentIndex],
-    ];
-    const orderedWorkspaces = this.normalizeWorkspaceOrder(workspaces);
-    this.workspaceItems.set(orderedWorkspaces);
-    void this.repository.saveAll(orderedWorkspaces);
-    return true;
+    const moved = this.workspaceOrganization.moveWorkspace(
+      workspaceId,
+      direction,
+      this.workspaceItems(),
+    );
+    if (moved) this.applyWorkspaceOrganizationOrder();
+    return moved;
   }
 
   reorderWorkspace(
@@ -459,24 +473,57 @@ export class AppStateService {
     targetWorkspaceId: string,
     position: 'before' | 'after',
   ): boolean {
-    const workspaces = [...this.workspaceItems()];
-    const currentIndex = workspaces.findIndex((workspace) => workspace.id === workspaceId);
-    if (currentIndex < 0 || workspaceId === targetWorkspaceId) return false;
-
-    const [moved] = workspaces.splice(currentIndex, 1);
-    const targetIndex = workspaces.findIndex((workspace) => workspace.id === targetWorkspaceId);
-    if (targetIndex < 0) return false;
-    const insertIndex = targetIndex + (position === 'after' ? 1 : 0);
-    if (insertIndex === currentIndex) return false;
-
-    workspaces.splice(insertIndex, 0, moved);
-    const orderedWorkspaces = this.normalizeWorkspaceOrder(workspaces);
-    this.workspaceItems.set(orderedWorkspaces);
-    void this.repository.saveAll(orderedWorkspaces);
-    return true;
+    const moved = this.workspaceOrganization.reorderWorkspace(
+      workspaceId,
+      targetWorkspaceId,
+      position,
+      this.workspaceItems(),
+    );
+    if (moved) this.applyWorkspaceOrganizationOrder();
+    return moved;
   }
 
-  updateWorkspaceAppearance(workspaceId: string, name: string, themeColor: string): boolean {
+  moveWorkspaceToFolder(workspaceId: string, folderId: string | null): boolean {
+    const moved = this.workspaceOrganization.moveWorkspaceToFolder(workspaceId, folderId);
+    if (moved) this.applyWorkspaceOrganizationOrder();
+    return moved;
+  }
+
+  createWorkspaceFolder(name: string, parentId: string | null = null): boolean {
+    return this.workspaceOrganization.createFolder(name, parentId) !== null;
+  }
+
+  renameWorkspaceFolder(folderId: string, name: string): boolean {
+    return this.workspaceOrganization.renameFolder(folderId, name);
+  }
+
+  deleteWorkspaceFolder(folderId: string): boolean {
+    const deleted = this.workspaceOrganization.deleteFolder(folderId);
+    if (deleted) this.applyWorkspaceOrganizationOrder();
+    return deleted;
+  }
+
+  toggleWorkspaceFolder(folderId: string): void {
+    this.workspaceOrganization.toggleFolder(folderId);
+  }
+
+  moveWorkspaceFolder(
+    folderId: string,
+    targetFolderId: string | null,
+    position?: 'before' | 'after',
+  ): boolean {
+    const moved = this.workspaceOrganization.moveFolder(folderId, targetFolderId, position);
+    if (moved) this.applyWorkspaceOrganizationOrder();
+    return moved;
+  }
+
+  updateWorkspaceAppearance(
+    workspaceId: string,
+    name: string,
+    themeColor: string,
+    tags: string[] = [],
+    icon: string | null = null,
+  ): boolean {
     const workspace = this.workspaceItems().find((item) => item.id === workspaceId);
     const normalizedName = name.trim();
     if (!workspace || !normalizedName) {
@@ -490,7 +537,24 @@ export class AppStateService {
     };
     this.replaceWorkspace(updatedWorkspace);
     void this.repository.save(updatedWorkspace);
+    this.workspaceOrganization.updateWorkspace(workspaceId, { tags, icon });
     return true;
+  }
+
+  async saveCommonActions(workspaceId: string, commonActions: CommonAction[]): Promise<void> {
+    const workspace = this.workspaceItems().find((item) => item.id === workspaceId);
+    if (!workspace) throw new Error('项目不存在。');
+    const updated = { ...workspace, commonActions };
+    // Apply before awaiting: concurrent terminal status saves must include the confirmed actions.
+    this.replaceWorkspace(updated);
+    try {
+      await this.repository.save(updated);
+    } catch (error) {
+      const latest = this.workspaceItems().find((item) => item.id === workspaceId);
+      if (latest?.commonActions === commonActions)
+        this.replaceWorkspace({ ...latest, commonActions: workspace.commonActions });
+      throw error;
+    }
   }
 
   createTerminal(input: CreateTerminalInput, workspaceId?: string): TerminalSession | null {
@@ -603,6 +667,16 @@ export class AppStateService {
   }
 
   updateTerminalStatus(terminalId: string, status: TerminalStatus): void {
+    const current = this.findTerminal(terminalId);
+    // Killing a common operation produces a late unsuccessful PTY exit on Windows.
+    // Preserve the user's explicit stop after that runtime has already been marked exited.
+    if (
+      current?.commonActionId &&
+      current.status === 'STOPPED' &&
+      this.isExitedLaunch(current) &&
+      status === 'FAILED'
+    )
+      return;
     this.recordStatusChange(terminalId, Date.now());
     this.updateTerminal(terminalId, (terminal) => ({ ...terminal, status }));
   }
@@ -722,6 +796,10 @@ export class AppStateService {
     return (
       terminal !== undefined &&
       (this.isExitedLaunch(terminal) ||
+        // A delayed startup hook is not evidence that a submitted turn, approval or error ended.
+        (event.agentType === 'codex' &&
+          event.eventType === 'session.ready' &&
+          !['STARTING', 'IDLE'].includes(terminal.status)) ||
         (event.eventType === 'agent.idle' &&
           ['COMPLETED', 'FAILED', 'STOPPED', 'DISCONNECTED'].includes(terminal.status)) ||
         (terminal.status === 'WAITING_APPROVAL' && event.eventType === TOOL_STARTED_EVENT_TYPE))
@@ -967,6 +1045,7 @@ export class AppStateService {
 
     return {
       id: input.id ?? createId(),
+      commonActionId: input.commonActionId,
       name: input.name?.trim() || `${agentLabel} ${workspace.terminals.length + 1}`,
       workingDirectory: input.workingDirectory ?? workspace.projectPath,
       shell: DEFAULT_SHELL,
@@ -985,6 +1064,7 @@ export class AppStateService {
                 : 'Local'),
       branch: workspace.activeBranch,
       command: input.command ?? this.defaultCommand(agentType),
+      accountLogin: input.accountLogin,
       nativeSessionId: input.nativeSessionId,
       profileId: input.profileId,
       mcpProfileId: input.mcpProfileId,
@@ -1003,6 +1083,14 @@ export class AppStateService {
       ...workspace,
       sortOrder,
     }));
+  }
+
+  private applyWorkspaceOrganizationOrder(): void {
+    this.workspaceItems.set(
+      this.normalizeWorkspaceOrder(
+        this.workspaceOrganization.orderWorkspaces(this.workspaceItems()),
+      ),
+    );
   }
 
   /**
@@ -1026,13 +1114,19 @@ export class AppStateService {
         .map((terminal) => {
           const runningRevision = live.get(terminal.id);
           return runningRevision === undefined
-            ? {
+            ? terminal.commonActionId
+              ? { ...terminal, status: 'STOPPED' as const }
+              : {
+                  ...terminal,
+                  status: 'STARTING' as const,
+                  command: terminal.command ?? this.restoredCommand(terminal),
+                  runtimeRevision: (terminal.runtimeRevision ?? 0) + 1,
+                }
+            : {
                 ...terminal,
-                status: 'STARTING' as const,
-                command: terminal.command ?? this.restoredCommand(terminal),
-                runtimeRevision: (terminal.runtimeRevision ?? 0) + 1,
-              }
-            : { ...terminal, runtimeRevision: runningRevision };
+                runtimeRevision: runningRevision,
+                status: terminal.commonActionId ? ('RUNNING' as const) : terminal.status,
+              };
         }),
     }));
   }
@@ -1047,8 +1141,14 @@ export class AppStateService {
       terminals: workspace.terminals.map((terminal) => {
         const runningRevision = live.get(terminal.id);
         return runningRevision === undefined
-          ? terminal
-          : { ...terminal, runtimeRevision: runningRevision };
+          ? terminal.commonActionId
+            ? { ...terminal, status: 'STOPPED' as const }
+            : terminal
+          : {
+              ...terminal,
+              runtimeRevision: runningRevision,
+              status: terminal.commonActionId ? ('RUNNING' as const) : terminal.status,
+            };
       }),
     }));
   }

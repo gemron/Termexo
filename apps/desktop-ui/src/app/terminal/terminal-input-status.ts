@@ -173,6 +173,10 @@ export class TerminalInputStatusTracker {
       }
     }
     if (status !== 'WAITING_APPROVAL') {
+      // Local commands such as /recap consume Enter without a task lifecycle. Claude's
+      // UserPromptSubmit hook sets THINKING when a model turn actually begins.
+      // An answer to an in-flight question still resumes the existing turn immediately.
+      if (agentType === 'claude' && status !== 'WAITING_INPUT') return null;
       return isSubmission(data) ? submittedStatus(agentType) : null;
     }
     return this.approvalAnswerStatus(data, context);

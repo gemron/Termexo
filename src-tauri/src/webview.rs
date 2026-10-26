@@ -42,7 +42,8 @@ pub fn status() -> WebviewStatus {
         minimum_major: MINIMUM_CHROMIUM_MAJOR,
         // An unreadable version is treated as unsupported: the alternative is staying silent
         // about a runtime that may well be the reason the window looks wrong.
-        supported: major.is_some_and(|major| major >= MINIMUM_CHROMIUM_MAJOR),
+        supported: cfg!(target_os = "macos")
+            || major.is_some_and(|major| major >= MINIMUM_CHROMIUM_MAJOR),
         download_url: DOWNLOAD_URL,
     }
 }

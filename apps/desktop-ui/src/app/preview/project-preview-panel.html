@@ -1,0 +1,201 @@
+<header>
+  <strong>内容预览 · 只读</strong
+  ><button
+    type="button"
+    class="btn btn-ghost btn-xs"
+    (click)="preview.close()"
+    aria-label="关闭预览"
+  >
+    关闭
+  </button>
+</header>
+<div class="panel-tools preview-actions" role="group" aria-label="预览操作">
+  <button
+    type="button"
+    class="btn btn-outline btn-xs file-browser-toggle"
+    [class.expanded]="browserOpen()"
+    [attr.aria-expanded]="browserOpen()"
+    [attr.aria-controls]="browserId()"
+    data-testid="preview-file-browser-toggle"
+    [title]="preview.root()"
+    (click)="browserOpen() ? browserOpen.set(false) : browse(preview.directory()?.path)"
+  >
+    {{ browserOpen() ? '收起文件' : '项目文件' }}
+  </button>
+  @if (preview.file() || preview.url() || preview.failedPath()) {
+    <button type="button" class="btn btn-outline btn-xs" (click)="external()">外部打开</button>
+  }
+</div>
+<form class="address" (ngSubmit)="navigate()">
+  <input
+    class="input input-bordered input-sm"
+    aria-label="项目文件路径或网页地址"
+    placeholder="项目内文件路径或 http(s)://…"
+    [ngModel]="address()"
+    (ngModelChange)="address.set($event)"
+    name="address"
+  /><button type="submit" class="btn btn-primary btn-sm">打开</button>
+</form>
+@if (preview.error()) {
+  <p class="notice error" role="alert">{{ preview.error() }}</p>
+}
+@if (message()) {
+  <p class="notice" role="status">{{ message() }}</p>
+}
+@if (browserOpen()) {
+  <nav [id]="browserId()" class="file-browser" aria-label="项目文件">
+    <div class="panel-tools">
+      <button type="button" class="btn btn-xs btn-ghost" (click)="browse()">项目根目录</button
+      ><button
+        type="button"
+        class="btn btn-xs btn-ghost"
+        [disabled]="atRoot()"
+        (click)="browse(parent())"
+      >
+        上一级</button
+      ><button
+        type="button"
+        class="btn btn-xs btn-ghost"
+        (click)="browse(preview.directory()?.path)"
+      >
+        刷新
+      </button>
+    </div>
+    <small>{{ preview.directory()?.path }}</small>
+    @if (preview.listing()) {
+      <p role="status">读取目录中…</p>
+    }
+    @for (entry of preview.directory()?.entries; track entry.path) {
+      <button
+        type="button"
+        class="file-entry"
+        [title]="entry.path"
+        (click)="open(entry.path, entry.directory)"
+      >
+        <span aria-hidden="true">{{ entry.directory ? '▸' : '·' }}</span
+        >{{ entry.name }}
+      </button>
+    } @empty {
+      @if (!preview.listing()) {
+        <p>此目录暂无可查看的文件。</p>
+      }
+    }
+    @if (preview.directory()?.truncated) {
+      <p>目录条目超过 500 项，仅展示部分。可输入具体文件路径。</p>
+    }
+  </nav>
+}
+@if (preview.loading()) {
+  <p class="notice" role="status">读取文件中…</p>
+}
+@if (preview.file(); as file) {
+  <div class="file-heading">
+    <strong [title]="file.path">{{ file.path }}</strong
+    ><button type="button" class="btn btn-ghost btn-xs" (click)="copy('path')">复制路径</button>
+  </div>
+  @if (file.kind === 'text' || file.kind === 'markdown') {
+    <div class="copy-tools">
+      <button
+        type="button"
+        class="btn btn-ghost btn-xs"
+        (mousedown)="$event.preventDefault()"
+        (click)="copy('all')"
+      >
+        {{ file.kind === 'markdown' ? '复制全部源文' : '复制全部代码' }}
+      </button>
+      @if (file.kind !== 'markdown' || sourceMode()) {
+        <button
+          type="button"
+          class="btn btn-ghost btn-xs"
+          (mousedown)="$event.preventDefault()"
+          (click)="copy('location')"
+        >
+          复制位置
+        </button>
+        <button
+          type="button"
+          class="btn btn-ghost btn-xs"
+          (mousedown)="$event.preventDefault()"
+          (click)="copy('quote')"
+        >
+          复制代码及位置
+        </button>
+      }
+      @if (file.kind === 'markdown') {
+        <button type="button" class="btn btn-ghost btn-xs" (click)="sourceMode.set(!sourceMode())">
+          {{ sourceMode() ? '阅读文档' : '查看源文' }}
+        </button>
+      }
+    </div>
+    @if (file.kind !== 'markdown' || sourceMode()) {
+      <small class="location" [title]="reference()">{{ reference() }} · 无选区时引用当前行</small>
+      @if (language(); as name) {
+        <small class="code-language">{{ name }} · 保留原始排版</small>
+      }
+    } @else {
+      <small class="location">需要带行号引用？查看源文后选择内容。</small>
+    }
+    @if (file.kind === 'markdown' && !sourceMode()) {
+      <article
+        class="markdown document"
+        [innerHTML]="markdown()"
+        (click)="markdownLink($event)"
+      ></article>
+    } @else {
+      <div class="code-body">
+        <pre class="gutter" aria-hidden="true" #gutter>{{ lineNumbers() }}</pre>
+        <div class="code-editor">
+          <pre #highlightedCode class="syntax-layer" aria-hidden="true"><code [innerHTML]="highlighted()"></code></pre>
+          <textarea
+            #codeText
+            class="code"
+            readonly
+            wrap="off"
+            spellcheck="false"
+            aria-label="只读代码，可选择复制"
+            [value]="file.content"
+            (select)="updateSelection(codeText)"
+            (click)="updateSelection(codeText)"
+            (keyup)="updateSelection(codeText)"
+            (scroll)="scrollCode(codeText)"
+          ></textarea>
+        </div>
+      </div>
+    }
+  } @else if (file.kind === 'image') {
+    <div class="image-body">
+      <img
+        [src]="media()"
+        [alt]="file.path"
+        (error)="message.set('图片无法解码，请使用外部应用打开。')"
+      />
+    </div>
+  } @else if (file.kind === 'pdf') {
+    <p class="notice">PDF 由浏览器内置查看器显示；若当前环境不支持或显示空白，请外部打开。</p>
+    <!-- Only fixed-MIME application/pdf blobs reach this viewer; web pages below stay sandboxed. -->
+    @if (mediaFrame(); as source) {
+      <iframe
+        class="document"
+        [src]="source"
+        title="PDF 只读预览"
+        (error)="message.set('PDF 无法载入，请外部打开。')"
+      ></iframe>
+    }
+  } @else {
+    <p class="notice">{{ file.message }}</p>
+  }
+} @else if (frame(); as source) {
+  <p class="notice" role="status">{{ frameState() }}</p>
+  <small class="location">{{ preview.url() }}</small>
+  <iframe
+    class="document webpage"
+    [src]="source"
+    title="网页预览"
+    sandbox="allow-scripts allow-forms allow-popups"
+    referrerpolicy="no-referrer"
+    (load)="frameState.set('若网页空白、拒绝连接或需要登录，请使用外部打开。')"
+    (error)="frameState.set('网页载入失败，请外部打开。')"
+  ></iframe>
+} @else if (!preview.loading() && !preview.error()) {
+  <p class="notice">从项目文件中选择文件，或输入网页地址。代码支持选中复制及带行号的位置引用。</p>
+}

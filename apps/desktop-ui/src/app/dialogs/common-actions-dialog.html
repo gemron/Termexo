@@ -1,0 +1,102 @@
+<div class="backdrop modal modal-open" (mousedown)="closed.emit()">
+  <section class="dialog modal-box common-actions" appModal (dismissModal)="closed.emit()" role="dialog" aria-modal="true" aria-labelledby="common-actions-title" (mousedown)="$event.stopPropagation()">
+    <header>
+      <div class="heading"><app-icon name="command" [size]="18" /><h2 id="common-actions-title">常用操作</h2><span>{{ workspace().name }}</span></div>
+      <button type="button" aria-label="关闭" (click)="closed.emit()"><app-icon name="x" [size]="16" /></button>
+    </header>
+    <div class="actions-toolbar">
+      <div class="list-tabs" role="tablist" aria-label="操作列表">
+        <button type="button" role="tab" [attr.aria-selected]="activeTab() === 'saved'" [class.active]="activeTab() === 'saved'" (click)="activeTab.set('saved')">已保存 <b>{{ workspace().commonActions?.length ?? 0 }}</b></button>
+        <button type="button" role="tab" [attr.aria-selected]="activeTab() === 'suggestions'" [class.active]="activeTab() === 'suggestions'" (click)="activeTab.set('suggestions')">识别建议 <b>{{ review()?.waiting ? '…' : (review()?.suggestions?.length ?? 0) }}</b></button>
+      </div>
+      <div class="action-buttons">
+        <button type="button" class="btn btn-outline btn-sm" [disabled]="busy()" (click)="add()"><app-icon name="plus" [size]="13" />手动添加</button>
+        <button type="button" class="btn btn-outline btn-sm" [disabled]="busy()" (click)="add(true)">添加 IDE 操作</button>
+        @if (agents().length > 1 && !review()?.waiting) {
+          <select class="select select-bordered select-sm" aria-label="识别使用的 Agent" [ngModel]="agentId() || agents()[0].id" (ngModelChange)="agentId.set($event)">
+            @for (agent of agents(); track agent.id) { <option [value]="agent.id">{{ agent.name }}</option> }
+          </select>
+        }
+        @if (agents().length || review()?.waiting) {
+          <button type="button" class="btn btn-primary btn-sm" [disabled]="!available || busy() || review()?.waiting" (click)="recognize()"><app-icon name="sparkles" [size]="13" />{{ review()?.waiting ? '正在识别…' : '识别常用操作' }}</button>
+        } @else {
+          <button type="button" class="btn btn-primary btn-sm" [disabled]="!available || busy()" (click)="agentRequested.emit()"><app-icon name="sparkles" [size]="13" />启动 Agent 并识别</button>
+        }
+      </div>
+    </div>
+    @if (error()) { <p class="notice error" role="alert">{{ error() }}</p> }
+    @if (message()) { <p class="notice success" role="status">{{ message() }}</p> }
+    @if (!available) { <p class="notice">连接桌面应用后可识别和运行；现在可手动维护操作。</p> }
+    <div class="dialog-body" [class.with-editor]="editor()">
+      @if (editor(); as draft) {
+        <form class="editor" aria-label="操作编辑" (ngSubmit)="save()">
+          <div class="editor-heading"><h3>{{ editingSuggestionId() ? '编辑建议' : (isEditing() ? '编辑操作' : '添加操作') }}</h3><button type="button" class="btn btn-ghost btn-xs" aria-label="关闭编辑" (click)="editor.set(null)"><app-icon name="x" [size]="13" /></button></div>
+          <label>名称<input #editorName name="name" class="input input-bordered input-sm" required [ngModel]="draft.name" (ngModelChange)="patchEditor({ name: $event })" /></label>
+          <label>命令<input name="command" class="input input-bordered input-sm command" required placeholder="npm run dev" [ngModel]="draft.command" (ngModelChange)="patchEditor({ command: $event })" /></label>
+          <label>工作目录<input name="directory" class="input input-bordered input-sm" required [ngModel]="draft.workingDirectory" (ngModelChange)="patchEditor({ workingDirectory: $event })" /></label>
+          <label>说明<input name="description" class="input input-bordered input-sm" [ngModel]="draft.description" (ngModelChange)="patchEditor({ description: $event })" /></label>
+          <div class="action-buttons"><button type="submit" class="btn btn-primary btn-sm" [disabled]="busy()">{{ editingSuggestionId() ? '更新建议' : '确认保存' }}</button><button type="button" class="btn btn-outline btn-sm" (click)="editor.set(null)">取消</button></div>
+        </form>
+      }
+      <div class="list-area">
+        @if (activeTab() === 'saved') {
+          <div class="actions-grid">
+            @for (action of workspace().commonActions ?? []; track action.id) {
+              <article class="saved-action action-card">
+                <div class="action-summary" [title]="action.description || action.name">
+                  <div class="action-name"><strong>{{ action.name }}</strong><small class="action-status" [class.running]="actionStatus(action) === '运行中'">{{ actionStatus(action) }}</small></div>
+                  <code [title]="action.command">{{ action.command }}</code>
+                  <small class="directory" [title]="action.workingDirectory">{{ relativeDirectory(action.workingDirectory) }}</small>
+                </div>
+                <div class="card-buttons">
+                  <button type="button" class="btn btn-primary btn-xs" [disabled]="!available || busy()" (click)="actionStatus(action) === '运行中' ? console(action) : run(action.id)">{{ actionStatus(action) === '运行中' ? '查看' : '启动' }}</button>
+                  <button type="button" class="btn btn-outline btn-xs" [disabled]="!available || busy() || actionStatus(action) !== '运行中'" (click)="stop(action.id)">停止</button>
+                  <button type="button" class="btn btn-outline btn-xs" [disabled]="!available || busy()" (click)="run(action.id, true)">重启</button>
+                  <button type="button" class="btn btn-ghost btn-xs" [disabled]="!hasConsole(action)" (click)="console(action)">控制台</button>
+                  <button type="button" class="btn btn-ghost btn-xs" [disabled]="busy()" (click)="edit(action)">编辑</button>
+                  <button type="button" class="btn btn-ghost btn-xs remove" [disabled]="busy()" title="仅移除入口，已启动的终端会保留" (click)="remove(action.id)">移除</button>
+                </div>
+              </article>
+            } @empty {
+              <div class="empty-state"><app-icon name="command" [size]="28" /><h3>把项目常用命令放在这里</h3><p>点击“识别常用操作”，或手动添加启动、测试、构建等命令。</p></div>
+            }
+          </div>
+        } @else {
+          <div class="recognition-progress" aria-label="识别流程"><span [class.current]="review()?.waiting">1 · 识别项目</span><i>→</i><span [class.current]="review() && !review()?.waiting">2 · 审核建议</span><i>→</i><span>3 · 添加到常用操作</span></div>
+          @if (review()?.waiting) {
+            <div class="waiting-state" role="status"><span class="loading loading-spinner loading-sm"></span><div><h3>{{ review()?.phase === 'starting' ? '正在启动 Agent，准备识别' : 'Agent 正在读取项目并生成建议' }}</h3><p>就绪后自动识别，结果会直接显示在这里。</p></div></div>
+            <div class="action-buttons progress-buttons">
+              @if (review()?.terminalId) { <button type="button" class="btn btn-outline btn-sm" (click)="recognitionAgentRequested.emit(review()!.terminalId!)">查看 Agent 进度</button> }
+              <button type="button" class="btn btn-ghost btn-sm" (click)="actions.discard(workspace().id)">取消本次识别</button>
+            </div>
+            <details class="import-fallback"><summary>手动导入 Agent 返回的 JSON</summary><textarea class="textarea textarea-bordered" aria-label="Agent 建议 JSON" rows="4" [ngModel]="importJson()" (ngModelChange)="importJson.set($event)"></textarea><button type="button" class="btn btn-outline btn-sm" [disabled]="!importJson().trim()" (click)="importSuggestions()">导入待确认建议</button></details>
+          } @else if (review(); as result) {
+            @if (result.error) { <p class="notice error" role="alert">{{ result.error }}</p> }
+            @if (result.suggestions.length) {
+              <div class="review-toolbar"><span>选择要添加的操作，可编辑后再确认</span><div class="action-buttons"><button type="button" class="btn btn-ghost btn-xs" (click)="selectAll(true)">全选</button><button type="button" class="btn btn-ghost btn-xs" (click)="selectAll(false)">取消全选</button></div></div>
+              <div class="actions-grid">
+                @for (item of result.suggestions; track item.id) {
+                  <article class="suggestion action-card" [class.selected]="item.selected">
+                    <input type="checkbox" class="checkbox checkbox-sm" [attr.aria-label]="'添加 ' + item.name" [ngModel]="item.selected" (ngModelChange)="actions.editSuggestion(workspace().id, item.id, { selected: $event })" />
+                    <div class="action-summary"><strong>{{ item.name }}</strong><code [title]="item.command">{{ item.command }}</code><small class="directory" [title]="item.workingDirectory + ' · ' + item.description">{{ relativeDirectory(item.workingDirectory) }}</small></div>
+                    <button type="button" class="btn btn-outline btn-xs" (click)="editSuggestion(item)">编辑</button>
+                  </article>
+                }
+              </div>
+            } @else if (!result.error) { <div class="empty-state"><h3>{{ result.duplicateCount ? '识别到的操作已在列表中' : '没有发现可确定的操作' }}</h3><p>可重新识别，或手动添加命令。</p></div> }
+            @if (result.duplicateCount) { <p class="list-note">已跳过 {{ result.duplicateCount }} 项重复操作。</p> }
+          } @else {
+            <div class="empty-state"><app-icon name="sparkles" [size]="28" /><h3>识别项目中的常用命令</h3><p>选择空闲 Agent 后点击识别；没有 Agent 时，可启动后自动继续。</p><p>建议由你审核后添加。</p></div>
+          }
+        }
+      </div>
+    </div>
+    <footer>
+      <small>{{ activeTab() === 'suggestions' ? '建议确认后才会保存，添加不会自动运行。' : '启动后留在此页，可连续操作；点击控制台查看输出。' }}</small>
+      @if (activeTab() === 'suggestions' && review() && !review()?.waiting) {
+        <button type="button" class="btn btn-outline btn-sm" [disabled]="busy()" (click)="actions.discard(workspace().id); activeTab.set('saved')">放弃建议</button>
+        <button type="button" class="btn btn-primary btn-sm" [disabled]="busy() || !selectedCount() || !!editor()" (click)="confirm()">确认添加 {{ selectedCount() }} 项操作</button>
+      } @else { <button type="button" class="btn btn-outline btn-sm" (click)="closed.emit()">关闭</button> }
+    </footer>
+  </section>
+</div>

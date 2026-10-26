@@ -1,16 +1,16 @@
 ﻿import { ComponentFixture, TestBed } from '@angular/core/testing';
 
 import {
-  type CliOperationRequest,
   type AccountProfile,
+  type AccountProfileInput,
   ModelProfile,
   ModelProfileInput,
   NetworkProfile,
   NetworkProfileInput,
 } from '../core/models/agent.models';
 import { AgentSettingsDialogComponent } from './agent-settings-dialog';
-
-type CliRequest = CliOperationRequest;
+import { AgentService } from '../core/services/agent.service';
+import { ModelCatalogService } from '../core/services/model-catalog.service';
 
 const CUSTOM_PROFILE: ModelProfile = {
   id: 'custom-default',
@@ -54,6 +54,89 @@ describe('AgentSettingsDialogComponent', () => {
     fixture = TestBed.createComponent(AgentSettingsDialogComponent);
     component = fixture.componentInstance;
     root = fixture.nativeElement as HTMLElement;
+  });
+
+  it('offers newly discovered models when adding a profile and saves the selected id', async () => {
+    const catalog = TestBed.inject(ModelCatalogService);
+    catalog['items'].set([
+      {
+        provider: 'Anthropic',
+        id: 'claude-sonnet-new',
+        name: 'New Sonnet',
+        family: 'claude-sonnet',
+        releaseDate: '2026-01-01',
+        retired: false,
+      },
+    ]);
+    fixture.componentRef.setInput('initialTab', 'models');
+    fixture.detectChanges();
+    await fixture.whenStable();
+    component['newModel']();
+    fixture.detectChanges();
+    await fixture.whenStable();
+    const choice = root.querySelector<HTMLSelectElement>('[data-testid="claude-model-choice"]')!;
+    expect(Array.from(choice.options).some((option) => option.value === 'claude-sonnet-new')).toBe(
+      true,
+    );
+    choice.value = 'claude-sonnet-new';
+    choice.dispatchEvent(new Event('change'));
+    await fixture.whenStable();
+    const saved: ModelProfileInput[] = [];
+    component.modelSaved.subscribe((input) => saved.push(input));
+    component['saveModel']();
+    expect(saved[0].claudeModel).toBe('claude-sonnet-new');
+  });
+
+  it('applies a default-model upgrade to the draft and preserves other profile settings', async () => {
+    const original = {
+      ...CUSTOM_PROFILE,
+      claudeBaseUrl: '',
+      claudeEffort: 'high',
+      planAlertThreshold: 82,
+    };
+    const agents = TestBed.inject(AgentService);
+    agents['modelProfileItems'].set([original]);
+    TestBed.inject(ModelCatalogService)['items'].set([
+      {
+        provider: 'Anthropic',
+        id: original.claudeModel,
+        name: 'Old Sonnet',
+        family: 'claude-sonnet',
+        releaseDate: '2025-01-01',
+        retired: false,
+      },
+      {
+        provider: 'Anthropic',
+        id: 'claude-sonnet-new',
+        name: 'New Sonnet',
+        family: 'claude-sonnet',
+        releaseDate: '2026-01-01',
+        retired: false,
+      },
+    ]);
+    fixture.componentRef.setInput('modelProfiles', [original]);
+    fixture.componentRef.setInput('initialTab', 'models');
+    fixture.detectChanges();
+    await fixture.whenStable();
+    const saved: ModelProfileInput[] = [];
+    component.modelSaved.subscribe((input) => saved.push(input));
+    expect(root.querySelector('[data-testid="model-upgrade"]')?.textContent).toContain(
+      'claude-sonnet-new',
+    );
+    clickButton('采用新模型');
+    fixture.detectChanges();
+    expect(saved).toEqual([]);
+    expect(agents.modelProfiles()[0].claudeModel).toBe(original.claudeModel);
+    clickButton('保存 Profile');
+    expect(saved[0]).toMatchObject({
+      id: original.id,
+      isDefault: true,
+      claudeModel: 'claude-sonnet-new',
+      claudeEffort: 'high',
+      planAlertThreshold: 82,
+    });
+    expect(saved[0].apiKey).toBeUndefined();
+    expect(saved[0].clearCredential).toBe(false);
   });
 
   it('loads the persisted default profile into the editor', async () => {
@@ -227,115 +310,15 @@ describe('AgentSettingsDialogComponent', () => {
     expect(testedIds).toEqual(['network-workspace']);
   });
 
-  it('previews an official CLI package with the current workspace scope', async () => {
-    fixture.componentRef.setInput('activeWorkspaceId', 'workspace-1');
+  it('opens the simplified installer on the requested agent', async () => {
+    fixture.componentRef.setInput('initialTab', 'cli');
+    fixture.componentRef.setInput('initialCliAgent', 'antigravity');
     fixture.detectChanges();
     await fixture.whenStable();
-
-    clickButton('CLI 安装与升级');
-    setLabeledInputValue('目标版本', '0.145.0');
-    const requests: CliRequest[] = [];
-    component.cliPreviewRequested.subscribe((request) => requests.push(request));
-    clickButton('生成安装计划');
-
-    expect(requests).toEqual([
-      {
-        agentType: 'claude',
-        installer: 'npm',
-        targetVersion: '0.145.0',
-        workspaceId: 'workspace-1',
-      },
-    ]);
-  });
-
-  it('asks for no version when the agent is installed by its own script', async () => {
-    fixture.componentRef.setInput('activeWorkspaceId', 'workspace-1');
     fixture.detectChanges();
-    await fixture.whenStable();
-
-    clickButton('CLI 安装与升级');
-    setLabeledInputValue('目标版本', '0.145.0');
-    clickButton('Antigravity');
-    fixture.detectChanges();
-
-    // The version box is gone, and the request carries no version for the script to ignore.
-    expect(root.textContent).toContain('官方脚本始终安装');
-    const requests: CliRequest[] = [];
-    component.cliPreviewRequested.subscribe((request) => requests.push(request));
-    clickButton('生成安装计划');
-
-    expect(requests).toEqual([
-      {
-        agentType: 'antigravity',
-        installer: 'script',
-        targetVersion: undefined,
-        workspaceId: 'workspace-1',
-      },
-    ]);
-  });
-
-  /** Claude Code publishes both, so the choice is the user's rather than Termexo's. */
-  it('can install an npm-published agent from its vendor script instead', async () => {
-    fixture.componentRef.setInput('activeWorkspaceId', 'workspace-1');
-    fixture.detectChanges();
-    await fixture.whenStable();
-
-    clickButton('CLI 安装与升级');
-    setLabeledInputValue('目标版本', '0.145.0');
-    clickButton('官方脚本');
-    fixture.detectChanges();
-
-    const requests: CliRequest[] = [];
-    component.cliPreviewRequested.subscribe((request) => requests.push(request));
-    clickButton('生成安装计划');
-
-    expect(requests).toEqual([
-      {
-        agentType: 'claude',
-        installer: 'script',
-        targetVersion: undefined,
-        workspaceId: 'workspace-1',
-      },
-    ]);
-  });
-
-  it('requires confirmation before emitting a CLI mutation', async () => {
-    fixture.componentRef.setInput('activeWorkspaceId', 'workspace-1');
-    fixture.componentRef.setInput('cliPlan', {
-      agentType: 'claude',
-      displayName: 'Claude Code',
-      packageName: '@anthropic-ai/claude-code',
-      targetVersion: 'latest',
-      installer: 'npm',
-      supportsVersion: true,
-      packageSpec: '@anthropic-ai/claude-code@latest',
-      action: 'upgrade',
-      currentVersion: '2.1.220',
-      npmPath: 'C:\\Program Files\\nodejs\\npm.cmd',
-      npmVersion: '11.6.2',
-      commandPreview: 'npm install --global @anthropic-ai/claude-code@latest --no-fund --no-audit',
-      networkProfileId: 'network-workspace',
-      networkProfileName: '内网代理',
-      npmRegistry: 'https://npm.internal.example/',
-      ready: true,
-      diagnostic: '可升级 Claude Code。',
-    });
-    fixture.detectChanges();
-    await fixture.whenStable();
-
-    clickButton('CLI 安装与升级');
-    const requests: Array<{ confirmed?: boolean }> = [];
-    component.cliExecuteRequested.subscribe((request) => requests.push(request));
-    clickButton('确认并升级');
-    expect(requests).toEqual([]);
-
-    const confirmation = root.querySelector<HTMLInputElement>('.cli-confirmation input');
-    expect(confirmation).toBeTruthy();
-    confirmation!.click();
-    fixture.detectChanges();
-    clickButton('确认并升级');
-
-    expect(requests).toEqual([expect.objectContaining({ confirmed: true })]);
+    expect(root.querySelector('app-agent-install-panel')).toBeTruthy();
+    expect(root.querySelector('.agent-card.selected')?.textContent).toContain('Antigravity');
+    expect(root.querySelector('.advanced')?.hasAttribute('open')).toBe(false);
   });
 
   it('retains separate drafts across profiles and categories, including a new profile', async () => {
@@ -567,6 +550,89 @@ describe('AgentSettingsDialogComponent', () => {
     fixture.detectChanges();
     component['requestClose']();
     expect(closed).toBe(true);
+  });
+
+  it('offers only compatible login methods and saves the current choice before signing in', async () => {
+    fixture.componentRef.setInput('activeWorkspaceId', 'workspace-1');
+    fixture.detectChanges();
+    await fixture.whenStable();
+    component['selectTab']('accounts');
+    component['newAccount']();
+    component['accountName'] = 'Device account';
+    fixture.detectChanges();
+    await fixture.whenStable();
+    const methods = (): HTMLSelectElement =>
+      root.querySelector('[data-testid="account-login-method"]')!;
+    expect(Array.from(methods().options, (option) => option.value)).toEqual([
+      'browser',
+      'console',
+      'sso',
+    ]);
+    component['accountLoginMethod'] = 'sso';
+    component['changeAccountAgentType']('codex');
+    fixture.detectChanges();
+    await fixture.whenStable();
+    expect(component['accountLoginMethod']).toBe('browser');
+    expect(Array.from(methods().options, (option) => option.value)).toEqual([
+      'browser',
+      'device-code',
+    ]);
+    methods().value = 'device-code';
+    methods().dispatchEvent(new Event('change'));
+    fixture.detectChanges();
+    const logins: AccountProfileInput[] = [];
+    component.accountLoginRequested.subscribe((input) => logins.push(input));
+    root.querySelector<HTMLButtonElement>('[data-testid="account-login-submit"]')!.click();
+    expect(logins).toEqual([
+      expect.objectContaining({
+        name: 'Device account',
+        agentType: 'codex',
+        loginMethod: 'device-code',
+      }),
+    ]);
+    expect(logins[0].id).toBeTruthy();
+  });
+
+  it('keeps per-account login drafts through switching records and status refreshes', async () => {
+    const profiles: AccountProfile[] = [
+      {
+        id: 'claude-account',
+        name: 'Claude',
+        agentType: 'claude',
+        loginMethod: 'console',
+        isDefault: true,
+        isSystem: false,
+        authenticated: false,
+        diagnostic: '',
+      },
+      {
+        id: 'codex-account',
+        name: 'Codex',
+        agentType: 'codex',
+        loginMethod: 'device-code',
+        isDefault: false,
+        isSystem: false,
+        authenticated: false,
+        diagnostic: '',
+      },
+    ];
+    fixture.componentRef.setInput('accountProfiles', profiles);
+    fixture.detectChanges();
+    await fixture.whenStable();
+    component['editAccount'](profiles[0]);
+    component['accountLoginMethod'] = 'sso';
+    component['editAccount'](profiles[1]);
+    expect(component['accountLoginMethod']).toBe('device-code');
+    component['editAccount'](profiles[0]);
+    expect(component['accountLoginMethod']).toBe('sso');
+    fixture.componentRef.setInput(
+      'accountProfiles',
+      profiles.map((profile) => ({ ...profile, authenticated: true })),
+    );
+    fixture.detectChanges();
+    await fixture.whenStable();
+    expect(component['accountLoginMethod']).toBe('sso');
+    expect(component['accountDirty']()).toBe(true);
   });
 
   function clickButton(label: string): void {

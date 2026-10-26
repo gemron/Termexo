@@ -7,6 +7,7 @@ import {
 } from '../core/models/agent.models';
 import { CodexLaunchDialogComponent, type CodexLaunchDialogValue } from './codex-launch-dialog';
 import { CodexModelCatalogService } from '../core/services/codex-model-catalog.service';
+import { CLI_NATIVE_PROFILE_ID } from '../core/models/launch-model-choice';
 
 const INSTALLATION: AgentInstallation = {
   agentType: 'codex',
@@ -76,6 +77,31 @@ describe('CodexLaunchDialogComponent', () => {
 
   it('shows the model supplied by the selected profile before launch', () => {
     expect(root.querySelector<HTMLInputElement>('.model-field input')?.value).toBe('MiniMax-M3');
+  });
+
+  it('offers official CLI models beside saved profiles even with a third-party default', async () => {
+    catalogs.load.mockResolvedValue({ source: 'codex-app-server', configuredDefault: 'cli-current', models: [{ id: 'cli-current', isDefault: true }] });
+    await component['refreshModels'](); fixture.detectChanges();
+    const select = root.querySelector<HTMLSelectElement>('.profile-field select')!;
+    expect(select.querySelector('option[value="official:cli-current"]')).not.toBeNull();
+    expect(select.querySelector('option[value="minimax"]')).not.toBeNull();
+    select.value = 'official:cli-current'; select.dispatchEvent(new Event('change')); fixture.detectChanges();
+    const launches: CodexLaunchDialogValue[] = [];
+    component.launched.subscribe(value => launches.push(value));
+    root.querySelector<HTMLButtonElement>('footer .primary')!.click();
+    expect(launches[0]).toMatchObject({ model: 'cli-current', profileId: CLI_NATIVE_PROFILE_ID, accountProfileId: ACCOUNT.id });
+    select.value = 'minimax'; select.dispatchEvent(new Event('change')); fixture.detectChanges();
+    root.querySelector<HTMLButtonElement>('footer .primary')!.click();
+    expect(launches[1]).toMatchObject({ model: 'MiniMax-M3', profileId: MINIMAX.id });
+  });
+
+  it('can use the native CLI default without requiring a saved model profile', async () => {
+    fixture.componentRef.setInput('profiles', []); fixture.detectChanges(); await fixture.whenStable();
+    const launches: CodexLaunchDialogValue[] = [];
+    component.launched.subscribe(value => launches.push(value));
+    root.querySelector<HTMLButtonElement>('footer .primary')!.click();
+    expect(launches[0]).toMatchObject({ profileId: CLI_NATIVE_PROFILE_ID, accountProfileId: ACCOUNT.id });
+    expect(launches[0].model).toBeUndefined();
   });
 
   it('loads current CLI models without replacing a user-selected model', async () => {

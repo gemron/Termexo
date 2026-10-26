@@ -313,6 +313,32 @@ describe('TerminalGatewayService attachment', () => {
     ]);
   });
 
+  it('keeps the login purpose and account identity when starting or restoring authentication', async () => {
+    let startedRequest: Record<string, unknown> | undefined;
+    commandHandler = async (command, args) => {
+      if (command === 'create_terminal')
+        startedRequest = args['request'] as Record<string, unknown>;
+      return { attached: false, runtimeRevision: 0 };
+    };
+    await service.start(
+      {
+        ...startableSession(),
+        command: "& 'claude.exe' auth login",
+        accountLogin: true,
+        accountProfileId: 'isolated-claude',
+      },
+      80,
+      24,
+      'workspace-1',
+    );
+    expect(startedRequest).toMatchObject({
+      command: "& 'claude.exe' auth login",
+      accountLogin: true,
+      accountProfileId: 'isolated-claude',
+      workspaceId: 'workspace-1',
+    });
+  });
+
   const startableSession = () =>
     ({
       id: 'terminal-1',

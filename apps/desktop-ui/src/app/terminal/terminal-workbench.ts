@@ -13,6 +13,7 @@ import {
 import { WorkspaceOnboardingComponent } from '../workspace/workspace-onboarding';
 import { DEFAULT_TERMINAL_FONT_NAME } from './terminal-font';
 import { TerminalPanelComponent } from './terminal-panel';
+import type { TerminalCloseRequest } from './terminal-close-request';
 
 @Component({
   selector: 'app-terminal-workbench',
@@ -40,7 +41,7 @@ export class TerminalWorkbenchComponent {
   readonly gridRows = input(DEFAULT_TERMINAL_GRID_DIMENSION);
 
   readonly terminalSelected = output<string>();
-  readonly terminalClosed = output<string>();
+  readonly terminalClosed = output<TerminalCloseRequest>();
   readonly terminalMaximizeRequested = output<string>();
   /** Which of the empty state's launch options was picked; the host opens it. */
   readonly launchRequested = output<AgentType>();

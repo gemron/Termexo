@@ -1,3 +1,4 @@
+use crate::platform::{shell_invoke, shell_quote};
 use std::env;
 use std::path::{Path, PathBuf};
 use std::process::Output;
@@ -233,7 +234,7 @@ impl AgentAdapter for AntigravityAdapter {
         let executable = self
             .find_executable()
             .ok_or(AntigravityError::NotInstalled)?;
-        let mut command = format!("& {}", powershell_quote(&executable.to_string_lossy()));
+        let mut command = shell_invoke(&executable.to_string_lossy());
         append_option(
             &mut command,
             "--conversation",
@@ -409,16 +410,12 @@ fn command_paths(command: &str) -> Vec<PathBuf> {
     paths
 }
 
-fn powershell_quote(value: &str) -> String {
-    format!("'{}'", value.replace('\'', "''"))
-}
-
 fn append_option(command: &mut String, flag: &str, value: Option<&str>) {
     if let Some(value) = value.filter(|value| !value.trim().is_empty()) {
         command.push(' ');
         command.push_str(flag);
         command.push(' ');
-        command.push_str(&powershell_quote(value));
+        command.push_str(&shell_quote(value));
     }
 }
 
@@ -498,6 +495,7 @@ mod tests {
     }
 
     /// A workspace only wants the conversations that belong to it.
+    #[cfg(windows)] // asserts Windows paths or PowerShell syntax
     #[test]
     fn sessions_are_filtered_by_the_workspace_they_were_opened_against() {
         let directory = temporary_directory("filter");

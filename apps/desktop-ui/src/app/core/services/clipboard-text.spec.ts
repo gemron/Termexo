@@ -1,14 +1,14 @@
 import { vi } from 'vitest';
-import { readText, writeText } from '@tauri-apps/plugin-clipboard-manager';
 import { readClipboardText, writeClipboardText } from './clipboard-text';
 
-vi.mock('@tauri-apps/plugin-clipboard-manager', () => ({
-  readText: vi.fn(),
-  writeText: vi.fn(),
-}));
-
 describe('clipboard text access', () => {
+  const readText = vi.fn();
+  const writeText = vi.fn();
   const runtime = window as unknown as Record<string, unknown>;
+  const nativeRuntime = () => ({
+    invoke: (command: string, args?: { text: string }) =>
+      command === 'plugin:clipboard-manager|read_text' ? readText() : writeText(args!.text),
+  });
 
   beforeEach(() => vi.resetAllMocks());
   afterEach(() => {
@@ -18,7 +18,7 @@ describe('clipboard text access', () => {
   });
 
   it('reads and writes natively on desktop when WebView2 has no browser clipboard API', async () => {
-    runtime['__TAURI_INTERNALS__'] = {};
+    runtime['__TAURI_INTERNALS__'] = nativeRuntime();
     vi.stubGlobal('navigator', {});
     const text = '  中文\r\nsecond line\t ';
     vi.mocked(readText).mockResolvedValue(text);
@@ -30,7 +30,7 @@ describe('clipboard text access', () => {
   });
 
   it('does not use WebView2 clipboard methods even when they reject permission', async () => {
-    runtime['__TAURI_INTERNALS__'] = {};
+    runtime['__TAURI_INTERNALS__'] = nativeRuntime();
     const browserRead = vi.fn().mockRejectedValue(new DOMException('Denied', 'NotAllowedError'));
     const browserWrite = vi.fn().mockRejectedValue(new DOMException('Denied', 'NotAllowedError'));
     vi.stubGlobal('navigator', { clipboard: { readText: browserRead, writeText: browserWrite } });
@@ -63,7 +63,7 @@ describe('clipboard text access', () => {
   });
 
   it('preserves native errors so the terminal can tell the user why paste failed', async () => {
-    runtime['__TAURI_INTERNALS__'] = {};
+    runtime['__TAURI_INTERNALS__'] = nativeRuntime();
     vi.mocked(readText).mockRejectedValue('Clipboard is busy');
     await expect(readClipboardText()).rejects.toBe('Clipboard is busy');
   });

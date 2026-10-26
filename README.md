@@ -11,7 +11,7 @@
 </p>
 
 <p align="center">
-  <img alt="Version 0.10.13" src="https://img.shields.io/badge/version-0.10.13-58c7a0">
+  <img alt="Version 0.10.15" src="https://img.shields.io/badge/version-0.10.15-58c7a0">
   <img alt="Windows" src="https://img.shields.io/badge/platform-Windows-0078D4?logo=windows">
   <img alt="Tauri 2" src="https://img.shields.io/badge/Tauri-2-24C8DB?logo=tauri&logoColor=white">
   <img alt="Angular 22" src="https://img.shields.io/badge/Angular-22-DD0031?logo=angular">
@@ -29,13 +29,14 @@
   <img src="website/assets/agent-opencode.svg" alt="OpenCode" title="OpenCode" width="26" height="26">&nbsp;&nbsp;
   <img src="website/assets/agent-antigravity.svg" alt="Antigravity" title="Antigravity" width="26" height="26">&nbsp;&nbsp;
   <img src="website/assets/agent-grok.svg" alt="Grok Build" title="Grok Build" width="26" height="26">
+  <img src="website/assets/agent-pi.svg" alt="Pi Agent" title="Pi Agent" width="26" height="26">
 </p>
 
-**Use MCP to let AI operate Claude Code, Codex, OpenCode, Grok Build, and Antigravity terminals.**
+**Use MCP to let AI operate Claude Code, Codex, OpenCode, Pi Agent, Grok Build, and Antigravity terminals.**
 
 Give a connected AI an instruction. Through Termexo, it can find another agent's terminal, send a prompt, submit it, and read the actual reply. Watch the process or take over in the same Windows workbench, with working, approval, and completion states in view.
 
-All five agents run in real terminals on your PC. Termexo also organizes projects into workspaces, resumes native sessions, and lets you reconnect from your phone through your own relay, a trusted LAN, or a VPN.
+All six agents run in real terminals on your PC. Termexo also organizes projects into workspaces, resumes native sessions, and lets you reconnect from your phone through your own relay, a trusted LAN, or a VPN.
 
 [![Two real Antigravity sessions in Termexo v0.10.6](website/assets/termexo-workbench-demo.png)](https://www.termexo.com/#workbench-demo)
 
@@ -91,7 +92,7 @@ Install and configure your chosen agent CLI and model access; Termexo does not i
 MCP connects AI to Termexo. **Ask in everyday language; no tool names or code required.** Install and sign in to the agent CLIs you want to use, then:
 
 1. Open **Settings → AI control (MCP)**. Enable the local server, keep automatic connection checked, and allow terminal access; also allow task access if you want to create and execute tasks. Click Apply and check for Running.
-2. Start a new agent terminal in Termexo, or restart an existing one. Claude Code, Codex, OpenCode, Grok Build, and Antigravity CLI support automatic connection, with no address, token, or configuration file to copy.
+2. Start a new agent terminal in Termexo, or restart an existing one. Claude Code, Codex, OpenCode, Pi Agent, Grok Build, and Antigravity CLI support automatic connection, with no address, token, or configuration file to copy.
 3. Send this to the **AI terminal** and check that it returns the actual workspaces and terminals on your PC:
 
 > Use Termexo MCP to list my workspaces and terminals, and tell me which are running. Do not change anything yet.
@@ -108,7 +109,7 @@ After that, try a project task:
 
 > Use Termexo MCP to create a Claude Code task in the current project titled “Map the project.” Use its configured default model. Read the project and explain its main folders, how to run it, and its test entry points without changing files. Start the task, inspect the terminal to confirm the prompt was submitted, and summarize the actual output.
 
-**Existing-terminal interaction works with all five agent types. Task-board execution supports Claude Code, Codex, OpenCode, and Grok Build.** Start Antigravity in the workbench first, then operate its terminal through MCP. The terminal creation tool creates a Shell.
+**Existing-terminal interaction works with all six agent types. Task-board execution supports Claude Code, Codex, OpenCode, Pi Agent, and Grok Build.** Start Antigravity in the workbench first, then operate its terminal through MCP. The terminal creation tool creates a Shell.
 
 “Sent” and “started” do not mean “finished.” Continue reading output and task status, and check code changes and test results as the task requires. MCP is off by default and available only on the host PC; phone remote access is a separate feature, and the agent's own tool approvals still apply.
 
@@ -133,7 +134,7 @@ Keep the token private. Closing Termexo or stopping the PC ends the running proc
 
 ## Latest release
 
-**[v0.10.13](https://github.com/gemron/Termexo/releases/tag/v0.10.13)** cleans up the Windows proxy environment, applies the default network profile to every terminal, rescues session scans on older OpenCode CLIs, strips instruction markup from Codex session titles, and separates completed tabs from the selected one. [Start using MCP](https://www.termexo.com/guide.en.html#ai-control).
+**[v0.10.15](https://github.com/gemron/Termexo/releases/tag/v0.10.15)** adds workspace folders, tags and icons, account login choices, model discovery and upgrade suggestions, and confirmation before closing active Agent terminals.
 [Full changelog](CHANGELOG.md).
 
 If Termexo helps your workflow, a **Star on this repository** helps other developers discover it.
@@ -151,8 +152,8 @@ One Ring is built into Termexo, including its engine and runtime. No separate pl
 <table>
   <tr>
     <td width="50%" valign="top">
-      <strong>Five agents. One screen.</strong><br><br>
-      Run Claude Code, Codex, OpenCode, Antigravity, and Grok Build side by side in as many real PTY
+      <strong>Six agents. One screen.</strong><br><br>
+      Run Claude Code, Codex, OpenCode, Pi Agent, Antigravity, and Grok Build side by side in as many real PTY
       terminals as you need, choose which stay visible, and arrange them in a custom 1–6
       row/column grid. Reorder tabs by dragging, close one with the middle mouse button, and drive the workbench from the
       keyboard. Each workspace remembers its folder, tabs, layout, model, and theme.
@@ -171,7 +172,7 @@ One Ring is built into Termexo, including its engine and runtime. No separate pl
   <tr>
     <td width="50%" valign="top">
       <strong>Pick up yesterday's conversation.</strong><br><br>
-      Search local Claude Code, Codex, OpenCode, Antigravity, and Grok Build sessions across projects,
+      Search local Claude Code, Codex, OpenCode, Pi Agent, Antigravity, and Grok Build sessions across projects,
       accounts, branches, and models. Termexo restores them through the CLIs' own
       <code>claude --resume</code>, <code>codex resume</code>, <code>opencode --session</code>,
       <code>agy --conversation</code>, and <code>grok --resume</code> commands. It can reclaim a Claude session the CLI still holds
@@ -272,17 +273,17 @@ Set `TERMEXO_PI_PATH` to override the executable. Session discovery respects `PI
 | ------------------------ | ------------------------------------------------------------------------------------------------------------------ |
 | Workspace management     | Create, rename, theme, drag to reorder, and switch workspaces; persist paths, layouts, and terminal configuration |
 | Multi-terminal workbench | Unlimited tabs, explicit pane selection, configurable 1–6 row/column grids, pane/workspace maximize, and real PTYs |
-| Agent detection          | Detect the Claude Code, Codex, OpenCode, Antigravity, and Grok Build executables, their versions, and health on Windows |
-| Start agent sessions     | Launch Claude, Codex, OpenCode, Antigravity, or Grok Build with a working directory and the available account, model, and confirmation options for that CLI |
-| Session center           | Read-only discovery of Claude/Codex/OpenCode/Antigravity/Grok Build sessions, search, workspace filtering, native resume, and reclaim of a Claude session the CLI still holds open |
+| Agent detection          | Detect the Claude Code, Codex, OpenCode, Pi Agent, Antigravity, and Grok Build executables, their versions, and health on Windows |
+| Start agent sessions     | Launch Claude, Codex, OpenCode, Pi Agent, Antigravity, or Grok Build with a working directory and the available account, model, and confirmation options for that CLI |
+| Session center           | Read-only discovery of Claude/Codex/OpenCode/Pi/Antigravity/Grok Build sessions, search, workspace filtering, native resume, and reclaim of a Claude session the CLI still holds open |
 | Agent status tracking    | Isolated hooks per terminal for thinking, tool use, approval, user input, completion, and failure states           |
-| MCP agent control        | Automatic local MCP connection for all five agents; a connected AI can find real terminals, send prompts or control keys, and read output. Task tools support Claude Code, Codex, OpenCode, and Grok Build |
+| MCP agent control        | Automatic local MCP connection for all six agents; a connected AI can find real terminals, send prompts or control keys, and read output. Task tools support Claude Code, Codex, OpenCode, Pi Agent, and Grok Build |
 | Model and MCP profiles   | Manage endpoints, keys, and MCP configuration; switch Claude CLI across Anthropic-compatible backends              |
 | Network and npm profiles | Scope HTTP/HTTPS/SOCKS and npm settings globally or per workspace, test reachability, and inject them at launch    |
 | Account management       | Manage multiple isolated Claude and ChatGPT/Codex logins, defaults, authentication status, and launch-time choice  |
-| Managed CLI lifecycle    | Preview, confirm, install, or upgrade each agent's CLI — from its official npm package, or from the vendor's own Windows installer where one is published — then verify the result |
+| Managed CLI lifecycle    | Pick an agent to install or check for updates. Termexo chooses the installer, verifies the result, and offers recovery steps; version selection and logs stay in advanced options |
 | Allowance visibility     | Show reported quota where supported, including Grok Build's exhausted free allowance; unknown percentages remain unavailable |
-| Task board               | Organise projects and tasks with priorities and acceptance criteria, run one as a Claude/Codex/OpenCode/Grok Build terminal, and track it from todo through executing, completed, and verified |
+| Task board               | Organise projects and tasks with priorities and acceptance criteria, run one as a Claude/Codex/OpenCode/Pi/Grok Build terminal, and track it from todo through executing, completed, and verified |
 | Prompt assets            | Recover live per-terminal drafts; search, favorite, pin, delete, and reuse submitted prompts                       |
 | Session handoff          | Build redacted, token-budgeted Git/task packages; import/export documents and continue in another Agent            |
 | Git graph and diff       | Show the active terminal's branch, commit topology, and changes since terminal start with unified or split diff    |
@@ -315,7 +316,7 @@ Set `TERMEXO_PI_PATH` to override the executable. Session discovery respects `PI
 
 ## Current Boundaries
 
-- All five supported agents can be detected and launched on Windows, with native sessions discoverable and resumable from the session center. Status events and launch options vary by CLI; compatible-provider model switching currently applies to Claude terminals.
+- All six supported agents can be detected and launched on Windows, with native sessions discoverable and resumable from the session center. Status events and launch options vary by CLI; compatible-provider model switching currently applies to Claude terminals.
 - Termexo restores terminal configuration after an app restart. An exited operating-system process is not treated as still running; resume a historical agent session explicitly from the session center.
 - Native session files remain read-only. Cross-agent handoff uses a redacted context package rather than rewriting a provider's private transcript.
 - Git session changes are repository deltas observed since terminal start; concurrent editors or other terminals may contribute.
@@ -442,7 +443,9 @@ identifiers still use a legacy name. This does not affect the Termexo product na
 | V0.10.10 | Local MCP control and automatic connection for five Agents | Released |
 | V0.10.11 | Agent status and launch fixes, mobile shortcuts, and clearer setup | Released |
 | V0.10.12 | Responsive terminals, Windows paste, and Codex mobile shortcuts | Released |
-| V0.10.13 | Proxy cleanup, older OpenCode scans, clean Codex titles, distinct completed tabs | Current |
+| V0.10.13 | Proxy cleanup, older OpenCode scans, clean Codex titles, distinct completed tabs | Released |
+| V0.10.14 | Easier setup, Pi Agent, official Antigravity updates, persistent reminders | Released |
+| V0.10.15 | Workspace organization, login choices, model discovery, active terminal close confirmation | Current |
 | V1.0 | Stability, security hardening, and recovery experience | Planned |
 
 See [open issues](https://github.com/gemron/Termexo/issues) for ongoing work and

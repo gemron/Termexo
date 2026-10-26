@@ -68,9 +68,33 @@ impl MaterialPaths {
 
     fn write(&self, material: &PemMaterial) -> Result<(), String> {
         fs::write(&self.certificate, &material.certificate)
-            .and_then(|_| fs::write(&self.private_key, &material.private_key))
+            .and_then(|_| write_private(&self.private_key, &material.private_key))
             .map_err(|error| format!("无法保存自签名证书：{error}"))
     }
+}
+
+/// Writes the private key readable by its owner alone where the platform has file modes.
+///
+/// `fs::write` would leave it at the process umask, usually world-readable. A key written by an
+/// earlier build keeps its old mode unless it is tightened here too.
+#[cfg(unix)]
+fn write_private(path: &Path, contents: &[u8]) -> std::io::Result<()> {
+    use std::io::Write;
+    use std::os::unix::fs::{OpenOptionsExt, PermissionsExt};
+
+    let mut file = fs::OpenOptions::new()
+        .write(true)
+        .create(true)
+        .truncate(true)
+        .mode(0o600)
+        .open(path)?;
+    file.set_permissions(fs::Permissions::from_mode(0o600))?;
+    file.write_all(contents)
+}
+
+#[cfg(not(unix))]
+fn write_private(path: &Path, contents: &[u8]) -> std::io::Result<()> {
+    fs::write(path, contents)
 }
 
 fn generate(host_addresses: &[String]) -> Result<PemMaterial, String> {
@@ -100,6 +124,28 @@ fn subject_alt_names(host_addresses: &[String]) -> Vec<String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[cfg(unix)]
+    #[test]
+    fn the_private_key_is_readable_by_its_owner_alone() {
+        use std::os::unix::fs::PermissionsExt;
+
+        let directory =
+            std::env::temp_dir().join(format!("termexo-tls-key-{}", std::process::id()));
+        fs::create_dir_all(&directory).unwrap();
+        let path = directory.join("key.pem");
+        fs::write(&path, "old").unwrap();
+        fs::set_permissions(&path, fs::Permissions::from_mode(0o644)).unwrap();
+
+        write_private(&path, b"new").unwrap();
+
+        assert_eq!(fs::read(&path).unwrap(), b"new");
+        assert_eq!(
+            fs::metadata(&path).unwrap().permissions().mode() & 0o777,
+            0o600
+        );
+        fs::remove_dir_all(directory).unwrap();
+    }
 
     #[test]
     fn always_covers_localhost_and_every_supplied_address() {

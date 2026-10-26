@@ -1,0 +1,136 @@
+name: Build Windows installers
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: windows-build-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  build:
+    name: Windows (x64)
+    runs-on: windows-2022
+    timeout-minutes: 60
+    defaults:
+      run:
+        shell: pwsh
+    env:
+      CI: "true"
+      CARGO_TERM_COLOR: always
+      TARGET: x86_64-pc-windows-msvc
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: "24"
+          cache: npm
+          cache-dependency-path: apps/desktop-ui/package-lock.json
+
+      - name: Set up MSVC
+        uses: ilammy/msvc-dev-cmd@v1
+        with:
+          arch: x64
+
+      - name: Set up Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: x86_64-pc-windows-msvc
+
+      - name: Cache Rust builds
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri -> target
+          key: windows-x86_64-pc-windows-msvc
+          cache-on-failure: true
+
+      - name: Install frontend dependencies
+        run: npm --prefix apps/desktop-ui ci
+
+      - name: Run native Rust tests
+        run: cargo test --manifest-path src-tauri/Cargo.toml --lib --locked --target "$env:TARGET" -- --quiet
+
+      - name: Build EXE and MSI
+        # Call the portable CLI wrapper directly; the local .cmd uses a machine-specific VS path.
+        run: npm --prefix apps/desktop-ui run tauri:build -- --target "$env:TARGET" --bundles "nsis,msi" -- --locked
+
+      - name: Verify and collect installers
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $version = (Get-Content -LiteralPath package.json -Raw | ConvertFrom-Json).version
+          $release = Join-Path "src-tauri/target/$env:TARGET" release
+          $bundle = Join-Path $release bundle
+          $output = "artifacts/$env:TARGET"
+          New-Item -ItemType Directory -Path $output -Force | Out-Null
+
+          $binary = Get-Item -LiteralPath (Join-Path $release termexo.exe)
+          $binaryBytes = [System.IO.File]::ReadAllBytes($binary.FullName)
+          if ([BitConverter]::ToUInt16($binaryBytes, 0) -ne 0x5A4D) { throw 'Missing executable MZ header' }
+          $peOffset = [BitConverter]::ToInt32($binaryBytes, 0x3C)
+          if ([BitConverter]::ToUInt32($binaryBytes, $peOffset) -ne 0x4550) { throw 'Missing PE signature' }
+          if ([BitConverter]::ToUInt16($binaryBytes, $peOffset + 4) -ne 0x8664) { throw 'Application is not x64' }
+          if ($binary.VersionInfo.ProductVersion -ne $version) { throw 'Executable version mismatch' }
+
+          $setup = Get-Item -LiteralPath (Join-Path $bundle "nsis/Termexo_${version}_x64-setup.exe")
+          $msi = Get-Item -LiteralPath (Join-Path $bundle "msi/Termexo_${version}_x64_en-US.msi")
+          $installer = $database = $view = $record = $summary = $null
+          try {
+            $installer = New-Object -ComObject WindowsInstaller.Installer
+            $database = $installer.OpenDatabase($msi.FullName, 0)
+            $view = $database.OpenView("SELECT ``Value`` FROM ``Property`` WHERE ``Property`` = 'ProductVersion'")
+            $view.Execute()
+            $record = $view.Fetch()
+            if ($record.StringData(1) -ne $version) { throw 'MSI version mismatch' }
+            $summary = $database.SummaryInformation(0)
+            if ($summary.Property(7) -notmatch '^x64;') { throw 'MSI architecture mismatch' }
+          } finally {
+            foreach ($comObject in @($record, $view, $summary, $database, $installer)) {
+              if ($null -ne $comObject) { [void][System.Runtime.InteropServices.Marshal]::FinalReleaseComObject($comObject) }
+            }
+          }
+
+          $signature = Get-AuthenticodeSignature -LiteralPath $setup.FullName
+          if ($signature.Status.ToString() -notin @('Valid', 'NotSigned')) { throw "Invalid installer signature: $($signature.Status)" }
+          Copy-Item -LiteralPath $setup.FullName, $msi.FullName -Destination $output
+          $checksums = Get-ChildItem -LiteralPath $output -File | Sort-Object Name | ForEach-Object {
+            $hash = (Get-FileHash -LiteralPath $_.FullName -Algorithm SHA256).Hash.ToLowerInvariant()
+            "$hash  $($_.Name)"
+          }
+          $utf8 = [System.Text.UTF8Encoding]::new($false)
+          [System.IO.File]::WriteAllLines((Join-Path $output SHA256SUMS.txt), [string[]]$checksums, $utf8)
+          $metadata = [ordered]@{
+            version = $version
+            commit = $env:GITHUB_SHA
+            target = $env:TARGET
+            signing = $signature.Status.ToString()
+            executableArchitectureVerified = $true
+            executableVersionVerified = $true
+            msiVersionVerified = $true
+            msiArchitectureVerified = $true
+          } | ConvertTo-Json
+          [System.IO.File]::WriteAllText((Join-Path $output build-info.json), $metadata, $utf8)
+
+          @"
+          ### Termexo $version — Windows x64
+          Download the EXE or MSI from this run's **Artifacts** section.
+          Includes SHA-256 checksums and build metadata.
+          Installer signing: $($signature.Status).
+          Source commit: $env:GITHUB_SHA
+          "@ >> $env:GITHUB_STEP_SUMMARY
+
+      - name: Upload installers
+        uses: actions/upload-artifact@v7
+        with:
+          name: Termexo-Windows-x86_64-pc-windows-msvc
+          path: artifacts/x86_64-pc-windows-msvc/
+          if-no-files-found: error
+          retention-days: 14
+          compression-level: 0

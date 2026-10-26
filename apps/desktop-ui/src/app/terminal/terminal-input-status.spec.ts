@@ -160,8 +160,19 @@ describe('TerminalInputStatusTracker', () => {
   });
 
   describe('Enter', () => {
+    it('leaves Claude local commands such as /recap to its lifecycle hooks', () => {
+      const tracker = new TerminalInputStatusTracker();
+      for (const status of ['IDLE', 'COMPLETED', 'RUNNING', 'THINKING'] as const) {
+        expect(statusAfter('/recap\r', 'claude', status, [], tracker)).toBeNull();
+        for (const key of ['/', 'r', 'e', 'c', 'a', 'p', '\r']) {
+          expect(statusAfter(key, 'claude', status, [], tracker)).toBeNull();
+        }
+        expect(statusAfter('/config\r', 'claude', status, [], tracker)).toBeNull();
+      }
+      expect(statusAfter('\r', 'claude', 'WAITING_INPUT')).toBe('THINKING');
+    });
     it('keeps moving a submitted prompt to thinking, or running for a shell', () => {
-      expect(statusAfter('\r', 'claude', 'IDLE')).toBe('THINKING');
+      expect(statusAfter('\r', 'claude', 'IDLE')).toBeNull();
       expect(statusAfter('\r', 'codex', 'COMPLETED')).toBe('THINKING');
       expect(statusAfter('\r', 'opencode', 'WAITING_APPROVAL')).toBe('THINKING');
       expect(statusAfter('\r', 'antigravity', 'IDLE')).toBe('THINKING');

@@ -33,7 +33,7 @@
         </a>
         <nav aria-label="Guide navigation">
           <a href="./">Home</a>
-          <a class="guide-download" href="downloads/termexo-user-guide-en.pdf" download="Termexo-User-Guide-v0.10.13-en.pdf">Download PDF</a>
+          <a class="guide-download" href="downloads/termexo-user-guide-en.pdf" download="Termexo-User-Guide-v0.10.15-en.pdf">Download PDF</a>
         </nav>
         <div class="language-switch" role="group" aria-label="Guide language">
           <a href="guide.en.html" data-lang="en" lang="en" hreflang="en" aria-label="Read in English" aria-current="page" class="active">EN</a>
@@ -56,16 +56,16 @@
           <a href="#faq">08　FAQ</a>
           <a href="#privacy">09　Data &amp; security</a>
         </nav>
-        <p class="guide-sidebar-note">Windows desktop edition<br />V0.10.13 · English</p>
+        <p class="guide-sidebar-note">Windows desktop edition<br />V0.10.15 · English</p>
       </aside>
       <article id="guide-content" class="guide-content" lang="en">
         <header class="guide-intro">
           <p class="guide-label">TERMEXO / USER GUIDE</p>
           <h1>User guide</h1>
           <p class="guide-lead">Start with your first workspace. Keep your terminals, Agents and project progress together.</p>
-          <p class="guide-meta">For V0.10.13 · Updated 2026-10-09 · Windows 10/11 x64</p>
+          <p class="guide-meta">For V0.10.15 · Updated 2026-10-23 · Windows 10/11 x64</p>
           <div class="guide-actions" data-pdf-skip>
-            <a class="button primary" href="downloads/termexo-user-guide-en.pdf" download="Termexo-User-Guide-v0.10.13-en.pdf">Download English guide · PDF</a>
+            <a class="button primary" href="downloads/termexo-user-guide-en.pdf" download="Termexo-User-Guide-v0.10.15-en.pdf">Download English guide · PDF</a>
             <a class="button secondary" href="#quick-start">Start reading ↓</a>
           </div>
           <p class="guide-note" data-pdf-skip>The English PDF matches this page and works offline. Labels and button locations may vary by app language or version. The workbench screenshot shows the Chinese interface.</p>
@@ -84,15 +84,15 @@
           <h3>Your first session in three steps</h3>
           <ol>
             <li><strong>Create a workspace.</strong> Use the first-run guide to create a workspace. Enter a project name and select a project folder that actually exists on this computer.</li>
-            <li><strong>Prepare an Agent.</strong> Check the detection status of Claude Code, Codex, OpenCode, Antigravity and Grok Build in Settings. If needed, use CLI install and update, review the installation preview and confirm. Complete the selected Agent's sign-in or model configuration. Starting a terminal for an agent that is not installed also offers Install from the dialog itself, opened on that agent.</li>
+            <li><strong>Prepare an Agent.</strong> Check the detection status of Claude Code, Codex, OpenCode, Pi Agent, Antigravity and Grok Build in Settings. If needed, open Install & update, choose the Agent and click Install latest version. Complete the selected Agent's sign-in or model configuration. Starting a terminal for an agent that is not installed also offers Install from the dialog itself, opened on that agent.</li>
             <li><strong>Open a terminal.</strong> Click New on the tab bar, select an Agent, and confirm the working folder, account and model. Start it and enter a task. You can also open a regular terminal first to check the project path and command environment.</li>
           </ol>
           <p class="guide-callout">Start with a small check, such as: "Read this project and explain how to run its tests. Do not change any files yet." Confirm the folder, account and connection before assigning code changes.</p>
           <h3>Installing an Agent's CLI</h3>
-          <p>CLI install and update in Settings installs each agent's own command-line tool, showing the command and where it lands before anything runs and checking the result afterwards. Two sources:</p>
+          <p>Use Settings → Install & update. Install a missing Agent with one click or check an existing version. Close settings and return to see the result. Versions, commands and logs are in Advanced options & details.</p>
           <ul>
             <li><strong>The official npm package:</strong> a version can be named and a failed install is rolled back to the previous one. Needs Node.js and npm, and uses the proxy and registry settings in effect.</li>
-            <li><strong>The vendor's own Windows script:</strong> published by Claude Code, Codex CLI and Antigravity. Installs whatever that vendor currently publishes, with no version to choose and no rollback; OpenCode and Grok Build publish none.</li>
+            <li><strong>Official Windows installers:</strong> Claude Code, Codex and Antigravity offer vendor installers without version pinning or rollback. For installed Antigravity, Check & update runs its official updater. OpenCode, Pi Agent and Grok Build use npm.</li>
           </ul>
         </section>
 
@@ -105,14 +105,14 @@
           </figure>
           <h3>Arrange your workbench</h3>
           <ul>
-            <li>Use New on the tab bar to start a regular shell, Claude Code, Codex, OpenCode, Antigravity or Grok Build. The working folder is a local directory, not a GitHub web address.</li>
+            <li>Use New on the tab bar to start a regular shell, Claude Code, Codex, OpenCode, Pi Agent, Antigravity or Grok Build. The working folder is a local directory, not a GitHub web address.</li>
             <li>Open several tabs, select the terminals to display, and adjust the grid. Choose 1 to 6 rows/columns or maximize a terminal. Drag tabs to reorder them.</li>
             <li>Each terminal runs a separate real process. Agents editing the same folder can affect each other's work. Use separate directories or Git worktrees when changes need isolation.</li>
           </ul>
           <h3>Understand status alerts</h3>
           <ul>
             <li><strong>Running / thinking:</strong> the Agent is processing a task or using tools.</li>
-            <li><strong>Waiting for input / approval:</strong> answer a question or authorize an operation. Click the persistent alert to reach that terminal, then read the full request.</li>
+            <li><strong>Waiting for input / approval:</strong> read the request in that terminal. Input, approval and completion notices keep the taskbar flashing until acknowledged or cleared, even after activating the window.</li>
             <li><strong>Completed / failed / stopped:</strong> inspect terminal output and file changes before accepting, troubleshooting or restarting. A status badge does not prove the code passed validation.</li>
           </ul>
           <p class="guide-callout">Automatic confirmation reduces approval prompts and expands what an Agent may execute without asking each time. Keep manual confirmation for unfamiliar or sensitive projects. An AUTO badge is not a security review.</p>
@@ -122,7 +122,7 @@
         <section id="sessions" class="guide-section" data-pdf-page>
           <h2>03 / Resume sessions</h2>
           <ol>
-            <li>Open the Session Center and search for local Claude Code, Codex, OpenCode, Antigravity or Grok Build sessions. Narrow the list by project, account or other available filters.</li>
+            <li>Open the Session Center and search for local Claude Code, Codex, OpenCode, Pi Agent, Antigravity or Grok Build sessions. Narrow the list by project, account or other available filters.</li>
             <li>Check the folder, Agent, account and recent activity to identify the session you want.</li>
             <li>Select Resume and confirm the launch options. Termexo uses the CLI's native resume capability, then lets you continue in a terminal.</li>
           </ol>
@@ -171,12 +171,12 @@
 
         <section id="ai-control" class="guide-section" data-pdf-page>
           <h2>06 / AI control (MCP)</h2>
-          <p><strong>Let one AI operate another and spend less time carrying messages.</strong> MCP connects AI to Termexo. A connected Agent can find another terminal, send a prompt, submit Enter and read the reply. This works with Claude Code, Codex, OpenCode, Grok Build and Antigravity CLI. Use everyday language; no code or tool names to memorize.</p>
+          <p><strong>Let one AI operate another and spend less time carrying messages.</strong> MCP connects AI to Termexo. A connected Agent can find another terminal, send a prompt, submit Enter and read the reply. This works with Claude Code, Codex, OpenCode, Pi Agent, Grok Build and Antigravity CLI. Use everyday language; no code or tool names to memorize.</p>
           <h3>First time? Follow these 3 steps</h3>
           <p>Add a project workspace, install and sign in to the Agent CLIs you want to use, and confirm they start normally. MCP does not replace their accounts, models or allowances. Keep Termexo running.</p>
           <ol>
             <li><strong>Enable:</strong> In desktop Settings → AI control (MCP), enable the local server, keep automatic connection checked and allow terminal access. Check task access if you need the task board. Click Apply and look for Running. Usually, leave the port unchanged.</li>
-            <li><strong>Restart the Agent:</strong> Open or restart an AI terminal in Termexo so it loads the connection settings. All 5 Agents support automatic connection; a Claude attach session needs its original process restarted.</li>
+            <li><strong>Restart the Agent:</strong> Open or restart an AI terminal in Termexo so it loads the connection settings. All 6 Agents support automatic connection; a Claude attach session needs its original process restarted.</li>
             <li><strong>Ask:</strong> Paste the example below into that AI terminal and press Enter. AI chooses the tools for you. Do not paste it into a plain PowerShell or CMD shell.</li>
           </ol>
           <p class="guide-callout">Use Termexo MCP to list my workspaces and terminals, and tell me which are running. Do not change anything yet.</p>
@@ -191,7 +191,7 @@
             <li><strong>Tasks:</strong> “Create a Claude Code task called ‘Review project structure’. Save it without starting it.” Requires task access; you can also ask AI to start, stop or resume tasks.</li>
             <li><strong>Settings:</strong> “Set the Termexo terminal font size to 18.” Enable settings access separately to change language, font size and existing model/network profiles.</li>
           </ul>
-          <p>Terminal and task access allow execution by default. The task board runs Claude Code, Codex, OpenCode and Grok Build. Antigravity accepts messages through an existing terminal but is not a task executor. Creating a plain terminal opens a Shell, not a configured Agent. Name the target if several match, and configure the account and model before requesting a particular model.</p>
+          <p>Terminal and task access allow execution by default. The task board runs Claude Code, Codex, OpenCode, Pi Agent and Grok Build. Antigravity accepts messages through an existing terminal but is not a task executor. Creating a plain terminal opens a Shell, not a configured Agent. Name the target if several match, and configure the account and model before requesting a particular model.</p>
           <h3 data-pdf-page>Not working? Check these first</h3>
           <ul>
             <li><strong>AI cannot find tools:</strong> Check Running and automatic connection, then restart the AI session from Termexo.</li>
@@ -272,7 +272,7 @@
       </article>
     </main>
     <footer class="guide-footer">
-      <div class="shell guide-footer-links"><span>Termexo User Guide · V0.10.13</span><a href="#guide-content">Back to top ↑</a><a href="downloads/termexo-user-guide-en.pdf" download="Termexo-User-Guide-v0.10.13-en.pdf">Download PDF</a></div>
+      <div class="shell guide-footer-links"><span>Termexo User Guide · V0.10.15</span><a href="#guide-content">Back to top ↑</a><a href="downloads/termexo-user-guide-en.pdf" download="Termexo-User-Guide-v0.10.15-en.pdf">Download PDF</a></div>
       <div class="shell site-counter">
         <p>Website visits (PV): <span id="busuanzi_value_site_pv" class="site-counter-value">—</span></p>
         <p>Third-party website statistics only; “—” means unavailable.</p>

@@ -1,3 +1,4 @@
+use crate::platform::{shell_invoke, shell_quote};
 use std::cmp::Reverse;
 use std::env;
 use std::fs;
@@ -217,14 +218,14 @@ impl AgentAdapter for GrokBuildAdapter {
         options: &GrokLaunchOptions,
     ) -> Result<AgentLaunchSpec, Self::Error> {
         let executable = self.find_executable().ok_or(GrokError::NotInstalled)?;
-        let mut command = format!("& {}", powershell_quote(&executable.to_string_lossy()));
+        let mut command = shell_invoke(&executable.to_string_lossy());
         if let Some(session_id) = options
             .session_id
             .as_deref()
             .filter(|value| !value.trim().is_empty())
         {
             command.push_str(" --resume ");
-            command.push_str(&powershell_quote(session_id));
+            command.push_str(&shell_quote(session_id));
         } else if options.continue_last {
             command.push_str(" --continue");
         } else if let Some(new_session_id) = options
@@ -233,7 +234,7 @@ impl AgentAdapter for GrokBuildAdapter {
             .filter(|value| !value.trim().is_empty())
         {
             command.push_str(" --session-id ");
-            command.push_str(&powershell_quote(new_session_id));
+            command.push_str(&shell_quote(new_session_id));
         }
         if let Some(model) = options
             .model
@@ -241,7 +242,7 @@ impl AgentAdapter for GrokBuildAdapter {
             .filter(|value| !value.trim().is_empty())
         {
             command.push_str(" --model ");
-            command.push_str(&powershell_quote(model));
+            command.push_str(&shell_quote(model));
         }
         if options.auto_confirm {
             command.push_str(" --always-approve");
@@ -276,10 +277,6 @@ fn query_command(executable: &Path) -> Command {
     hidden_command(executable)
 }
 
-fn powershell_quote(value: &str) -> String {
-    format!("'{}'", value.replace('\'', "''"))
-}
-
 fn paths_equal(left: &str, right: &str) -> bool {
     let normalize = |value: &str| {
         value
@@ -295,6 +292,7 @@ mod tests {
     use super::*;
     use std::time::{SystemTime, UNIX_EPOCH};
 
+    #[cfg(windows)]
     #[test]
     fn builds_documented_launch_flags_and_reads_session_summary() {
         let unique = SystemTime::now()

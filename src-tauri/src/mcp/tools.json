@@ -659,5 +659,294 @@
       "idempotentHint": false,
       "openWorldHint": false
     }
+  },
+  {
+    "name": "common_action_list",
+    "group": "terminal",
+    "description": "List saved project actions and the pending recognition request. Only the user can confirm proposals in the desktop UI.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "workspaceId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        }
+      },
+      "required": ["workspaceId"],
+      "additionalProperties": false
+    },
+    "annotations": {
+      "readOnlyHint": true,
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": false
+    }
+  },
+  {
+    "name": "common_action_propose",
+    "group": "terminal",
+    "description": "Submit suggestions for an active recognition request for USER REVIEW ONLY. Never saves or runs commands. Use the requestId returned by common_action_list or the recognition prompt.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "workspaceId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        },
+        "requestId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        },
+        "actionsJson": {
+          "type": "string",
+          "maxLength": 100000,
+          "description": "JSON array of objects with name, command, absolute workingDirectory, description. Empty array if no reliable suggestions."
+        }
+      },
+      "required": ["workspaceId", "requestId", "actionsJson"],
+      "additionalProperties": false
+    },
+    "annotations": {
+      "readOnlyHint": false,
+      "destructiveHint": false,
+      "idempotentHint": false,
+      "openWorldHint": true
+    }
+  },
+  {
+    "name": "common_action_run",
+    "group": "terminal",
+    "description": "Run an already saved project action in its own terminal, or focus its existing running terminal. Read output with terminal_read.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "workspaceId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        },
+        "actionId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        }
+      },
+      "required": ["workspaceId", "actionId"],
+      "additionalProperties": false
+    },
+    "annotations": {
+      "readOnlyHint": false,
+      "destructiveHint": true,
+      "idempotentHint": false,
+      "openWorldHint": true
+    }
+  },
+  {
+    "name": "common_action_restart",
+    "group": "terminal",
+    "description": "Stop and restart an already saved project action in its own terminal.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "workspaceId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        },
+        "actionId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        }
+      },
+      "required": ["workspaceId", "actionId"],
+      "additionalProperties": false
+    },
+    "annotations": {
+      "readOnlyHint": false,
+      "destructiveHint": true,
+      "idempotentHint": false,
+      "openWorldHint": true
+    }
+  },
+  {
+    "name": "common_action_stop",
+    "group": "terminal",
+    "description": "Stop the terminal process of a saved project action.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "workspaceId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        },
+        "actionId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        }
+      },
+      "required": ["workspaceId", "actionId"],
+      "additionalProperties": false
+    },
+    "annotations": {
+      "readOnlyHint": false,
+      "destructiveHint": true,
+      "idempotentHint": true,
+      "openWorldHint": true
+    }
+  },
+  {
+    "name": "project_preview_open",
+    "group": "terminal",
+    "description": "Open and select a Content Preview tab alongside terminal tabs. Shows project files/directories READ-ONLY: syntax-highlighted UTF-8 code/text (preserving source whitespace), Markdown, images and PDF. Optional line/column jumps to source. Creates a new independent tab by default; pass a returned tabId to update that specific tab. Returns the actual tabId; does not create a PTY or edit files. Paths must stay inside the selected project.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "workspaceId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        },
+        "path": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 4000
+        },
+        "line": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 1000000
+        },
+        "column": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 1000000
+        },
+        "tabId": {
+          "type": "string",
+          "description": "Optional existing preview tab ID from a prior call. Omit to create a new independent tab; the tab must belong to workspaceId."
+        }
+      },
+      "required": ["workspaceId", "path"],
+      "additionalProperties": false
+    },
+    "annotations": {
+      "readOnlyHint": true,
+      "destructiveHint": false,
+      "idempotentHint": false,
+      "openWorldHint": false
+    }
+  },
+  {
+    "name": "web_preview_open",
+    "group": "terminal",
+    "description": "Open and select an http(s) URL in the sandboxed Content Preview tab alongside terminal tabs. Creates a new independent tab by default; pass a returned tabId to update that specific tab. Returns the actual tabId; does not create a PTY. Websites may block embedding; opening does not prove the page is displayed. No file editing.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "workspaceId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        },
+        "url": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 8000
+        },
+        "tabId": {
+          "type": "string",
+          "description": "Optional existing preview tab ID from a prior call. Omit to create a new independent tab; the tab must belong to workspaceId."
+        }
+      },
+      "required": ["workspaceId", "url"],
+      "additionalProperties": false
+    },
+    "annotations": {
+      "readOnlyHint": true,
+      "destructiveHint": false,
+      "idempotentHint": false,
+      "openWorldHint": true
+    }
+  },
+  {
+    "name": "wechat_notification_status",
+    "group": "settings",
+    "description": "Read user-configured desktop WeChat notification settings and recent results. Cannot enable sending or change target.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {},
+      "required": [],
+      "additionalProperties": false
+    },
+    "annotations": {
+      "readOnlyHint": true,
+      "destructiveHint": false,
+      "idempotentHint": false,
+      "openWorldHint": false
+    }
+  },
+  {
+    "name": "wechat_notification_probe",
+    "group": "settings",
+    "description": "Check the configured desktop WeChat target without composing or sending a message. May switch chats. Refuses ambiguous targets.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {},
+      "required": [],
+      "additionalProperties": false
+    },
+    "annotations": {
+      "readOnlyHint": false,
+      "destructiveHint": true,
+      "idempotentHint": false,
+      "openWorldHint": false
+    }
+  },
+  {
+    "name": "wechat_notify",
+    "group": "settings",
+    "description": "Notify through user-enabled desktop WeChat notifications for a project event. Uses configured target only. Never auto-approves an authorization. Do not retry an uncertain result; duplicate event keys are not resent.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "workspaceId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        },
+        "eventKey": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 500
+        },
+        "kind": {
+          "type": "string",
+          "enum": ["completed", "error", "approval", "input"]
+        },
+        "terminalId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        },
+        "taskTitle": {
+          "type": "string",
+          "maxLength": 150
+        }
+      },
+      "required": ["workspaceId", "eventKey", "kind"],
+      "additionalProperties": false
+    },
+    "annotations": {
+      "readOnlyHint": false,
+      "destructiveHint": true,
+      "idempotentHint": true,
+      "openWorldHint": true
+    }
   }
 ]

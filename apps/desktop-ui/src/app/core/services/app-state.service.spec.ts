@@ -48,6 +48,7 @@ describe('AppStateService', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     window.localStorage.removeItem('termexo.selectedTerminals.v1');
+    window.localStorage.removeItem('termexo.workspace-organization.v1');
     repository.list.mockResolvedValue([]);
     repository.watchChanges.mockResolvedValue(() => undefined);
     gateway.liveTerminals.mockResolvedValue(new Map<string, number>());
@@ -171,6 +172,18 @@ describe('AppStateService', () => {
     expect(await service.createWorkspace(' ', 'D:\\dev\\first')).toBeNull();
     expect(await service.createWorkspace('First project', ' ')).toBeNull();
     expect(repository.save).not.toHaveBeenCalled();
+  });
+
+  it('preserves an explicit common-operation stop when its killed PTY reports failure late', async () => {
+    await service.createWorkspace('Server', 'D:/test');
+    const terminal = service.createTerminal({ agentType: 'shell', commonActionId: 'dev' })!;
+    service.markTerminalExited(terminal.id, 'STOPPED');
+    service.markTerminalExited(terminal.id, 'FAILED');
+    service.updateTerminalStatus(terminal.id, 'FAILED');
+    expect(service.activeTerminal()?.status).toBe('STOPPED');
+    const failed = service.createTerminal({ agentType: 'shell', commonActionId: 'bad' })!;
+    service.markTerminalExited(failed.id, 'FAILED');
+    expect(service.activeTerminal()?.status).toBe('FAILED');
   });
 
   it('marks persisted terminals for automatic restart', async () => {
@@ -510,7 +523,7 @@ describe('AppStateService', () => {
     );
   });
 
-  it('moves a workspace manually and persists the new order', async () => {
+  it('moves a workspace manually and persists order in local organization data', async () => {
     await service.initialize();
     repository.saveAll.mockClear();
     const workspaceIds = service.workspaces().map((workspace) => workspace.id);
@@ -524,12 +537,11 @@ describe('AppStateService', () => {
       workspaceIds[1],
     ]);
     expect(service.workspaces().map((workspace) => workspace.sortOrder)).toEqual([0, 1, 2]);
-    expect(repository.saveAll).toHaveBeenCalledWith(
-      service.workspaces().map((workspace) => expect.objectContaining({ id: workspace.id })),
-    );
+    expect(service.organization().workspaces[workspaceIds[2]].sortOrder).toBe(1);
+    expect(repository.saveAll).not.toHaveBeenCalled();
   });
 
-  it('inserts a dragged workspace at the requested position and persists it', async () => {
+  it('inserts a dragged workspace at the requested position without rewriting workspace rows', async () => {
     await service.initialize();
     repository.saveAll.mockClear();
     const ids = service.workspaces().map((workspace) => workspace.id);
@@ -537,7 +549,8 @@ describe('AppStateService', () => {
     expect(service.reorderWorkspace(ids[2], ids[0], 'before')).toBe(true);
     expect(service.workspaces().map((workspace) => workspace.id)).toEqual([ids[2], ids[0], ids[1]]);
     expect(service.workspaces().map((workspace) => workspace.sortOrder)).toEqual([0, 1, 2]);
-    expect(repository.saveAll).toHaveBeenCalledWith(service.workspaces());
+    expect(service.organization().workspaces[ids[2]].sortOrder).toBe(0);
+    expect(repository.saveAll).not.toHaveBeenCalled();
 
     repository.saveAll.mockClear();
     expect(service.reorderWorkspace(ids[2], ids[0], 'before')).toBe(false);
@@ -935,6 +948,46 @@ describe('AppStateService', () => {
 
       service.applyAgentEvent(hookEvent('approval.required', base + 3_500));
       expect(statusOf()).toBe('WAITING_APPROVAL');
+    });
+
+    it('ignores late Codex readiness after a turn started without hiding real later events', () => {
+      const id = 'new-codex';
+      service.createTerminal({ id, agentType: 'codex' });
+      const event = (type: string, time: number) => ({
+        ...hookEvent(type, base + time, id),
+        agentType: 'codex' as const,
+      });
+      service.applyAgentEvent(event('session.ready', 100));
+      expect(statusOf(id)).toBe('IDLE');
+      for (const status of [
+        'THINKING',
+        'RUNNING',
+        'WAITING_APPROVAL',
+        'WAITING_INPUT',
+        'FAILED',
+        'RATE_LIMITED',
+        'COMPLETED',
+      ] as const) {
+        atTime(base + 200, () => service.updateTerminalStatus(id, status));
+        service.applyAgentEvent(event('session.ready', 300));
+        expect(statusOf(id)).toBe(status);
+      }
+      service.applyAgentEvent(event('agent.thinking', 400));
+      expect(statusOf(id)).toBe('THINKING');
+    });
+
+    it('persists a manual idle correction, rejects old hook replay and accepts new activity', () => {
+      atTime(base + 1000, () => service.updateTerminalStatus(terminalId, 'RUNNING'));
+      repository.save.mockClear();
+      atTime(base + 3000, () => service.updateTerminalStatus(terminalId, 'IDLE'));
+      expect(statusOf()).toBe('IDLE');
+      expect(repository.save).toHaveBeenCalled();
+      service.applyAgentEvent(hookEvent('tool.started', base + 2000));
+      expect(statusOf()).toBe('IDLE');
+      service.applyAgentEvent(hookEvent('agent.thinking', base + 4000));
+      expect(statusOf()).toBe('THINKING');
+      service.applyAgentEvent(hookEvent('task.completed', base + 5000));
+      expect(statusOf()).toBe('COMPLETED');
     });
 
     it('keeps a pending approval visible while another tool starts', () => {

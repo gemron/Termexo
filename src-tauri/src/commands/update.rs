@@ -90,7 +90,16 @@ pub(crate) fn open_url(url: &str) -> Result<(), String> {
         .map_err(|error| format!("无法打开发布页面：{error}"))
 }
 
-#[cfg(not(windows))]
+#[cfg(target_os = "macos")]
+pub(crate) fn open_url(url: &str) -> Result<(), String> {
+    std::process::Command::new("open")
+        .arg(url)
+        .spawn()
+        .map(|_| ())
+        .map_err(|error| format!("无法打开发布页面：{error}"))
+}
+
+#[cfg(not(any(windows, target_os = "macos")))]
 pub(crate) fn open_url(_url: &str) -> Result<(), String> {
     Err("当前平台不支持打开发布页面。".into())
 }

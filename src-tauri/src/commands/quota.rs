@@ -81,6 +81,7 @@ pub async fn get_provider_quotas(
     database: State<'_, WorkspaceDatabase>,
     credentials: State<'_, CredentialStore>,
     cache: State<'_, QuotaCache>,
+    data: State<'_, crate::storage::DataDirectories>,
 ) -> Result<Vec<ProviderQuota>, String> {
     let now = now_ms();
     let profiles = database
@@ -116,7 +117,7 @@ pub async fn get_provider_quotas(
                 continue;
             }
         }
-        match resolve_agent(&account, &cache_key, now) {
+        match resolve_agent(&account, &cache_key, now, &data.active) {
             Ok(query) => pending.push(query),
             Err(unavailable) => resolved.push(unavailable),
         }
@@ -248,8 +249,14 @@ fn resolve_agent(
     account: &AccountProfile,
     cache_key: &str,
     now: i64,
+    data_directory: &std::path::Path,
 ) -> Result<PendingQuery, ProviderQuota> {
     let provider = quota::agent_display_name(&account.agent_type);
+    #[cfg(target_os = "macos")]
+    if account.agent_type == "claude" {
+        return Err(claude_status_quota(account, cache_key, now, data_directory));
+    }
+    let _ = data_directory;
     let token = quota::read_agent_token(&account.agent_type, account.config_dir.as_deref())
         .map_err(|reason| {
             ProviderQuota::unavailable(cache_key, &account.name, provider, now, reason)
@@ -261,6 +268,47 @@ fn resolve_agent(
         parser: QuotaParser::Agent(account.agent_type.clone()),
         request: quota::build_agent_request(&account.agent_type, &token),
     })
+}
+
+/// Claude Code's allowance as its status line last reported it, in place of a request that would
+/// need the OAuth token out of the macOS Keychain.
+#[cfg(target_os = "macos")]
+fn claude_status_quota(
+    account: &AccountProfile,
+    cache_key: &str,
+    now: i64,
+    data_directory: &std::path::Path,
+) -> ProviderQuota {
+    let provider = quota::agent_display_name(&account.agent_type);
+    let unavailable = |reason: &str| {
+        ProviderQuota::unavailable(cache_key, &account.name, provider, now, reason)
+    };
+    if crate::claude_status::user_has_status_line() {
+        return unavailable(
+            "Claude Code is using your own status line, so Termexo cannot read the allowance from it.",
+        );
+    }
+    let Some(stored) = crate::claude_status::read_allowance(
+        data_directory,
+        account.config_dir.as_deref(),
+        now / 1000,
+    ) else {
+        return unavailable(
+            "No allowance reported yet. It appears after Claude Code answers in a Termexo terminal (Pro and Max plans).",
+        );
+    };
+    match quota::parse_agent_response(&account.agent_type, &stored.body) {
+        Ok(entries) => ProviderQuota {
+            profile_id: cache_key.to_owned(),
+            profile_name: account.name.clone(),
+            official: quota::is_official(provider),
+            provider: provider.to_owned(),
+            entries,
+            checked_at: stored.updated_at,
+            diagnostic: None,
+        },
+        Err(reason) => unavailable(&reason),
+    }
 }
 
 #[derive(Clone, Copy)]

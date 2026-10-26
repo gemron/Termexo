@@ -17,6 +17,7 @@ import { AGENT_ICONS } from '../core/models/workspace.models';
 import { IconComponent } from '../shared/icon/icon';
 import { LaunchDialogShellComponent } from './launch-dialog-shell';
 import { CodexModelCatalogService } from '../core/services/codex-model-catalog.service';
+import { launchProfileId, officialModelId, OFFICIAL_MODEL_PREFIX } from '../core/models/launch-model-choice';
 
 export interface CodexLaunchDialogValue {
   name: string;
@@ -62,24 +63,27 @@ export interface CodexLaunchDialogValue {
           />
         </label>
         <label class="profile-field">
-          <span>{{ 'launch.modelProfile' | t }}</span>
+          <span>{{ 'launch.modelChoice' | t }}</span>
           <select
             class="select select-bordered select-sm"
             [ngModel]="resolvedProfileId()"
             (ngModelChange)="onProfileChange($event)"
           >
-            @for (profile of codexProfiles(); track profile.id) {
+            <optgroup [label]="'launch.officialModels' | t">
+              <option value="official:">{{ 'launch.cliDefaultModel' | t }}{{ configuredDefault() ? ' · ' + configuredDefault() : '' }}</option>
+              @for (model of officialModels(); track model) { <option [value]="'official:' + model">{{ model }}</option> }
+            </optgroup>
+            <optgroup [label]="'launch.savedProfiles' | t">
+              @for (profile of codexProfiles(); track profile.id) {
               <option [value]="profile.id">
                 {{ profile.name }} · {{ modelOf(profile) }}
                 @if (isNativeModel(profile)) {
                   ({{ 'settings.nativeModel' | t }})
                 }
               </option>
-            }
+              }
+            </optgroup>
           </select>
-          @if (!codexProfiles().length) {
-            <small class="account-warning">{{ 'launch.noModelProfile' | t }}</small>
-          }
         </label>
         <label class="account-field">
           <span>{{ 'launch.chatgptAccount' | t }}</span>
@@ -190,6 +194,10 @@ export class CodexLaunchDialogComponent {
   protected readonly modelsError = signal('');
   private catalogGeneration = 0;
   protected readonly configuredDefault = signal('');
+  protected readonly officialModels = computed(() => {
+    const selected = officialModelId(this.resolvedProfileId());
+    return [...new Set([...this.modelSuggestions(), ...(selected ? [selected] : [])])];
+  });
 
   constructor() {
     effect(() => { if (this.installation()?.healthy && this.resolvedAccountProfileId()) void this.refreshModels(); });
@@ -199,11 +207,6 @@ export class CodexLaunchDialogComponent {
     const account = this.resolvedAccountProfileId(), directory = this.workingDirectory();
     const generation = ++this.catalogGeneration;
     this.modelsLoading.set(true); this.modelsError.set(''); this.modelSuggestions.set([]); this.configuredDefault.set('');
-    const profile = this.codexProfiles().find(profile => profile.id === this.resolvedProfileId());
-    if (profile && !isNativeModel(profile, 'codex')) {
-      this.modelSuggestions.set(profile.codexModel ? [profile.codexModel] : []);
-      this.modelsLoading.set(false); return;
-    }
     try {
       const catalog = await this.catalogs.load(account, directory, true);
       if (generation !== this.catalogGeneration) return;
@@ -232,13 +235,15 @@ export class CodexLaunchDialogComponent {
       this.profileId() ||
       this.codexProfiles().find((profile) => profile.isDefault)?.id ||
       this.codexProfiles()[0]?.id ||
-      '',
+      OFFICIAL_MODEL_PREFIX,
   );
   protected readonly resolvedModel = computed(() => {
     const explicit = this.model().trim();
     if (explicit) {
       return explicit;
     }
+    const native = officialModelId(this.resolvedProfileId());
+    if (native !== undefined) return native;
     const profile = this.codexProfiles().find(
       (candidate) => candidate.id === this.resolvedProfileId(),
     );
@@ -273,6 +278,8 @@ export class CodexLaunchDialogComponent {
 
   protected onProfileChange(profileId: string): void {
     this.profileId.set(profileId);
+    const native = officialModelId(profileId);
+    if (native !== undefined) { this.model.set(native); return; }
     const profile = this.codexProfiles().find((p) => p.id === profileId);
     if (profile) {
       // A model name belongs to its provider. Retaining the previous profile's value can launch an
@@ -288,7 +295,7 @@ export class CodexLaunchDialogComponent {
     this.launched.emit({
       name: this.name().trim(),
       model: this.resolvedModel() || undefined,
-      profileId: this.resolvedProfileId() || undefined,
+      profileId: launchProfileId(this.resolvedProfileId()),
       accountProfileId: this.resolvedAccountProfileId() || undefined,
       autoConfirm: this.autoConfirm() || undefined,
       reasoningEffort: this.effort() || undefined,

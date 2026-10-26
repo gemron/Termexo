@@ -290,6 +290,7 @@ mod tests {
 
     /// A drive that is not attached must not be able to stop the application starting, because the
     /// only way to correct the setting is from inside the application.
+    #[cfg(windows)] // asserts Windows paths or PowerShell syntax
     #[test]
     fn an_unusable_recorded_location_falls_back_to_the_default() {
         let default = temporary_directory("unusable-default");

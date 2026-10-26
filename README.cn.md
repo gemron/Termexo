@@ -11,7 +11,7 @@
 </p>
 
 <p align="center">
-  <img alt="Version 0.10.13" src="https://img.shields.io/badge/version-0.10.13-58c7a0">
+  <img alt="Version 0.10.15" src="https://img.shields.io/badge/version-0.10.15-58c7a0">
   <img alt="Windows" src="https://img.shields.io/badge/platform-Windows-0078D4?logo=windows">
   <img alt="Tauri 2" src="https://img.shields.io/badge/Tauri-2-24C8DB?logo=tauri&logoColor=white">
   <img alt="Angular 22" src="https://img.shields.io/badge/Angular-22-DD0031?logo=angular">
@@ -29,13 +29,14 @@
   <img src="website/assets/agent-opencode.svg" alt="OpenCode" title="OpenCode" width="26" height="26">&nbsp;&nbsp;
   <img src="website/assets/agent-antigravity.svg" alt="Antigravity" title="Antigravity" width="26" height="26">&nbsp;&nbsp;
   <img src="website/assets/agent-grok.svg" alt="Grok Build" title="Grok Build" width="26" height="26">
+  <img src="website/assets/agent-pi.svg" alt="Pi Agent" title="Pi Agent" width="26" height="26">
 </p>
 
-**让 AI 通过 MCP 操控 Claude Code、Codex、OpenCode、Grok Build 和 Antigravity 的终端。**
+**让 AI 通过 MCP 操控 Claude Code、Codex、OpenCode、Pi Agent、Grok Build 和 Antigravity 的终端。**
 
 对一个已连接的 AI 说一句话，它就能通过 Termexo 找到另一个 Agent 的终端，发送提示词、提交回车，再读回实际回复。你可以随时在同一个 Windows 工作台查看过程、接手操作，集中查看执行、等待确认和完成状态。
 
-五种 Agent 都在本机真实终端运行。Termexo 还按项目组织工作区、恢复原生会话；需要离开电脑时，可通过自建中继、可信局域网或 VPN 从手机接回同一个工作台。
+六种 Agent 都在本机真实终端运行。Termexo 还按项目组织工作区、恢复原生会话；需要离开电脑时，可通过自建中继、可信局域网或 VPN 从手机接回同一个工作台。
 
 [![Termexo v0.10.6 中的两个真实 Antigravity 会话](website/assets/termexo-workbench-demo.png)](https://www.termexo.com/#workbench-demo)
 
@@ -91,7 +92,7 @@ npx termexo@latest
 MCP 是 AI 与 Termexo 之间的连接。**你用日常语言提出要求，不用记工具名，也不用写代码。** 先安装并登录要用的 Agent CLI，然后：
 
 1. 打开「设置 → AI 操控（MCP）」，启用本地服务，保留自动连接，开启终端权限；要创建和执行任务时再开启任务权限。点击「应用」，确认显示「运行中」。
-2. 在 Termexo 新开或重新启动一个 Agent 终端。Claude Code、Codex、OpenCode、Grok Build 和 Antigravity CLI 都支持自动接入，无需复制地址、令牌或配置文件。
+2. 在 Termexo 新开或重新启动一个 Agent 终端。Claude Code、Codex、OpenCode、Pi Agent、Grok Build 和 Antigravity CLI 都支持自动接入，无需复制地址、令牌或配置文件。
 3. 把下面这句话发给 **AI 终端**，确认它返回你电脑上的实际工作区和终端：
 
 > 请通过 Termexo MCP 列出我的工作区和终端，告诉我哪些正在运行。先不要修改任何内容。
@@ -108,7 +109,7 @@ MCP 是 AI 与 Termexo 之间的连接。**你用日常语言提出要求，不�
 
 > 请通过 Termexo MCP，在当前项目创建一个 Claude Code 任务，标题是“梳理项目结构”。使用已配置的默认模型，先只阅读项目，说明主要目录、运行方法和测试入口，不修改文件。启动后查看终端，确认提示词已提交，再把实际输出整理给我。
 
-**已有终端的交互适用于五种 Agent；任务看板执行支持 Claude Code、Codex、OpenCode 和 Grok Build。** Antigravity 请先在工作台中启动，再通过 MCP 操作它的终端。普通终端创建工具创建的是 Shell。
+**已有终端的交互适用于六种 Agent；任务看板执行支持 Claude Code、Codex、OpenCode、Pi Agent 和 Grok Build。** Antigravity 请先在工作台中启动，再通过 MCP 操作它的终端。普通终端创建工具创建的是 Shell。
 
 “已发送”和“已启动”都不代表任务完成，要继续读取输出、查看任务状态，并按任务需要检查代码和测试结果。MCP 默认关闭，仅供本机使用；它与手机远程访问独立，Agent 自身的工具审批仍生效。
 
@@ -116,7 +117,7 @@ MCP 是 AI 与 Termexo 之间的连接。**你用日常语言提出要求，不�
 
 ## 通过自建中继，从电脑接到手机
 
-1. 在电脑上打开项目，启动 Claude Code、Codex、OpenCode、Antigravity 或 Grok Build。
+1. 在电脑上打开项目，启动 Claude Code、Codex、OpenCode、Pi Agent、Antigravity 或 Grok Build。
 2. 按 **[termexo-relay 文档](https://github.com/gemron/termexo-relay)** 部署双方可达的 HTTPS 中继，或使用管理员提供的入口。
 3. 在「设置 → 远程访问」中启用访问、填写中继地址，使用注册码或中继账号登记设备。
 4. 手机打开生成的中继访问链接或扫描二维码，按提示完成中继登录和桌面访问令牌校验，接回原来的终端。
@@ -132,7 +133,7 @@ MCP 是 AI 与 Termexo 之间的连接。**你用日常语言提出要求，不�
 
 ## 最新版本
 
-**[v0.10.13](https://github.com/gemron/Termexo/releases/tag/v0.10.13)** 清理 Windows 代理环境变量，所有终端统一应用默认网络配置，旧版 OpenCode 也能扫描会话，Codex 会话标题去掉指令杂质，完成态与选中态不再混淆。[开始使用 MCP](https://www.termexo.com/guide.html#ai-control)。
+**[v0.10.15](https://github.com/gemron/Termexo/releases/tag/v0.10.15)** 加入工作区文件夹、标签与图标，支持选择账号登录方式、模型目录与升级建议，以及关闭活动 Agent 终端前确认。
 [完整更新记录](CHANGELOG.cn.md)。
 
 如果 Termexo 帮到了你，欢迎 **给仓库点一个 Star**，帮助更多开发者发现它。
@@ -150,8 +151,8 @@ One Ring 已内置于 Termexo：无需安装独立插件、配置 Node 或填写
 <table>
   <tr>
     <td width="50%" valign="top">
-      <strong>五个 Agent，一块屏幕。</strong><br><br>
-      Claude Code、Codex、OpenCode、Antigravity 和 Grok Build 可以并排跑在真实 PTY 终端里，想开多少开多少，再选择当前
+      <strong>六个 Agent，一块屏幕。</strong><br><br>
+      Claude Code、Codex、OpenCode、Pi Agent、Antigravity 和 Grok Build 可以并排跑在真实 PTY 终端里，想开多少开多少，再选择当前
       要显示的终端，排成 1–6 行/列的自定义网格。标签支持拖拽排序和中键关闭，工作台支持键盘
       快捷键。每个工作空间都会记住目录、标签、布局、模型和主题。
       <br><br>
@@ -168,7 +169,7 @@ One Ring 已内置于 Termexo：无需安装独立插件、配置 Node 或填写
   <tr>
     <td width="50%" valign="top">
       <strong>接着昨天的会话继续。</strong><br><br>
-      跨项目、账号、分支和模型搜索本机 Claude Code/Codex/OpenCode/Antigravity/Grok Build 会话。Termexo 调用 CLI
+      跨项目、账号、分支和模型搜索本机 Claude Code/Codex/OpenCode/Pi/Antigravity/Grok Build 会话。Termexo 调用 CLI
       原生的 <code>claude --resume</code>、<code>codex resume</code>、<code>opencode --session</code>
       、<code>agy --conversation</code> 与 <code>grok --resume</code>
       恢复完整上下文，也能接管 CLI 仍然持有的 Claude 后台会话，并始终只读原生会话文件。
@@ -261,17 +262,17 @@ Termexo 将扩展写入自己的运行时目录，以 `--extension` 注入每个
 | ------------------ | --------------------------------------------------------------------------------- |
 | Workspace 管理     | 创建、改名、换色、拖拽排序和切换 Workspace，并持久化项目路径、布局与终端配置      |
 | 多终端工作台       | 不限终端数量、指定窗口显示、1–6 行列网格、终端/工作区最大化；桌面端启动真实 PTY   |
-| Agent 检测         | 在 Windows 上检测 Claude Code、Codex、OpenCode、Antigravity 与 Grok Build 的可执行文件、版本与健康状态 |
-| 新建 Agent 会话    | 按目录启动 Claude/Codex/OpenCode/Antigravity/Grok Build，并选择对应 CLI 可用的账号、模型和确认选项 |
-| Agent 会话中心     | 只读发现 Claude/Codex/OpenCode/Antigravity/Grok Build 会话，支持搜索、Workspace 过滤、原生恢复，以及接管 CLI 仍持有的 Claude 后台会话 |
+| Agent 检测         | 在 Windows 上检测 Claude Code、Codex、OpenCode、Pi Agent、Antigravity 与 Grok Build 的可执行文件、版本与健康状态 |
+| 新建 Agent 会话    | 按目录启动 Claude/Codex/OpenCode/Pi/Antigravity/Grok Build，并选择对应 CLI 可用的账号、模型和确认选项 |
+| Agent 会话中心     | 只读发现 Claude/Codex/OpenCode/Pi/Antigravity/Grok Build 会话，支持搜索、Workspace 过滤、原生恢复，以及接管 CLI 仍持有的 Claude 后台会话 |
 | Agent 状态识别     | 为每个终端生成隔离 Hooks 设置，识别思考、工具调用、权限确认、用户输入和完成状态   |
-| MCP 操控 Agent     | 五种 Agent 自动接入本地 MCP；让已连接的 AI 查询真实终端、发送提示词或控制按键并读取输出，任务工具支持 Claude Code、Codex、OpenCode 和 Grok Build |
+| MCP 操控 Agent     | 六种 Agent 自动接入本地 MCP；让已连接的 AI 查询真实终端、发送提示词或控制按键并读取输出，任务工具支持 Claude Code、Codex、OpenCode、Pi Agent 和 Grok Build |
 | 模型与 MCP Profile | 管理模型、Endpoint、API Key 与 MCP 配置；Claude CLI 可切换 Anthropic 兼容后端     |
 | 网络与 npm Profile | 按全局/Workspace 管理 HTTP/HTTPS/SOCKS 与 npm 配置，测试连通性并在启动时注入      |
 | 多账号管理         | 管理多个隔离 Claude 与 ChatGPT/Codex 登录、默认账号、认证状态和启动时选择         |
-| CLI 生命周期管理   | 预览、确认、安装或升级各 Agent 的 CLI——可用官方 npm 包，也可用厂商自己发布的 Windows 安装脚本——并在完成后验证结果 |
+| CLI 生命周期管理   | 选择 Agent 后一键安装或检查更新，自动选择安装方式、验证结果；缺少运行环境和下载失败时提供下一步指引，指定版本与日志收进高级选项 |
 | 余量查询           | 显示支持的供应商报告的额度，包括 Grok Build 免费额度已用尽状态；未知百分比保持不可用 |
-| 任务看板           | 按项目管理任务，带优先级与验收标准；可将一条任务跑成 Claude/Codex/OpenCode/Grok Build 终端，并从待办跟踪到执行中、已完成、已验收 |
+| 任务看板           | 按项目管理任务，带优先级与验收标准；可将一条任务跑成 Claude/Codex/OpenCode/Pi/Grok Build 终端，并从待办跟踪到执行中、已完成、已验收 |
 | 提示词资产         | 按终端恢复实时草稿；搜索、收藏、置顶、删除和复用已提交提示词                     |
 | 会话交接           | 生成带脱敏和 Token 预算的 Git/任务包；导入导出文档并交给另一个 Agent 继续         |
 | Git Graph 与 Diff  | 展示当前终端的分支、提交拓扑和启动后的代码变更，支持单栏或双栏 Diff              |
@@ -298,7 +299,7 @@ Termexo 将扩展写入自己的运行时目录，以 `--extension` 注入每个
 
 ## 当前边界
 
-- 五个支持的 Agent 均可在 Windows 上检测、启动，并从会话中心寻找和恢复原生会话。各 CLI 提供的状态事件与启动选项不同；兼容供应商模型切换目前适用于 Claude 终端。
+- 六个支持的 Agent 均可在 Windows 上检测、启动，并从会话中心寻找和恢复原生会话。各 CLI 提供的状态事件与启动选项不同；兼容供应商模型切换目前适用于 Claude 终端。
 - 应用退出后，已退出的操作系统进程不会被“伪恢复”。Termexo 恢复终端配置；历史 Agent 会话需从会话中心显式恢复。
 - 原生会话文件只读，Termexo 不修改、重命名或删除。跨 Agent 交接使用脱敏上下文包，不改写供应商私有记录。
 - Git 会话变更表示终端启动后观察到的仓库差异；同期运行的编辑器或其他终端也可能参与这些改动。
@@ -423,7 +424,9 @@ flowchart LR
 | V0.10.10 | 本地 MCP 操控与五种 Agent 自动接入 | 已发布 |
 | V0.10.11 | Agent 状态与启动修复、移动快捷键和更清楚的设置引导 | 已发布 |
 | V0.10.12 | 桌面终端响应、Windows 粘贴和 Codex 手机快捷键 | 已发布 |
-| V0.10.13 | 代理清理、旧版 OpenCode 扫描、干净标题、可区分的完成态 | 当前版本 |
+| V0.10.13 | 代理清理、旧版 OpenCode 扫描、干净标题、可区分的完成态 | 已发布 |
+| V0.10.14 | 简化安装与更新、Pi Agent、官方 Antigravity 升级、持续闪动提醒 | 已发布 |
+| V0.10.15 | 工作区整理、登录方式、模型目录、活动终端关闭确认 | 当前版本 |
 | V1.0 | 稳定性、安全加固与恢复体验 | 规划中 |
 
 进行中的工作见 [Issues](https://github.com/gemron/Termexo/issues)，实际交付内容见

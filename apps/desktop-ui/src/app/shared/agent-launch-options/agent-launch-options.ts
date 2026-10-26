@@ -56,6 +56,12 @@ interface AgentLaunchGroup {
           </button>
         }
       }
+      @if (includePreview()) {
+        <button type="button" [attr.role]="variant() === 'menu' ? 'menuitem' : null" data-action="preview" (click)="previewRequested.emit()">
+          <span data-tone="slate"><app-icon name="folder" [size]="14" /></span>
+          <div><strong>内容预览</strong><small>文件、网页、图片与文档</small></div>
+        </button>
+      }
     </div>
   `,
   styles: `
@@ -165,6 +171,8 @@ export class AgentLaunchOptionsComponent {
   private readonly i18n = inject(I18nService);
 
   readonly variant = input<AgentLaunchOptionsVariant>('menu');
+  readonly includePreview = input(false);
+  readonly previewRequested = output<void>();
   readonly optionSelected = output<AgentType>();
 
   protected readonly groups = computed<AgentLaunchGroup[]>(() => [

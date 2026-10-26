@@ -42,6 +42,9 @@ pub(super) fn inject(
     executable: &Path,
     database: &Path,
 ) -> Result<(), String> {
+    if request.account_login {
+        return Ok(());
+    }
     let Some(command) = request.command.as_mut() else {
         return Ok(());
     };
@@ -408,6 +411,34 @@ mod tests {
     }
     fn executable() -> PathBuf {
         PathBuf::from("C:/Termexo's app/termexo.exe")
+    }
+
+    #[test]
+    fn authentication_terminals_keep_their_commands_and_environment_unchanged() {
+        for (agent, command) in [
+            ("claude", "& 'C:/Claude Code/claude.exe' auth login"),
+            ("codex", "& 'C:/Codex/codex.cmd' login"),
+        ] {
+            let mut request: TerminalStartRequest = serde_json::from_value(json!({
+                "terminalId":"login", "shell":"powershell", "workingDirectory":"C:/",
+                "command":command, "cols":80, "rows":24, "agentType":agent,
+                "accountLogin":true, "accountProfileId":"managed-account"
+            }))
+            .unwrap();
+            let mut environment =
+                HashMap::from([("ACCOUNT_HOME".into(), "isolated profile".into())]);
+            let original = environment.clone();
+            // A database path without a parent also proves login never prepares runtime files.
+            inject(
+                &mut request,
+                &mut environment,
+                &executable(),
+                Path::new("/"),
+            )
+            .unwrap();
+            assert_eq!(request.command.as_deref(), Some(command));
+            assert_eq!(environment, original);
+        }
     }
 
     #[test]

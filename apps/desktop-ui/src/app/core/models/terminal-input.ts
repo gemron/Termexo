@@ -10,6 +10,8 @@
 
 /** How long to wait between the writes that make up one prompt delivery. */
 export const TERMINAL_INPUT_SETTLE_MS = 120;
+/** Codex defers large/multiline pastes before accepting a submit key. */
+export const TERMINAL_PASTE_SETTLE_MS = 1_000;
 /** Ctrl+U, so a prompt never lands behind whatever the input already held. */
 export const TERMINAL_CLEAR_INPUT_KEY = '\x15';
 /** Enter, which submits whatever the input currently holds. */

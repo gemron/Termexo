@@ -4,6 +4,11 @@
 //! and none of them can replace a running executable in place. So this module only *reports*
 //! what the latest published release is; downloading and installing stays the user's decision,
 //! which also keeps the check free of any signing-key infrastructure.
+//!
+//! A macOS build reports "up to date" without asking GitHub, so the release comparison below is
+//! unused there.
+
+#![cfg_attr(target_os = "macos", allow(dead_code))]
 
 use std::time::Duration;
 
@@ -105,8 +110,32 @@ fn is_update_available(current: &str, latest: &str) -> bool {
     }
 }
 
+/// The answer when there is nothing to offer.
+fn up_to_date(current_version: &str) -> UpdateCheck {
+    UpdateCheck {
+        current_version: current_version.to_owned(),
+        latest_version: current_version.to_owned(),
+        update_available: false,
+        release_notes: None,
+        release_url: RELEASES_PAGE.to_owned(),
+        published_at: None,
+        installed_via_npm: is_npm_installation(),
+    }
+}
+
 /// Fetches the latest published release from GitHub.
+///
+/// The upstream releases are Windows installers, so a macOS build never offers one.
 pub async fn check_for_update(current_version: &str) -> Result<UpdateCheck, String> {
+    #[cfg(target_os = "macos")]
+    return Ok(up_to_date(current_version));
+
+    #[cfg(not(target_os = "macos"))]
+    fetch_latest_release(current_version).await
+}
+
+#[cfg(not(target_os = "macos"))]
+async fn fetch_latest_release(current_version: &str) -> Result<UpdateCheck, String> {
     let client = reqwest::Client::builder()
         .user_agent(USER_AGENT)
         .timeout(REQUEST_TIMEOUT)
@@ -132,15 +161,7 @@ pub async fn check_for_update(current_version: &str) -> Result<UpdateCheck, Stri
     // The "latest" endpoint already excludes drafts and prereleases, but a repository that
     // publishes one later must not push it to everyone.
     if release.draft || release.prerelease {
-        return Ok(UpdateCheck {
-            current_version: current_version.to_owned(),
-            latest_version: current_version.to_owned(),
-            update_available: false,
-            release_notes: None,
-            release_url: RELEASES_PAGE.to_owned(),
-            published_at: None,
-            installed_via_npm: is_npm_installation(),
-        });
+        return Ok(up_to_date(current_version));
     }
 
     let latest_version = release.tag_name.trim_start_matches(['v', 'V']).to_owned();

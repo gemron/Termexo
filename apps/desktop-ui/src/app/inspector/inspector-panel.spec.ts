@@ -305,6 +305,39 @@ describe('InspectorPanelComponent provider allowances', () => {
     expect(root.querySelector('.overview-stats .stat b')?.textContent?.trim()).toBe('65%');
   });
 
+  it('shows the Claude status line notes in the interface language', async () => {
+    const quota = {
+      profileId: 'agent:claude-system',
+      profileName: 'Claude',
+      provider: 'Claude Code',
+      official: true,
+      checkedAt: Date.now(),
+      entries: [],
+      diagnostic:
+        'No allowance reported yet. It appears after Claude Code answers in a Termexo terminal (Pro and Max plans).',
+    };
+    fixture.componentRef.setInput('activeTerminal', {
+      ...TERMINAL,
+      agentType: 'claude',
+      profileId: undefined,
+      accountProfileId: 'claude-system',
+    });
+    fixture.componentRef.setInput('quotas', [quota]);
+    TestBed.inject(I18nService).setPreference('zh-CN');
+    fixture.detectChanges();
+    await fixture.whenStable();
+    root.querySelector<HTMLButtonElement>('.quota-scope-toggle')!.click();
+    fixture.detectChanges();
+
+    expect(root.querySelector('.quota-unavailable')?.textContent).toContain('尚未收到额度信息');
+
+    TestBed.inject(I18nService).setPreference('en');
+    fixture.detectChanges();
+    expect(root.querySelector('.quota-unavailable')?.textContent).toContain(
+      'No allowance reported yet',
+    );
+  });
+
   it('shows live session code changes and opens the full Git view', () => {
     const repository: RepositoryOverview = {
       available: true,

@@ -1,23 +1,24 @@
 import { AgentType, TerminalStatus } from './workspace.models';
+import type { AccountLoginMethod } from './account-login';
 
 export type NativeAgentType = 'claude' | 'codex' | 'opencode' | 'pi' | 'grok' | 'antigravity';
 
 /**
  * The agents Termexo can install and upgrade itself.
  *
- * These arrive as npm packages. Antigravity does not — it ships its own installer, puts its
- * binary outside PATH and updates itself — so it is driven but never managed.
+ * Most arrive as npm packages. Antigravity uses its official script for the first installation
+ * and its installed binary's `update` command for upgrades.
  */
 export type ManagedAgentType = 'claude' | 'codex' | 'opencode' | 'pi' | 'grok' | 'antigravity';
 
 export type CliInstaller = 'npm' | 'script';
 
 /**
- * How each managed CLI can be installed, best-supported first.
+ * The installation methods offered in advanced options.
  *
  * npm can be pinned to a version and rolled back to one; a vendor's script always fetches what
- * that vendor currently publishes and puts it where the vendor wants it. Where both are listed
- * the user picks. OpenCode and Grok Build offer npm here, while Antigravity uses its own script.
+ * that vendor currently publishes and puts it where the vendor wants it. The backend chooses
+ * automatically by default; these choices let an experienced user override that decision.
  *
  * The panel needs this before a plan exists, which is why it is stated here rather than read off
  * the plan the backend returns.
@@ -130,7 +131,7 @@ export interface CliOperationPlan {
   displayName: string;
   packageName: string;
   targetVersion: string;
-  /** `npm` for a published package, `script` for the vendor's own installer. */
+  /** `npm` for a published package, `script` for the vendor's installer or native updater. */
   installer: CliInstaller;
   /** False when the installer offers no version to pin, as a script install does not. */
   supportsVersion: boolean;
@@ -207,6 +208,7 @@ export interface ClaudeLaunchRequest {
   sessionId?: string;
   name?: string;
   profileId?: string;
+  model?: string;
   mcpProfileId?: string;
   accountProfileId?: string;
   autoConfirm?: boolean;
@@ -300,6 +302,7 @@ export interface AccountProfile {
   id: string;
   name: string;
   agentType: AccountAgentType;
+  loginMethod?: AccountLoginMethod;
   configDir?: string;
   isDefault: boolean;
   isSystem: boolean;
@@ -311,6 +314,7 @@ export interface AccountProfileInput {
   id: string;
   name: string;
   agentType: AccountAgentType;
+  loginMethod?: AccountLoginMethod;
   isDefault: boolean;
 }
 

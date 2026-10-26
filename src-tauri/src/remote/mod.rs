@@ -379,10 +379,7 @@ impl RemoteAccessManager {
         let handle = axum_server::Handle::<SocketAddr>::new();
 
         let task = if settings.tls {
-            let app_data_dir = self
-                .app
-                .path()
-                .app_data_dir()
+            let app_data_dir = crate::platform::app_data_dir(&self.app)
                 .map_err(|error| format!("无法定位应用数据目录：{error}"))?;
             let host_addresses: Vec<String> = local_addresses()
                 .into_iter()

@@ -42,7 +42,7 @@ pub async fn execute_cli_operation(
         Ok((plan, environment)) => {
             tauri::async_runtime::spawn_blocking(move || cli::execute_operation(plan, environment))
                 .await
-                .map_err(|error| error.to_string())?
+                .unwrap_or_else(|error| Err(error.to_string()))
         }
         Err(error) => Err(error),
     };

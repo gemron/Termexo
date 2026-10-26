@@ -22,7 +22,14 @@ describe('ExternalLinkDirective', () => {
   beforeEach(() => {
     vi.resetAllMocks();
     vi.mocked(invoke).mockResolvedValue(undefined);
-    Object.defineProperty(window, '__TAURI_INTERNALS__', { value: {}, configurable: true });
+    // The lazy inspector may bundle its own core import; stub the transport as well as the module.
+    Object.defineProperty(window, '__TAURI_INTERNALS__', {
+      value: {
+        invoke: (command: string, args?: Record<string, unknown>) =>
+          args === undefined ? invoke(command) : invoke(command, args),
+      },
+      configurable: true,
+    });
   });
 
   afterEach(() => {

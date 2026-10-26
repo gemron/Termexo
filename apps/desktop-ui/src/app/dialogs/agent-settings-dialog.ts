@@ -1,3 +1,5 @@
+import { WechatNotificationsPanelComponent } from './wechat-notifications-panel';
+import { registerTranslations } from '../core/i18n/i18n.service';
 import { ProfileDrafts, type ProfileSaveCompleted } from './profile-drafts';
 import {
   Component,
@@ -12,15 +14,19 @@ import {
 import { FormsModule } from '@angular/forms';
 
 import { I18nService } from '../core/i18n/i18n.service';
+import { ModelCatalogService } from '../core/services/model-catalog.service';
+import type { ModelUpgrade } from '../core/models/model-catalog';
 import { TranslatePipe } from '../core/i18n/translate.pipe';
+import {
+  ACCOUNT_LOGIN_OPTIONS,
+  accountLoginOption,
+  type AccountLoginMethod,
+} from '../core/models/account-login';
 import {
   AccountAgentType,
   AccountProfile,
   AccountProfileInput,
   AgentInstallation,
-  CliOperationPlan,
-  CliOperationRequest,
-  CliOperationResult,
   CLAUDE_EFFORT_LEVELS,
   CODEX_REASONING_EFFORT_LEVELS,
   CUSTOM_PROVIDER,
@@ -34,8 +40,6 @@ import {
   NetworkProfileInput,
   NetworkProfileScope,
   NetworkTestResult,
-  type CliInstaller,
-  MANAGED_AGENT_INSTALLERS,
   ManagedAgentType,
   PROVIDER_PRESETS,
 } from '../core/models/agent.models';
@@ -50,6 +54,7 @@ import { McpServerPanelComponent } from './mcp-server-panel';
 import { registerMcpServerTranslations } from '../core/i18n/mcp-server.i18n';
 import { AGENT_ICONS } from '../core/models/workspace.models';
 import { ProjectLinksComponent } from './project-links';
+import { AgentInstallPanelComponent } from './agent-install-panel';
 
 export type SettingsTab =
   | 'diagnostics'
@@ -58,11 +63,16 @@ export type SettingsTab =
   | 'models'
   | 'mcp'
   | 'mcp-server'
+  | 'wechat'
   | 'network'
   | 'remote'
   | 'storage';
 
 registerMcpServerTranslations();
+registerTranslations({
+  en: { 'wechat.tab': 'WeChat notifications' },
+  'zh-CN': { 'wechat.tab': '微信通知' },
+});
 
 interface ModelEditorDraft {
   modelName: string;
@@ -88,6 +98,7 @@ const DEFAULT_ALERT_THRESHOLD = 80;
 @Component({
   selector: 'app-agent-settings-dialog',
   imports: [
+    WechatNotificationsPanelComponent,
     ModalFocusDirective,
     FormsModule,
     IconComponent,
@@ -96,6 +107,7 @@ const DEFAULT_ALERT_THRESHOLD = 80;
     StoragePanelComponent,
     McpServerPanelComponent,
     ProjectLinksComponent,
+    AgentInstallPanelComponent,
     TranslatePipe,
   ],
   template: `
@@ -391,282 +403,11 @@ const DEFAULT_ALERT_THRESHOLD = 80;
               </section>
             }
             @case ('cli') {
-              <section class="cli-manager">
-                <div class="cli-manager-intro">
-                  <div>
-                    <strong>{{ 'settings.managedCli' | t }}</strong>
-                    <span>{{ 'settings.managedCliHelp' | t }}</span>
-                  </div>
-                  <span class="scope-chip">WORKSPACE</span>
-                </div>
-
-                <div
-                  class="cli-agent-selector"
-                  role="group"
-                  [attr.aria-label]="'settings.selectAgentCli' | t"
-                >
-                  <button
-                    type="button"
-                    [class.active]="cliAgentType === 'claude'"
-                    (click)="selectCliAgent('claude')"
-                  >
-                    <span><app-icon [name]="agentIcons.claude" [size]="16" /></span>
-                    <strong>Claude Code</strong>
-                    <small>{{
-                      installation()?.healthy
-                        ? (installation()?.version ?? ('settings.installed' | t))
-                        : ('common.notDetected' | t)
-                    }}</small>
-                  </button>
-                  <button
-                    type="button"
-                    [class.active]="cliAgentType === 'opencode'"
-                    (click)="selectCliAgent('opencode')"
-                  >
-                    <span><app-icon [name]="agentIcons.opencode" [size]="16" /></span>
-                    <strong>OpenCode</strong>
-                    <small>{{
-                      openCodeInstallation()?.healthy
-                        ? (openCodeInstallation()?.version ?? ('settings.installed' | t))
-                        : ('common.notDetected' | t)
-                    }}</small>
-                  </button>
-                  <button
-                    type="button"
-                    [class.active]="cliAgentType === 'pi'"
-                    (click)="selectCliAgent('pi')"
-                  >
-                    <span><app-icon [name]="agentIcons.pi" [size]="16" /></span>
-                    <strong>Pi Agent</strong>
-                    <small>{{
-                      piInstallation()?.healthy
-                        ? (piInstallation()?.version ?? ('settings.installed' | t))
-                        : ('common.notDetected' | t)
-                    }}</small>
-                  </button>
-                  <button
-                    type="button"
-                    [class.active]="cliAgentType === 'grok'"
-                    (click)="selectCliAgent('grok')"
-                  >
-                    <span><app-icon [name]="agentIcons.grok" [size]="16" /></span>
-                    <strong>Grok Build</strong>
-                    <small>{{
-                      grokInstallation()?.healthy
-                        ? (grokInstallation()?.version ?? ('settings.installed' | t))
-                        : ('common.notDetected' | t)
-                    }}</small>
-                  </button>
-                  <button
-                    type="button"
-                    [class.active]="cliAgentType === 'codex'"
-                    (click)="selectCliAgent('codex')"
-                  >
-                    <span><app-icon [name]="agentIcons.codex" [size]="16" /></span>
-                    <strong>Codex CLI</strong>
-                    <small>{{
-                      codexInstallation()?.healthy
-                        ? (codexInstallation()?.version ?? ('settings.installed' | t))
-                        : ('common.notDetected' | t)
-                    }}</small>
-                  </button>
-                  <button
-                    type="button"
-                    [class.active]="cliAgentType === 'antigravity'"
-                    (click)="selectCliAgent('antigravity')"
-                  >
-                    <span><app-icon [name]="agentIcons.antigravity" [size]="16" /></span>
-                    <strong>Antigravity</strong>
-                    <small>{{
-                      antigravityInstallation()?.healthy
-                        ? (antigravityInstallation()?.version ?? ('settings.installed' | t))
-                        : ('common.notDetected' | t)
-                    }}</small>
-                  </button>
-                </div>
-
-                <div class="cli-version-row">
-                  @if (cliInstallers().length > 1) {
-                    <div
-                      class="cli-installer"
-                      role="tablist"
-                      [attr.aria-label]="'settings.installVia' | t"
-                    >
-                      @for (installer of cliInstallers(); track installer) {
-                        <button
-                          type="button"
-                          role="tab"
-                          [class.active]="cliInstaller === installer"
-                          [attr.aria-selected]="cliInstaller === installer"
-                          (click)="selectCliInstaller(installer)"
-                        >
-                          {{
-                            (installer === 'script'
-                              ? 'settings.installerScript'
-                              : 'settings.installerNpm'
-                            ) | t
-                          }}
-                        </button>
-                      }
-                    </div>
-                  }
-                  @if (cliTakesVersion()) {
-                    <label>
-                      <span>{{ 'settings.targetVersion' | t }}</span>
-                      <input
-                        [attr.aria-label]="'settings.targetVersionAria' | t"
-                        [placeholder]="'settings.targetVersionPlaceholder' | t"
-                        [(ngModel)]="cliTargetVersion"
-                        (ngModelChange)="cliConfirmed = false"
-                      />
-                    </label>
-                  } @else {
-                    <small class="cli-installer-note">{{
-                      'settings.scriptInstallerHelp' | t
-                    }}</small>
-                  }
-                  <button
-                    type="button"
-                    class="secondary"
-                    [disabled]="busy() || (cliTakesVersion() && !cliTargetVersion.trim())"
-                    (click)="previewCli()"
-                  >
-                    <app-icon name="refresh" [size]="13" />{{ 'settings.generatePlan' | t }}
-                  </button>
-                </div>
-
-                @if (cliPlanMatches()) {
-                  <div
-                    class="cli-plan"
-                    [class.unavailable]="!cliPlan()?.ready"
-                    [class.up-to-date]="cliPlan()?.upToDate"
-                  >
-                    <div class="cli-plan-heading">
-                      <span>
-                        <app-icon [name]="cliPlan()?.upToDate ? 'check' : 'shield'" [size]="17" />
-                      </span>
-                      <div>
-                        <strong>
-                          {{ planHeadline() }}
-                          {{ cliPlan()?.displayName }}
-                        </strong>
-                        <small>{{ cliPlan()?.diagnostic }}</small>
-                      </div>
-                      @if (cliPlan()?.installer !== 'script') {
-                        <code>{{ cliPlan()?.resolvedVersion ?? cliPlan()?.targetVersion }}</code>
-                      }
-                    </div>
-                    <dl>
-                      <div>
-                        <dt>
-                          {{
-                            (cliPlan()?.installer === 'script'
-                              ? 'settings.officialInstaller'
-                              : 'settings.officialPackage'
-                            ) | t
-                          }}
-                        </dt>
-                        <dd>{{ cliPlan()?.packageSpec }}</dd>
-                      </div>
-                      <div>
-                        <dt>{{ 'settings.currentVersion' | t }}</dt>
-                        <dd>{{ cliPlan()?.currentVersion ?? ('settings.notInstalled' | t) }}</dd>
-                      </div>
-                      @if (cliPlan()?.resolvedVersion) {
-                        <div>
-                          <dt>{{ 'settings.latestVersion' | t }}</dt>
-                          <dd>{{ cliPlan()?.resolvedVersion }}</dd>
-                        </div>
-                      }
-                      @if (cliPlan()?.installer !== 'script') {
-                        <div>
-                          <dt>npm</dt>
-                          <dd>
-                            {{ cliPlan()?.npmVersion ?? ('common.unavailable' | t) }} ·
-                            {{ cliPlan()?.npmPath ?? ('settings.notFound' | t) }}
-                          </dd>
-                        </div>
-                        <div>
-                          <dt>{{ 'settings.activeProxy' | t }}</dt>
-                          <dd>
-                            {{ cliPlan()?.networkProfileName ?? ('settings.directConnection' | t) }}
-                          </dd>
-                        </div>
-                        <div>
-                          <dt>registry</dt>
-                          <dd>{{ cliPlan()?.npmRegistry ?? ('settings.defaultRegistry' | t) }}</dd>
-                        </div>
-                      }
-                    </dl>
-                    <code class="cli-command-preview">{{ cliPlan()?.commandPreview }}</code>
-
-                    <label class="checkbox-control cli-confirmation">
-                      <input
-                        type="checkbox"
-                        [(ngModel)]="cliConfirmed"
-                        [disabled]="busy() || !cliPlan()?.ready"
-                      />
-                      <span>{{
-                        (cliPlan()?.installer === 'script'
-                          ? 'settings.confirmScriptSource'
-                          : 'settings.confirmCliSource'
-                        ) | t
-                      }}</span>
-                    </label>
-                    <div class="cli-actions">
-                      <span>{{
-                        (cliPlan()?.installer === 'script'
-                          ? 'settings.scriptFailureHelp'
-                          : 'settings.cliFailureHelp'
-                        ) | t
-                      }}</span>
-                      <button
-                        type="button"
-                        class="primary"
-                        [disabled]="busy() || !cliConfirmed || !cliPlan()?.ready"
-                        (click)="executeCli()"
-                      >
-                        @if (busy()) {
-                          <span class="cli-spinner" aria-hidden="true"></span>
-                        }
-                        {{ confirmLabel() }}
-                      </button>
-                    </div>
-
-                    @if (busy()) {
-                      <!-- npm reports no percentage, so the bar animates rather than fills. -->
-                      <div
-                        class="cli-progress"
-                        role="progressbar"
-                        [attr.aria-label]="'settings.cliRunning' | t"
-                      >
-                        <i></i>
-                      </div>
-                      <small class="cli-progress-note">{{ 'settings.cliRunningHelp' | t }}</small>
-                    }
-                  </div>
-                } @else {
-                  <div class="cli-empty-state">
-                    <app-icon name="terminal" [size]="18" />
-                    <span>{{ 'settings.cliEmpty' | t }}</span>
-                  </div>
-                }
-
-                @if (cliResult(); as result) {
-                  <div class="cli-result" [class.unavailable]="!result.success">
-                    <app-icon [name]="result.success ? 'check' : 'shield'" [size]="15" />
-                    <span>
-                      <strong>{{ result.diagnostic }}</strong>
-                      <small>
-                        {{ result.installation.diagnostic }} · {{ result.durationMs }} ms
-                      </small>
-                      @if (result.stderr) {
-                        <code>{{ result.stderr }}</code>
-                      }
-                    </span>
-                  </div>
-                }
-              </section>
+              <app-agent-install-panel
+                [initialAgent]="initialCliAgent()"
+                [workspaceId]="activeWorkspaceId()"
+                (networkRequested)="selectTab('network')"
+              />
             }
             @case ('accounts') {
               <div class="settings-split account-settings">
@@ -717,12 +458,26 @@ const DEFAULT_ALERT_THRESHOLD = 80;
                       /></label>
                       <label>
                         <span>{{ 'settings.cliType' | t }}</span>
-                        <select [(ngModel)]="accountAgentType" [disabled]="accountSystem()">
+                        <select
+                          [ngModel]="accountAgentType"
+                          (ngModelChange)="changeAccountAgentType($event)"
+                          [disabled]="accountSystem()"
+                        >
                           <option value="claude">Claude Code</option>
                           <option value="codex">ChatGPT / Codex</option>
                         </select>
                       </label>
                     </div>
+
+                    <label class="account-login-method">
+                      <span>{{ 'account.loginMethod' | t }}</span>
+                      <select [(ngModel)]="accountLoginMethod" data-testid="account-login-method">
+                        @for (method of accountLoginMethods(); track method.id) {
+                          <option [value]="method.id">{{ method.labelKey | t }}</option>
+                        }
+                      </select>
+                      <small>{{ accountLoginChoice().helpKey | t }}</small>
+                    </label>
 
                     @if (selectedAccount(); as profile) {
                       <div
@@ -841,15 +596,22 @@ const DEFAULT_ALERT_THRESHOLD = 80;
                       >
                         <app-icon name="refresh" [size]="13" />{{ 'settings.refreshStatus' | t }}
                       </button>
-                      <button
-                        type="button"
-                        class="secondary"
-                        [disabled]="busy()"
-                        (click)="accountLoginRequested.emit(accountId())"
-                      >
-                        <app-icon name="terminal" [size]="13" />{{ 'settings.loginSwitch' | t }}
-                      </button>
                     }
+                    <button
+                      type="button"
+                      class="secondary"
+                      data-testid="account-login-submit"
+                      [disabled]="busy() || !accountName.trim() || !activeWorkspaceId()"
+                      [title]="!activeWorkspaceId() ? ('account.loginWorkspaceRequired' | t) : ''"
+                      (click)="saveAccount(true)"
+                    >
+                      <app-icon name="terminal" [size]="13" />{{
+                        (!selectedAccount() || accountDirty()
+                          ? 'account.saveAndLogin'
+                          : 'settings.loginSwitch'
+                        ) | t
+                      }}
+                    </button>
                     <button
                       type="button"
                       class="primary"
@@ -901,6 +663,58 @@ const DEFAULT_ALERT_THRESHOLD = 80;
                 </div>
                 <div class="profile-editor">
                   <div class="profile-fields">
+                    <div class="model-catalog-tools">
+                      <strong>{{ 'settings.modelCatalog' | t }}</strong>
+                      <button
+                        type="button"
+                        class="secondary"
+                        data-testid="model-catalog-refresh"
+                        [disabled]="catalog.loading()"
+                        (click)="catalog.refresh(true)"
+                      >
+                        <app-icon name="refresh" [size]="13" />
+                        {{
+                          (catalog.loading()
+                            ? 'settings.catalogChecking'
+                            : 'settings.catalogRefresh'
+                          ) | t
+                        }}
+                      </button>
+                    </div>
+                    <p class="model-catalog-help">{{ 'settings.catalogHelp' | t }}</p>
+                    @if (catalog.error()) {
+                      <p class="model-catalog-help" role="status">
+                        {{ 'settings.catalogOffline' | t }}
+                      </p>
+                    }
+                    @for (upgrade of selectedModelUpgrades(); track upgrade.key) {
+                      <div class="model-upgrade" role="status" data-testid="model-upgrade">
+                        <strong>{{
+                          'settings.modelUpgrade'
+                            | t: { agent: upgrade.agent === 'claude' ? 'Claude' : 'Codex' }
+                        }}</strong>
+                        <p>{{ upgrade.current }} → {{ upgrade.model.id }}</p>
+                        <small>{{ 'settings.modelUpgradeHelp' | t }}</small>
+                        <div>
+                          <button
+                            type="button"
+                            class="secondary"
+                            [disabled]="busy()"
+                            (click)="catalog.dismiss(upgrade)"
+                          >
+                            {{ 'settings.modelUpgradeDismiss' | t }}
+                          </button>
+                          <button
+                            type="button"
+                            class="primary"
+                            [disabled]="busy()"
+                            (click)="applyModelUpgrade(upgrade)"
+                          >
+                            {{ 'settings.modelUpgradeUse' | t }}
+                          </button>
+                        </div>
+                      </div>
+                    }
                     <div class="two-columns">
                       <label
                         ><span>{{ 'settings.name' | t }}</span
@@ -933,7 +747,30 @@ const DEFAULT_ALERT_THRESHOLD = 80;
                       <div class="two-columns">
                         <label
                           ><span>{{ 'settings.model' | t }}</span
-                          ><input [disabled]="!claudeEnabled" [(ngModel)]="claudeModel"
+                          ><select
+                            data-testid="claude-model-choice"
+                            [disabled]="!claudeEnabled"
+                            [ngModel]="claudeModel"
+                            (ngModelChange)="claudeModel = $event"
+                            [attr.aria-label]="('settings.catalogPick' | t) + ' · Claude'"
+                          >
+                            <option [value]="claudeModel">
+                              {{ claudeModel || ('settings.catalogPick' | t) }}
+                            </option>
+                            @for (
+                              model of catalog.choices(modelProvider, 'claude');
+                              track model.id
+                            ) {
+                              @if (model.id !== claudeModel) {
+                                <option [value]="model.id">
+                                  {{ model.name }} · {{ model.id }}
+                                </option>
+                              }
+                            }</select
+                          ><input
+                            [disabled]="!claudeEnabled"
+                            [(ngModel)]="claudeModel"
+                            [attr.aria-label]="('settings.catalogCustom' | t) + ' · Claude'"
                         /></label>
                         <label
                           ><span>{{ 'settings.endpointAnthropic' | t }}</span
@@ -970,7 +807,30 @@ const DEFAULT_ALERT_THRESHOLD = 80;
                       <div class="two-columns">
                         <label
                           ><span>{{ 'settings.model' | t }}</span
-                          ><input [disabled]="!codexEnabled" [(ngModel)]="codexModel"
+                          ><select
+                            data-testid="codex-model-choice"
+                            [disabled]="!codexEnabled"
+                            [ngModel]="codexModel"
+                            (ngModelChange)="codexModel = $event"
+                            [attr.aria-label]="('settings.catalogPick' | t) + ' · Codex'"
+                          >
+                            <option [value]="codexModel">
+                              {{ codexModel || ('settings.catalogPick' | t) }}
+                            </option>
+                            @for (
+                              model of catalog.choices(modelProvider, 'codex');
+                              track model.id
+                            ) {
+                              @if (model.id !== codexModel) {
+                                <option [value]="model.id">
+                                  {{ model.name }} · {{ model.id }}
+                                </option>
+                              }
+                            }</select
+                          ><input
+                            [disabled]="!codexEnabled"
+                            [(ngModel)]="codexModel"
+                            [attr.aria-label]="('settings.catalogCustom' | t) + ' · Codex'"
                         /></label>
                         <label
                           ><span>{{ 'settings.endpointOpenAI' | t }}</span
@@ -1440,6 +1300,11 @@ const DEFAULT_ALERT_THRESHOLD = 80;
                 <section class="profile-editor"></section>
               }
             }
+            @case ('wechat') {
+              @defer (on immediate) {
+                <app-wechat-notifications-panel />
+              }
+            }
             @case ('mcp-server') {
               @defer (on immediate) {
                 <app-mcp-server-panel />
@@ -1466,6 +1331,7 @@ const DEFAULT_ALERT_THRESHOLD = 80;
 })
 export class AgentSettingsDialogComponent {
   private readonly i18n = inject(I18nService);
+  protected readonly catalog = inject(ModelCatalogService);
   readonly installation = input<AgentInstallation | null>(null);
   readonly codexInstallation = input<AgentInstallation | null>(null);
   readonly openCodeInstallation = input<AgentInstallation | null>(null);
@@ -1486,8 +1352,6 @@ export class AgentSettingsDialogComponent {
   readonly initialCliAgent = input<ManagedAgentType | ''>('');
   readonly initialModelProfileId = input('');
   readonly networkTestResult = input<NetworkTestResult | null>(null);
-  readonly cliPlan = input<CliOperationPlan | null>(null);
-  readonly cliResult = input<CliOperationResult | null>(null);
   readonly busy = input(false);
   /** A profile save is in flight; its result lands in this dialog, so it cannot close meanwhile. */
   readonly saving = input(false);
@@ -1502,8 +1366,6 @@ export class AgentSettingsDialogComponent {
   readonly updateDownloadRequested = output<void>();
   readonly updateNpmRequested = output<void>();
   readonly autoCheckChanged = output<boolean>();
-  readonly cliPreviewRequested = output<CliOperationRequest>();
-  readonly cliExecuteRequested = output<CliOperationRequest>();
   readonly modelSaved = output<ModelProfileInput>();
   readonly deleteModelRequested = output<string>();
   readonly mcpSaved = output<McpProfileInput>();
@@ -1516,7 +1378,7 @@ export class AgentSettingsDialogComponent {
   readonly networkSystemProxyRequested = output<void>();
   readonly accountSaved = output<AccountProfileInput>();
   readonly deleteAccountRequested = output<string>();
-  readonly accountLoginRequested = output<string>();
+  readonly accountLoginRequested = output<AccountProfileInput>();
   readonly accountRefreshRequested = output<string>();
   readonly accountConfigCopyRequested = output<{ sourceId: string; targetId: string }>();
 
@@ -1556,6 +1418,7 @@ export class AgentSettingsDialogComponent {
       section: 'settings.sectionApp',
       tabs: [
         { id: 'mcp-server', label: 'mcpServer.tab' },
+        { id: 'wechat', label: 'wechat.tab' },
         { id: 'storage', label: 'settings.tabStorage' },
       ],
     },
@@ -1589,11 +1452,6 @@ export class AgentSettingsDialogComponent {
   });
   protected readonly hasNetworkCredential = signal(false);
   protected readonly allPresets = PROVIDER_PRESETS;
-  protected cliAgentType: ManagedAgentType = 'claude';
-  /** Which of the agent's installers to use; the first it offers until the user picks. */
-  protected cliInstaller: CliInstaller = MANAGED_AGENT_INSTALLERS.claude[0];
-  protected cliTargetVersion = 'latest';
-  protected cliConfirmed = false;
   protected modelName = 'Claude Sonnet';
   protected modelProvider = 'Anthropic';
   protected claudeEnabled = true;
@@ -1632,6 +1490,7 @@ export class AgentSettingsDialogComponent {
   protected clearNetworkCredential = false;
   protected accountName = '';
   protected accountAgentType: AccountAgentType = 'claude';
+  protected accountLoginMethod: AccountLoginMethod = 'browser';
   protected accountDefault = false;
   private initialSelectionApplied = false;
 
@@ -1655,10 +1514,6 @@ export class AgentSettingsDialogComponent {
       }
       this.initialSelectionApplied = true;
       this.tab.set(requestedTab);
-      const requestedAgent = this.initialCliAgent();
-      if (requestedAgent) {
-        this.selectCliAgent(requestedAgent);
-      }
       if (requestedProfile) {
         this.editModel(requestedProfile);
       }
@@ -1694,25 +1549,21 @@ export class AgentSettingsDialogComponent {
     }
   }
 
-  protected selectCliAgent(agentType: ManagedAgentType): void {
-    this.cliAgentType = agentType;
-    // The installer belonged to the agent being left; this one may not even offer it.
-    this.cliInstaller = MANAGED_AGENT_INSTALLERS[agentType][0];
-    this.cliConfirmed = false;
-  }
-
-  protected selectCliInstaller(installer: CliInstaller): void {
-    this.cliInstaller = installer;
-    this.cliConfirmed = false;
-  }
-
-  /** The ways the selected agent can be installed. */
-  protected cliInstallers(): readonly CliInstaller[] {
-    return MANAGED_AGENT_INSTALLERS[this.cliAgentType];
-  }
-
   protected selectedAccount(): AccountProfile | undefined {
     return this.accountProfiles().find((profile) => profile.id === this.accountId());
+  }
+
+  protected accountLoginMethods() {
+    return ACCOUNT_LOGIN_OPTIONS[this.accountAgentType];
+  }
+
+  protected accountLoginChoice() {
+    return accountLoginOption(this.accountAgentType, this.accountLoginMethod);
+  }
+
+  protected changeAccountAgentType(agentType: AccountAgentType): void {
+    this.accountAgentType = agentType;
+    this.accountLoginMethod = this.accountLoginChoice().id;
   }
 
   protected editAccount(profile: AccountProfile): void {
@@ -1720,6 +1571,7 @@ export class AgentSettingsDialogComponent {
     this.accountId.set(profile.id);
     this.accountName = profile.name;
     this.accountAgentType = profile.agentType;
+    this.accountLoginMethod = accountLoginOption(profile.agentType, profile.loginMethod).id;
     this.accountDefault = profile.isDefault;
     this.accountSystem.set(profile.isSystem);
     // The previous pick belongs to the account being left, not this one.
@@ -1741,34 +1593,26 @@ export class AgentSettingsDialogComponent {
     this.accountId.set('');
     this.accountName = '';
     this.accountAgentType = 'claude';
+    this.accountLoginMethod = 'browser';
     this.accountDefault = false;
     this.accountSystem.set(false);
     Object.assign(this, this.accountDrafts.restore(this.accountId(), this.captureAccountDraft()));
   }
 
-  protected saveAccount(): void {
+  protected saveAccount(loginAfterSave = false): void {
     if (this.busy() || !this.accountName.trim()) return;
     const profileId = this.accountId() || createId();
     this.accountDrafts.beginSave(this.accountId(), profileId, this.captureAccountDraft());
     this.accountId.set(profileId);
-    this.accountSaved.emit({
+    const input: AccountProfileInput = {
       id: profileId,
       name: this.accountName.trim(),
       agentType: this.accountAgentType,
+      loginMethod: this.accountLoginChoice().id,
       isDefault: this.accountDefault,
-    });
-  }
-
-  protected previewCli(): void {
-    this.cliConfirmed = false;
-    this.cliPreviewRequested.emit(this.cliRequest());
-  }
-
-  protected executeCli(): void {
-    if (this.cliConfirmed && this.cliPlanMatches()) {
-      this.cliExecuteRequested.emit({ ...this.cliRequest(), confirmed: true });
-      this.cliConfirmed = false;
-    }
+    };
+    if (loginAfterSave) this.accountLoginRequested.emit(input);
+    else this.accountSaved.emit(input);
   }
 
   /**
@@ -1804,55 +1648,6 @@ export class AgentSettingsDialogComponent {
     this.deleteNetworkRequested.emit(id);
   }
 
-  /** Heading verb: an already-current CLI must not read as an available upgrade. */
-  protected planHeadline(): string {
-    const action = this.cliPlan()?.action;
-    if (action === 'install') {
-      return this.i18n.t('settings.prepareInstall');
-    }
-    return this.i18n.t(
-      action === 'reinstall' ? 'settings.prepareReinstall' : 'settings.prepareUpgrade',
-    );
-  }
-
-  protected confirmLabel(): string {
-    if (this.busy()) {
-      return this.i18n.t('settings.cliRunning');
-    }
-    const action = this.cliPlan()?.action;
-    if (action === 'install') {
-      return this.i18n.t('settings.confirmInstall');
-    }
-    return this.i18n.t(
-      action === 'reinstall' ? 'settings.confirmReinstall' : 'settings.confirmUpgrade',
-    );
-  }
-
-  protected cliPlanMatches(): boolean {
-    const plan = this.cliPlan();
-    if (plan?.agentType !== this.cliAgentType || plan.installer !== this.cliInstaller) {
-      return false;
-    }
-    // A script install has no version to match on: the plan is for the agent, not for a version.
-    return (
-      !plan.supportsVersion || plan.targetVersion === (this.cliTargetVersion.trim() || 'latest')
-    );
-  }
-
-  /** Whether the chosen installer takes a version at all; a script install always takes latest. */
-  protected cliTakesVersion(): boolean {
-    return this.cliInstaller === 'npm';
-  }
-
-  private cliRequest(): CliOperationRequest {
-    return {
-      agentType: this.cliAgentType,
-      installer: this.cliInstaller,
-      targetVersion: this.cliTakesVersion() ? this.cliTargetVersion.trim() || 'latest' : undefined,
-      workspaceId: this.activeWorkspaceId() || undefined,
-    };
-  }
-
   private captureModelDraft(): ModelEditorDraft {
     return {
       modelName: this.modelName,
@@ -1877,6 +1672,7 @@ export class AgentSettingsDialogComponent {
     return {
       accountName: this.accountName,
       accountAgentType: this.accountAgentType,
+      accountLoginMethod: this.accountLoginMethod,
       accountDefault: this.accountDefault,
     };
   }
@@ -1932,6 +1728,32 @@ export class AgentSettingsDialogComponent {
 
   protected modelDirty(): boolean {
     return this.modelDrafts.dirty(this.modelId(), this.captureModelDraft());
+  }
+
+  protected selectedModelUpgrades(): ModelUpgrade[] {
+    return this.catalog
+      .upgrades()
+      .filter(
+        (upgrade) =>
+          upgrade.profileId === this.modelId() &&
+          upgrade.current === (upgrade.agent === 'claude' ? this.claudeModel : this.codexModel),
+      );
+  }
+
+  protected applyModelUpgrade(upgrade: ModelUpgrade): void {
+    if (this.busy() || !this.selectedModelUpgrades().some((item) => item.key === upgrade.key))
+      return;
+    const previous = this.catalog
+      .models()
+      .find(
+        (model) =>
+          model.provider === this.modelProvider &&
+          model.id === upgrade.current.replace(/\[1m\]$/, ''),
+      );
+    if (this.modelName === previous?.name || this.modelName === upgrade.current)
+      this.modelName = upgrade.model.name;
+    if (upgrade.agent === 'claude') this.claudeModel = upgrade.model.id;
+    else this.codexModel = upgrade.model.id;
   }
 
   private acknowledgeProfileSave(saved: ProfileSaveCompleted): void {

@@ -1,0 +1,245 @@
+<section class="agent-installer">
+  <header class="intro">
+    <div>
+      <h3>{{ 'install.title' | t }}</h3>
+      <p>{{ 'install.intro' | t }}</p>
+    </div>
+    <button type="button" class="quiet" [disabled]="busy()" (click)="refresh()">
+      <app-icon name="refresh" [size]="14" />{{ 'install.refresh' | t }}
+    </button>
+  </header>
+  <div class="agent-grid" role="group" [attr.aria-label]="'install.select' | t">
+    @for (agent of catalog; track agent.type) {
+      <button
+        type="button"
+        class="agent-card"
+        [class.selected]="selected() === agent.type"
+        [attr.aria-pressed]="selected() === agent.type"
+        [disabled]="busy()"
+        (click)="select(agent.type)"
+      >
+        <app-icon [name]="icons[agent.type]" [size]="22" />
+        <span
+          ><strong>{{ agent.name }}</strong
+          ><small [class.ready]="installations()[agent.type]?.healthy">{{
+            status(agent.type)
+          }}</small></span
+        >
+        @if (selected() === agent.type) {
+          <app-icon class="selected-mark" name="check" [size]="14" />
+        }
+      </button>
+    }
+  </div>
+
+  <section class="action-card" [attr.aria-busy]="busy()">
+    <div class="agent-heading">
+      <span class="agent-mark"><app-icon [name]="icons[selected()]" [size]="26" /></span>
+      <div>
+        <h3>{{ selectedName() }}</h3>
+        <p>
+          {{
+            (installation()?.installed
+              ? selected() === 'antigravity' || plan()?.installer === 'script'
+                ? 'install.nativeHelp'
+                : 'install.checkHelp'
+              : 'install.defaultHelp'
+            ) | t
+          }}
+        </p>
+      </div>
+    </div>
+    <div class="versions">
+      <span
+        >{{ 'install.version' | t }}
+        <strong>{{ installation()?.version || ('install.missing' | t) }}</strong></span
+      >
+      @if (plan()?.resolvedVersion && !result()?.success) {
+        <span
+          >{{ 'install.newVersion' | t }} <strong>{{ plan()?.resolvedVersion }}</strong></span
+        >
+      }
+    </div>
+    @if (!available) {
+      <p class="preview-note">{{ 'install.preview' | t }}</p>
+    }
+    @if (needsNode()) {
+      <div class="message warning" role="status">
+        <app-icon name="shield" [size]="18" />
+        <div>
+          <strong>{{ 'install.nodeTitle' | t }}</strong>
+          <p>{{ 'install.nodeHelp' | t }}</p>
+          <a
+            href="https://nodejs.org/en/download"
+            appExternalLink
+            target="_blank"
+            rel="noopener noreferrer"
+            (openFailed)="linkError.set($event)"
+            >{{ 'install.nodeDownload' | t }} ↗</a
+          >
+        </div>
+      </div>
+    } @else if (plan() && !plan()?.ready) {
+      <div class="message warning" role="status">
+        <div>
+          <strong>{{ 'install.environment' | t }}</strong>
+          <p>{{ plan()?.diagnostic }}</p>
+        </div>
+      </div>
+    }
+    @if (failed()) {
+      <div class="message warning" role="alert">
+        <app-icon name="shield" [size]="18" />
+        <div>
+          <strong>{{ (result() ? 'install.failed' : 'install.checkFailed') | t }}</strong>
+          <p>{{ failureHelp() }}</p>
+          @if (result()?.rollbackDiagnostic) {
+            <p>{{ result()?.rollbackDiagnostic }}</p>
+          }
+          <div class="inline-actions">
+            <button class="secondary" type="button" [disabled]="busy()" (click)="flow.retry()">
+              {{ 'install.retry' | t }}</button
+            ><button class="quiet" type="button" (click)="networkRequested.emit()">
+              {{ 'install.networkSettings' | t }}
+            </button>
+          </div>
+        </div>
+      </div>
+    } @else if (result()?.success) {
+      <div class="message success" role="status">
+        <app-icon name="check" [size]="20" />
+        <div>
+          <strong>{{ 'install.success' | t: { name: selectedName() } }}</strong>
+          <p>
+            {{
+              (result()?.plan?.currentVersion ? 'install.restart' : 'install.next')
+                | t: { name: selectedName() }
+            }}
+          </p>
+        </div>
+      </div>
+    } @else if (plan()?.upToDate) {
+      <div class="message success" role="status">
+        <app-icon name="check" [size]="18" /><strong>{{ currentLabel() }}</strong>
+      </div>
+    }
+    @if (linkError()) {
+      <p role="alert">{{ linkError() }}</p>
+    }
+    <div class="primary-actions">
+      <button
+        class="primary"
+        type="button"
+        [disabled]="
+          !available || busy() || (plan() && !plan()?.ready) || (plan()?.upToDate && !result())
+        "
+        (click)="primary()"
+      >
+        @if (busy()) {
+          <span class="spinner" aria-hidden="true"></span>
+        } @else {
+          <app-icon [name]="installation()?.installed ? 'refresh' : 'download'" [size]="16" />
+        }
+        {{ primaryLabel() }}
+      </button>
+      @if (plan() && !busy() && !result() && !failed()) {
+        <button class="quiet" type="button" (click)="flow.check(request())">
+          {{ 'install.check' | t }}
+        </button>
+      }
+    </div>
+    @if (busy()) {
+      <div class="progress" role="progressbar" [attr.aria-label]="primaryLabel()"><i></i></div>
+      <p class="background-note" role="status">{{ 'install.background' | t }}</p>
+    }
+  </section>
+
+  <details class="advanced">
+    <summary>{{ 'install.advanced' | t }}</summary>
+    <div class="advanced-content">
+      <div class="advanced-form">
+        <label
+          ><span>{{ 'install.method' | t }}</span
+          ><select
+            [ngModel]="installer()"
+            (ngModelChange)="installer.set($event)"
+            [disabled]="busy()"
+          >
+            <option value="auto">{{ 'install.auto' | t }}</option>
+            @for (method of methods(); track method) {
+              <option [value]="method">
+                {{
+                  (method === 'script' ? 'settings.installerScript' : 'settings.installerNpm') | t
+                }}
+              </option>
+            }
+          </select></label
+        >
+        @if (installer() === 'npm') {
+          <label
+            ><span>{{ 'install.target' | t }}</span
+            ><input
+              [ngModel]="version()"
+              (ngModelChange)="version.set($event)"
+              [disabled]="busy()"
+              placeholder="latest"
+          /></label>
+        }
+      </div>
+      <div class="inline-actions">
+        <button
+          class="secondary"
+          type="button"
+          [disabled]="!available || busy()"
+          (click)="flow.check(request())"
+        >
+          {{ 'install.plan' | t }}
+        </button>
+        @if (installation()?.installed) {
+          <button
+            class="quiet"
+            type="button"
+            [disabled]="!available || busy()"
+            (click)="flow.install(request(), true)"
+          >
+            {{ 'install.repair' | t }}
+          </button>
+        }
+      </div>
+      @if (installation()?.installed) {
+        <p class="muted">{{ 'install.repairHelp' | t }}</p>
+      }
+      @if (plan(); as plan) {
+        <div class="technical">
+          <strong>{{ 'install.details' | t }}</strong>
+          <p>{{ plan.diagnostic }}</p>
+          <code>{{ plan.commandPreview }}</code>
+          @if (plan.npmPath) {
+            <code>{{ plan.npmPath }}</code>
+          }
+          @if (plan.networkProfileName) {
+            <p>{{ plan.networkProfileName }}</p>
+          }
+        </div>
+      }
+      @if (result(); as result) {
+        <div class="technical">
+          <strong>{{ 'install.logs' | t }}</strong>
+          <p>{{ result.diagnostic }}</p>
+          @if (result.stdout) {
+            <pre>{{ result.stdout }}</pre>
+          }
+          @if (result.stderr) {
+            <pre>{{ result.stderr }}</pre>
+          }
+        </div>
+      }
+      @if (error()) {
+        <div class="technical">
+          <strong>{{ 'install.error' | t }}</strong>
+          <pre>{{ error() }}</pre>
+        </div>
+      }
+    </div>
+  </details>
+</section>

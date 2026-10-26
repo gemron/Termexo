@@ -6,6 +6,7 @@ import { TranslatePipe } from '../core/i18n/translate.pipe';
 import {
   normalizeWorkspaceThemeColor,
   Workspace,
+  WORKSPACE_ICON_OPTIONS,
   WORKSPACE_THEME_PRESETS,
 } from '../core/models/workspace.models';
 import { ModalFocusDirective } from '../shared/modal-focus.directive';
@@ -15,6 +16,8 @@ export interface WorkspaceAppearanceValue {
   workspaceId: string;
   name: string;
   themeColor: string;
+  tags: string[];
+  icon: string | null;
 }
 
 @Component({
@@ -102,6 +105,48 @@ export interface WorkspaceAppearanceValue {
           </span>
         </div>
 
+        <label class="tag-field">
+          <span>{{ 'workspace.tags' | t }}</span>
+          <input
+            type="text"
+            class="input input-bordered input-sm"
+            [ngModel]="tagsText()"
+            (ngModelChange)="tagsText.set($event)"
+            [placeholder]="'workspace.tagsHint' | t"
+          />
+          <small>{{ 'workspace.tagsHelp' | t }}</small>
+        </label>
+
+        <fieldset class="workspace-icon-fieldset">
+          <legend>{{ 'workspace.icon' | t }}</legend>
+          <div class="workspace-icon-options">
+            <button
+              type="button"
+              class="workspace-icon-option"
+              [class.selected]="!selectedIcon()"
+              [attr.aria-label]="'workspace.defaultIcon' | t"
+              [attr.title]="'workspace.defaultIcon' | t"
+              [attr.aria-pressed]="!selectedIcon()"
+              (click)="selectedIcon.set(null)"
+            >
+              <app-icon name="folder" [size]="17" />
+            </button>
+            @for (icon of iconOptions; track icon) {
+              <button
+                type="button"
+                class="workspace-icon-option"
+                [class.selected]="selectedIcon() === icon"
+                [attr.aria-label]="'workspace.icon.' + icon | t"
+                [attr.title]="'workspace.icon.' + icon | t"
+                [attr.aria-pressed]="selectedIcon() === icon"
+                (click)="selectedIcon.set(icon)"
+              >
+                <app-icon [name]="icon" [size]="17" />
+              </button>
+            }
+          </div>
+        </fieldset>
+
         <footer>
           <button type="button" class="secondary btn btn-ghost btn-sm" (click)="cancelled.emit()">
             {{ 'common.cancel' | t }}
@@ -123,12 +168,17 @@ export interface WorkspaceAppearanceValue {
 export class EditWorkspaceDialogComponent {
   private readonly i18n = inject(I18nService);
   readonly workspace = input.required<Workspace>();
+  readonly tags = input<string[]>([]);
+  readonly customIcon = input<string | null>(null);
   readonly saved = output<WorkspaceAppearanceValue>();
   readonly cancelled = output<void>();
 
   protected readonly name = signal('');
   protected readonly themeColor = signal(normalizeWorkspaceThemeColor(undefined));
   protected readonly themePresets = WORKSPACE_THEME_PRESETS;
+  protected readonly iconOptions = WORKSPACE_ICON_OPTIONS.filter((icon) => icon !== 'folder');
+  protected readonly tagsText = signal('');
+  protected readonly selectedIcon = signal<string | null>(null);
   private initializedWorkspaceId: string | null = null;
 
   constructor() {
@@ -138,6 +188,8 @@ export class EditWorkspaceDialogComponent {
         this.initializedWorkspaceId = workspace.id;
         this.name.set(workspace.name);
         this.themeColor.set(normalizeWorkspaceThemeColor(workspace.themeColor));
+        this.tagsText.set(this.tags().join(', '));
+        this.selectedIcon.set(this.customIcon());
       }
     });
   }
@@ -170,6 +222,15 @@ export class EditWorkspaceDialogComponent {
       workspaceId: this.workspace().id,
       name: this.name().trim(),
       themeColor: normalizeWorkspaceThemeColor(this.themeColor()),
+      tags: [
+        ...new Set(
+          this.tagsText()
+            .split(',')
+            .map((tag) => tag.trim())
+            .filter(Boolean),
+        ),
+      ],
+      icon: this.selectedIcon(),
     });
   }
 }

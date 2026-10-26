@@ -1,5 +1,5 @@
-import { inject, Injectable } from '@angular/core';
-import { getCurrentWindow, UserAttentionType } from '@tauri-apps/api/window';
+import { inject, Injectable, InjectionToken } from '@angular/core';
+import { getCurrentWindow } from '@tauri-apps/api/window';
 import { isPermissionGranted, requestPermission } from '@tauri-apps/plugin-notification';
 import { message } from '@tauri-apps/plugin-dialog';
 
@@ -8,11 +8,17 @@ import { I18nService } from '../i18n/i18n.service';
 import { invoke } from './backend-bridge';
 import { hasBackend, isTauriRuntime } from './tauri-runtime';
 
+export const DESKTOP_NOTIFICATION_WINDOW = new InjectionToken<ReturnType<typeof getCurrentWindow> | null>('Desktop notification window', {
+  providedIn: 'root', factory: () => isTauriRuntime() ? getCurrentWindow() : null,
+});
+
 @Injectable({ providedIn: 'root' })
 export class DesktopNotificationService {
   private readonly i18n = inject(I18nService);
-  private readonly appWindow = isTauriRuntime() ? getCurrentWindow() : null;
+  private readonly appWindow = inject(DESKTOP_NOTIFICATION_WINDOW);
   private permissionPromise?: Promise<boolean>;
+  private taskbarAttention: boolean | null = null;
+  private attentionQueue: Promise<void> = Promise.resolve();
 
   constructor() {
     const appWindow = this.appWindow;
@@ -22,11 +28,31 @@ export class DesktopNotificationService {
 
     void appWindow
       .onFocusChanged(({ payload: focused }) => {
-        if (focused) {
-          void appWindow.requestUserAttention(null).catch(() => undefined);
+        if (focused && this.taskbarAttention) {
+          // Activating the window does not acknowledge its pending messages.
+          this.enqueueTaskbarAttention(true);
         }
       })
       .catch(() => undefined);
+  }
+
+  /** Includes completions until explicitly confirmed, independently of toast permissions. */
+  syncTaskbarAttention(notices: readonly GlobalTerminalNotice[]): void {
+    if (!this.appWindow) return;
+    const active = notices.length > 0;
+    if (this.taskbarAttention === active) return;
+    this.taskbarAttention = active;
+    this.enqueueTaskbarAttention(active);
+  }
+
+  private enqueueTaskbarAttention(active: boolean): void {
+    // Start/stop requests must reach the native window in order, even during rapid status changes.
+    this.attentionQueue = this.attentionQueue
+      .then(() => invoke<void>('set_taskbar_attention', { active }))
+      .catch((error: unknown) => {
+        if (this.taskbarAttention === active) this.taskbarAttention = null;
+        console.warn('Unable to update taskbar attention', error);
+      });
   }
 
   async notify(notices: readonly GlobalTerminalNotice[]): Promise<void> {
@@ -41,15 +67,6 @@ export class DesktopNotificationService {
       await this.sendBrowserNotification(notification.title, notification.body);
       return;
     }
-
-    // Waiting-for-approval and waiting-for-input must never be missed, so the window focus
-    // state is deliberately not checked: the taskbar flash and the system notification are
-    // always requested, and the operating system ignores the flash for a foreground window.
-    const attentionType =
-      notification.attention === 'critical'
-        ? UserAttentionType.Critical
-        : UserAttentionType.Informational;
-    void appWindow.requestUserAttention(attentionType).catch(() => undefined);
 
     await this.send(notification.title, notification.body);
   }

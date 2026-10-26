@@ -1,3 +1,5 @@
+import { CommonActionsService } from './common-actions.service';
+import { ProjectPreviewService } from './project-preview.service';
 import { TestBed } from '@angular/core/testing';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -205,6 +207,79 @@ describe('McpDesktopService', () => {
       agentType: 'codex',
     })) as { id: string };
   }
+
+  it('lets AI propose actions for review, but exposes no confirmation or save tool', async () => {
+    const common = TestBed.inject(CommonActionsService);
+    const requestId = common.beginRecognition('w1');
+    const proposal = (await service.execute('common_action_propose', {
+      workspaceId: 'w1',
+      requestId,
+      actionsJson: JSON.stringify([
+        {
+          name: 'Web',
+          command: 'npm run dev',
+          workingDirectory: 'D:/project',
+          description: 'scripts.dev',
+        },
+      ]),
+    })) as { suggestions: { id: string }[] };
+    expect(proposal.suggestions).toHaveLength(1);
+    expect(state.workspaces()[0].commonActions).toBeUndefined();
+    expect(gateway.start).not.toHaveBeenCalled();
+    await expect(service.execute('common_action_confirm', { workspaceId: 'w1' })).rejects.toThrow(
+      'Unknown MCP tool',
+    );
+    common.discard('w1');
+    await expect(
+      service.execute('common_action_propose', { workspaceId: 'w1', requestId, actionsJson: '[]' }),
+    ).rejects.toThrow('取消');
+  });
+
+  it('opens a sandboxed web preview through the same workspace selection workflow without claiming embed success', async () => {
+    const result = await service.execute('web_preview_open', {
+      workspaceId: 'w2',
+      url: 'http://localhost:3000',
+    });
+    expect(actions.selectTaskWorkspace).toHaveBeenCalledWith('w2');
+    expect(TestBed.inject(ProjectPreviewService).url()).toBe('http://localhost:3000/');
+    expect(result).toMatchObject({ opened: true, tabId: TestBed.inject(ProjectPreviewService).activeTabId(), note: expect.stringContaining('未验证') });
+    expect(TestBed.inject(ProjectPreviewService).activation()).toBe(1);
+    await expect(
+      service.execute('web_preview_open', { workspaceId: 'w2', url: 'file:///D:/project' }),
+    ).rejects.toThrow();
+    expect(gateway.start).not.toHaveBeenCalled();
+  });
+
+  it('opens a source location in the shared preview tab without creating a terminal process', async () => {
+    const preview = TestBed.inject(ProjectPreviewService);
+    const open = vi.spyOn(preview, 'openFile').mockImplementationOnce(async (workspaceId, path) => {
+      const tab = preview.createTab(workspaceId);
+      tab.file.set({ path, content: 'const value = 1;', kind: 'text', mime: 'text/plain' });
+      return tab;
+    });
+    const result = await service.execute('project_preview_open', {
+      workspaceId: 'w2', path: 'src/main.ts', line: 12, column: 3,
+    });
+    expect(actions.selectTaskWorkspace).toHaveBeenCalledWith('w2');
+    expect(open).toHaveBeenCalledWith('w2', 'src/main.ts', undefined, 12, 3, undefined);
+    expect(result).toMatchObject({ opened: true, tabId: preview.activeTabId(), readOnly: true });
+    expect(preview.activation()).toBe(1);
+    expect(gateway.start).not.toHaveBeenCalled();
+    open.mockRestore();
+  });
+
+  it('creates independent web preview tabs and updates only an explicitly requested tab', async () => {
+    const first = await service.execute('web_preview_open', { workspaceId: 'w2', url: 'https://example.com' }) as { tabId: string };
+    const second = await service.execute('web_preview_open', { workspaceId: 'w2', url: 'https://example.org' }) as { tabId: string };
+    const preview = TestBed.inject(ProjectPreviewService);
+    expect(first.tabId).not.toBe(second.tabId);
+    expect(preview.tabs()).toHaveLength(2);
+    const updated = await service.execute('web_preview_open', { workspaceId: 'w2', url: 'https://example.com/next', tabId: first.tabId }) as { tabId: string };
+    expect(updated.tabId).toBe(first.tabId);
+    expect(preview.tabs()).toHaveLength(2);
+    expect(preview.tabs().find((tab) => tab.id === second.tabId)?.url()).toBe('https://example.org/');
+    expect(gateway.start).not.toHaveBeenCalled();
+  });
 
   it('uses the configured default model and persists new tasks', async () => {
     const created = await createTask();

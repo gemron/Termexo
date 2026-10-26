@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta
       name="description"
-      content="Let one AI operate Claude Code, Codex, OpenCode, Grok Build and Antigravity terminals through Termexo MCP. Send instructions, read real output and keep your Windows workbench in view."
+      content="Let one AI operate Claude Code, Codex, OpenCode, Pi Agent, Grok Build and Antigravity terminals through Termexo MCP. Send instructions, read real output and keep your Windows workbench in view."
     />
     <meta name="theme-color" content="#edf4f8" />
     <meta property="og:type" content="website" />
@@ -29,7 +29,7 @@
     />
     <meta
       name="twitter:description"
-      content="Ask your connected AI to find a terminal, send an instruction and read the reply. Supports Claude Code, Codex, OpenCode, Grok Build and Antigravity."
+      content="Ask your connected AI to find a terminal, send an instruction and read the reply. Supports Claude Code, Codex, OpenCode, Pi Agent, Grok Build and Antigravity."
     />
     <meta
       name="twitter:image"
@@ -46,9 +46,9 @@
         "@context": "https://schema.org",
         "@type": "SoftwareApplication",
         "name": "Termexo",
-        "softwareVersion": "0.10.13",
+        "softwareVersion": "0.10.15",
         "url": "https://www.termexo.com/",
-        "description": "A local-first Windows workbench whose MCP server lets a connected AI read and operate Claude Code, Codex, OpenCode, Grok Build and Antigravity terminals and manage tasks. The workbench also offers native session recovery and optional remote access.",
+        "description": "A local-first Windows workbench whose MCP server lets a connected AI read and operate Claude Code, Codex, OpenCode, Pi Agent, Grok Build and Antigravity terminals and manage tasks. The workbench also offers native session recovery and optional remote access.",
         "applicationCategory": "DeveloperApplication",
         "operatingSystem": "Windows 10, Windows 11",
         "license": "https://github.com/gemron/Termexo/blob/main/LICENSE",
@@ -65,7 +65,7 @@
     <link rel="canonical" href="https://www.termexo.com/" />
     <link rel="icon" href="assets/termexo-mark.svg" type="image/svg+xml" />
     <link rel="stylesheet" href="styles.css?v=c64af7392e7e" />
-    <script src="app.js?v=1372d7fd40da" defer></script>
+    <script src="app.js?v=30f50816a465" defer></script>
     <script src="analytics.js" defer></script>
   </head>
   <body class="home-page">
@@ -78,7 +78,7 @@
             <img src="assets/termexo-mark.svg" alt="" />
           </span>
           <span>Termexo</span>
-          <small>0.10.13</small>
+          <small>0.10.15</small>
         </a>
 
         <nav
@@ -143,7 +143,7 @@
             <span data-i18n="heroLine1">Let AI operate your agents.</span>
             <em data-i18n="heroLine2">Send work. Read results.</em>
           </h1>
-          <p class="hero-lead" data-i18n="heroLead">Connect an AI to Termexo MCP. Ask it to find a Claude Code, Codex, OpenCode, Grok Build or Antigravity terminal, send an instruction and read the real reply. Keep tasks, sessions and optional phone access in one Windows workspace.</p>
+          <p class="hero-lead" data-i18n="heroLead">Connect an AI to Termexo MCP. Ask it to find a Claude Code, Codex, OpenCode, Pi Agent, Grok Build or Antigravity terminal, send an instruction and read the real reply. Keep tasks, sessions and optional phone access in one Windows workspace.</p>
           <ul class="hero-agents" aria-label="Supported agents">
             <li>
               <img src="assets/agent-claude.svg" alt="" width="22" height="22" loading="lazy" />
@@ -165,6 +165,7 @@
               <img src="assets/agent-grok.svg" alt="" width="22" height="22" loading="lazy" />
               <span>Grok Build</span>
             </li>
+            <li><img src="assets/agent-pi.svg" alt="" width="22" height="22" loading="lazy" /><span>Pi Agent</span></li>
           </ul>
           <div class="hero-actions">
             <a
@@ -384,7 +385,7 @@
       <section class="signal-strip" aria-label="Supported tools">
         <div class="signal-track">
           <span>Claude Code</span><i></i><span>Codex CLI</span><i></i
-          ><span>OpenCode</span><i></i><span>Antigravity</span><i></i><span>Grok Build</span><i></i
+          ><span>OpenCode</span><i></i><span>Antigravity</span><i></i><span>Grok Build</span><i></i><span>Pi Agent</span><i></i
           ><span>Task board</span><i></i
           ><span>Multi-account</span><i></i><span>DeepSeek</span><i></i
           ><span>MiniMax</span><i></i><span>GLM</span><i></i><span>MCP</span
@@ -417,13 +418,14 @@
             </div>
             <span class="mcp-flow-arrow" aria-hidden="true">⇄</span>
             <div class="mcp-flow-stage">
-              <span class="mcp-flow-label" data-i18n="mcpTargetLabel">FIVE KINDS OF AGENT TERMINALS</span>
+              <span class="mcp-flow-label" data-i18n="mcpTargetLabel">SIX KINDS OF AGENT TERMINALS</span>
               <ul class="mcp-targets" aria-label="Agent terminals">
                 <li><img src="assets/agent-claude.svg" alt="" width="20" height="20" loading="lazy" />Claude Code</li>
                 <li><img src="assets/agent-codex.svg" alt="" width="20" height="20" loading="lazy" />Codex CLI</li>
                 <li><img src="assets/agent-opencode.svg" alt="" width="20" height="20" loading="lazy" />OpenCode</li>
                 <li><img src="assets/agent-grok.svg" alt="" width="20" height="20" loading="lazy" />Grok Build</li>
                 <li><img src="assets/agent-antigravity.svg" alt="" width="20" height="20" loading="lazy" />Antigravity</li>
+                <li><img src="assets/agent-pi.svg" alt="" width="20" height="20" loading="lazy" />Pi Agent</li>
               </ul>
             </div>
           </div>
@@ -459,7 +461,7 @@
           </article>
         </div>
         <div class="mcp-section-footer">
-          <p data-i18n="mcpBoundary">All five support interaction with existing terminals. Task-board execution supports Claude Code, Codex, OpenCode and Grok Build. Sending input or starting a task does not mean it has finished.</p>
+          <p data-i18n="mcpBoundary">All six support interaction with existing terminals. Task-board execution supports Claude Code, Codex, OpenCode, Pi Agent and Grok Build. Sending input or starting a task does not mean it has finished.</p>
           <a class="button secondary" href="guide.en.html#ai-control" data-i18n="mcpFullGuide">Open the step-by-step MCP guide →</a>
         </div>
       </section>
@@ -1020,7 +1022,7 @@
             <article class="roadmap-item shipped reveal" data-delay="3">
               <div><span>V0.10.10</span><b data-i18n="shipped">SHIPPED</b></div>
               <h3 data-i18n="roadmapMcpTitle">Local MCP control, connected automatically</h3>
-              <p data-i18n="roadmapMcpBody">19 tools for terminals, tasks and settings. Enable the server, select permissions, then launch Claude Code, Codex, OpenCode, Grok Build or Antigravity. Restart existing Agents to connect.</p>
+              <p data-i18n="roadmapMcpBody">19 tools for terminals, tasks and settings. Enable the server, select permissions, then launch Claude Code, Codex, OpenCode, Pi Agent, Grok Build or Antigravity. Restart existing Agents to connect.</p>
             </article>
             <article class="roadmap-item current reveal" data-delay="3">
               <div><span>V0.10.11</span><b data-i18n="shipped">SHIPPED</b></div>
@@ -1033,9 +1035,19 @@
               <p data-i18n="roadmapResponsiveBody">Keep desktop input and scrolling responsive while reconnecting from a phone, paste clipboard text reliably on Windows, and edit queued Codex input with ⇧←.</p>
             </article>
             <article class="roadmap-item current reveal" data-delay="3">
-              <div><span>V0.10.13</span><b data-i18n="current">YOU ARE HERE</b></div>
-              <h3 data-i18n="roadmapLatestTitle">Cleaner proxy, titles and tab states</h3>
-              <p data-i18n="roadmapLatestBody">Single-casing proxy on Windows for every terminal, session scans on older OpenCode CLIs, instruction-free Codex titles, and completed tabs set apart from the selected one.</p>
+              <div><span>V0.10.13</span><b data-i18n="shipped">SHIPPED</b></div>
+              <h3 data-i18n="roadmapProxyTitle">Cleaner proxy, titles and tab states</h3>
+              <p data-i18n="roadmapProxyBody">Single-casing proxy on Windows for every terminal, session scans on older OpenCode CLIs, instruction-free Codex titles, and completed tabs set apart from the selected one.</p>
+            </article>
+            <article class="roadmap-item current reveal" data-delay="3">
+              <div><span>V0.10.14</span><b data-i18n="shipped">SHIPPED</b></div>
+              <h3 data-i18n="roadmapSetupTitle">Easier Agent setup and Pi support</h3>
+              <p data-i18n="roadmapSetupBody">Install and update six Agents with clear guidance, use the official Antigravity updater, and keep pending reminders flashing until acknowledged.</p>
+            </article>
+            <article class="roadmap-item current reveal" data-delay="3">
+              <div><span>V0.10.15</span><b data-i18n="current">YOU ARE HERE</b></div>
+              <h3 data-i18n="roadmapLatestTitle">Organized projects and clearer account setup</h3>
+              <p data-i18n="roadmapLatestBody">Workspace folders, tags and icons, account login choices, model discovery and upgrade suggestions, and confirmation before closing active Agent terminals.</p>
             </article>
           </div>
         </div>

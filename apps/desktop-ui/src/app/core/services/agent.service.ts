@@ -1,7 +1,9 @@
-import { effect, inject, Injectable, signal, type WritableSignal } from '@angular/core';
+import { computed, effect, inject, Injectable, signal, type WritableSignal } from '@angular/core';
 import { open as openDialog, save } from '@tauri-apps/plugin-dialog';
 
 import { I18nService } from '../i18n/i18n.service';
+import { accountLoginOption } from '../models/account-login';
+import { nameSystemAccountQuotas } from '../models/system-account-quota';
 import {
   AccountLoginRequest,
   AccountProfile,
@@ -120,8 +122,25 @@ export class AgentService {
   readonly modelProfiles = this.modelProfileItems.asReadonly();
   readonly mcpProfiles = this.mcpProfileItems.asReadonly();
   readonly networkProfiles = this.networkProfileItems.asReadonly();
-  readonly accountProfiles = this.accountProfileItems.asReadonly();
-  readonly providerQuotas = this.providerQuotaItems.asReadonly();
+  /**
+   * The backend seeds its two system accounts with Chinese names, so they are named here, in the
+   * language the interface is showing, from the agent they belong to.
+   */
+  readonly accountProfiles = computed(() =>
+    this.accountProfileItems().map((profile) =>
+      profile.isSystem
+        ? {
+            ...profile,
+            name: this.i18n.t('agent.systemAccount', {
+              name: profile.agentType === 'codex' ? 'ChatGPT' : 'Claude',
+            }),
+          }
+        : profile,
+    ),
+  );
+  readonly providerQuotas = computed(() =>
+    nameSystemAccountQuotas(this.providerQuotaItems(), this.accountProfiles()),
+  );
   readonly quotaLoading = this.quotaLoadingState.asReadonly();
   readonly busy = this.busyState.asReadonly();
   readonly error = this.errorState.asReadonly();
@@ -406,9 +425,10 @@ export class AgentService {
       const profile = this.accountProfileItems().find(
         (candidate) => candidate.id === request.accountProfileId,
       );
+      if (!profile) throw new Error(this.i18n.t('account.notFound'));
       return {
-        command: profile?.agentType === 'codex' ? 'codex login' : 'claude auth login',
-        executablePath: profile?.agentType === 'codex' ? 'codex' : 'claude',
+        command: accountLoginOption(profile.agentType, profile.loginMethod).command,
+        executablePath: profile.agentType === 'codex' ? 'codex' : 'claude',
       };
     }
     return invoke<AgentLaunchSpec>('prepare_account_login', { request });
@@ -421,6 +441,8 @@ export class AgentService {
       const script = preview.package ? request.installer === 'script' : true;
       const source = (script ? preview.script : preview.package) ?? '';
       const targetVersion = script ? 'latest' : request.targetVersion?.trim() || 'latest';
+      const nativeUpdate = request.agentType === 'antigravity' && installation?.installed;
+      const updatePath = installation?.executablePath ?? 'agy';
       return {
         agentType: request.agentType,
         displayName: preview.displayName,
@@ -428,7 +450,7 @@ export class AgentService {
         targetVersion,
         installer: script ? 'script' : 'npm',
         supportsVersion: !script,
-        packageSpec: script ? source : `${source}@${targetVersion}`,
+        packageSpec: nativeUpdate ? updatePath : script ? source : `${source}@${targetVersion}`,
         action: installation?.installed ? 'upgrade' : 'install',
         currentVersion: installation?.version,
         // Browser preview cannot reach the registry, so no version is resolved and the plan
@@ -436,9 +458,11 @@ export class AgentService {
         upToDate: false,
         npmPath: script ? undefined : 'browser-preview/npm',
         npmVersion: script ? undefined : 'preview',
-        commandPreview: script
-          ? `powershell -NoProfile -ExecutionPolicy Bypass -Command "irm ${source} | iex"`
-          : `npm install --global ${source}@${targetVersion} --no-fund --no-audit`,
+        commandPreview: nativeUpdate
+          ? `powershell -NoProfile -ExecutionPolicy Bypass -Command "& '${updatePath.replaceAll("'", "''")}' update; exit $LASTEXITCODE"`
+          : script
+            ? `powershell -NoProfile -ExecutionPolicy Bypass -Command "irm ${source} | iex"`
+            : `npm install --global ${source}@${targetVersion} --no-fund --no-audit`,
         networkProfileId: this.networkProfileItems().find(
           (profile) =>
             profile.enabled &&
@@ -912,7 +936,9 @@ export class AgentService {
 
   private upsertModelProfile(profile: ModelProfile): void {
     this.modelProfileItems.update((items) => [
-      ...items.filter((item) => item.id !== profile.id),
+      ...items
+        .filter((item) => item.id !== profile.id)
+        .map((item) => (profile.isDefault ? { ...item, isDefault: false } : item)),
       profile,
     ]);
   }

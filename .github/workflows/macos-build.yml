@@ -1,0 +1,109 @@
+name: Build macOS installers
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: macos-build-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  build:
+    name: macOS (${{ matrix.label }})
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - label: Apple Silicon
+            runner: macos-15
+            target: aarch64-apple-darwin
+            arch: arm64
+          - label: Intel
+            runner: macos-15-intel
+            target: x86_64-apple-darwin
+            arch: x86_64
+    env:
+      CI: "true"
+      CARGO_TERM_COLOR: always
+      # Ad-hoc signing needs no certificate. These test builds are not notarized.
+      APPLE_SIGNING_IDENTITY: "-"
+      TARGET: ${{ matrix.target }}
+      ARCH: ${{ matrix.arch }}
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: "24"
+          cache: npm
+          cache-dependency-path: apps/desktop-ui/package-lock.json
+
+      - name: Set up Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+
+      - name: Cache Rust builds
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri -> target
+          key: macos-${{ matrix.target }}
+          cache-on-failure: true
+
+      - name: Install frontend dependencies
+        run: npm --prefix apps/desktop-ui ci
+
+      - name: Run native Rust tests
+        run: cargo test --manifest-path src-tauri/Cargo.toml --lib --locked --target "$TARGET" -- --quiet
+
+      - name: Build app and DMG
+        run: npm run tauri:build:mac -- --target "$TARGET" --bundles app,dmg
+
+      - name: Verify and collect installers
+        shell: bash
+        run: |
+          set -euo pipefail
+          bundle="src-tauri/target/$TARGET/release/bundle"
+          app="$bundle/macos/Termexo.app"
+          output="artifacts/$TARGET"
+          version=$(node -p "require('./package.json').version")
+          mkdir -p "$output"
+
+          lipo "$app/Contents/MacOS/termexo" -verify_arch "$ARCH"
+          codesign --verify --deep --strict --verbose=2 "$app"
+          for dmg in "$bundle"/dmg/*.dmg; do
+            hdiutil verify "$dmg"
+            cp "$dmg" "$output/"
+          done
+          # Archive the app before upload to preserve executable bits and symlinks.
+          tar -czf "$output/Termexo_${version}_${ARCH}.app.tar.gz" -C "$bundle/macos" Termexo.app
+          jq -n --arg version "$version" --arg commit "$GITHUB_SHA" --arg target "$TARGET" \
+            '{version: $version, commit: $commit, target: $target, signing: "ad-hoc", notarized: false}' \
+            > "$output/build-info.json"
+          (cd "$output" && shasum -a 256 *.dmg *.app.tar.gz > SHA256SUMS.txt)
+
+          {
+            echo "### Termexo $version — $ARCH"
+            echo "Download the installer from this run's **Artifacts** section."
+            echo "Includes a DMG, an app archive, SHA-256 checksums, and build metadata."
+            echo "Signing: ad-hoc. Apple notarization: not configured."
+            echo "Source commit: $GITHUB_SHA"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload installers
+        uses: actions/upload-artifact@v7
+        with:
+          name: Termexo-macOS-${{ matrix.target }}
+          path: artifacts/${{ matrix.target }}/
+          if-no-files-found: error
+          retention-days: 14
+          compression-level: 0

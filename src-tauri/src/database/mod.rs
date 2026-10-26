@@ -14,6 +14,8 @@ const INITIAL_MIGRATION: &str = include_str!("../../migrations/0001_initial.sql"
 const AGENT_MIGRATION: &str = include_str!("../../migrations/0002_agent_sessions.sql");
 const NETWORK_MIGRATION: &str = include_str!("../../migrations/0003_network_profiles.sql");
 const ACCOUNT_MIGRATION: &str = include_str!("../../migrations/0004_account_profiles.sql");
+const ACCOUNT_LOGIN_MIGRATION: &str =
+    include_str!("../../migrations/0013_account_login_methods.sql");
 const API_PROTOCOL_MIGRATION: &str = include_str!("../../migrations/0005_api_protocol.sql");
 const PROVIDER_PROFILE_MIGRATION: &str =
     include_str!("../../migrations/0006_provider_profiles.sql");
@@ -99,11 +101,15 @@ pub struct Workspace {
     #[serde(default = "default_grid_dimension")]
     pub grid_rows: u8,
     pub terminals: Vec<TerminalSession>,
+    #[serde(default)]
+    pub common_actions: Vec<CommonAction>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct TerminalSession {
+    #[serde(default)]
+    pub common_action_id: Option<String>,
     pub id: String,
     pub name: String,
     pub working_directory: String,
@@ -113,10 +119,24 @@ pub struct TerminalSession {
     pub model: String,
     pub branch: String,
     pub command: Option<String>,
+    #[serde(default)]
+    pub account_login: bool,
     pub native_session_id: Option<String>,
     pub profile_id: Option<String>,
     pub mcp_profile_id: Option<String>,
     pub account_profile_id: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CommonAction {
+    pub id: String,
+    pub name: String,
+    pub command: String,
+    pub working_directory: String,
+    #[serde(default)]
+    pub description: String,
+    pub terminal_id: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
@@ -215,6 +235,7 @@ impl WorkspaceDatabase {
         connection.execute_batch(AGENT_MIGRATION)?;
         connection.execute_batch(NETWORK_MIGRATION)?;
         connection.execute_batch(ACCOUNT_MIGRATION)?;
+        run_account_login_migration(&connection)?;
         run_api_protocol_migration(&connection)?;
         run_provider_profile_migration(&connection)?;
         connection.execute_batch(V05_ASSETS_MIGRATION)?;
@@ -273,6 +294,19 @@ impl WorkspaceDatabase {
             params![key, value, unix_timestamp_millis()],
         )?;
         Ok(())
+    }
+
+    /// Atomic across processes: an external notification occurrence can be claimed only once.
+    pub fn claim_app_setting(&self, key: &str, value: &str) -> Result<bool, DatabaseError> {
+        let connection = self
+            .connection
+            .lock()
+            .map_err(|_| DatabaseError::LockPoisoned)?;
+        let inserted = connection.execute(
+            "INSERT OR IGNORE INTO app_settings (key, value, updated_at) VALUES (?1, ?2, ?3)",
+            params![key, value, unix_timestamp_millis()],
+        )?;
+        Ok(inserted == 1)
     }
 
     pub fn list_todo_snapshots(&self) -> Result<Vec<Value>, DatabaseError> {
@@ -1060,7 +1094,7 @@ impl WorkspaceDatabase {
             .lock()
             .map_err(|_| DatabaseError::LockPoisoned)?;
         let mut statement = connection.prepare(
-            "SELECT id, name, agent_type, config_dir, is_default, is_system
+            "SELECT id, name, agent_type, config_dir, is_default, is_system, login_method
              FROM account_profiles
              ORDER BY agent_type, is_default DESC, is_system DESC, name",
         )?;
@@ -1078,7 +1112,7 @@ impl WorkspaceDatabase {
             .lock()
             .map_err(|_| DatabaseError::LockPoisoned)?;
         let mut statement = connection.prepare(
-            "SELECT id, name, agent_type, config_dir, is_default, is_system
+            "SELECT id, name, agent_type, config_dir, is_default, is_system, login_method
              FROM account_profiles
              WHERE id = ?1",
         )?;
@@ -1100,14 +1134,15 @@ impl WorkspaceDatabase {
         }
         connection.execute(
             "INSERT INTO account_profiles (
-                 id, name, agent_type, config_dir, is_default, is_system, created_at, updated_at
+                 id, name, agent_type, config_dir, is_default, is_system, login_method, created_at, updated_at
              )
-             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?7)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?8)
              ON CONFLICT(id) DO UPDATE SET
                  name = excluded.name,
                  agent_type = excluded.agent_type,
                  config_dir = excluded.config_dir,
                  is_default = excluded.is_default,
+                 login_method = excluded.login_method,
                  updated_at = excluded.updated_at",
             params![
                 profile.id,
@@ -1116,6 +1151,7 @@ impl WorkspaceDatabase {
                 profile.config_dir,
                 profile.is_default,
                 profile.is_system,
+                profile.login_method.as_str(),
                 now,
             ],
         )?;
@@ -1257,6 +1293,13 @@ fn account_profile_from_row(row: &rusqlite::Row<'_>) -> rusqlite::Result<Account
         config_dir: row.get(3)?,
         is_default: row.get(4)?,
         is_system: row.get(5)?,
+        login_method: serde_json::from_value(Value::String(row.get(6)?)).map_err(|error| {
+            rusqlite::Error::FromSqlConversionFailure(
+                6,
+                rusqlite::types::Type::Text,
+                Box::new(error),
+            )
+        })?,
         authenticated: false,
         diagnostic: String::new(),
     })
@@ -1269,6 +1312,17 @@ fn unix_timestamp_millis() -> i64 {
         .duration_since(UNIX_EPOCH)
         .map(|duration| duration.as_millis() as i64)
         .unwrap_or_default()
+}
+
+fn run_account_login_migration(connection: &Connection) -> Result<(), DatabaseError> {
+    let mut columns = connection.prepare("PRAGMA table_info(account_profiles)")?;
+    let names = columns
+        .query_map([], |row| row.get::<_, String>(1))?
+        .collect::<Result<Vec<_>, _>>()?;
+    if !names.iter().any(|name| name == "login_method") {
+        connection.execute_batch(ACCOUNT_LOGIN_MIGRATION)?;
+    }
+    Ok(())
 }
 
 fn run_api_protocol_migration(connection: &Connection) -> Result<(), DatabaseError> {
@@ -1717,6 +1771,14 @@ mod tests {
             layout: "columns".into(),
             grid_columns: 2,
             grid_rows: 2,
+            common_actions: vec![CommonAction {
+                id: "frontend".into(),
+                name: "Frontend".into(),
+                command: "npm run dev".into(),
+                working_directory: "D:/dev/termexo".into(),
+                description: "package.json".into(),
+                terminal_id: None,
+            }],
             terminals: vec![],
         };
 
@@ -1741,6 +1803,7 @@ mod tests {
         assert_eq!(stored[0].name, first_workspace.name);
         assert_eq!(stored[1].name, workspace.name);
         assert_eq!(stored[1].layout, workspace.layout);
+        assert_eq!(stored[1].common_actions[0].command, "npm run dev");
 
         database.delete_workspace(&workspace.id).unwrap();
         assert!(database.list_todo_snapshots().unwrap().is_empty());
@@ -1776,7 +1839,9 @@ mod tests {
             layout: "single".into(),
             grid_columns: 2,
             grid_rows: 2,
+            common_actions: vec![],
             terminals: vec![TerminalSession {
+                common_action_id: None,
                 id: "terminal-1".into(),
                 name: "Claude 1".into(),
                 working_directory: "D:\\dev\\termexo".into(),
@@ -1786,6 +1851,7 @@ mod tests {
                 model: "GLM 4.6".into(),
                 branch: "main".into(),
                 command: Some("claude".into()),
+                account_login: true,
                 native_session_id: Some("session-1".into()),
                 profile_id: Some("glm-4-6".into()),
                 mcp_profile_id: Some("mcp-1".into()),
@@ -1796,6 +1862,7 @@ mod tests {
         database.save(&workspace).unwrap();
         let stored = database.list().unwrap();
 
+        assert!(stored[0].terminals[0].account_login);
         assert_eq!(
             stored[0].terminals[0].profile_id.as_deref(),
             Some("glm-4-6")
@@ -1823,6 +1890,7 @@ mod tests {
         )
         .unwrap();
 
+        assert!(workspace.common_actions.is_empty());
         assert_eq!(workspace.grid_columns, 2);
         assert_eq!(workspace.grid_rows, 2);
         assert_eq!(workspace.theme_color, "#58c7a0");
@@ -2116,6 +2184,7 @@ mod tests {
             id: "claude-one".into(),
             name: "Claude One".into(),
             agent_type: "claude".into(),
+            login_method: crate::config::AccountLoginMethod::Console,
             config_dir: Some("C:\\accounts\\claude-one".into()),
             is_default: true,
             is_system: false,
@@ -2135,6 +2204,10 @@ mod tests {
         let profiles = database.list_account_profiles().unwrap();
         assert!(profiles
             .iter()
+            .filter(|profile| profile.id == first.id || profile.id == second.id)
+            .all(|profile| profile.login_method == crate::config::AccountLoginMethod::Console));
+        assert!(profiles
+            .iter()
             .any(|profile| profile.id == second.id && profile.is_default));
         assert!(profiles
             .iter()
@@ -2146,6 +2219,50 @@ mod tests {
                 .unwrap()
                 .config_dir,
             second.config_dir
+        );
+        let mut updated = second.clone();
+        updated.login_method = crate::config::AccountLoginMethod::Sso;
+        database.save_account_profile(&updated).unwrap();
+        assert_eq!(
+            database
+                .find_account_profile(&second.id)
+                .unwrap()
+                .unwrap()
+                .login_method,
+            crate::config::AccountLoginMethod::Sso
+        );
+    }
+
+    #[test]
+    fn migrates_existing_accounts_to_browser_login_without_changing_their_identity() {
+        let connection = Connection::open_in_memory().unwrap();
+        connection.execute_batch("CREATE TABLE account_profiles (
+            id TEXT PRIMARY KEY, name TEXT NOT NULL, agent_type TEXT NOT NULL,
+            config_dir TEXT, is_default INTEGER NOT NULL, is_system INTEGER NOT NULL,
+            created_at INTEGER NOT NULL, updated_at INTEGER NOT NULL
+        );
+        INSERT INTO account_profiles VALUES ('legacy', 'Original', 'codex', 'C:/isolated', 1, 0, 1, 1);").unwrap();
+        run_account_login_migration(&connection).unwrap();
+        run_account_login_migration(&connection).unwrap();
+        let database = WorkspaceDatabase {
+            connection: Mutex::new(connection),
+        };
+        let mut profile = database.find_account_profile("legacy").unwrap().unwrap();
+        assert_eq!(
+            profile.login_method,
+            crate::config::AccountLoginMethod::Browser
+        );
+        assert_eq!(profile.config_dir.as_deref(), Some("C:/isolated"));
+        assert!(profile.is_default);
+        profile.login_method = crate::config::AccountLoginMethod::DeviceCode;
+        database.save_account_profile(&profile).unwrap();
+        assert_eq!(
+            database
+                .find_account_profile("legacy")
+                .unwrap()
+                .unwrap()
+                .login_method,
+            crate::config::AccountLoginMethod::DeviceCode
         );
     }
 

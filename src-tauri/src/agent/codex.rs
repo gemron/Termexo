@@ -1,3 +1,4 @@
+use crate::platform::{shell_invoke, shell_quote};
 use std::cmp::Reverse;
 use std::collections::HashMap;
 use std::env;
@@ -286,7 +287,7 @@ impl AgentAdapter for CodexCliAdapter {
         options: &CodexLaunchOptions,
     ) -> Result<AgentLaunchSpec, Self::Error> {
         let executable = self.find_executable().ok_or(CodexError::NotInstalled)?;
-        let mut command = format!("& {}", powershell_quote(&executable.to_string_lossy()));
+        let mut command = shell_invoke(&executable.to_string_lossy());
         append_option(&mut command, "-c", options.notify_config.as_deref());
         for provider_config in &options.provider_configs {
             append_option(&mut command, "-c", Some(provider_config));
@@ -307,12 +308,12 @@ impl AgentAdapter for CodexCliAdapter {
             .filter(|value| !value.trim().is_empty())
         {
             command.push_str(" resume ");
-            command.push_str(&powershell_quote(session_id));
+            command.push_str(&shell_quote(session_id));
         }
         append_option(&mut command, "--model", options.model.as_deref());
         if let Some(prompt) = options.initial_prompt.as_deref() {
             command.push_str(" -- ");
-            command.push_str(&powershell_quote(prompt));
+            command.push_str(&shell_quote(prompt));
         }
 
         Ok(AgentLaunchSpec {
@@ -629,16 +630,12 @@ fn home_directory() -> Option<PathBuf> {
         .map(PathBuf::from)
 }
 
-fn powershell_quote(value: &str) -> String {
-    format!("'{}'", value.replace('\'', "''"))
-}
-
 fn append_option(command: &mut String, flag: &str, value: Option<&str>) {
     if let Some(value) = value.filter(|value| !value.trim().is_empty()) {
         command.push(' ');
         command.push_str(flag);
         command.push(' ');
-        command.push_str(&powershell_quote(value));
+        command.push_str(&shell_quote(value));
     }
 }
 

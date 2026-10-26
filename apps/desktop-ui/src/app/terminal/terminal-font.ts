@@ -1,4 +1,8 @@
-export const DEFAULT_TERMINAL_FONT_NAME = 'Consolas';
+/** Only WKWebView's own user agent says "Macintosh"; the unit-test DOM does not. */
+const IS_MACOS = typeof navigator !== 'undefined' && /Macintosh/.test(navigator.userAgent);
+
+/** Consolas ships with Windows only, so macOS starts on the font it always has. */
+export const DEFAULT_TERMINAL_FONT_NAME = IS_MACOS ? 'Menlo' : 'Consolas';
 export const TERMINAL_FONT_NAME_STORAGE_KEY = 'termexo.terminalFontName';
 export const MAX_TERMINAL_FONT_NAME_LENGTH = 100;
 
@@ -36,6 +40,9 @@ export const TERMINAL_FONT_PRESETS = [
 const LEGACY_PROPORTIONAL_FONT_NAME = 'system-ui';
 const WINDOWS_TERMINAL_FALLBACK =
   '"Cascadia Mono", "JetBrains Mono", Consolas, "Lucida Console", "Microsoft YaHei UI", "Microsoft YaHei", monospace';
+const MACOS_TERMINAL_FALLBACK =
+  '"JetBrains Mono", "SF Mono", Menlo, Monaco, "PingFang SC", monospace';
+const TERMINAL_FALLBACK = IS_MACOS ? MACOS_TERMINAL_FALLBACK : WINDOWS_TERMINAL_FALLBACK;
 
 const FONT_DETECTION_SAMPLE = 'mmmmmmmmmmlliWW00@#中文';
 const FONT_DETECTION_SIZE = '72px';
@@ -55,10 +62,10 @@ export function normalizeTerminalFontName(value: string | null | undefined): str
   return normalized;
 }
 
-/** Builds xterm's CSS font stack while keeping Windows' system Chinese font as the fallback. */
+/** Builds xterm's CSS font stack, falling back to the platform's own monospace and Chinese fonts. */
 export function terminalFontFamily(fontName: string | null | undefined): string {
   const normalized = normalizeTerminalFontName(fontName);
-  return `"${normalized}", ${WINDOWS_TERMINAL_FALLBACK}`;
+  return `"${normalized}", ${TERMINAL_FALLBACK}`;
 }
 
 /** Detects a locally installed font without mistaking the browser's fallback font for a match. */

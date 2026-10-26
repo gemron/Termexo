@@ -16,7 +16,12 @@ export class WindowControlsService {
   private readonly appWindow = isTauriRuntime() ? getCurrentWindow() : null;
   private readonly maximizedState = signal(false);
 
-  readonly available = this.appWindow !== null;
+  /**
+   * macOS draws its own traffic lights over the overlaid title bar, so the buttons below are not
+   * offered there and the topbar leaves room for the native ones instead.
+   */
+  readonly nativeChrome = this.appWindow !== null && /Mac/i.test(navigator.userAgent);
+  readonly available = this.appWindow !== null && !this.nativeChrome;
   readonly maximized = this.maximizedState.asReadonly();
 
   constructor() {

@@ -37,6 +37,11 @@ fn main() {
             }
             return;
         }
+        Some("claude-status") => {
+            // A status line that fails would print its error into Claude Code's footer.
+            let _ = termexo_lib::capture_claude_status_from_cli();
+            return;
+        }
         Some("grok-hook") => {
             if let Err(error) = termexo_lib::capture_grok_hook_event_from_cli() {
                 eprintln!("{error}");

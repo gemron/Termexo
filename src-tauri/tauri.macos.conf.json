@@ -1,0 +1,41 @@
+{
+  "app": {
+    "windows": [
+      {
+        "title": "Termexo",
+        "width": 1440,
+        "height": 900,
+        "minWidth": 720,
+        "minHeight": 480,
+        "resizable": true,
+        "fullscreen": false,
+        "center": true,
+        "decorations": true,
+        "titleBarStyle": "Overlay",
+        "hiddenTitle": true,
+        "trafficLightPosition": {
+          "x": 16,
+          "y": 20
+        },
+        "dragDropEnabled": false
+      }
+    ],
+    "security": {
+      "csp": "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:; connect-src 'self' ipc: http://ipc.localhost; worker-src 'self' blob:; object-src 'none'; base-uri 'self'; frame-src 'none'; form-action 'self'",
+      "devCsp": "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:; connect-src 'self' ipc: http://ipc.localhost ws://127.0.0.1:4200; worker-src 'self' blob:; object-src 'none'; base-uri 'self'; frame-src 'none'",
+      "dangerousDisableAssetCspModification": true
+    }
+  },
+  "bundle": {
+    "resources": {
+      "vendor/conpty/conpty.dll": null,
+      "vendor/conpty/OpenConsole.exe": null
+    },
+    "macOS": {
+      "minimumSystemVersion": "12.0"
+    }
+  },
+  "build": {
+    "beforeBuildCommand": "npm --prefix apps/desktop-ui run build -- --configuration macos"
+  }
+}

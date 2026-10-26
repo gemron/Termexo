@@ -10,15 +10,45 @@ const EXECUTABLE_EXTENSIONS: &[&str] = &[
     "psm1", "vbs", "vbe", "js", "jse", "wsf", "wsh", "jar",
 ];
 
-/// Whether the path names something Windows would run if it were opened.
+/// Extensions macOS runs, installs or mounts rather than displays when handed to `open`.
+///
+/// `.command` and `.terminal` start Terminal.app and execute their contents, the installer and
+/// automation types run code on open, and the script extensions are what an editor would not
+/// necessarily be registered for. `.app` bundles are directories and are revealed already.
+#[cfg(target_os = "macos")]
+const MACOS_EXECUTABLE_EXTENSIONS: &[&str] = &[
+    "command", "terminal", "tool", "sh", "zsh", "bash", "pkg", "mpkg", "dmg", "workflow",
+    "action", "scpt", "scptd", "applescript", "app", "jar", "py", "pl", "rb",
+];
+
+#[cfg(not(target_os = "macos"))]
+const MACOS_EXECUTABLE_EXTENSIONS: &[&str] = &[];
+
+/// Whether the path names something the platform would run if it were opened.
 fn is_executable_extension(path: &Path) -> bool {
     path.extension()
         .and_then(|extension| extension.to_str())
         .is_some_and(|extension| {
             EXECUTABLE_EXTENSIONS
                 .iter()
+                .chain(MACOS_EXECUTABLE_EXTENSIONS)
                 .any(|known| extension.eq_ignore_ascii_case(known))
         })
+}
+
+/// Whether the file carries an execute permission, which makes `open` run it in a terminal
+/// whatever its name. Windows has no such bit; it is judged by extension alone.
+#[cfg(unix)]
+fn has_execute_permission(path: &Path) -> bool {
+    use std::os::unix::fs::PermissionsExt;
+
+    path.metadata()
+        .is_ok_and(|metadata| metadata.permissions().mode() & 0o111 != 0)
+}
+
+#[cfg(not(unix))]
+fn has_execute_permission(_path: &Path) -> bool {
+    false
 }
 
 /// Schemes a browser may be handed. Terminal output is written by an agent, not by the user, so
@@ -54,10 +84,26 @@ pub fn open_terminal_url(url: String) -> Result<(), String> {
 #[tauri::command(async)]
 pub fn open_terminal_path(path: String, working_directory: Option<String>) -> Result<(), String> {
     let resolved = resolve(&path, working_directory.as_deref())?;
-    if resolved.is_dir() || is_executable_extension(&resolved) {
+    if resolved.is_dir() || is_executable_extension(&resolved) || has_execute_permission(&resolved)
+    {
         return reveal(&resolved);
     }
     open_with_default_program(&resolved)
+}
+
+/// Opens a project directory's contents, rather than selecting it in its parent folder.
+#[tauri::command(async)]
+pub fn open_directory(path: String) -> Result<(), String> {
+    let resolved = resolve_directory(&path)?;
+    open_with_default_program(&resolved)
+}
+
+fn resolve_directory(path: &str) -> Result<PathBuf, String> {
+    let resolved = resolve(path, None)?;
+    if !resolved.is_dir() {
+        return Err(format!("不是文件夹：{}。", resolved.to_string_lossy()));
+    }
+    Ok(resolved)
 }
 
 /// Resolves what the terminal printed into a path that exists on this machine.
@@ -110,15 +156,37 @@ fn open_with_default_program(path: &Path) -> Result<(), String> {
 #[cfg(windows)]
 fn strip_extended_prefix(path: &Path) -> String {
     let text = path.to_string_lossy().into_owned();
+    if let Some(unc) = text.strip_prefix(r"\\?\UNC\") {
+        return format!(r"\\{unc}");
+    }
     text.strip_prefix(r"\\?\").unwrap_or(&text).to_owned()
 }
 
-#[cfg(not(windows))]
+#[cfg(target_os = "macos")]
+fn reveal(path: &Path) -> Result<(), String> {
+    std::process::Command::new("open")
+        .arg("-R")
+        .arg(path)
+        .spawn()
+        .map(|_| ())
+        .map_err(|error| format!("无法在 Finder 中定位该文件：{error}"))
+}
+
+#[cfg(target_os = "macos")]
+fn open_with_default_program(path: &Path) -> Result<(), String> {
+    std::process::Command::new("open")
+        .arg(path)
+        .spawn()
+        .map(|_| ())
+        .map_err(|error| format!("无法打开该文件：{error}"))
+}
+
+#[cfg(not(any(windows, target_os = "macos")))]
 fn reveal(_path: &Path) -> Result<(), String> {
     Err("当前平台不支持在文件管理器中定位。".into())
 }
 
-#[cfg(not(windows))]
+#[cfg(not(any(windows, target_os = "macos")))]
 fn open_with_default_program(_path: &Path) -> Result<(), String> {
     Err("当前平台不支持打开文件。".into())
 }
@@ -126,6 +194,36 @@ fn open_with_default_program(_path: &Path) -> Result<(), String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[cfg(target_os = "macos")]
+    #[test]
+    fn macos_files_that_run_when_opened_are_recognised() {
+        for name in ["fix.command", "x.TERMINAL", "setup.pkg", "a.dmg", "run.scpt", "job.workflow"] {
+            assert!(is_executable_extension(Path::new(name)), "{name}");
+        }
+        for name in ["notes.md", "image.png", "main.rs", "README"] {
+            assert!(!is_executable_extension(Path::new(name)), "{name}");
+        }
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn a_file_with_an_execute_bit_counts_as_executable() {
+        use std::os::unix::fs::PermissionsExt;
+
+        let directory = std::env::temp_dir().join(format!("termexo-open-exec-{}", std::process::id()));
+        std::fs::create_dir_all(&directory).unwrap();
+        let plain = directory.join("notes");
+        let program = directory.join("tool-without-extension");
+        std::fs::write(&plain, "text").unwrap();
+        std::fs::write(&program, "#!/bin/sh\n").unwrap();
+        std::fs::set_permissions(&plain, std::fs::Permissions::from_mode(0o644)).unwrap();
+        std::fs::set_permissions(&program, std::fs::Permissions::from_mode(0o755)).unwrap();
+
+        assert!(!has_execute_permission(&plain));
+        assert!(has_execute_permission(&program));
+        std::fs::remove_dir_all(directory).unwrap();
+    }
 
     #[test]
     fn refuses_a_scheme_a_browser_should_not_be_handed() {
@@ -188,5 +286,47 @@ mod tests {
     #[test]
     fn refuses_a_relative_path_with_no_directory_to_resolve_it_against() {
         assert!(resolve("src/main.rs", None).is_err());
+    }
+
+    #[test]
+    fn resolves_project_directories_with_spaces_and_unicode() {
+        let directory =
+            std::env::temp_dir().join(format!("termexo-project-{} 空格目录", std::process::id()));
+        std::fs::create_dir_all(&directory).unwrap();
+        assert_eq!(
+            resolve_directory(directory.to_str().unwrap()).unwrap(),
+            directory.canonicalize().unwrap()
+        );
+        std::fs::remove_dir(directory).unwrap();
+    }
+
+    #[test]
+    fn refuses_files_and_invalid_project_directories() {
+        let file =
+            std::env::temp_dir().join(format!("termexo-project-file-{}.txt", std::process::id()));
+        std::fs::write(&file, "x").unwrap();
+        assert!(resolve_directory(file.to_str().unwrap()).is_err());
+        std::fs::remove_file(file).unwrap();
+        assert!(resolve_directory("").is_err());
+        assert!(resolve_directory("relative/project").is_err());
+        assert!(resolve_directory(
+            &std::env::temp_dir()
+                .join("termexo-nonexistent-project-directory")
+                .to_string_lossy()
+        )
+        .is_err());
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn converts_extended_local_and_unc_paths_for_explorer() {
+        assert_eq!(
+            strip_extended_prefix(Path::new(r"\\?\C:\my project")),
+            r"C:\my project"
+        );
+        assert_eq!(
+            strip_extended_prefix(Path::new(r"\\?\UNC\server\share\项目")),
+            r"\\server\share\项目"
+        );
     }
 }

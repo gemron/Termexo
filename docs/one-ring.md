@@ -19,11 +19,13 @@ OpenCode 实施者必须明确 `provider/model`。Codex 可使用明确模型，
 
 Codex 新会话模型建议通过 CLI app-server 的 `model/list` 动态加载，默认值读取有效配置。未修改的内置旧默认 Profile 会迁移为沿用 CLI 配置；用户手动指定的模型保留。读取失败时仍可手动输入模型 ID。接口见 [Codex App Server 模型目录](https://learn.chatgpt.com/docs/app-server#models)。
 
+创建 Codex / Claude 会话的“模型 / Profile”下拉框同时列出官方模型和已保存的 Profile。官方模型沿用所选 CLI 账号，不需要预先创建模型 Profile，也不会继承第三方 Profile 的地址和密钥。详见 [上游同步和模型选择验证](upstream-model-selection-validation.md)。
+
 ## OpenCode 实施与验证
 
 OpenCode 使用 Termexo 的原生前台 CLI 会话，可查看、输入及接管。结果取自 OpenCode 2 的原生 session export，核对 sessionId、实际模型、原生回合结束状态及 JSON 报告；空闲状态或普通完成文字不足以取得结果。改动文件还需与真实工作区差异一致，再由独立 Codex 检查并运行验证命令。OpenCode 实施者使用自身工具权限，Shell 命令仍可能要求在原生窗口确认；不宣称具有 Codex 的操作系统沙箱。
 
-本机已验证原生 OpenCode 调度/回收、受控本地响应下的真实文件修改，以及独立真实 Codex 验证和只读沙箱命令重放。真实 OpenCode 开发任务在本机受到免费额度 429 限制，尚未完成真实模型开发验收。详见 [OpenCode 与模型选择验证记录](opencode-worker-validation.md)。
+本机已验证原生 OpenCode 调度/回收、真实 DeepSeek 模型生成动画初版、独立 Codex 验证和只读沙箱命令重放；动画后续按用户选择改用 Codex 完成修复并已确认交付。早期免费模型 429 记录属于历史环境限制。详见 [动画真实测试及证据校验修复](pelican-bike-validation.md) 和 [早期 OpenCode 接入记录](opencode-worker-validation.md)。
 
 ## 无需用户配置的部分
 

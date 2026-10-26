@@ -116,6 +116,51 @@ fieldset {
   }
 }
 
+.tag-field {
+  display: grid;
+  gap: 6px;
+  margin-top: 16px;
+
+  > span {
+    color: var(--text-secondary);
+    font-size: 11px;
+    font-weight: 560;
+  }
+
+  small {
+    color: var(--text-muted);
+    font-size: 10px;
+    line-height: 1.45;
+  }
+}
+
+.workspace-icon-fieldset {
+  margin-top: 14px;
+}
+
+.workspace-icon-options {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.workspace-icon-option {
+  display: grid;
+  height: 34px;
+  place-items: center;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-field);
+  color: var(--text-muted);
+  background: var(--surface-inset);
+
+  &:hover,
+  &.selected {
+    border-color: color-mix(in srgb, var(--color-primary) 58%, var(--border));
+    color: var(--text);
+    background: color-mix(in srgb, var(--color-primary) 10%, var(--surface-inset));
+  }
+}
+
 .theme-preview {
   --preview-color: var(--accent);
 
@@ -155,5 +200,9 @@ fieldset {
     > code {
       display: none;
     }
+  }
+
+  .workspace-icon-options {
+    grid-template-columns: repeat(5, minmax(0, 1fr));
   }
 }

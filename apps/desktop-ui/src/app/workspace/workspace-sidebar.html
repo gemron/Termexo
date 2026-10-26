@@ -1,5 +1,4 @@
 <aside class="workspace-sidebar bg-base-200">
-  <!-- Occupies the shell's header row now that the brand sits in the title bar. -->
   <div class="sidebar-tools">
     <label class="search-field input input-bordered input-sm">
       <app-icon name="search" [size]="14" />
@@ -24,6 +23,15 @@
     <button
       class="icon-button btn btn-square btn-ghost btn-sm"
       type="button"
+      [title]="'workspace.newFolder' | t"
+      [attr.aria-label]="'workspace.newFolder' | t"
+      (click)="beginFolderCreate()"
+    >
+      <app-icon name="folder" [size]="15" />
+    </button>
+    <button
+      class="icon-button btn btn-square btn-ghost btn-sm"
+      type="button"
       [title]="'workspace.create' | t"
       [attr.aria-label]="'workspace.create' | t"
       (click)="createRequested.emit()"
@@ -34,103 +42,371 @@
 
   <nav [attr.aria-label]="'workspace.section' | t">
     <p class="section-label">{{ 'workspace.section' | t }}</p>
-    <ul class="workspace-list menu menu-sm">
-      @for (workspace of visibleWorkspaces(); track workspace.id) {
-        <li
-          class="workspace-entry"
-          [class.dragging]="draggedWorkspaceId() === workspace.id"
-          [class.drop-before]="
-            dropTarget()?.workspaceId === workspace.id && dropTarget()?.position === 'before'
-          "
-          [class.drop-after]="
-            dropTarget()?.workspaceId === workspace.id && dropTarget()?.position === 'after'
-          "
-          [style.--workspace-color]="workspaceColor(workspace)"
-          (dragover)="dragOverWorkspace($event, workspace.id)"
-          (drop)="dropWorkspace($event, workspace.id)"
-        >
+
+    @if (tagFilters().length) {
+      <div class="tag-filters" [attr.aria-label]="'workspace.filterByTag' | t">
+        @for (tag of tagFilters(); track tag.name) {
           <button
             type="button"
-            class="workspace-item"
-            draggable="true"
-            [class.active]="workspace.id === activeWorkspaceId()"
-            [attr.aria-keyshortcuts]="'Alt+ArrowUp Alt+ArrowDown'"
-            (click)="openActions.set(null); workspaceSelected.emit(workspace.id)"
-            (keydown)="moveWorkspaceWithKeyboard($event, workspace.id)"
-            (dragstart)="startWorkspaceDrag($event, workspace.id)"
-            (dragend)="endWorkspaceDrag()"
+            class="tag-filter"
+            [class.selected]="selectedTags().includes(tag.name)"
+            [attr.aria-pressed]="selectedTags().includes(tag.name)"
+            (click)="toggleTag(tag.name)"
           >
-            <span class="workspace-glyph">
-              <app-icon name="folder" [size]="15" />
-            </span>
-            <span class="workspace-copy">
-              <strong>{{ workspace.name }}</strong>
-              @let agents = agentTerminals(workspace);
-              @if (agents.length) {
-                <span class="workspace-agent-statuses">
-                  @for (terminal of agents; track terminal.id) {
-                    <span
-                      class="workspace-agent-status"
-                      [attr.data-status]="terminal.status"
-                      [title]="terminal.name"
-                      role="img"
-                      [attr.aria-label]="
-                        terminal.name + ': ' + (statusMeta[terminal.status].labelKey | t)
-                      "
-                    >
-                      <app-icon [name]="agentIcons[terminal.agentType]" [size]="15" />
-                      @if (terminal.status === 'COMPLETED') {
-                        <app-icon class="status-check" name="check" [size]="9" />
-                      }
-                    </span>
-                  }
-                </span>
+            {{ tag.name }} <span>{{ tag.count }}</span>
+          </button>
+        }
+      </div>
+    }
+
+    @if (folderEditor(); as editor) {
+      <form class="folder-editor" (submit)="$event.preventDefault(); submitFolderEditor()">
+        <strong>{{
+          (editor.mode === 'create' ? 'workspace.newFolder' : 'workspace.renameFolder') | t
+        }}</strong>
+        <label>
+          <span>{{ 'workspace.folderName' | t }}</span>
+          <input
+            #folderNameInput
+            type="text"
+            [value]="editor.value"
+            (input)="updateFolderEditor($event)"
+            (keydown.escape)="cancelFolderEditor(); $event.stopPropagation()"
+            [attr.aria-invalid]="!!folderNameError()"
+            [attr.aria-describedby]="folderNameError() ? 'folder-name-error' : null"
+            [attr.aria-label]="
+              editor.mode === 'create'
+                ? ('workspace.folderName' | t)
+                : ('workspace.renameFolder' | t)
+            "
+            [placeholder]="'workspace.folderName' | t"
+          />
+        </label>
+        @if (editor.mode === 'create') {
+          <label>
+            <span>{{ 'workspace.parentFolder' | t }}</span>
+            <select
+              [value]="editor.parentId ?? ''"
+              (change)="updateFolderParent($event)"
+              [attr.aria-label]="'workspace.parentFolder' | t"
+            >
+              <option value="" [selected]="!editor.parentId">{{ 'workspace.topLevel' | t }}</option>
+              @for (option of folderOptions(); track option.id) {
+                <option [value]="option.id" [selected]="editor.parentId === option.id">
+                  {{ option.label }}
+                </option>
               }
-            </span>
+            </select>
+          </label>
+        }
+        @if (folderNameError(); as error) {
+          <p id="folder-name-error" class="folder-error" role="alert">{{ error | t }}</p>
+        }
+        <div class="folder-editor-actions">
+          <button type="button" class="btn btn-ghost btn-xs" (click)="cancelFolderEditor()">
+            {{ 'common.cancel' | t }}
           </button>
           <button
-            class="workspace-more"
-            type="button"
-            [attr.aria-label]="'workspace.more' | t"
-            [attr.aria-expanded]="openActions() === workspace.id"
-            (click)="openActions.set(openActions() === workspace.id ? null : workspace.id)"
+            type="submit"
+            class="btn btn-primary btn-xs"
+            [disabled]="!editor.value.trim() || !!folderNameError()"
           >
-            <app-icon name="more" [size]="16" />
+            {{ (editor.mode === 'create' ? 'workspace.newFolder' : 'dialog.saveChanges') | t }}
           </button>
-          @if (openActions() === workspace.id) {
-            <span class="workspace-actions" (click)="openActions.set(null)">
-              <button
-                type="button"
-                class="workspace-action edit"
-                [title]="'workspace.edit' | t"
-                [attr.aria-label]="'workspace.edit' | t"
-                (click)="editRequested.emit(workspace.id)"
-              >
-                <app-icon name="edit" [size]="12" />
-              </button>
-              <button
-                type="button"
-                class="workspace-action delete"
-                [title]="'workspace.delete' | t"
-                [attr.aria-label]="'workspace.delete' | t"
-                (click)="deleteRequested.emit(workspace.id)"
-              >
-                <app-icon name="trash" [size]="12" />
-              </button>
-              <button
-                type="button"
-                class="workspace-action favorite"
-                [class.selected]="workspace.favorite"
-                [attr.aria-label]="
-                  workspace.favorite ? ('workspace.unfavorite' | t) : ('workspace.favorite' | t)
-                "
-                (click)="favoriteToggled.emit(workspace.id)"
-              >
-                <app-icon name="star" [size]="13" />
-              </button>
-            </span>
-          }
-        </li>
+        </div>
+      </form>
+    }
+
+    @if (draggedEntry()) {
+      <button
+        type="button"
+        class="root-drop-target"
+        (dragover)="$event.preventDefault()"
+        (drop)="dropOnRoot($event)"
+      >
+        <app-icon name="folder" [size]="13" />{{ 'workspace.moveToRoot' | t }}
+      </button>
+    }
+
+    <ul class="workspace-list menu menu-sm">
+      @for (entry of treeEntries(); track entry.kind + ':' + entry.id) {
+        @if (entry.kind === 'folder' && entry.folder; as folder) {
+          <li
+            class="workspace-entry folder-entry"
+            [class.dragging]="draggedEntry()?.kind === 'folder' && draggedEntry()?.id === folder.id"
+            [class.drop-before]="
+              dropTarget()?.kind === 'folder' &&
+              dropTarget()?.id === folder.id &&
+              dropTarget()?.position === 'before'
+            "
+            [class.drop-after]="
+              dropTarget()?.kind === 'folder' &&
+              dropTarget()?.id === folder.id &&
+              dropTarget()?.position === 'after'
+            "
+            [class.drop-inside]="
+              dropTarget()?.kind === 'folder' &&
+              dropTarget()?.id === folder.id &&
+              dropTarget()?.position === 'inside'
+            "
+            (dragover)="dragOverEntry($event, 'folder', folder.id)"
+            (drop)="dropOnFolder($event, folder.id)"
+          >
+            <button
+              type="button"
+              class="folder-item"
+              draggable="true"
+              [style.padding-inline-start.px]="8 + entry.level * 14"
+              [attr.aria-expanded]="!folder.collapsed || search() || selectedTags().length"
+              (click)="folderToggleRequested.emit(folder.id)"
+              (dragstart)="startEntryDrag($event, 'folder', folder.id)"
+              (dragend)="endDrag()"
+            >
+              <span class="folder-caret" [class.collapsed]="folder.collapsed">
+                <app-icon name="chevron-down" [size]="12" />
+              </span>
+              <app-icon class="folder-mark" name="folder" [size]="15" />
+              <strong>{{ folder.name }}</strong>
+            </button>
+            <button
+              class="workspace-more folder-more"
+              type="button"
+              [attr.aria-label]="'workspace.more' | t"
+              [attr.aria-expanded]="openFolderActions() === folder.id"
+              (click)="toggleFolderActions(folder.id)"
+            >
+              <app-icon name="more" [size]="16" />
+            </button>
+            @if (openFolderActions() === folder.id) {
+              <div class="workspace-actions folder-actions" (click)="$event.stopPropagation()">
+                <button
+                  type="button"
+                  class="workspace-action folder-action"
+                  [title]="'workspace.newSubfolder' | t"
+                  [attr.aria-label]="'workspace.newSubfolder' | t"
+                  (click)="beginFolderCreate(folder.id)"
+                >
+                  <app-icon name="plus" [size]="12" />
+                  <span>{{ 'workspace.newSubfolder' | t }}</span>
+                </button>
+                <button
+                  type="button"
+                  class="workspace-action folder-action"
+                  [title]="'workspace.renameFolder' | t"
+                  [attr.aria-label]="'workspace.renameFolder' | t"
+                  (click)="beginFolderRename(folder)"
+                >
+                  <app-icon name="edit" [size]="12" />
+                  <span>{{ 'workspace.renameFolder' | t }}</span>
+                </button>
+                <label class="workspace-move">
+                  <span>{{ 'workspace.moveToFolder' | t }}</span>
+                  <select
+                    [value]="folder.parentId ?? ''"
+                    [attr.aria-label]="'workspace.moveToFolder' | t"
+                    (change)="moveFolderFromMenu(folder.id, $event)"
+                  >
+                    <option
+                      value=""
+                      [selected]="!folder.parentId"
+                      [disabled]="!canMoveFolderTo(folder, null)"
+                    >
+                      {{ 'workspace.topLevel' | t }}
+                    </option>
+                    @for (option of folderOptions(); track option.id) {
+                      @if (canMoveFolderTo(folder, option.id)) {
+                        <option [value]="option.id" [selected]="folder.parentId === option.id">
+                          {{ option.label }}
+                        </option>
+                      }
+                    }
+                  </select>
+                </label>
+                <button
+                  type="button"
+                  class="workspace-action folder-action delete"
+                  [title]="'workspace.deleteFolder' | t"
+                  [attr.aria-label]="'workspace.deleteFolder' | t"
+                  (click)="folderPendingDeletion.set(folder.id)"
+                >
+                  <app-icon name="trash" [size]="12" />
+                  <span>{{ 'workspace.deleteFolder' | t }}</span>
+                </button>
+                @if (folderPendingDeletion() === folder.id) {
+                  <div class="folder-delete-confirm" role="alert">
+                    <p>{{ 'workspace.deleteFolderHelp' | t }}</p>
+                    <div class="folder-editor-actions">
+                      <button
+                        type="button"
+                        class="btn btn-ghost btn-xs"
+                        (click)="folderPendingDeletion.set(null)"
+                      >
+                        {{ 'common.cancel' | t }}
+                      </button>
+                      <button
+                        type="button"
+                        class="btn btn-error btn-xs"
+                        (click)="folderDeleteRequested.emit(folder.id); closeMenus()"
+                      >
+                        {{ 'workspace.deleteFolder' | t }}
+                      </button>
+                    </div>
+                  </div>
+                }
+              </div>
+            }
+            @if (
+              !folder.collapsed && folderIsEmpty(folder.id) && !search() && !selectedTags().length
+            ) {
+              <p class="folder-empty" [style.padding-inline-start.px]="28 + entry.level * 14">
+                {{ 'workspace.emptyFolder' | t }}
+              </p>
+            }
+          </li>
+        } @else if (entry.kind === 'workspace' && entry.workspace; as workspace) {
+          <li
+            class="workspace-entry"
+            [class.dragging]="
+              draggedEntry()?.kind === 'workspace' && draggedEntry()?.id === workspace.id
+            "
+            [class.drop-before]="
+              dropTarget()?.kind === 'workspace' &&
+              dropTarget()?.id === workspace.id &&
+              dropTarget()?.position === 'before'
+            "
+            [class.drop-after]="
+              dropTarget()?.kind === 'workspace' &&
+              dropTarget()?.id === workspace.id &&
+              dropTarget()?.position === 'after'
+            "
+            [style.--workspace-color]="workspaceColor(workspace)"
+            (dragover)="dragOverEntry($event, 'workspace', workspace.id)"
+            (drop)="dropOnWorkspace($event, workspace.id)"
+          >
+            <button
+              type="button"
+              class="workspace-item"
+              draggable="true"
+              [style.padding-inline-start.px]="8 + entry.level * 14"
+              [class.active]="workspace.id === activeWorkspaceId()"
+              [attr.aria-keyshortcuts]="'Alt+ArrowUp Alt+ArrowDown'"
+              (click)="openActions.set(null); workspaceSelected.emit(workspace.id)"
+              (keydown)="moveWorkspaceWithKeyboard($event, workspace.id)"
+              (dragstart)="startEntryDrag($event, 'workspace', workspace.id)"
+              (dragend)="endDrag()"
+            >
+              <span class="workspace-glyph">
+                <app-icon [name]="workspaceIcon(workspace)" [size]="15" />
+              </span>
+              <span class="workspace-copy">
+                <strong>{{ workspace.name }}</strong>
+                @if (workspaceTags(workspace).length) {
+                  <span class="workspace-tags">
+                    @for (tag of workspaceTags(workspace); track tag) {
+                      <span>{{ tag }}</span>
+                    }
+                  </span>
+                }
+                @let agents = agentTerminals(workspace);
+                @if (agents.length) {
+                  <span class="workspace-agent-statuses">
+                    @for (terminal of agents; track terminal.id) {
+                      <span
+                        class="workspace-agent-status"
+                        [attr.data-status]="terminal.status"
+                        [title]="terminal.name"
+                        role="img"
+                        [attr.aria-label]="
+                          terminal.name + ': ' + (statusMeta[terminal.status].labelKey | t)
+                        "
+                      >
+                        <app-icon [name]="agentIcons[terminal.agentType]" [size]="15" />
+                        @if (terminal.status === 'COMPLETED') {
+                          <app-icon class="status-check" name="check" [size]="9" />
+                        }
+                      </span>
+                    }
+                  </span>
+                }
+              </span>
+            </button>
+            <button
+              class="workspace-more"
+              type="button"
+              [attr.aria-label]="'workspace.more' | t"
+              [attr.aria-expanded]="openActions() === workspace.id"
+              (click)="toggleWorkspaceActions(workspace.id)"
+            >
+              <app-icon name="more" [size]="16" />
+            </button>
+            @if (openActions() === workspace.id) {
+              <div class="workspace-actions" (click)="openActions.set(null)">
+                <button
+                  type="button"
+                  class="workspace-action"
+                  [disabled]="!canOpenDirectory()"
+                  [title]="'common.openInExplorer' | t"
+                  [attr.aria-label]="'common.openInExplorer' | t"
+                  (click)="directoryOpenRequested.emit(workspace.projectPath)"
+                >
+                  <app-icon name="folder" [size]="12" />
+                </button>
+                <button
+                  type="button"
+                  class="workspace-action edit"
+                  [title]="'workspace.edit' | t"
+                  [attr.aria-label]="'workspace.edit' | t"
+                  (click)="editRequested.emit(workspace.id)"
+                >
+                  <app-icon name="edit" [size]="12" />
+                </button>
+                <button
+                  type="button"
+                  class="workspace-action delete"
+                  [title]="'workspace.delete' | t"
+                  [attr.aria-label]="'workspace.delete' | t"
+                  (click)="deleteRequested.emit(workspace.id)"
+                >
+                  <app-icon name="trash" [size]="12" />
+                </button>
+                <button
+                  type="button"
+                  class="workspace-action favorite"
+                  [class.selected]="workspace.favorite"
+                  [attr.aria-label]="
+                    workspace.favorite ? ('workspace.unfavorite' | t) : ('workspace.favorite' | t)
+                  "
+                  (click)="favoriteToggled.emit(workspace.id)"
+                >
+                  <app-icon name="star" [size]="13" />
+                </button>
+                <label class="workspace-move" (click)="$event.stopPropagation()">
+                  <span>{{ 'workspace.moveToFolder' | t }}</span>
+                  <select
+                    [value]="organization().workspaces[workspace.id]?.folderId ?? ''"
+                    [attr.aria-label]="'workspace.moveToFolder' | t"
+                    (change)="moveWorkspaceFromMenu(workspace.id, $event)"
+                  >
+                    <option
+                      value=""
+                      [selected]="!organization().workspaces[workspace.id]?.folderId"
+                    >
+                      {{ 'workspace.topLevel' | t }}
+                    </option>
+                    @for (option of folderOptions(); track option.id) {
+                      <option
+                        [value]="option.id"
+                        [selected]="organization().workspaces[workspace.id]?.folderId === option.id"
+                      >
+                        {{ option.label }}
+                      </option>
+                    }
+                  </select>
+                </label>
+              </div>
+            }
+          </li>
+        }
       }
     </ul>
   </nav>

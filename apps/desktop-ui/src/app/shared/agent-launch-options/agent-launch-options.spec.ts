@@ -78,4 +78,20 @@ describe('AgentLaunchOptionsComponent', () => {
 
     expect(picked).toEqual(['claude', 'grok', 'shell']);
   });
+
+  it('uses the same menu item structure for content preview as Shell', () => {
+    fixture.componentRef.setInput('includePreview', true);
+    fixture.detectChanges();
+    const shell = root.querySelector('button[data-agent="shell"]')!;
+    const preview = root.querySelector<HTMLButtonElement>('button[data-action="preview"]')!;
+    expect(preview.getAttribute('role')).toBe('menuitem');
+    expect(preview.querySelector('span[data-tone="slate"] app-icon')).not.toBeNull();
+    expect(preview.querySelector('strong')?.textContent).toBe('内容预览');
+    expect(preview.querySelector('small')?.textContent).toContain('文件');
+    expect(preview.parentElement).toBe(shell.parentElement);
+    const selected = vi.fn();
+    fixture.componentInstance.previewRequested.subscribe(selected);
+    preview.click();
+    expect(selected).toHaveBeenCalledOnce();
+  });
 });

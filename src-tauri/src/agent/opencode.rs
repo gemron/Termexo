@@ -1,3 +1,4 @@
+use crate::platform::shell_invoke;
 use std::cmp::Reverse;
 use std::env;
 #[cfg(test)]
@@ -10,7 +11,7 @@ use serde::Deserialize;
 use serde_json::Value;
 use thiserror::Error;
 
-use super::cli::{append_option, command_paths, powershell_quote, query_command};
+use super::cli::{append_option, command_paths, query_command};
 use super::{
     AgentAdapter, AgentInstallation, AgentLaunchSpec, AgentSession, OpenCodeLaunchOptions,
 };
@@ -308,7 +309,7 @@ impl AgentAdapter for OpenCodeAdapter {
         options: &OpenCodeLaunchOptions,
     ) -> Result<AgentLaunchSpec, Self::Error> {
         let executable = self.find_executable().ok_or(OpenCodeError::NotInstalled)?;
-        let mut command = format!("& {}", powershell_quote(&executable.to_string_lossy()));
+        let mut command = shell_invoke(&executable.to_string_lossy());
         if self.supports_private_server()? {
             command.push(' ');
             command.push_str(STANDALONE_FLAG);

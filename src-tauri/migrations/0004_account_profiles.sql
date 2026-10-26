@@ -5,6 +5,8 @@ CREATE TABLE IF NOT EXISTS account_profiles (
     config_dir TEXT,
     is_default INTEGER NOT NULL DEFAULT 0,
     is_system INTEGER NOT NULL DEFAULT 0,
+    login_method TEXT NOT NULL DEFAULT 'browser'
+        CHECK (login_method IN ('browser', 'console', 'sso', 'device-code')),
     created_at INTEGER NOT NULL,
     updated_at INTEGER NOT NULL
 );

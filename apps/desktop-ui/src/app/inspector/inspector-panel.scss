@@ -777,7 +777,9 @@ button.stat {
 .quota-entry-head {
   display: grid;
   min-width: 0;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 1.2fr);
+  // The label keeps room for its longest word, which a translation such as "Wochenkontingent"
+  // would otherwise have split mid-word in the narrow side panel.
+  grid-template-columns: minmax(min-content, 1fr) minmax(0, 1.2fr);
   align-items: center;
   gap: 6px;
 }
@@ -787,7 +789,7 @@ button.stat {
   color: var(--text-secondary);
   font-size: 12px;
   line-height: 1.5;
-  overflow-wrap: anywhere;
+  overflow-wrap: break-word;
 }
 
 .quota-entry-amount {

@@ -1,3 +1,4 @@
+use crate::platform::shell_invoke;
 use std::collections::HashMap;
 use std::fs;
 use std::io::ErrorKind;
@@ -7,7 +8,7 @@ use std::process::{Command, Output};
 use serde_json::{Map, Value};
 
 use crate::agent::{AgentAdapter, AgentInstallation, ClaudeCodeAdapter, CodexCliAdapter};
-use crate::config::AccountProfile;
+use crate::config::{AccountLoginMethod, AccountProfile};
 
 /// Claude's per-home global config: identity, first-run state and caches.
 const CLAUDE_GLOBAL_CONFIG_FILE: &str = ".claude.json";
@@ -75,6 +76,58 @@ pub fn managed_config_dir(
         .join("accounts")
         .join(agent_type)
         .join(profile_id))
+}
+
+/// Keychain service Claude Code files a config directory's sign-in under: the shared name with
+/// the first eight hex digits of the directory path's SHA-256 appended.
+#[cfg(target_os = "macos")]
+fn claude_keychain_service(config_dir: &str) -> String {
+    use sha2::{Digest, Sha256};
+
+    let digest = Sha256::digest(config_dir.as_bytes());
+    let suffix: String = digest
+        .iter()
+        .take(4)
+        .map(|byte| format!("{byte:02x}"))
+        .collect();
+    format!("Claude Code-credentials-{suffix}")
+}
+
+/// Removes what a deleted managed account leaves behind on macOS: its config directory and, for
+/// Claude, the sign-in Claude Code keeps in the Keychain rather than in that directory.
+///
+/// Only a directory inside Termexo's own `accounts` folder is touched, so a profile pointing at
+/// someone's real `~/.claude` is never deleted. Best effort: the profile is already gone.
+#[cfg(target_os = "macos")]
+pub fn forget_managed_account(profile: &AccountProfile, data_directory: &Path) {
+    let Some(config_dir) = profile.config_dir.as_deref() else {
+        return;
+    };
+    let accounts = data_directory.join("accounts");
+    let inside_accounts = Path::new(config_dir)
+        .canonicalize()
+        .ok()
+        .zip(accounts.canonicalize().ok())
+        .is_some_and(|(directory, accounts)| directory.starts_with(accounts));
+    if !inside_accounts {
+        return;
+    }
+    if profile.agent_type == "claude" {
+        let removed = Command::new("security")
+            .args([
+                "delete-generic-password",
+                "-s",
+                &claude_keychain_service(config_dir),
+            ])
+            .output()
+            .is_ok_and(|output| output.status.success());
+        if !removed {
+            tracing::info!(target: "termexo::account", "No Keychain sign-in found for the deleted account");
+        }
+    }
+    if let Err(error) = fs::remove_dir_all(config_dir) {
+        tracing::warn!(target: "termexo::account", "Could not remove the account directory: {error}");
+    }
 }
 
 pub fn prepare_managed_directory(profile: &AccountProfile) -> Result<(), String> {
@@ -248,8 +301,7 @@ pub fn resolve_config_dir(profile: &AccountProfile) -> Result<PathBuf, String> {
     if let Some(config_dir) = profile.config_dir.as_deref() {
         return Ok(PathBuf::from(config_dir));
     }
-    let home = std::env::var_os("USERPROFILE")
-        .or_else(|| std::env::var_os("HOME"))
+    let home = crate::platform::home_dir()
         .ok_or_else(|| "无法定位用户主目录，系统账号的配置位置未知。".to_owned())?;
     let default_dir = if profile.agent_type == "claude" {
         PathBuf::from(home).join(".claude")
@@ -343,17 +395,57 @@ fn copy_directory(from: &Path, to: &Path) -> Result<(), String> {
 }
 
 pub fn login_spec(profile: &AccountProfile) -> Result<(String, String), String> {
+    validate_agent_type(&profile.agent_type)?;
+    validate_login_method(&profile.agent_type, profile.login_method)?;
     prepare_managed_directory(profile)?;
     let installation = detect(&profile.agent_type)?;
     let executable = installation
         .executable_path
         .ok_or_else(|| installation.diagnostic.clone())?;
-    let command = if profile.agent_type == "claude" {
-        format!("& {} auth login", powershell_quote(&executable))
-    } else {
-        format!("& {} login", powershell_quote(&executable))
-    };
+    let command = close_when_done(login_command(
+        &profile.agent_type,
+        profile.login_method,
+        &executable,
+    )?);
     Ok((command, executable))
+}
+
+pub fn validate_login_method(agent_type: &str, method: AccountLoginMethod) -> Result<(), String> {
+    login_arguments(agent_type, method).map(|_| ())
+}
+
+fn login_arguments(agent_type: &str, method: AccountLoginMethod) -> Result<&'static str, String> {
+    match (validate_agent_type(agent_type)?, method) {
+        ("claude", AccountLoginMethod::Browser) => Ok("auth login"),
+        ("claude", AccountLoginMethod::Console) => Ok("auth login --console"),
+        ("claude", AccountLoginMethod::Sso) => Ok("auth login --sso"),
+        ("codex", AccountLoginMethod::Browser) => Ok("login"),
+        ("codex", AccountLoginMethod::DeviceCode) => Ok("login --device-auth"),
+        _ => Err(format!(
+            "{agent_type} 不支持 {} 登录方式。",
+            method.as_str()
+        )),
+    }
+}
+
+/// Ends the shell when the login CLI does, so the terminal's exit is the moment the account is
+/// read back. PowerShell is started with the command as its argument and needs no help; a Unix
+/// shell has the command typed into it and would otherwise sit at its prompt, leaving the tab
+/// "running" and the account never re-read. `exit` with no status passes the CLI's on.
+fn close_when_done(command: String) -> String {
+    #[cfg(unix)]
+    return format!("{command}; exit");
+    #[cfg(not(unix))]
+    return command;
+}
+
+fn login_command(
+    agent_type: &str,
+    method: AccountLoginMethod,
+    executable: &str,
+) -> Result<String, String> {
+    let arguments = login_arguments(agent_type, method)?;
+    Ok(format!("{} {arguments}", shell_invoke(executable)))
 }
 
 fn detect(agent_type: &str) -> Result<AgentInstallation, String> {
@@ -406,13 +498,107 @@ fn output_text(output: &Output) -> String {
     String::from_utf8_lossy(&output.stderr).trim().to_owned()
 }
 
-fn powershell_quote(value: &str) -> String {
-    format!("'{}'", value.replace('\'', "''"))
-}
-
 #[cfg(test)]
 mod tests {
+    #[cfg(target_os = "macos")]
+    #[test]
+    fn the_keychain_service_follows_claude_codes_naming() {
+        // Observed on a real sign-in: this config directory was filed under this suffix.
+        assert_eq!(
+            super::claude_keychain_service(
+                "/Users/ullvarirontrail/Library/Application Support/Termexo/accounts/claude/d9834650-9eae-4951-a853-2737eb32673a"
+            ),
+            "Claude Code-credentials-20e800dd"
+        );
+    }
     use super::*;
+    use serde_json::json;
+
+    #[cfg(windows)]
+    #[test]
+    fn each_agent_uses_its_native_authentication_subcommand() {
+        assert_eq!(
+            login_command(
+                "claude",
+                AccountLoginMethod::Browser,
+                "C:/Claude Code/claude.exe"
+            )
+            .unwrap(),
+            "& 'C:/Claude Code/claude.exe' auth login"
+        );
+        assert_eq!(
+            login_command(
+                "codex",
+                AccountLoginMethod::Browser,
+                "C:/Codex's CLI/codex.cmd"
+            )
+            .unwrap(),
+            "& 'C:/Codex''s CLI/codex.cmd' login"
+        );
+        assert!(login_command("unknown-agent", AccountLoginMethod::Browser, "agent.exe").is_err());
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn the_login_shell_exits_with_the_cli() {
+        assert_eq!(
+            close_when_done("'/bin/claude' auth login".into()),
+            "'/bin/claude' auth login; exit"
+        );
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn login_commands_are_plain_posix_words() {
+        assert_eq!(
+            login_command("claude", AccountLoginMethod::Browser, "/Users/me/my tools/claude")
+                .unwrap(),
+            "'/Users/me/my tools/claude' auth login"
+        );
+        assert_eq!(
+            login_command("codex", AccountLoginMethod::DeviceCode, "/opt/codex's/bin/codex")
+                .unwrap(),
+            r"'/opt/codex'\''s/bin/codex' login --device-auth"
+        );
+        assert!(login_command("unknown-agent", AccountLoginMethod::Browser, "agent").is_err());
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn builds_only_the_login_methods_supported_by_each_agent() {
+        for (agent, method, arguments) in [
+            (
+                "claude",
+                AccountLoginMethod::Console,
+                "auth login --console",
+            ),
+            ("claude", AccountLoginMethod::Sso, "auth login --sso"),
+            (
+                "codex",
+                AccountLoginMethod::DeviceCode,
+                "login --device-auth",
+            ),
+        ] {
+            assert_eq!(
+                login_command(agent, method, "C:/Agent's CLI/agent.exe").unwrap(),
+                format!("& 'C:/Agent''s CLI/agent.exe' {arguments}")
+            );
+        }
+        assert!(validate_login_method("claude", AccountLoginMethod::DeviceCode).is_err());
+        assert!(validate_login_method("codex", AccountLoginMethod::Console).is_err());
+        assert!(validate_login_method("codex", AccountLoginMethod::Sso).is_err());
+    }
+
+    #[test]
+    fn legacy_account_inputs_keep_browser_login_and_unknown_methods_are_rejected() {
+        let input = json!({"id":"legacy", "name":"Legacy", "agentType":"claude"});
+        let parsed: crate::config::AccountProfileInput =
+            serde_json::from_value(input.clone()).unwrap();
+        assert_eq!(parsed.login_method, AccountLoginMethod::Browser);
+        let mut invalid = input;
+        invalid["loginMethod"] = json!("custom; injected-command");
+        assert!(serde_json::from_value::<crate::config::AccountProfileInput>(invalid).is_err());
+    }
 
     #[test]
     fn maps_managed_profiles_to_isolated_cli_homes() {
@@ -420,6 +606,7 @@ mod tests {
             id: "claude-one".into(),
             name: "Claude One".into(),
             agent_type: "claude".into(),
+            login_method: AccountLoginMethod::Browser,
             config_dir: Some("C:\\profiles\\claude-one".into()),
             is_default: true,
             is_system: false,
@@ -465,6 +652,7 @@ mod tests {
             id: "managed".into(),
             name: "Managed".into(),
             agent_type: "claude".into(),
+            login_method: AccountLoginMethod::Browser,
             config_dir: Some(config_dir.to_string_lossy().into_owned()),
             is_default: false,
             is_system: false,
@@ -587,6 +775,7 @@ mod tests {
             id: "source".into(),
             name: "Source".into(),
             agent_type: "claude".into(),
+            login_method: AccountLoginMethod::Browser,
             config_dir: Some(source_dir.to_string_lossy().into_owned()),
             is_default: false,
             is_system: false,
@@ -627,6 +816,7 @@ mod tests {
             id: "one".into(),
             name: "One".into(),
             agent_type: "claude".into(),
+            login_method: AccountLoginMethod::Browser,
             config_dir: Some("C:\\profiles\\one".into()),
             is_default: false,
             is_system: false,

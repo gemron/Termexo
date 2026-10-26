@@ -92,10 +92,39 @@ mod tests {
             ..Default::default()
         };
         let list = list(&settings);
-        assert_eq!(list["tools"].as_array().unwrap().len(), 8);
+        assert_eq!(list["tools"].as_array().unwrap().len(), 16);
         for tool in list["tools"].as_array().unwrap() {
             assert!(tool.get("group").is_none());
         }
+    }
+
+    #[test]
+    fn project_tools_respect_terminal_permissions_and_cannot_confirm_proposals() {
+        let catalog = catalog();
+        assert!(!catalog
+            .iter()
+            .any(|tool| tool["name"] == "common_action_confirm"
+                || tool["name"] == "common_action_save"));
+        let settings = McpSettings {
+            terminal_access: false,
+            ..Default::default()
+        };
+        for tool in catalog.iter().filter(|tool| {
+            tool["name"].as_str().is_some_and(|name| {
+                name.starts_with("common_action_") || name.ends_with("preview_open")
+            })
+        }) {
+            assert!(!allowed(tool, &settings));
+        }
+        let proposal = catalog
+            .iter()
+            .find(|tool| tool["name"] == "common_action_propose")
+            .unwrap();
+        assert!(validate_arguments(
+            &proposal["inputSchema"],
+            &json!({ "workspaceId": "w", "actionsJson": "[]" })
+        )
+        .is_err());
     }
 
     #[test]

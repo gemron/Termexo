@@ -264,7 +264,7 @@
               @for (line of row.entries; track line.entry.label) {
                 <div class="quota-entry" [class.alerting]="line.alerting">
                   <div class="quota-entry-head">
-                    <span class="quota-entry-label">{{ line.entry.label }}</span>
+                    <span class="quota-entry-label">{{ quotaLabel(line.entry.label) }}</span>
                     <span class="quota-entry-amount">
                       <small>{{ 'quota.remaining' | t }}</small>
                       <b>{{ formatAmount(line.entry, line.entry.remaining) }}</b>
@@ -307,7 +307,7 @@
               @if (row.quota.diagnostic) {
                 <div class="quota-unavailable">
                   <app-icon name="triangle-alert" [size]="13" />
-                  <span>{{ row.quota.diagnostic }}</span>
+                  <span>{{ quotaDiagnostic(row.quota.diagnostic) }}</span>
                 </div>
               } @else {
                 <small class="quota-checked">

@@ -170,6 +170,11 @@ app-inspector-panel {
   padding-left: 10px;
 }
 
+// The three macOS window buttons sit over the topbar's left edge.
+.topbar .topbar-lead.native-traffic-lights {
+  padding-left: 80px;
+}
+
 /*
    Product identity, moved off the workspace panel so it survives that panel being hidden.
    A separator sets it apart from the workspace title beside it, which changes per workspace.
@@ -231,7 +236,7 @@ app-inspector-panel {
   padding-left: 5px;
 
   strong,
-  span {
+  .workspace-path {
     display: block;
     overflow: hidden;
     text-overflow: ellipsis;
@@ -245,10 +250,20 @@ app-inspector-panel {
     text-shadow: 0 0 10px color-mix(in srgb, var(--accent) 18%, transparent);
   }
 
-  span {
+  .workspace-path {
+    max-width: 100%;
     margin-top: 4px;
+    padding: 0;
+    border: 0;
     color: var(--text-muted);
+    background: transparent;
     font: 10px/1 var(--mono);
+    text-align: left;
+
+    &:enabled:hover {
+      color: var(--accent);
+      text-decoration: underline;
+    }
   }
 }
 
@@ -1073,48 +1088,6 @@ app-inspector-panel {
   background: var(--color-primary);
 }
 
-/* Confirmation for closing a terminal with work in flight, below the top toolbar. */
-.app-terminal-close-confirm {
-  position: fixed;
-  z-index: var(--z-toast);
-  right: 18px;
-  top: 64px;
-  width: min(360px, calc(100vw - 32px));
-  padding: 14px;
-  border: 1px solid color-mix(in oklab, var(--color-warning) 48%, var(--border));
-  border-radius: var(--radius-box);
-  color: var(--text);
-  background: var(--surface-raised);
-  box-shadow: 0 12px 32px rgb(0 0 0 / 35%);
-  font-size: 13px;
-  line-height: 1.5;
-  pointer-events: auto;
-  animation: app-terminal-close-enter 180ms ease-out;
-
-  p {
-    margin: 0;
-  }
-}
-
-@keyframes app-terminal-close-enter {
-  from {
-    opacity: 0;
-    transform: translateY(-12px);
-  }
-
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
-.app-terminal-close-actions {
-  display: flex;
-  justify-content: flex-end;
-  gap: 8px;
-  margin-top: 12px;
-}
-
 @keyframes app-toast-enter {
   from {
     opacity: 0;
@@ -1190,7 +1163,7 @@ app-inspector-panel {
     }
   }
 
-  .workspace-title span {
+  .workspace-title .workspace-path {
     display: none;
   }
 
@@ -1285,4 +1258,34 @@ app-inspector-panel {
   flex-shrink: 0;
   color: var(--color-warning);
   font-size: 9px;
+}
+
+.preview-tab-content {
+  display: flex;
+  width: 100%;
+  height: 100%;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+  background: var(--surface-inset);
+  > app-project-preview-panel {
+    flex: 0 1 auto;
+    max-width: calc(100% - 6px);
+    min-width: min(320px, calc(100% - 6px));
+  }
+  &.view-hidden { display: none; }
+}
+.preview-width-resizer {
+  flex: 0 0 6px;
+  cursor: col-resize;
+  touch-action: none;
+  background: var(--border);
+  &:hover { background: var(--accent); }
+}
+@media (max-width: 800px) {
+  .preview-tab-content > app-project-preview-panel {
+    width: 100% !important;
+    max-width: 100%;
+  }
+  .preview-width-resizer { display: none; }
 }

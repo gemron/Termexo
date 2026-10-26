@@ -1,3 +1,4 @@
+use crate::platform::{shell_invoke, shell_quote};
 use std::cmp::Reverse;
 use std::env;
 use std::ffi::OsStr;
@@ -252,7 +253,7 @@ impl AgentAdapter for ClaudeCodeAdapter {
         options: &ClaudeLaunchOptions,
     ) -> Result<AgentLaunchSpec, Self::Error> {
         let executable = self.find_executable().ok_or(ClaudeError::NotInstalled)?;
-        let mut command = format!("& {}", powershell_quote(&executable.to_string_lossy()));
+        let mut command = shell_invoke(&executable.to_string_lossy());
 
         // `attach` reconnects to a live session and accepts no other flags, so it is the whole
         // command: the session it opens already has the model and settings it was started with.
@@ -263,7 +264,7 @@ impl AgentAdapter for ClaudeCodeAdapter {
         {
             command.push_str(&format!(
                 " {ATTACH_SUBCOMMAND} {}",
-                powershell_quote(short_id)
+                shell_quote(short_id)
             ));
             return Ok(AgentLaunchSpec {
                 command,
@@ -594,16 +595,12 @@ fn paths_equal(left: &str, right: &str) -> bool {
     normalize(left) == normalize(right)
 }
 
-fn powershell_quote(value: &str) -> String {
-    format!("'{}'", value.replace('\'', "''"))
-}
-
 fn append_option(command: &mut String, flag: &str, value: Option<&str>) {
     if let Some(value) = value.filter(|value| !value.trim().is_empty()) {
         command.push(' ');
         command.push_str(flag);
         command.push(' ');
-        command.push_str(&powershell_quote(value));
+        command.push_str(&shell_quote(value));
     }
 }
 
@@ -663,10 +660,10 @@ mod tests {
     fn builds_a_quoted_resume_command() {
         let command = format!(
             "& {} --name {} --model {} --resume {}",
-            powershell_quote("C:\\Tools\\Claude Code\\claude.cmd"),
-            powershell_quote("Auth refactor"),
-            powershell_quote("sonnet"),
-            powershell_quote("session-1")
+            shell_quote("C:\\Tools\\Claude Code\\claude.cmd"),
+            shell_quote("Auth refactor"),
+            shell_quote("sonnet"),
+            shell_quote("session-1")
         );
 
         assert_eq!(

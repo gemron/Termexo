@@ -1,3 +1,4 @@
+use crate::platform::shell_quote;
 use std::collections::HashMap;
 use std::env;
 use std::io::Read;
@@ -47,7 +48,7 @@ pub struct CliOperationPlan {
     pub display_name: String,
     pub package_name: String,
     pub target_version: String,
-    /// `npm` for a published package, `script` for a vendor installer.
+    /// `npm` for a published package, `script` for a vendor installer or native updater.
     pub installer: String,
     /// False when the agent's installer offers no version to pin, as a script install does not.
     pub supports_version: bool,
@@ -109,12 +110,54 @@ pub fn build_operation_plan(
     network_profile: Option<&NetworkProfile>,
 ) -> Result<CliOperationPlan, String> {
     let definition = definition(&request.agent_type)?;
-    match choose_installer(&definition, request.installer.as_deref())? {
-        Installer::Npm { package_name } => {
-            build_npm_plan(&definition, package_name, request, network_profile)
-        }
-        Installer::Script(script) => build_script_plan(&definition, script),
+    let installation = detect_agent(definition.agent_type)?;
+    let version_requested = request.target_version.as_deref().is_some_and(|version| {
+        !version.trim().is_empty() && version.trim() != SCRIPT_TARGET_VERSION
+    });
+    let installer =
+        if request.installer.is_none() && version_requested && definition.package_name.is_some() {
+            choose_installer(&definition, Some(NPM_INSTALLER))?
+        } else if request.installer.is_none() {
+            recommended_installer(&definition, &installation, find_npm_executable().is_some())?
+        } else {
+            choose_installer(&definition, request.installer.as_deref())?
+        };
+    match installer {
+        Installer::Npm { package_name } => build_npm_plan(
+            &definition,
+            package_name,
+            request,
+            network_profile,
+            installation,
+        ),
+        Installer::Script(script) => Ok(build_script_plan_for_installation(
+            &definition,
+            script,
+            installation,
+        )),
     }
+}
+
+/// Keep native installations on their official channel, and avoid requiring npm for a vendor
+/// that offers a standalone installer. Explicit choices in advanced options still take priority.
+fn recommended_installer(
+    definition: &CliDefinition,
+    installation: &AgentInstallation,
+    npm_available: bool,
+) -> Result<Installer, String> {
+    if let Some(script) = definition.script {
+        let native_install = installation.installed
+            && script.directory().is_some_and(|directory| {
+                installation
+                    .executable_path
+                    .as_deref()
+                    .is_some_and(|path| Path::new(path).starts_with(directory))
+            });
+        if native_install || !npm_available {
+            return Ok(Installer::Script(script));
+        }
+    }
+    choose_installer(definition, None)
 }
 
 /// Picks the installer the request asked for, or the agent's own when it asked for none.
@@ -150,10 +193,10 @@ fn build_npm_plan(
     package_name: &str,
     request: &CliOperationRequest,
     network_profile: Option<&NetworkProfile>,
+    installation: AgentInstallation,
 ) -> Result<CliOperationPlan, String> {
     let target_version = normalize_target_version(request.target_version.as_deref())?;
     let package_spec = format!("{package_name}@{target_version}");
-    let installation = detect_agent(definition.agent_type)?;
     let npm_path = find_npm_executable();
     let npm_version = npm_path
         .as_deref()
@@ -240,18 +283,17 @@ fn build_npm_plan(
     })
 }
 
-/// The plan for a CLI installed by the vendor's own script.
-///
-/// A script install takes no version, resolves nothing against a registry, and leaves nothing to
-/// roll back to: it fetches whatever the vendor currently publishes. The plan therefore says what
-/// will be run and where it lands, and leaves the npm fields empty rather than inventing them.
-fn build_script_plan(
+/// A vendor install or update always fetches the current release rather than a pinned version.
+fn build_script_plan_for_installation(
     definition: &CliDefinition,
     script: ScriptInstaller,
-) -> Result<CliOperationPlan, String> {
-    let installation = detect_agent(definition.agent_type)?;
-    let ready = find_powershell().is_some();
-    let action = if installation.installed {
+    installation: AgentInstallation,
+) -> CliOperationPlan {
+    let ready = find_script_shell().is_some();
+    let native_update = installation.installed && script.update_command.is_some();
+    let action = if native_update {
+        "upgrade"
+    } else if installation.installed {
         "reinstall"
     } else {
         "install"
@@ -262,8 +304,18 @@ fn build_script_plan(
         .map(|path| path.to_string_lossy().into_owned())
         .unwrap_or_else(|| script.directory_label.to_owned());
 
-    let diagnostic = if !ready {
+    let source = if native_update {
+        installation.executable_path.as_deref().unwrap_or_default()
+    } else {
+        script.url
+    };
+    let ready = ready && !source.is_empty();
+    let diagnostic = if native_update && source.is_empty() {
+        "未找到已安装 CLI 的执行路径，无法运行官方升级命令。".into()
+    } else if !ready {
         "未找到 PowerShell，无法运行官方安装脚本。".into()
+    } else if native_update {
+        format!("将运行 {} 的官方升级命令 agy update，检查并更新到最新版本。完成后请重启正在运行的 CLI。", definition.display_name)
     } else {
         let elsewhere = installs_elsewhere(&installation, directory.as_deref());
         let base = format!(
@@ -279,14 +331,14 @@ fn build_script_plan(
         }
     };
 
-    Ok(CliOperationPlan {
+    CliOperationPlan {
         agent_type: definition.agent_type.into(),
         display_name: definition.display_name.into(),
         package_name: String::new(),
         target_version: SCRIPT_TARGET_VERSION.into(),
         installer: SCRIPT_INSTALLER.into(),
         supports_version: false,
-        package_spec: script.url.into(),
+        package_spec: source.into(),
         action: action.into(),
         current_version: installation.version,
         // The script does not say what it is about to install, so there is no version to compare.
@@ -294,13 +346,13 @@ fn build_script_plan(
         up_to_date: false,
         npm_path: None,
         npm_version: None,
-        command_preview: script_command_preview(script.url),
+        command_preview: vendor_command_preview(script, source, action),
         network_profile_id: None,
         network_profile_name: None,
         npm_registry: None,
         ready,
         diagnostic,
-    })
+    }
 }
 
 /// Whether the CLI already on the machine sits somewhere the script will not replace.
@@ -323,7 +375,7 @@ pub fn execute_operation(
         return Err(plan.diagnostic.clone());
     }
     if plan.installer == SCRIPT_INSTALLER {
-        return execute_script_install(plan, environment);
+        return execute_vendor_operation(plan, environment);
     }
     let npm_path = plan
         .npm_path
@@ -407,32 +459,37 @@ pub fn execute_operation(
     })
 }
 
-/// Runs the vendor's installer script and checks the CLI afterwards.
+/// Runs the vendor's installer or native updater and checks the CLI afterwards.
 ///
-/// Nothing is rolled back on failure: the script owns its own directory and Termexo has no
-/// previous copy to put back, so a failed run is reported with its output and left as it lies.
-fn execute_script_install(
+/// Nothing is rolled back on failure: the vendor owns replacement of its binary, so a failed
+/// run is reported with its output and the installation is detected again.
+fn execute_vendor_operation(
     plan: CliOperationPlan,
     environment: HashMap<String, String>,
 ) -> Result<CliOperationResult, String> {
-    let Some(shell) = find_powershell() else {
+    let Some(shell) = find_script_shell() else {
         return Err("未找到 PowerShell，无法运行官方安装脚本。".to_owned());
     };
     let script = definition(&plan.agent_type)?
         .script
         .ok_or_else(|| format!("{} 没有官方安装脚本。", plan.display_name))?;
     let started = Instant::now();
+    let native_update = plan.action == "upgrade" && script.update_command.is_some();
 
+    let expression = vendor_expression(script, &plan.package_spec, &plan.action);
     let mut command = Command::new(shell);
+    #[cfg(windows)]
+    command.args([
+        "-NoProfile",
+        "-NonInteractive",
+        "-ExecutionPolicy",
+        "Bypass",
+        "-Command",
+        &expression,
+    ]);
+    #[cfg(unix)]
+    command.args(["-c", &expression]);
     command
-        .args([
-            "-NoProfile",
-            "-NonInteractive",
-            "-ExecutionPolicy",
-            "Bypass",
-            "-Command",
-            &script_expression(&plan.package_spec),
-        ])
         .envs(&environment)
         // Last, so a script that must not stop to ask cannot be overridden by the proxy
         // environment carrying the same name.
@@ -444,7 +501,11 @@ fn execute_script_install(
             install.stdout,
             install.stderr,
             started,
-            "官方安装脚本执行失败。",
+            if native_update {
+                "官方升级命令执行失败。"
+            } else {
+                "官方安装脚本执行失败。"
+            },
         ));
     }
 
@@ -455,13 +516,27 @@ fn execute_script_install(
             install.stdout,
             install.stderr,
             started,
-            "安装脚本已完成，但 CLI 健康检查失败。",
+            if native_update {
+                "升级命令已完成，但 CLI 健康检查失败。"
+            } else {
+                "安装脚本已完成，但 CLI 健康检查失败。"
+            },
         ));
     }
 
     let diagnostic = format!(
-        "安装完成，已验证 {}。",
-        installation.version.as_deref().unwrap_or("CLI 可正常执行")
+        "{}完成，已验证 {}。{}",
+        if native_update {
+            "升级检查"
+        } else {
+            "安装"
+        },
+        installation.version.as_deref().unwrap_or("CLI 可正常执行"),
+        if native_update {
+            "请重启正在运行的 CLI 以使用当前版本。"
+        } else {
+            ""
+        }
     );
     Ok(CliOperationResult {
         success: true,
@@ -478,20 +553,59 @@ fn execute_script_install(
 }
 
 /// The one-liner the vendor documents, which downloads the script and runs it.
+#[cfg(windows)]
 fn script_expression(url: &str) -> String {
     format!("irm {url} | iex")
 }
 
-/// The whole command as the user sees it before confirming, shell included.
-fn script_command_preview(url: &str) -> String {
-    format!(
-        "powershell -NoProfile -ExecutionPolicy Bypass -Command \"{}\"",
-        script_expression(url)
-    )
+/// The same one-liner for macOS and Linux, where the vendors publish a shell script.
+#[cfg(unix)]
+fn script_expression(url: &str) -> String {
+    format!("curl -fsSL {} | bash", shell_quote(url))
 }
 
-/// Windows PowerShell, which every supported Windows carries.
-fn find_powershell() -> Option<PathBuf> {
+/// The whole command as the user sees it before confirming, shell included.
+fn script_command_preview(url: &str) -> String {
+    #[cfg(windows)]
+    return format!(
+        "powershell -NoProfile -ExecutionPolicy Bypass -Command \"{}\"",
+        script_expression(url)
+    );
+    #[cfg(unix)]
+    return script_expression(url);
+}
+
+/// The existing Antigravity binary owns upgrades; its install script skips existing files.
+fn vendor_expression(script: ScriptInstaller, source: &str, action: &str) -> String {
+    if let Some(update_command) = script.update_command.filter(|_| action == "upgrade") {
+        // Invoke the detected installation, even when PATH points at another copy.
+        #[cfg(windows)]
+        return format!(
+            "& '{}' {update_command}; exit $LASTEXITCODE",
+            source.replace('\'', "''")
+        );
+        #[cfg(unix)]
+        format!("{} {update_command}", shell_quote(source))
+    } else {
+        script_expression(source)
+    }
+}
+
+fn vendor_command_preview(script: ScriptInstaller, source: &str, action: &str) -> String {
+    if action != "upgrade" || script.update_command.is_none() {
+        return script_command_preview(source);
+    }
+    #[cfg(windows)]
+    return format!(
+        "powershell -NoProfile -ExecutionPolicy Bypass -Command \"{}\"",
+        vendor_expression(script, source, action)
+    );
+    #[cfg(unix)]
+    vendor_expression(script, source, action)
+}
+
+/// The shell that runs vendor installers: Windows PowerShell, or `/bin/sh` on Unix.
+fn find_script_shell() -> Option<PathBuf> {
     #[cfg(windows)]
     {
         if let Some(root) = env::var_os("SystemRoot") {
@@ -506,9 +620,10 @@ fn find_powershell() -> Option<PathBuf> {
         }
         return command_on_path("powershell.exe");
     }
-    #[cfg(not(windows))]
+    #[cfg(unix)]
     {
-        command_on_path("pwsh")
+        // `sh` runs the vendors' one-liners (`curl … | bash`) and is on every Unix.
+        Some(PathBuf::from("/bin/sh")).filter(|path| path.is_file())
     }
 }
 
@@ -682,6 +797,19 @@ fn find_npm_executable() -> Option<PathBuf> {
             for command_name in command_names {
                 candidates.push(directory.join(command_name));
             }
+        }
+    }
+
+    // A newly installed Node.js is not yet in an already-open desktop app's inherited PATH.
+    #[cfg(windows)]
+    for (root, suffix) in [
+        ("ProgramFiles", "nodejs"),
+        ("ProgramFiles(x86)", "nodejs"),
+        ("LOCALAPPDATA", "Programs\\nodejs"),
+        ("APPDATA", "npm"),
+    ] {
+        if let Some(root) = env::var_os(root) {
+            candidates.push(PathBuf::from(root).join(suffix).join("npm.cmd"));
         }
     }
 
@@ -910,6 +1038,8 @@ enum Installer {
 #[derive(Clone, Copy)]
 struct ScriptInstaller {
     url: &'static str,
+    /// An installed CLI may provide an updater instead of accepting another script install.
+    update_command: Option<&'static str>,
     /// The environment variable naming the root the script installs under.
     directory_root: &'static str,
     /// The path below that root, and what the plan falls back to naming when it cannot resolve.
@@ -929,6 +1059,15 @@ impl ScriptInstaller {
 
 /// Codex asks before replacing an existing install; captured output already suppresses the
 /// prompt, and this says so outright rather than relying on that.
+/// Where the vendors' installers put a user-level binary, per platform.
+const HOME_VARIABLE: &str = if cfg!(windows) { "USERPROFILE" } else { "HOME" };
+const LOCAL_BIN_SUFFIX: &str = if cfg!(windows) { ".local\\bin" } else { ".local/bin" };
+const LOCAL_BIN_LABEL: &str = if cfg!(windows) {
+    "%USERPROFILE%\\.local\\bin"
+} else {
+    "~/.local/bin"
+};
+
 const CODEX_NON_INTERACTIVE: &[(&str, &str)] = &[("CODEX_NON_INTERACTIVE", "1")];
 
 fn definition(agent_type: &str) -> Result<CliDefinition, String> {
@@ -938,10 +1077,15 @@ fn definition(agent_type: &str) -> Result<CliDefinition, String> {
             display_name: "Claude Code",
             package_name: Some("@anthropic-ai/claude-code"),
             script: Some(ScriptInstaller {
-                url: "https://claude.ai/install.ps1",
-                directory_root: "USERPROFILE",
-                directory_suffix: ".local\\bin",
-                directory_label: "%USERPROFILE%\\.local\\bin",
+                url: if cfg!(windows) {
+                    "https://claude.ai/install.ps1"
+                } else {
+                    "https://claude.ai/install.sh"
+                },
+                update_command: None,
+                directory_root: HOME_VARIABLE,
+                directory_suffix: LOCAL_BIN_SUFFIX,
+                directory_label: LOCAL_BIN_LABEL,
                 environment: &[],
             }),
         }),
@@ -950,10 +1094,24 @@ fn definition(agent_type: &str) -> Result<CliDefinition, String> {
             display_name: "Codex CLI",
             package_name: Some("@openai/codex"),
             script: Some(ScriptInstaller {
-                url: "https://chatgpt.com/codex/install.ps1",
-                directory_root: "LOCALAPPDATA",
-                directory_suffix: "Programs\\OpenAI\\Codex\\bin",
-                directory_label: "%LOCALAPPDATA%\\Programs\\OpenAI\\Codex\\bin",
+                url: if cfg!(windows) {
+                    "https://chatgpt.com/codex/install.ps1"
+                } else {
+                    "https://chatgpt.com/codex/install.sh"
+                },
+                update_command: None,
+                // The Unix script installs next to Claude's, in `~/.local/bin`.
+                directory_root: if cfg!(windows) { "LOCALAPPDATA" } else { HOME_VARIABLE },
+                directory_suffix: if cfg!(windows) {
+                    "Programs\\OpenAI\\Codex\\bin"
+                } else {
+                    LOCAL_BIN_SUFFIX
+                },
+                directory_label: if cfg!(windows) {
+                    "%LOCALAPPDATA%\\Programs\\OpenAI\\Codex\\bin"
+                } else {
+                    LOCAL_BIN_LABEL
+                },
                 environment: CODEX_NON_INTERACTIVE,
             }),
         }),
@@ -982,10 +1140,19 @@ fn definition(agent_type: &str) -> Result<CliDefinition, String> {
             display_name: "Antigravity",
             package_name: None,
             script: Some(ScriptInstaller {
-                url: "https://antigravity.google/cli/install.ps1",
-                directory_root: "LOCALAPPDATA",
-                directory_suffix: "agy\\bin",
-                directory_label: "%LOCALAPPDATA%\\agy\\bin",
+                url: if cfg!(windows) {
+                    "https://antigravity.google/cli/install.ps1"
+                } else {
+                    "https://antigravity.google/cli/install.sh"
+                },
+                update_command: Some("update"),
+                directory_root: if cfg!(windows) { "LOCALAPPDATA" } else { HOME_VARIABLE },
+                directory_suffix: if cfg!(windows) { "agy\\bin" } else { LOCAL_BIN_SUFFIX },
+                directory_label: if cfg!(windows) {
+                    "%LOCALAPPDATA%\\agy\\bin"
+                } else {
+                    LOCAL_BIN_LABEL
+                },
                 environment: &[],
             }),
         }),
@@ -1075,6 +1242,7 @@ mod tests {
 
     /// Every script offered is the vendor's own, and the command shown is the documented
     /// one-liner rather than anything Termexo invented.
+    #[cfg(windows)]
     #[test]
     fn every_script_installer_is_the_vendors_own() {
         let expected = [
@@ -1090,6 +1258,121 @@ mod tests {
         // OpenCode publishes none for Windows, and inventing one would install something else.
         assert!(definition("opencode").unwrap().script.is_none());
         assert!(definition("grok").unwrap().script.is_none());
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn every_unix_script_installer_is_the_vendors_own() {
+        let expected = [
+            ("claude", "https://claude.ai/install.sh"),
+            ("codex", "https://chatgpt.com/codex/install.sh"),
+            ("antigravity", "https://antigravity.google/cli/install.sh"),
+        ];
+        for (agent_type, url) in expected {
+            let script = definition(agent_type).unwrap().script.unwrap();
+            assert_eq!(script.url, url);
+            assert_eq!(
+                script_command_preview(url),
+                format!("curl -fsSL '{url}' | bash")
+            );
+            assert_eq!(script.directory().unwrap().file_name().unwrap(), "bin");
+        }
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn antigravity_unix_update_invokes_the_installed_binary() {
+        let definition = definition("antigravity").unwrap();
+        let script = definition.script.unwrap();
+        let installation = AgentInstallation {
+            agent_type: "antigravity".into(),
+            installed: true,
+            executable_path: Some("/Users/me/my tools/agy".into()),
+            version: Some("1.2.10".into()),
+            healthy: true,
+            diagnostic: String::new(),
+        };
+        let plan = build_script_plan_for_installation(&definition, script, installation);
+        assert_eq!(plan.action, "upgrade");
+        assert_eq!(plan.command_preview, "'/Users/me/my tools/agy' update");
+        assert!(plan.ready);
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn antigravity_uses_its_installed_binary_for_official_updates() {
+        let definition = definition("antigravity").unwrap();
+        let script = definition.script.unwrap();
+        let installation = AgentInstallation {
+            agent_type: "antigravity".into(),
+            installed: true,
+            executable_path: Some("C:\\custom location\\agy.exe".into()),
+            version: Some("1.2.10".into()),
+            healthy: true,
+            diagnostic: String::new(),
+        };
+        let plan = build_script_plan_for_installation(&definition, script, installation.clone());
+        assert_eq!(plan.action, "upgrade");
+        assert_eq!(plan.package_spec, "C:\\custom location\\agy.exe");
+        assert!(plan
+            .command_preview
+            .contains("& 'C:\\custom location\\agy.exe' update"));
+        assert!(!plan.command_preview.contains("install.ps1"));
+        assert!(!plan.supports_version);
+        assert_eq!(plan.current_version.as_deref(), Some("1.2.10"));
+
+        let missing_path = build_script_plan_for_installation(
+            &definition,
+            script,
+            AgentInstallation {
+                executable_path: None,
+                ..installation.clone()
+            },
+        );
+        assert!(!missing_path.ready);
+
+        let first_install = build_script_plan_for_installation(
+            &definition,
+            script,
+            AgentInstallation {
+                installed: false,
+                executable_path: None,
+                version: None,
+                healthy: false,
+                ..installation
+            },
+        );
+        assert_eq!(first_install.action, "install");
+        assert_eq!(first_install.package_spec, script.url);
+        assert!(first_install
+            .command_preview
+            .contains("irm https://antigravity.google/cli/install.ps1 | iex"));
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn official_update_invokes_the_exact_path_and_preserves_failure_output() {
+        let script = definition("antigravity").unwrap().script.unwrap();
+        let directory =
+            env::temp_dir().join(format!("termexo agy's update {}", std::process::id()));
+        fs::create_dir_all(&directory).unwrap();
+        let executable = directory.join("agy.cmd");
+        fs::write(&executable, "@echo off\r\necho command=%1\r\necho proxy=%HTTPS_PROXY%\r\necho download failed 1>&2\r\nexit /b 7\r\n").unwrap();
+        let mut command = Command::new(find_script_shell().unwrap());
+        command.args([
+            "-NoProfile",
+            "-NonInteractive",
+            "-Command",
+            &vendor_expression(script, &executable.to_string_lossy(), "upgrade"),
+        ]);
+        command.env("HTTPS_PROXY", "http://proxy.example:8080");
+        let result = run_command(command, "PowerShell", VERSION_TIMEOUT).unwrap();
+        assert!(!result.success);
+        assert!(result.stdout.contains("command=update"));
+        assert!(result.stdout.contains("proxy=http://proxy.example:8080"));
+        assert!(result.stderr.contains("download failed"));
+        fs::remove_file(executable).unwrap();
+        fs::remove_dir(directory).unwrap();
     }
 
     /// Asking for an installer the agent does not have is refused, never quietly swapped.
@@ -1113,8 +1396,50 @@ mod tests {
         ));
     }
 
+    #[test]
+    fn automatic_installation_reuses_native_installs_and_avoids_missing_npm() {
+        let claude = definition("claude").unwrap();
+        let mut installation = AgentInstallation {
+            agent_type: "claude".into(),
+            installed: false,
+            healthy: false,
+            executable_path: None,
+            version: None,
+            diagnostic: String::new(),
+        };
+        assert!(matches!(
+            recommended_installer(&claude, &installation, false).unwrap(),
+            Installer::Script(_)
+        ));
+        assert!(matches!(
+            recommended_installer(&claude, &installation, true).unwrap(),
+            Installer::Npm { .. }
+        ));
+        if let Some(directory) = claude.script.unwrap().directory() {
+            installation.installed = true;
+            installation.executable_path =
+                Some(directory.join("claude.exe").to_string_lossy().into_owned());
+            assert!(matches!(
+                recommended_installer(&claude, &installation, true).unwrap(),
+                Installer::Script(_)
+            ));
+        }
+        // An npm-only agent keeps a plan that can explain the missing prerequisite.
+        let pi = definition("pi").unwrap();
+        assert!(matches!(
+            recommended_installer(&pi, &installation, false).unwrap(),
+            Installer::Npm { .. }
+        ));
+        // Explicit advanced settings are respected even when the automatic choice differs.
+        assert!(matches!(
+            choose_installer(&claude, Some(NPM_INSTALLER)).unwrap(),
+            Installer::Npm { .. }
+        ));
+    }
+
     /// A CLI found outside the script's own directory stays where it is; the plan has to say so,
     /// because the machine then carries two of them.
+    #[cfg(windows)] // asserts Windows paths or PowerShell syntax
     #[test]
     fn a_second_copy_elsewhere_is_reported() {
         let script = definition("claude").unwrap().script.unwrap();

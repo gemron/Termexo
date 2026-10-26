@@ -135,12 +135,26 @@ pub fn register_toast_identity(_config: &Config, _icon: Option<&Path>) -> Result
 
 /// Sends a desktop toast, surfacing delivery failures so the caller can fall back.
 #[cfg(windows)]
-pub fn show_toast(config: &Config, title: &str, body: &str) -> Result<(), String> {
-    platform::show_toast(&config.identifier, title, body)
+pub fn show_toast(app: &tauri::AppHandle, title: &str, body: &str) -> Result<(), String> {
+    platform::show_toast(&app.config().identifier, title, body)
 }
 
-#[cfg(not(windows))]
-pub fn show_toast(_config: &Config, _title: &str, _body: &str) -> Result<(), String> {
+/// macOS hands the notification to Notification Center through the Tauri plugin; it asks the user
+/// for permission itself the first time one is shown.
+#[cfg(target_os = "macos")]
+pub fn show_toast(app: &tauri::AppHandle, title: &str, body: &str) -> Result<(), String> {
+    use tauri_plugin_notification::NotificationExt;
+
+    app.notification()
+        .builder()
+        .title(title)
+        .body(body)
+        .show()
+        .map_err(|error| format!("系统通知发送失败：{error}"))
+}
+
+#[cfg(not(any(windows, target_os = "macos")))]
+pub fn show_toast(_app: &tauri::AppHandle, _title: &str, _body: &str) -> Result<(), String> {
     Err("当前平台不支持系统通知。".into())
 }
 

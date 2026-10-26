@@ -110,6 +110,7 @@ interface TerminalStartRequest {
   workingDirectory: string;
   command?: string;
   hideInitialCommand?: boolean;
+  accountLogin?: boolean;
   cols: number;
   rows: number;
   /** Which client these dimensions describe, so several viewers can share one PTY. */
@@ -329,6 +330,7 @@ export class TerminalGatewayService {
       shell: session.shell,
       workingDirectory: session.workingDirectory,
       command: session.command,
+      accountLogin: session.accountLogin,
       hideInitialCommand: session.agentType !== 'shell' && !!session.command,
       cols,
       rows,
@@ -461,6 +463,11 @@ export class TerminalGatewayService {
    */
   async openPath(path: string, workingDirectory?: string): Promise<void> {
     await invoke('open_terminal_path', { path, workingDirectory });
+  }
+
+  /** Opens the directory's contents in the file manager on the machine running the PTY. */
+  async openDirectory(path: string): Promise<void> {
+    await invoke('open_directory', { path });
   }
 
   async close(terminalId: string, preserveRepositoryBaseline = false): Promise<void> {

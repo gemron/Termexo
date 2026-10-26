@@ -96,7 +96,7 @@
         class="btn btn-square btn-ghost btn-xs"
         [title]="'terminal.close' | t"
         [attr.aria-label]="'terminal.close' | t"
-        (click)="$event.stopPropagation(); closeRequested.emit(session().id)"
+        (click)="$event.stopPropagation(); closeRequested.emit({ terminalId: session().id, event: $event })"
       >
         <app-icon name="x" [size]="13" />
       </button>
@@ -155,7 +155,14 @@
     }
   </div>
   <footer>
-    <span>{{ session().workingDirectory }}</span>
+    <button
+      type="button"
+      class="terminal-path"
+      [disabled]="!canOpenDirectory"
+      [title]="('common.openInExplorer' | t) + ': ' + session().workingDirectory"
+      [attr.aria-label]="('common.openInExplorer' | t) + ': ' + session().workingDirectory"
+      (click)="openWorkingDirectory($event)"
+    >{{ session().workingDirectory }}</button>
     @if (gitBranch(); as branch) {
       <span>{{ branch }}</span>
     }

@@ -96,7 +96,7 @@ test("remote guide follows language changes and preserves the remote chapter", (
     assert.equal(
       context.document.title,
       lang === "zh"
-        ? "Termexo — 通过 MCP，让 AI 操控五种 Agent"
+        ? "Termexo — 通过 MCP，让 AI 操控六种 Agent"
         : "Termexo — Let AI operate your coding agents through MCP",
     );
     const guide = readFileSync(

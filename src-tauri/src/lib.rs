@@ -1,5 +1,6 @@
 mod account;
 mod agent;
+mod claude_status;
 mod cli;
 mod commands;
 mod config;
@@ -11,14 +12,17 @@ mod mcp;
 mod network;
 mod notification;
 mod one_ring;
+mod platform;
 mod process;
 mod pty;
 mod quota;
 mod remote;
 mod storage;
 mod system_proxy;
+mod third_party_notifications;
 mod update;
 mod webview;
+mod wechat;
 
 use std::fs;
 use std::sync::Arc;
@@ -48,6 +52,11 @@ pub fn capture_antigravity_status_from_cli() -> Result<(), String> {
     hooks::capture_antigravity_status_from_cli().map_err(|error| error.to_string())
 }
 
+/// Records Claude Code's subscription allowance from its status line input.
+pub fn capture_claude_status_from_cli() -> Result<(), String> {
+    claude_status::capture_from_cli()
+}
+
 pub fn capture_codex_hook_event_from_cli() -> Result<(), String> {
     hooks::capture_codex_hook_event_from_cli().map_err(|error| error.to_string())
 }
@@ -71,6 +80,10 @@ pub fn run() {
         )
         .init();
 
+    // A Finder-launched app has launchd's minimal PATH; agent detection and every terminal
+    // inherit this process's environment, so it is repaired before anything reads it.
+    platform::inherit_login_environment();
+
     // Nothing below can report this: without a runtime Tauri cannot build the webview, and the
     // process dies behind a panic message no user sees. An install from npm never ran an
     // installer that could deploy WebView2, so this is the only notice such a user ever gets.
@@ -92,7 +105,7 @@ pub fn run() {
             // largest thing Termexo writes, so the data can be moved elsewhere. The pointer that
             // records where stays behind in the default directory — something has to be findable
             // without configuration.
-            let default_data_dir = app.path().app_data_dir()?;
+            let default_data_dir = platform::app_data_dir(app.handle())?;
             fs::create_dir_all(&default_data_dir)?;
             let app_data_dir = storage::resolve_data_directory(&default_data_dir);
             fs::create_dir_all(&app_data_dir)?;
@@ -184,6 +197,7 @@ pub fn run() {
             commands::agent::detect_antigravity,
             commands::agent::scan_antigravity_sessions,
             commands::agent::list_antigravity_models,
+            commands::model_catalog::read_model_catalog,
             commands::agent::read_antigravity_status_feed,
             commands::agent::set_antigravity_status_feed,
             commands::agent::prepare_antigravity_launch,
@@ -248,6 +262,13 @@ pub fn run() {
             commands::config::delete_account_profile,
             commands::config::validate_claude_profile,
             commands::notification::show_desktop_notification,
+            wechat::read_wechat_notifications,
+            wechat::update_wechat_notifications,
+            wechat::probe_wechat_notification_target,
+            wechat::send_wechat_notification,
+            third_party_notifications::read_third_party_notifications,
+            third_party_notifications::set_third_party_notifications_enabled,
+            commands::notification::set_taskbar_attention,
             commands::update::check_for_update,
             commands::update::open_release_page,
             commands::update::update_via_npm,
@@ -265,6 +286,9 @@ pub fn run() {
             commands::open::open_terminal_url,
             commands::open::open_support_email,
             commands::open::open_terminal_path,
+            commands::open::open_directory,
+            commands::preview::list_project_directory,
+            commands::preview::read_project_preview,
             commands::storage::read_storage_overview,
             commands::storage::relocate_application_data,
             commands::storage::reset_application_data_location,

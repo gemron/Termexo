@@ -1,3 +1,4 @@
+use crate::platform::shell_invoke;
 use std::cmp::Reverse;
 use std::env;
 use std::fs::{self, File};
@@ -9,7 +10,7 @@ use serde_json::Value;
 use thiserror::Error;
 use time::{format_description::well_known::Rfc3339, OffsetDateTime};
 
-use super::cli::{append_option, command_paths, powershell_quote, query_command};
+use super::cli::{append_option, command_paths, query_command};
 use super::{AgentAdapter, AgentInstallation, AgentLaunchSpec, AgentSession, PiLaunchOptions};
 use crate::process::run_with_timeout;
 
@@ -192,7 +193,7 @@ impl AgentAdapter for PiAdapter {
 
     fn build_launch_command(&self, options: &PiLaunchOptions) -> Result<AgentLaunchSpec, PiError> {
         let executable = self.find_executable().ok_or(PiError::NotInstalled)?;
-        let mut command = format!("& {}", powershell_quote(&executable.to_string_lossy()));
+        let mut command = shell_invoke(&executable.to_string_lossy());
         if let Some(id) = options
             .session_id
             .as_deref()
@@ -322,6 +323,7 @@ fn read_session(path: &Path) -> Result<Option<AgentSession>, PiError> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::platform::shell_quote;
     use serde_json::json;
     use std::time::{SystemTime, UNIX_EPOCH};
 
@@ -417,6 +419,7 @@ mod tests {
         assert_eq!(fs::read(path).unwrap(), original);
     }
 
+    #[cfg(windows)]
     #[test]
     fn launch_resolves_session_file_quotes_arguments_and_prefers_it_over_continue() {
         let fixture = Fixture::new();
@@ -432,7 +435,7 @@ mod tests {
             .unwrap();
         assert!(spec.command.contains(&format!(
             "--session {}",
-            powershell_quote(&path.to_string_lossy())
+            shell_quote(&path.to_string_lossy())
         )));
         assert!(spec.command.contains("--model 'provider/model''s'"));
         assert!(spec

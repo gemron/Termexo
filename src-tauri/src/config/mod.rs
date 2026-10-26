@@ -226,12 +226,35 @@ pub struct NetworkProfileInput {
     pub clear_credential: bool,
 }
 
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case")]
+pub enum AccountLoginMethod {
+    #[default]
+    Browser,
+    Console,
+    Sso,
+    DeviceCode,
+}
+
+impl AccountLoginMethod {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::Browser => "browser",
+            Self::Console => "console",
+            Self::Sso => "sso",
+            Self::DeviceCode => "device-code",
+        }
+    }
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct AccountProfile {
     pub id: String,
     pub name: String,
     pub agent_type: String,
+    #[serde(default)]
+    pub login_method: AccountLoginMethod,
     pub config_dir: Option<String>,
     pub is_default: bool,
     pub is_system: bool,
@@ -247,6 +270,8 @@ pub struct AccountProfileInput {
     pub id: String,
     pub name: String,
     pub agent_type: String,
+    #[serde(default)]
+    pub login_method: AccountLoginMethod,
     #[serde(default)]
     pub is_default: bool,
 }

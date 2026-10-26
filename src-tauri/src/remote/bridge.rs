@@ -64,6 +64,7 @@ pub const REMOTE_ALLOWED: &[&str] = &[
     "detect_antigravity",
     "scan_antigravity_sessions",
     "list_antigravity_models",
+    "read_model_catalog",
     "read_antigravity_status_feed",
     "prepare_antigravity_launch",
     "scan_claude_sessions",
@@ -133,6 +134,8 @@ pub const REMOTE_ALLOWED: &[&str] = &[
     "set_terminal_palette",
     "close_terminal",
     "read_terminal_scrollback",
+    "list_project_directory",
+    "read_project_preview",
     "get_remote_access_status",
     "render_remote_access_qr",
     // Reading where the data lives and how large it has grown is diagnosis a phone has as
@@ -169,11 +172,19 @@ pub const REMOTE_DENIED: &[&str] = &[
     "import_network_profiles",
     // Native shell side effects that would land on the desktop, not on the remote device.
     "show_desktop_notification",
+    "read_wechat_notifications",
+    "update_wechat_notifications",
+    "probe_wechat_notification_target",
+    "send_wechat_notification",
+    "read_third_party_notifications",
+    "set_third_party_notifications_enabled",
+    "set_taskbar_attention",
     "open_release_page",
     "open_webview_download",
     "open_terminal_url",
     "open_support_email",
     "open_terminal_path",
+    "open_directory",
     "update_via_npm",
     // Describes the desktop window's own WebView2, which says nothing about the browser a
     // remote client is being drawn in and would have it offer an install for another machine.
@@ -372,9 +383,9 @@ mod tests {
         let end = body.find(']').expect("the handler list should be closed");
         body[..end]
             .lines()
-            .filter_map(|line| line.trim().strip_prefix("commands::"))
-            .filter_map(|entry| entry.split("::").nth(1))
-            .map(|name| name.trim_end_matches(',').to_string())
+            // A handler may live outside commands:: (for example the desktop WeChat adapter).
+            .filter_map(|line| line.trim().strip_suffix(','))
+            .filter_map(|entry| entry.rsplit_once("::").map(|(_, name)| name.to_string()))
             .collect()
     }
 

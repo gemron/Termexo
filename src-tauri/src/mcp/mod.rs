@@ -182,6 +182,10 @@ impl McpManager {
         request: &mut crate::commands::terminal::TerminalStartRequest,
         environment: &mut HashMap<String, String>,
     ) -> Result<(), String> {
+        // Account login is independent of the MCP server's settings and readiness.
+        if request.account_login {
+            return Ok(());
+        }
         if self
             .app
             .state::<WorkspaceDatabase>()

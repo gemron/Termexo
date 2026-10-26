@@ -84,4 +84,32 @@ describe('AgentService CLI detection', () => {
     expect(service.codexInstallation()?.healthy).toBe(false);
     expect(service.detectionStates().codex).toEqual({ status: 'complete' });
   });
+
+  it('previews the official updater for an installed Antigravity and the script for a new install', async () => {
+    invoke.mockResolvedValueOnce({
+      ...installed('antigravity'),
+      executablePath: "C:\\ag y's\\agy.exe",
+    });
+    await service.detectAntigravity();
+    Reflect.deleteProperty(window, '__TAURI_INTERNALS__');
+
+    const upgrade = await service.previewCliOperation({
+      agentType: 'antigravity',
+      installer: 'script',
+    });
+    expect(upgrade.action).toBe('upgrade');
+    expect(upgrade.commandPreview).toContain("& 'C:\\ag y''s\\agy.exe' update");
+    expect(upgrade.commandPreview).not.toContain('install.ps1');
+    expect(upgrade.supportsVersion).toBe(false);
+
+    await service.detectAntigravity();
+    const install = await service.previewCliOperation({
+      agentType: 'antigravity',
+      installer: 'script',
+    });
+    expect(install.action).toBe('install');
+    expect(install.commandPreview).toContain(
+      'irm https://antigravity.google/cli/install.ps1 | iex',
+    );
+  });
 });

@@ -1142,25 +1142,6 @@ textarea {
   font-variant-ligatures: none;
 }
 
-/* The version field and the button that acts on it share a baseline, like the editor rows. */
-.cli-version-row {
-  display: flex;
-  align-items: end;
-  gap: 8px;
-  margin-top: 13px;
-
-  label {
-    display: grid;
-    min-width: 0;
-    flex: 1;
-    gap: 5px;
-  }
-
-  button {
-    flex: 0 0 auto;
-  }
-}
-
 /* Where a vendor publishes both a package and an installer script, the choice is segmented:
    there are only two of them, and which one is picked decides whether a version can be named. */
 .cli-installer {
@@ -1189,37 +1170,6 @@ textarea {
       color: var(--text);
       background: var(--surface-raised);
     }
-  }
-}
-
-/* Stands in for the version field when the chosen installer takes none. */
-.cli-installer-note {
-  min-width: 0;
-  flex: 1;
-  color: var(--text-muted);
-  font-size: 11px;
-  line-height: 1.45;
-}
-
-/* Hint on the left, the one confirming action on the right — same shape as .editor-actions. */
-.cli-actions {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: flex-end;
-  gap: 8px;
-  margin-top: 12px;
-
-  > span {
-    flex: 1;
-    min-width: 0;
-    color: var(--text-muted);
-    font-size: 9px;
-    line-height: 1.5;
-  }
-
-  button {
-    flex: 0 0 auto;
   }
 }
 

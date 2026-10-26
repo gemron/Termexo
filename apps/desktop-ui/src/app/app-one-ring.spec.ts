@@ -9,6 +9,7 @@ import type { OneRingCoordinatorRequest } from './core/models/one-ring.models';
 import type { CodexLaunchDialogValue } from './dialogs/codex-launch-dialog';
 import type { ModelProfile } from './core/models/agent.models';
 import { OneRingService } from './core/services/one-ring.service';
+import { CLI_NATIVE_PROFILE_ID } from './core/models/launch-model-choice';
 
 interface Flow {
   createWorkspace(value: { name: string; projectPath: string }): Promise<void>;
@@ -18,6 +19,8 @@ interface Flow {
   pendingOneRing: WritableSignal<OneRingCoordinatorRequest | null>;
   selectedTerminalDirectory: WritableSignal<string | null>;
   codexLaunchOpen: WritableSignal<boolean>;
+  refreshRestoredClaudeLaunches(): Promise<void>;
+  refreshRestoredCodexLaunches(): Promise<void>;
 }
 
 describe('One Ring coordinator launch', () => {
@@ -110,5 +113,18 @@ describe('One Ring coordinator launch', () => {
     await flow.openOneRingCoordinator({ ...request, workflowId: 'closed-workflow' });
     expect(flow.codexLaunchOpen()).toBe(true);
     expect(flow.pendingOneRing()?.workflowId).toBe('closed-workflow');
+  });
+  it('restores official model selections without substituting a custom default profile', async () => {
+    vi.spyOn(agents, 'modelProfiles').mockReturnValue([{ id: 'third-party', isDefault: true, provider: 'Custom', hasCredential: true,
+      claudeEnabled: true, claudeModel: 'custom-claude', codexEnabled: true, codexModel: 'custom-codex' } as ModelProfile]);
+    vi.spyOn(agents, 'prepareLaunch').mockResolvedValue({ command: 'claude --model claude-current', executablePath: 'claude' });
+    state.createTerminal({ id: 'native-claude', agentType: 'claude', model: 'claude-current', profileId: CLI_NATIVE_PROFILE_ID });
+    state.createTerminal({ id: 'native-codex', agentType: 'codex', model: 'gpt-current', profileId: CLI_NATIVE_PROFILE_ID });
+    await flow.refreshRestoredClaudeLaunches();
+    await flow.refreshRestoredCodexLaunches();
+    expect(agents.prepareLaunch).toHaveBeenCalledWith(expect.objectContaining({ terminalId: 'native-claude', model: 'claude-current', profileId: CLI_NATIVE_PROFILE_ID }));
+    expect(agents.prepareCodexLaunch).toHaveBeenCalledWith(expect.objectContaining({ terminalId: 'native-codex', model: 'gpt-current', profileId: CLI_NATIVE_PROFILE_ID }));
+    expect(state.activeWorkspace()?.terminals.find(t => t.id === 'native-claude')?.model).toBe('claude-current');
+    expect(state.activeWorkspace()?.terminals.find(t => t.id === 'native-codex')?.profileId).toBe(CLI_NATIVE_PROFILE_ID);
   });
 });

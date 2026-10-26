@@ -75,6 +75,38 @@
   }
 }
 
+.model-catalog-tools {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+.model-catalog-help {
+  color: var(--text-muted);
+  font-size: 11px;
+  margin: 8px 0 14px;
+}
+.model-upgrade {
+  padding: 12px;
+  margin-bottom: 14px;
+  border: 1px solid var(--accent);
+  border-radius: 8px;
+  p {
+    overflow-wrap: anywhere;
+    margin: 6px 0;
+  }
+  small {
+    color: var(--text-muted);
+  }
+  > div {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    gap: 8px;
+    margin-top: 10px;
+  }
+}
+
 .editor-actions {
   flex: 0 0 auto;
   margin: 0;
@@ -116,16 +148,6 @@
 }
 
 @media (max-width: 600px) {
-  .cli-version-row {
-    flex-wrap: wrap;
-    label {
-      flex-basis: 100%;
-    }
-    > button {
-      width: 100%;
-    }
-  }
-
   .settings-dialog {
     > header {
       flex-basis: 60px;

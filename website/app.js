@@ -10,7 +10,7 @@ const translations = {
     mcpHubLabel: "THE LOCAL CONNECTION",
     mcpHubBody: "Find the terminal → send input → submit Enter → read output",
     mcpLocal: "Runs on your Windows PC",
-    mcpTargetLabel: "FIVE KINDS OF AGENT TERMINALS",
+    mcpTargetLabel: "SIX KINDS OF AGENT TERMINALS",
     mcpFlowCaption: "How the connection works. The target terminal must be running; a reply comes from its actual output.",
     mcpStep1Title: "Prepare your workspace",
     mcpStep1Body: "Open Termexo and a project. Make sure your agent CLI is installed and signed in, and keep Termexo running.",
@@ -22,7 +22,7 @@ const translations = {
     mcpCheckPrompt: "Use Termexo MCP to list my workspaces and terminals, and tell me which are running. Do not change anything yet.",
     mcpTryLabel: "THEN, TRY AN EXISTING OPENCODE TERMINAL",
     mcpTryPrompt: "Use Termexo MCP to find the running OpenCode terminal in my current workspace, send hi, submit Enter and read its reply. If several terminals match, list their names and let me choose.",
-    mcpBoundary: "All five support interaction with existing terminals. Task-board execution supports Claude Code, Codex, OpenCode and Grok Build. Sending input or starting a task does not mean it has finished.",
+    mcpBoundary: "All six support interaction with existing terminals. Task-board execution supports Claude Code, Codex, OpenCode, Pi Agent and Grok Build. Sending input or starting a task does not mean it has finished.",
     mcpFullGuide: "Open the step-by-step MCP guide →",
     navSolutions: "Use cases",
     solutionsIndex: "DIRECTION / USE CASES",
@@ -65,7 +65,7 @@ const translations = {
     heroLine1: "Let AI operate your agents.",
     heroLine2: "Send work. Read results.",
     heroLead:
-      "Connect an AI to Termexo MCP. Ask it to find a Claude Code, Codex, OpenCode, Grok Build or Antigravity terminal, send an instruction and read the real reply. Keep tasks, sessions and optional phone access in one Windows workspace.",
+      "Connect an AI to Termexo MCP. Ask it to find a Claude Code, Codex, OpenCode, Pi Agent, Grok Build or Antigravity terminal, send an instruction and read the real reply. Keep tasks, sessions and optional phone access in one Windows workspace.",
     heroRemoteNote:
       "Phone access is optional. Keep your PC running and use a reachable HTTPS relay plus a desktop access token, or connect directly over a trusted LAN or VPN.",
     heroDownload: "Download for Windows",
@@ -131,7 +131,7 @@ const translations = {
 
     sessionTitle: "Pick up yesterday's conversation.",
     sessionLead:
-      "Search saved Claude Code, Codex, OpenCode, Grok Build, and Antigravity sessions across projects. Termexo uses each CLI's own resume command to reopen the native context, without changing session files.",
+      "Search saved Claude Code, Codex, OpenCode, Pi Agent, Grok Build, and Antigravity sessions across projects. Termexo uses each CLI's own resume command to reopen the native context, without changing session files.",
     sessionPoint1:
       "Search across every project by name, path, branch, or model",
     sessionPoint2:
@@ -157,7 +157,7 @@ const translations = {
       "Write down what needs doing and what counts as done, pick the agent and the project, and the task opens as a real terminal. It reports its own progress back to the board, so you can see what is running without reading every terminal at once.",
     taskPoint1:
       "Todo, executing, completed, verified — the terminal moves the card",
-    taskPoint2: "Send a task to Claude Code, Codex, OpenCode, or Grok Build",
+    taskPoint2: "Send a task to Claude Code, Codex, OpenCode, Pi Agent, or Grok Build",
     taskPoint3:
       "Reject a result with a note and it goes back for another round",
     taskCaption:
@@ -172,7 +172,7 @@ const translations = {
       "Project folder, grid layout, terminals, and colours come back with the workspace. Drag workspace rows to put projects in your preferred order.",
     featureSessionTitle: "Nothing you close is lost",
     featureSessionBody:
-      "Find past Claude Code, Codex, OpenCode, Grok Build, or Antigravity sessions across your projects and reopen their native history.",
+      "Find past Claude Code, Codex, OpenCode, Pi Agent, Grok Build, or Antigravity sessions across your projects and reopen their native history.",
     featureTasksTitle: "Hand a task to an agent",
     featureTasksBody:
       "Write down the task and what counts as done, pick an agent, and it opens as a real terminal that reports its own progress back to the board.",
@@ -193,7 +193,7 @@ const translations = {
     featureRemoteBody:
       "A self-hosted relay connects your phone to the same desktop terminals. No public IP or router port forwarding on the desktop.",
     featureMcpTitle: "Let one agent operate another",
-    featureMcpBody: "Connect through local MCP to send instructions to existing terminals for all five supported agents and read their output. Manage tasks or permitted settings too; choose access scopes yourself.",
+    featureMcpBody: "Connect through local MCP to send instructions to existing terminals for all six supported agents and read their output. Manage tasks or permitted settings too; choose access scopes yourself.",
     mcpGuide: "Set up MCP →",
 
     remoteTitle:
@@ -235,8 +235,12 @@ const translations = {
     roadmapPatchBody: "Codex resume and completion fixes, Grok and Antigravity launch repairs, agent-specific mobile shortcuts, and clearer remote-access and MCP setup.",
     roadmapResponsiveTitle: "Responsive terminals and Codex mobile shortcuts",
     roadmapResponsiveBody: "Keep desktop input and scrolling responsive while reconnecting from a phone, paste clipboard text reliably on Windows, and edit queued Codex input with ⇧←.",
-    roadmapLatestTitle: "Cleaner proxy, titles and tab states",
-    roadmapLatestBody: "Single-casing proxy on Windows for every terminal, session scans on older OpenCode CLIs, instruction-free Codex titles, and completed tabs set apart from the selected one.",
+    roadmapLatestTitle: "Organized projects and clearer account setup",
+    roadmapLatestBody: "Workspace folders, tags and icons, account login choices, model discovery and upgrade suggestions, and confirmation before closing active Agent terminals.",
+    roadmapSetupTitle: "Easier Agent setup and Pi support",
+    roadmapSetupBody: "Install and update six Agents with clear guidance, use the official Antigravity updater, and keep pending reminders flashing until acknowledged.",
+    roadmapProxyTitle: "Cleaner proxy, titles and tab states",
+    roadmapProxyBody: "Single-casing proxy on Windows for every terminal, session scans on older OpenCode CLIs, instruction-free Codex titles, and completed tabs set apart from the selected one.",
     roadmapMcpTitle: "Local MCP control, connected automatically",
     roadmapMcpBody: "19 tools for terminals, tasks and settings. Enable the server, select permissions, then launch Claude Code, Codex, OpenCode, Grok Build or Antigravity. Restart existing Agents to connect.",
 
@@ -293,7 +297,7 @@ const translations = {
     mcpHubLabel: "本地连接",
     mcpHubBody: "找到终端 → 发送指令 → 提交回车 → 读取输出",
     mcpLocal: "运行在你的 Windows 电脑上",
-    mcpTargetLabel: "五种 AGENT 终端",
+    mcpTargetLabel: "六种 AGENT 终端",
     mcpFlowCaption: "连接流程示意。目标终端需保持运行，回复来自终端的真实输出。",
     mcpStep1Title: "准备好工作台",
     mcpStep1Body: "打开 Termexo 和项目，确认 Agent CLI 已安装、已登录，并保持 Termexo 运行。",
@@ -305,7 +309,7 @@ const translations = {
     mcpCheckPrompt: "请通过 Termexo MCP 列出我的工作区和终端，告诉我哪些正在运行。先不要修改任何内容。",
     mcpTryLabel: "然后：操作已有的 OPENCODE 终端",
     mcpTryPrompt: "请通过 Termexo MCP 找到当前工作区中正在运行的 OpenCode 终端，发送 hi 并提交回车，然后读取它的回复。如果有多个匹配的终端，先列出名称让我选择。",
-    mcpBoundary: "五种 Agent 都支持已有终端交互。任务看板执行支持 Claude Code、Codex、OpenCode 和 Grok Build；发送成功或任务启动成功，不代表已经完成。",
+    mcpBoundary: "六种 Agent 都支持已有终端交互。任务看板执行支持 Claude Code、Codex、OpenCode、Pi Agent 和 Grok Build；发送成功或任务启动成功，不代表已经完成。",
     mcpFullGuide: "打开 MCP 逐步使用说明 →",
     navSolutions: "使用场景",
     solutionsIndex: "项目方向 / 解决方案场景",
@@ -348,7 +352,7 @@ const translations = {
     heroLine1: "让 AI 操控你的 Agent。",
     heroLine2: "发出指令，读回结果。",
     heroLead:
-      "通过 Termexo MCP，让 AI 找到 Claude Code、Codex、OpenCode、Grok Build 或 Antigravity 终端，发送指令，再读回真实回复。任务、会话和可选的手机访问，都在同一个 Windows 工作台里。",
+      "通过 Termexo MCP，让 AI 找到 Claude Code、Codex、OpenCode、Pi Agent、Grok Build 或 Antigravity 终端，发送指令，再读回真实回复。任务、会话和可选的手机访问，都在同一个 Windows 工作台里。",
     heroRemoteNote:
       "手机访问按需开启：电脑需保持运行，使用双方可达的 HTTPS 中继与桌面访问令牌，也可在可信局域网或 VPN 内直连。",
     heroDownload: "下载 Windows 版",
@@ -408,7 +412,7 @@ const translations = {
 
     sessionTitle: "接着昨天的会话聊。",
     sessionLead:
-      "跨项目搜索 Claude Code、Codex、OpenCode、Grok Build 和 Antigravity 的本地会话。Termexo 调用各 CLI 的原生恢复命令接回上下文，不改写会话文件。",
+      "跨项目搜索 Claude Code、Codex、OpenCode、Pi Agent、Grok Build 和 Antigravity 的本地会话。Termexo 调用各 CLI 的原生恢复命令接回上下文，不改写会话文件。",
     sessionPoint1: "按名称、路径、分支或模型跨项目搜索",
     sessionPoint2: "通过各 Agent 自己的命令恢复原生会话",
     sessionPoint3: "原生会话文件只读，Termexo 不改也不删",
@@ -426,7 +430,7 @@ const translations = {
     taskLead:
       "写清楚要做什么、做到什么算完成，选好 Agent 和项目，这条任务就会变成一个真实终端。它会把自己的进展回报到看板上，你不用逐个盯着终端也知道谁在跑。",
     taskPoint1: "待办、执行中、已完成、已验收——卡片由终端自己推动",
-    taskPoint2: "任务可以交给 Claude Code、Codex、OpenCode 或 Grok Build",
+    taskPoint2: "任务可以交给 Claude Code、Codex、OpenCode、Pi Agent 或 Grok Build",
     taskPoint3: "验收不通过时写一句反馈，任务带着反馈回到执行中",
     taskCaption: "一条任务带着验收标准从待办走到已验收",
     capabilitiesTitle: "那些你一直在手动做的事。",
@@ -439,7 +443,7 @@ const translations = {
       "项目目录、网格布局、终端和主题色跟着工作区一起回来。拖拽工作区条目，就能调整项目顺序。",
     featureSessionTitle: "关掉的东西没丢",
     featureSessionBody:
-      "翻出各项目里的 Claude Code、Codex、OpenCode、Grok Build 或 Antigravity 历史会话，恢复原生上下文。",
+      "翻出各项目里的 Claude Code、Codex、OpenCode、Pi Agent、Grok Build 或 Antigravity 历史会话，恢复原生上下文。",
     featureTasksTitle: "把一条任务交给 Agent",
     featureTasksBody:
       "写清楚任务和验收标准，选一个 Agent，它就变成一个真实终端，并把自己的进展回报到看板上。",
@@ -460,7 +464,7 @@ const translations = {
     featureRemoteBody:
       "通过自建中继，用手机连接桌面正在运行的同一批终端。桌面无需公网 IP，也无需路由器端口映射。",
     featureMcpTitle: "让一个 Agent 操控另一个",
-    featureMcpBody: "通过本地 MCP，向五种 Agent 的已有终端发送指令并读取输出，也能管理任务和修改获准的设置。访问范围由你选择。",
+    featureMcpBody: "通过本地 MCP，向六种 Agent 的已有终端发送指令并读取输出，也能管理任务和修改获准的设置。访问范围由你选择。",
     mcpGuide: "开始使用 MCP →",
 
     remoteTitle:
@@ -500,8 +504,12 @@ const translations = {
     roadmapPatchBody: "修复 Codex 恢复与完成状态、Grok 和 Antigravity 启动问题，增加按 Agent 区分的移动快捷键及更清楚的远程访问和 MCP 引导。",
     roadmapResponsiveTitle: "终端响应更稳定，Codex 手机快捷键更完整",
     roadmapResponsiveBody: "手机重连时桌面端输入和滚动保持响应，Windows 终端可可靠粘贴剪贴板文本，Codex 面板新增 ⇧← 编辑排队输入。",
-    roadmapLatestTitle: "代理更干净，标题与标签状态更清晰",
-    roadmapLatestBody: "Windows 代理单大小写并覆盖所有终端，旧版 OpenCode 也能扫描会话，Codex 标题去掉指令杂质，完成态与选中态不再混淆。",
+    roadmapLatestTitle: "项目整理与更清晰的账号设置",
+    roadmapLatestBody: "工作区文件夹、标签与图标，账号登录方式选择，模型目录与升级建议，以及关闭活动 Agent 终端前确认。",
+    roadmapSetupTitle: "Agent 安装更简单，新增 Pi 支持",
+    roadmapSetupBody: "六种 Agent 安装与更新有清楚引导，Antigravity 使用官方升级，待处理提醒持续闪动到确认。",
+    roadmapProxyTitle: "代理更干净，标题与标签状态更清晰",
+    roadmapProxyBody: "Windows 代理单大小写并覆盖所有终端，旧版 OpenCode 也能扫描会话，Codex 标题去掉指令杂质，完成态与选中态不再混淆。",
     roadmapMcpTitle: "本地 MCP 操控，Agent 自动接入",
     roadmapMcpBody: "19 个工具支持终端、任务和设置。开启服务并选择权限，再启动 Claude Code、Codex、OpenCode、Grok Build 或 Antigravity。已经运行的 Agent 需重启后接入。",
 
@@ -570,7 +578,7 @@ function setLanguage(language) {
   }
   document.title =
     language === "zh"
-      ? "Termexo — 通过 MCP，让 AI 操控五种 Agent"
+      ? "Termexo — 通过 MCP，让 AI 操控六种 Agent"
       : "Termexo — Let AI operate your coding agents through MCP";
 
   translatedElements.forEach((element) => {
