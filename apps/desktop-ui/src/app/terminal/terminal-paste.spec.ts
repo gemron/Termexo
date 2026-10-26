@@ -1,6 +1,5 @@
 import { signal } from '@angular/core';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
-import { readText, writeText } from '@tauri-apps/plugin-clipboard-manager';
 import type { Terminal } from '@xterm/xterm';
 import { vi } from 'vitest';
 import { I18nService } from '../core/i18n/i18n.service';
@@ -10,10 +9,8 @@ import { TerminalGatewayService } from '../core/services/terminal-gateway.servic
 import { TerminalPanelComponent } from './terminal-panel';
 import type { TerminalReplayGate } from './terminal-replay-gate';
 
-vi.mock('@tauri-apps/plugin-clipboard-manager', () => ({
-  readText: vi.fn(),
-  writeText: vi.fn(),
-}));
+const readText = vi.fn();
+const writeText = vi.fn();
 
 interface ClipboardHandlers {
   terminal: Terminal;
@@ -41,7 +38,13 @@ describe('terminal clipboard interactions', () => {
 
   beforeEach(async () => {
     vi.resetAllMocks();
-    (window as unknown as Record<string, unknown>)['__TAURI_INTERNALS__'] = {};
+    (window as unknown as Record<string, unknown>)['__TAURI_INTERNALS__'] = {
+      invoke: (command: string, args?: { text: string }) => {
+        if (command === 'plugin:clipboard-manager|read_text') return readText();
+        if (command === 'plugin:clipboard-manager|write_text') return writeText(args?.text);
+        throw new Error(`Unexpected native command: ${command}`);
+      },
+    };
     write.mockResolvedValue(undefined);
     vi.mocked(readText).mockResolvedValue('  中文\r\nsecond line\t ');
     TestBed.configureTestingModule({

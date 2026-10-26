@@ -1,12 +1,11 @@
 import { Component } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import { By } from '@angular/platform-browser';
-import { invoke } from '@tauri-apps/api/core';
 import { vi } from 'vitest';
 
 import { ExternalLinkDirective, SUPPORT_EMAIL } from './external-link.directive';
 
-vi.mock('@tauri-apps/api/core', () => ({ invoke: vi.fn() }));
+const invoke = vi.fn();
 
 @Component({
   imports: [ExternalLinkDirective],
@@ -22,14 +21,7 @@ describe('ExternalLinkDirective', () => {
   beforeEach(() => {
     vi.resetAllMocks();
     vi.mocked(invoke).mockResolvedValue(undefined);
-    // The lazy inspector may bundle its own core import; stub the transport as well as the module.
-    Object.defineProperty(window, '__TAURI_INTERNALS__', {
-      value: {
-        invoke: (command: string, args?: Record<string, unknown>) =>
-          args === undefined ? invoke(command) : invoke(command, args),
-      },
-      configurable: true,
-    });
+    Object.defineProperty(window, '__TAURI_INTERNALS__', { value: { invoke }, configurable: true });
   });
 
   afterEach(() => {
@@ -60,12 +52,12 @@ describe('ExternalLinkDirective', () => {
     const url = 'https://www.termexo.com/guide.html#remote';
     const { event } = await click(url);
     expect(event.defaultPrevented).toBe(true);
-    expect(invoke).toHaveBeenCalledWith('open_terminal_url', { url });
+    expect(invoke).toHaveBeenCalledWith('open_terminal_url', { url }, undefined);
   });
 
   it('uses a dedicated command without caller-supplied arguments for the support email', async () => {
     await click(`mailto:${SUPPORT_EMAIL}`);
-    expect(invoke).toHaveBeenCalledExactlyOnceWith('open_support_email');
+    expect(invoke).toHaveBeenCalledExactlyOnceWith('open_support_email', {}, undefined);
   });
 
   it('reports launch failures so users can use the displayed email address manually', async () => {
