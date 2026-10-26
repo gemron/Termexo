@@ -49,20 +49,15 @@ p {
   margin: 8px 0;
 }
 .muted,
-header p,
-.connection > p {
+header p {
   color: var(--text-muted);
   font-size: 12px;
 }
-.connection,
 .new-task {
   border: 1px solid var(--border);
   border-radius: 10px;
   padding: 20px;
   margin-bottom: 18px;
-}
-.connection {
-  max-width: 850px;
 }
 label {
   display: grid;
@@ -70,7 +65,6 @@ label {
   margin: 14px 0;
   font-size: 12px;
 }
-input,
 textarea {
   width: 100%;
   font-family: inherit;

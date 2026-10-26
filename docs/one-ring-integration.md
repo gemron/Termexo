@@ -1,8 +1,10 @@
 # One Ring · Termexo 接入预览
 
+> 历史记录：外部插件接入方式已被 [Termexo 内置 One Ring](one-ring.md) 替代。当前用户无需执行下文的独立安装或目录设置步骤。
+
 Termexo 增加独立的 **One Ring** 工作台入口，连接本地 One Ring Codex 插件，读取真实工作流，并在支持的平台上启动 Codex Coordinator。One Ring 仍单独安装；本仓库不包含它的私有引擎。
 
-当前分支：`feat/one-ring-integration`，基于 `feat/pi-agent`。这是接入预览，不是 Windows Worker 执行认证。
+Windows Worker 适配位于 `feat/windows-worker`，基于已合入 One Ring 的 `main`（`771d5bf`）。需同时使用 One Ring 的 Windows Worker 分支构建插件；旧插件仍保持查询模式。
 
 ## 当前能力与边界
 
@@ -11,10 +13,10 @@ Termexo 增加独立的 **One Ring** 工作台入口，连接本地 One Ring Cod
 | 插件连接 | 验证 `plugin.json`、构建产物、Skill 和 Node 24+；真实调用 `one_ring_doctor` 后保存配置 |
 | 工作流面板 | 按当前项目根目录过滤；显示计划、阶段、运行记录、阻塞原因、逐项证据和验证命令 |
 | 状态来源 | MCP `one_ring_list` / `one_ring_status`；不会把终端退出或 PASS 映射为已接受交付 |
-| Linux 协调入口 | 在现有 Codex 启动对话框中选择协调会话的账号、模型与推理强度 |
+| 协调入口 | 在现有 Codex 启动对话框中选择协调会话的账号、模型与推理强度 |
 | 会话恢复 | 每个协调终端保存原始连接；恢复及切换账号/模型时重新注入同一 MCP，而不随全局连接设置漂移 |
 | 人工决策 | 留在 Codex 交互终端，通过 One Ring 原有 MCP form elicitation；宿主拒绝时保持等待 |
-| Windows | 可连接与查询；One Ring 0.1.0 核心拒绝非 Linux Worker，面板禁用启动按钮 |
+| Windows | 仅当 doctor 声明 `workerExecution.supported=true`、包含 `codex` 且 `lifecycle=windows-job-v1` 时开放启动；旧插件仍禁用 |
 | 其他 CLI | 当前 One Ring 只认证 Codex Worker；发现 Claude/OpenCode/Pi 不代表可调度执行 |
 
 Worker 使用 One Ring 批准的 profile；未指定模型时使用 Worker 自身 Codex CLI 的默认模型。Termexo 模型 Profile 的临时 provider/model 覆盖只作用于 Coordinator，**不自动改写 Worker 的 provider/model**。MCP 显式继承所选账号的 `CODEX_HOME` 及代理变量，不把 API Key 写入启动命令。应先在这个账号的 Codex 配置中准备好 Worker 所需模型、provider 和登录状态。
@@ -27,7 +29,7 @@ Worker 使用 One Ring 批准的 profile；未指定模型时使用 Worker 自�
 
 ```powershell
 git fetch origin
-git switch feat/one-ring-integration
+git switch feat/windows-worker
 npm --prefix apps/desktop-ui install
 npm run tauri:dev
 ```
@@ -37,6 +39,7 @@ npm run tauri:dev
 ```powershell
 git clone https://github.com/wuyh410/one-ring.git
 cd one-ring
+git switch feat/windows-worker
 npm ci
 npm run build
 ```
@@ -47,14 +50,14 @@ Termexo 工作区切换到一个 Git 项目的**根目录**，点击顶部 **One
 - Node：`node` 或 `C:\Program Files\nodejs\node.exe`。
 - 状态目录：例如 `C:\Users\you\.one-ring`，放在目标项目以外。若查看已有工作流，必须选原来的状态目录。
 
-点击“验证并保存连接”。预期看到真实版本、Node 版本、`win32`，以及 Windows 执行限制。首次连接空状态目录时，工作流为空是正常结果。连接错误应显示原始诊断；不能显示已启动任务。
+点击“验证并保存连接”。预期看到真实版本、Node 版本和 `win32`。新版插件声明 Windows 执行能力后可启动协调会话，旧版仍显示限制。首次连接空状态目录时，工作流为空是正常结果。连接错误应显示原始诊断；不能显示已启动任务。
 
 验证以下行为：
 
 1. 带空格或单引号的插件路径能连接；错误目录、缺失构建产物、Node 低于 24 时显示明确错误。
 2. 重启 Termexo 后仍保留连接；切换工作区后只显示该项目的工作流。
 3. 无效 Node 路径/插件目录的设置保存失败，原来的有效连接保留。
-4. Windows 上显示限制，任务启动按钮保持禁用；普通 Codex 和其他 CLI 的入口仍正常。
+4. 旧插件在 Windows 上仍禁用任务启动；声明所需能力的新版插件允许启动。普通 Codex 和其他 CLI 的入口仍正常。
 5. 远程浏览器可读取桌面已配置的工作流；插件路径只能在桌面端修改。
 
 无需启动桌面，也可以验证相同桥接代码：
@@ -67,9 +70,9 @@ node --test scripts/one-ring-bridge.test.mjs
 
 不要把 Linux 生成的状态库直接拷到 Windows 当作可恢复任务：工作流记录绝对路径、PID、Git 快照和本机运行证据，均属于原主机。
 
-## Linux 协调链路
+## 协调链路
 
-Termexo 桌面正式目标仍为 Windows；本次 Linux 环境用于编译、协议和开发验证。在有可用开发桌面环境时：
+Termexo 启动的 Coordinator 会为新 Worker 使用真实的 Termexo 原生 CLI 会话；独立插件仍保留后台 Job Object 模式。请先确认所选账号能够使用原生沙箱。交互模式的验证与边界见 [交互 Worker 预览](interactive-worker-validation.md)。在桌面环境中：
 
 1. 连接插件并填写任务目标。
 2. 选择 Coordinator 的 Codex 账号和模型。One Ring 会话不启用 Termexo 的自动确认选项。
@@ -90,6 +93,6 @@ Termexo 桌面正式目标仍为 Windows；本次 Linux 环境用于编译、协
 
 关闭 Coordinator 终端会关闭其 MCP 并中断 Worker；面板查询进程不接管执行所有权。One Ring 工作流不写入旧 Todo 看板，避免旧的“终端完成/已验证”操作越过 One Ring 交付确认。
 
-下一步是 One Ring 的 Windows `.cmd`/可执行文件解析、沙箱、进程树终止与未知终止对账认证，然后再开放 Windows 启动。桌面原生审批和 Worker 终端可视化属于后续扩展。
+Windows 原生执行闭环、沙箱角色权限和进程生命周期的本机验证见 [Windows Worker 验证](windows-worker-validation.md)。OpenCode 和 Pi 已通过真实 CLI 配合本地模拟模型的 JSON 协议探针，尚未开放为 One Ring Worker。桌面原生审批和 Worker 终端可视化属于后续扩展。
 
 Codex MCP 配置参考：[OpenAI 官方文档](https://developers.openai.com/codex/mcp/)。

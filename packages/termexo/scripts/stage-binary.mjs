@@ -1,4 +1,4 @@
-import { copyFile, mkdir, open, stat } from 'node:fs/promises';
+import { copyFile, cp, mkdir, open, stat } from 'node:fs/promises';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -67,4 +67,11 @@ for (const { source, name, minimumBytes, missing } of PAYLOAD) {
   staged += stats.size;
 }
 
-console.log(`Staged ${staged} bytes across ${PAYLOAD.length} files for npm packaging.`);
+const oneRing = resolve(repositoryRoot, 'src-tauri/vendor/one-ring');
+for (const file of ['plugin.json', 'server/index.mjs', 'runtime/node.exe', 'skills/one-ring/SKILL.md', 'runtime/LICENSE.txt']) {
+  const artifact = await stat(resolve(oneRing, file)).catch(() => null);
+  if (!artifact?.isFile()) throw new Error(`Missing built-in One Ring resource ${file}; run npm run one-ring:stage before packaging.`);
+}
+await assertWindowsBinary(resolve(oneRing, 'runtime/node.exe'));
+await cp(oneRing, resolve(destinationDirectory, 'one-ring'), { recursive: true });
+console.log(`Staged desktop binaries and the complete built-in One Ring engine/runtime for npm packaging (${staged} desktop bytes).`);

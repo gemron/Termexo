@@ -6,15 +6,15 @@ use std::time::Duration;
 use rusqlite::{Connection, OpenFlags};
 use serde_json::{json, Value};
 
-use super::{McpSettings, CREDENTIAL_TARGET, SETTINGS_KEY};
+use super::{McpSettings, CREDENTIAL_TARGET, ONE_RING_CREDENTIAL_TARGET, SETTINGS_KEY};
 use crate::config::CredentialStore;
 
 const MAX_MESSAGE_BYTES: u64 = 1024 * 1024;
 
 pub(crate) fn run_proxy_from_cli() -> Result<(), String> {
     let args: Vec<_> = std::env::args().skip(2).collect();
-    if args.len() != 2 || args[0] != "--database" {
-        return Err("Usage: termexo mcp-proxy --database <Termexo database>".into());
+    if !(args.len() == 2 || args.len() == 3 && args[2] == "--one-ring") || args[0] != "--database" {
+        return Err("Usage: termexo mcp-proxy --database <Termexo database> [--one-ring]".into());
     }
     let database = PathBuf::from(&args[1]);
     if !database.is_absolute() {
@@ -24,10 +24,14 @@ pub(crate) fn run_proxy_from_cli() -> Result<(), String> {
         .enable_all()
         .build()
         .map_err(|e| e.to_string())?;
-    runtime.block_on(forward_stdio(&database))
+    runtime.block_on(forward_stdio(&database, args.len() == 3))
 }
 
 fn endpoint(database: &Path) -> Result<String, String> {
+    scoped_endpoint(database, false)
+}
+
+fn scoped_endpoint(database: &Path, internal: bool) -> Result<String, String> {
     // Do not open WorkspaceDatabase here: a helper must never migrate or create desktop data.
     let connection = Connection::open_with_flags(database, OpenFlags::SQLITE_OPEN_READ_ONLY)
         .map_err(|e| format!("Cannot read Termexo MCP settings: {e}"))?;
@@ -37,10 +41,22 @@ fn endpoint(database: &Path) -> Result<String, String> {
     let text: String = connection
         .query_row(
             "SELECT value FROM app_settings WHERE key = ?1",
-            [SETTINGS_KEY],
+            [if internal {
+                "one_ring.desktop_bridge.v1"
+            } else {
+                SETTINGS_KEY
+            }],
             |row| row.get(0),
         )
         .map_err(|e| e.to_string())?;
+    if internal {
+        let bridge: Value = serde_json::from_str(&text).map_err(|e| e.to_string())?;
+        let port = bridge["port"]
+            .as_u64()
+            .filter(|port| *port > 0 && *port <= u16::MAX as u64)
+            .ok_or("内置 One Ring 会话通道尚未就绪")?;
+        return Ok(format!("http://127.0.0.1:{port}/mcp"));
+    }
     let settings: McpSettings = serde_json::from_str(&text).map_err(|e| e.to_string())?;
     if !settings.enabled || !settings.auto_connect_agents {
         return Err("Termexo automatic agent MCP connection is disabled".into());
@@ -56,11 +72,20 @@ async fn forward(
     database: &Path,
     message: &Value,
     protocol: &str,
+    internal: bool,
 ) -> Result<Option<Value>, String> {
-    let url = endpoint(database)?;
+    let url = if internal {
+        scoped_endpoint(database, true)?
+    } else {
+        endpoint(database)?
+    };
     // Re-read on each request: token rotation and port edits need no config rewrite or restart.
     let token = CredentialStore
-        .get(CREDENTIAL_TARGET)
+        .get(if internal {
+            ONE_RING_CREDENTIAL_TARGET
+        } else {
+            CREDENTIAL_TARGET
+        })
         .map_err(|_| "Cannot read Termexo MCP credential")?;
     let response = client
         .post(url)
@@ -87,7 +112,7 @@ async fn forward(
     Ok(Some(value))
 }
 
-async fn forward_stdio(database: &Path) -> Result<(), String> {
+async fn forward_stdio(database: &Path, internal: bool) -> Result<(), String> {
     let client = reqwest::Client::builder()
         .no_proxy()
         .redirect(reqwest::redirect::Policy::none())
@@ -126,7 +151,7 @@ async fn forward_stdio(database: &Path) -> Result<(), String> {
         }
         let message: Value =
             serde_json::from_slice(&line).map_err(|_| "Invalid MCP JSON message")?;
-        let reply = match forward(&client, database, &message, &protocol).await {
+        let reply = match forward(&client, database, &message, &protocol, internal).await {
             Ok(reply) => reply,
             Err(error) => message.get("id").map(
                 |id| json!({"jsonrpc":"2.0", "id":id, "error":{"code":-32000,"message":error}}),
@@ -159,6 +184,34 @@ mod tests {
     fn existing_settings_enable_agent_autoconnection_by_default() {
         let settings: McpSettings = serde_json::from_value(json!({"enabled":true,"port":7421,"terminalAccess":true,"taskAccess":true,"settingsAccess":false})).unwrap();
         assert!(settings.auto_connect_agents);
+    }
+
+    #[test]
+    fn builtin_endpoint_uses_its_own_runtime_port_without_enabling_public_mcp() {
+        let path = std::env::temp_dir().join(format!(
+            "termexo-builtin-proxy-{}.db",
+            crate::remote::token::generate_token().unwrap()
+        ));
+        let connection = Connection::open(&path).unwrap();
+        connection
+            .execute(
+                "CREATE TABLE app_settings (key TEXT PRIMARY KEY, value TEXT)",
+                [],
+            )
+            .unwrap();
+        connection
+            .execute(
+                "INSERT INTO app_settings VALUES (?1, ?2)",
+                ["one_ring.desktop_bridge.v1", r#"{"port":17439}"#],
+            )
+            .unwrap();
+        assert_eq!(
+            scoped_endpoint(&path, true).unwrap(),
+            "http://127.0.0.1:17439/mcp"
+        );
+        assert!(endpoint(&path).is_err());
+        drop(connection);
+        std::fs::remove_file(path).unwrap();
     }
 
     #[test]

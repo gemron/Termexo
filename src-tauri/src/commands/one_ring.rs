@@ -6,18 +6,27 @@ use serde_json::{json, Value};
 use tauri::State;
 
 #[tauri::command(async)]
-pub fn get_one_ring_connection(
+pub fn find_one_ring_coordinator(
+    root: String,
+    workflow_id: String,
+    original_terminal_id: Option<String>,
+    terminal_ids: Vec<String>,
     database: State<'_, WorkspaceDatabase>,
-) -> Result<Option<Connection>, String> {
-    one_ring::load(&database)
+) -> Result<Option<String>, String> {
+    one_ring::find_coordinator(
+        &database,
+        &root,
+        &workflow_id,
+        original_terminal_id.as_deref(),
+        &terminal_ids,
+    )
 }
 
 #[tauri::command(async)]
-pub fn connect_one_ring(
-    connection: Connection,
+pub fn get_one_ring_connection(
     database: State<'_, WorkspaceDatabase>,
-) -> Result<Value, String> {
-    one_ring::save(&database, &connection)
+) -> Result<Option<Connection>, String> {
+    one_ring::bundled_connection(&database)
 }
 
 #[tauri::command(async)]
@@ -26,7 +35,8 @@ pub fn inspect_one_ring(
     workflow_id: Option<String>,
     database: State<'_, WorkspaceDatabase>,
 ) -> Result<Value, String> {
-    let connection = one_ring::load(&database)?.ok_or("请先连接 One Ring 插件。")?;
+    let connection = one_ring::bundled_connection(&database)?
+        .ok_or("内置 One Ring 引擎尚未就绪，请检查 Termexo 安装。")?;
     let args = match operation.as_str() {
         "one_ring_doctor" | "one_ring_list" => json!({}),
         "one_ring_status" => json!({ "workflowId": workflow_id.ok_or("缺少工作流 ID")? }),

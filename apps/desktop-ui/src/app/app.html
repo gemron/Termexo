@@ -550,8 +550,10 @@
           @if (workspaceView() === 'one-ring') {
             <app-one-ring-panel
               [root]="activeWorkspace.projectPath"
+              [terminals]="activeWorkspace.terminals"
               (coordinatorRequested)="openOneRingCoordinator($event)"
               (terminalRequested)="workspaceView.set('terminal')"
+              (workerTerminalRequested)="openOneRingWorkerTerminal($event)"
             />
           }
         }

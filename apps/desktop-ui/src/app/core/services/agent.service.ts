@@ -735,14 +735,14 @@ export class AgentService {
         },
         {
           id: 'codex-default',
-          name: 'GPT-5.6 Sol',
+          name: 'Codex configured default',
           provider: 'OpenAI',
           isDefault: false,
           hasCredential: false,
           claudeEnabled: false,
           claudeModel: '',
           codexEnabled: true,
-          codexModel: 'gpt-5.6-sol',
+          codexModel: '',
           planAlertThreshold: 80,
         },
       ]);

@@ -166,6 +166,7 @@ import { TerminalWorkbenchComponent } from './terminal/terminal-workbench';
 import { TodoBoardComponent } from './todo/todo-board';
 import { OneRingPanelComponent } from './one-ring/one-ring-panel';
 import { sameOneRingRoot, type OneRingCoordinatorRequest } from './core/models/one-ring.models';
+import { OneRingService } from './core/services/one-ring.service';
 import { WorkspaceSidebarComponent } from './workspace/workspace-sidebar';
 import { GitWorkbenchComponent } from './git/git-workbench';
 
@@ -1216,8 +1217,8 @@ export class App {
         name: oneRing ? `One Ring · ${value.name || 'Coordinator'}` : value.name || undefined,
         command: launch.command,
         model:
-          (profile ? profileModel(profile, 'codex') : undefined) ??
-          value.model ??
+          value.model ||
+          (profile ? profileModel(profile, 'codex') : undefined) ||
           this.i18n.t('terminal.defaultCodexModel'),
         workingDirectory,
         profileId: value.profileId,
@@ -1245,12 +1246,30 @@ export class App {
     this.selectedTerminalDirectory.set(null);
   }
 
+  private readonly oneRingService = inject(OneRingService);
+  private openingOneRingCoordinator = false;
   protected async openOneRingCoordinator(request: OneRingCoordinatorRequest): Promise<void> {
-    if (this.launchingCodex() || this.codexLaunchOpen()) return;
-    await this.openCodexLaunch();
-    if (this.codexLaunchOpen()) {
-      this.pendingOneRing.set(request);
-      this.selectedTerminalDirectory.set(request.root);
+    if (this.launchingCodex() || this.codexLaunchOpen() || this.openingOneRingCoordinator) return;
+    this.openingOneRingCoordinator = true;
+    try {
+      const workspace = this.state.activeWorkspace();
+      if (!workspace || !sameOneRingRoot(workspace.projectPath, request.root)) return;
+      if (request.workflowId) {
+        const id = await this.oneRingService.findCoordinator(request, workspace.terminals.map(t => t.id));
+        if (this.state.activeWorkspace()?.id !== workspace.id) return;
+        if (id && this.state.activeWorkspace()?.terminals.some(t => t.id === id && t.agentType === 'codex')) {
+          this.revealCreatedTerminal(id);
+          return;
+        }
+      }
+      await this.openCodexLaunch();
+      if (this.codexLaunchOpen()) {
+        this.pendingOneRing.set(request);
+      }
+    } catch (error) {
+      this.showToast(this.errorMessage(error), 'error');
+    } finally {
+      this.openingOneRingCoordinator = false;
     }
   }
 
@@ -1408,11 +1427,11 @@ export class App {
         name: value.session.title,
         command: launch.command,
         model:
+          value.model ||
           (profile
             ? profileModel(profile, agentType === 'claude' ? 'claude' : 'codex')
-            : undefined) ??
-          value.model ??
-          value.session.modelName ??
+            : undefined) ||
+          value.session.modelName ||
           (agentType === 'claude'
             ? 'Claude Sonnet'
             : agentType === 'codex'
@@ -1520,6 +1539,10 @@ export class App {
    * board or the Git view, where no terminal is drawn at all — the new one opened behind whichever
    * view was in front, and nothing said so.
    */
+  protected openOneRingWorkerTerminal(terminalId: string): void {
+    this.revealCreatedTerminal(terminalId);
+  }
+
   private revealCreatedTerminal(terminalId: string): void {
     this.workspaceView.set('terminal');
     this.selectTerminal(terminalId);
@@ -4157,8 +4180,7 @@ export class App {
           model:
             terminal.model &&
             !terminal.model.includes('默认模型') &&
-            !terminal.model.toLowerCase().includes('default model') &&
-            !profile
+            !terminal.model.toLowerCase().includes('default model')
               ? terminal.model
               : undefined,
           accountProfileId: terminal.accountProfileId,
@@ -4167,7 +4189,7 @@ export class App {
         if (
           !this.state.updateRestoredTerminalLaunch(terminal.id, launch.command, {
             profileId: profile?.id,
-            model: profile ? profileModel(profile, 'codex') : terminal.model,
+            model: terminal.model || (profile ? profileModel(profile, 'codex') : undefined) || this.i18n.t('terminal.defaultCodexModel'),
             nativeSessionId: sessionId,
           })
         ) {

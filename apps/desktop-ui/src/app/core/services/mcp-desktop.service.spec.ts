@@ -135,6 +135,68 @@ describe('McpDesktopService', () => {
     await service.start(actions);
   });
 
+  it('starts an interactive Codex Worker through the native preparation pipeline without creating a Todo task', async () => {
+    bridge.invoke.mockResolvedValueOnce({ command: "& 'codex.cmd' --sandbox read-only" });
+    const terminal = (await service.execute('agent_session_start', {
+      workspaceId: 'w2',
+      role: 'verifier',
+      instructionsPath: 'D:/state/instructions.md',
+      workingDirectory: 'D:/project',
+    })) as { id: string; agentType: string; autoConfirm: boolean };
+    expect(terminal.agentType).toBe('codex');
+    expect(terminal.autoConfirm).toBe(false);
+    expect(bridge.invoke).toHaveBeenCalledWith(
+      'prepare_interactive_worker_launch',
+      expect.objectContaining({
+        request: expect.objectContaining({ role: 'verifier', terminalId: terminal.id }),
+      }),
+    );
+    expect(gateway.start).toHaveBeenCalledWith(
+      expect.objectContaining({ id: terminal.id, agentType: 'codex' }),
+      120,
+      30,
+      'w2',
+    );
+    expect(actions.terminalCreated).toHaveBeenCalledWith('w2', terminal.id);
+  });
+
+  it('rejects unknown interactive roles before asking the native layer to launch anything', async () => {
+    await expect(
+      service.execute('agent_session_start', { workspaceId: 'w2', role: 'coordinator' }),
+    ).rejects.toThrow('不支持');
+    expect(bridge.invoke).not.toHaveBeenCalledWith(
+      'prepare_interactive_worker_launch',
+      expect.anything(),
+    );
+  });
+
+  it('binds an OpenCode implementation terminal to the native session and selected model', async () => {
+    bridge.invoke.mockResolvedValueOnce({ command: 'opencode --standalone --prompt task', nativeSessionId: 'ses_worker' });
+    const terminal = await service.execute('agent_session_start', { workspaceId: 'w2', cli: 'opencode', role: 'implementer', model: 'provider/model', instructionsPath: 'D:/instructions.md', workingDirectory: 'D:/project' });
+    expect(terminal).toMatchObject({ agentType: 'opencode', nativeSessionId: 'ses_worker', model: 'provider/model', autoConfirm: false });
+    expect(gateway.start).toHaveBeenCalledWith(expect.objectContaining({ agentType: 'opencode', nativeSessionId: 'ses_worker' }), 120, 30, 'w2');
+  });
+
+  it('rejects OpenCode verification rather than silently switching the requested CLI', async () => {
+    await expect(service.execute('agent_session_start', { workspaceId: 'w2', cli: 'opencode', role: 'verifier' })).rejects.toThrow('不支持');
+  });
+
+  it('confirms a removed Worker stopped only after checking the backend process inventory', async () => {
+    const result = await service.execute('agent_session_inspect', { terminalId: 'removed-worker' });
+    expect(gateway.liveTerminals).toHaveBeenCalled();
+    expect(result).toEqual({ terminalId: 'removed-worker', status: 'STOPPED', live: false, stoppedConfirmed: true });
+  });
+
+  it('does not report a removed UI row as stopped while the backend still owns its process', async () => {
+    gateway.liveTerminals.mockResolvedValueOnce(new Map([['removed-worker', 0]]));
+    await expect(service.execute('agent_session_inspect', { terminalId: 'removed-worker' })).rejects.toThrow('进程仍在运行');
+  });
+
+  it('does not confirm termination when the backend inventory is unavailable', async () => {
+    gateway.liveTerminals.mockRejectedValueOnce(new Error('Backend disconnected'));
+    await expect(service.execute('agent_session_inspect', { terminalId: 'removed-worker' })).rejects.toThrow('Backend disconnected');
+  });
+
   async function createTask() {
     return (await service.execute('task_create', {
       workspaceId: 'w2',
@@ -394,6 +456,17 @@ describe('McpDesktopService', () => {
         expect.objectContaining({ id: 'long' }),
       ),
     );
+  });
+  it('keeps Worker inspection available during a slow model catalog query', async () => {
+    let finish!: (value: unknown) => void;
+    bridge.invoke.mockImplementation((name: string) => name === 'list_codex_models'
+      ? new Promise(resolve => { finish = resolve; }) : Promise.resolve(undefined));
+    bridge.handler!({ payload: { id: 'catalog', name: 'agent_worker_models', arguments: { workspaceId: 'w2', cli: 'codex' }, deadline: Date.now() + 60000 } });
+    await vi.waitFor(() => expect(bridge.invoke).toHaveBeenCalledWith('list_codex_models', expect.anything()));
+    bridge.handler!({ payload: { id: 'inspect', name: 'agent_session_inspect', arguments: { terminalId: 'closed-worker' }, deadline: Date.now() + 60000 } });
+    await vi.waitFor(() => expect(bridge.invoke).toHaveBeenCalledWith('complete_mcp_tool', expect.objectContaining({ id: 'inspect', error: null, value: expect.objectContaining({ stoppedConfirmed: true }) })));
+    finish({ source: 'codex-app-server', models: [] });
+    await vi.waitFor(() => expect(bridge.invoke).toHaveBeenCalledWith('complete_mcp_tool', expect.objectContaining({ id: 'catalog', error: null })));
   });
 });
 

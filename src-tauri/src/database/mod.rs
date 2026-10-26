@@ -221,6 +221,7 @@ impl WorkspaceDatabase {
         connection.execute_batch(APP_SETTINGS_MIGRATION)?;
         split_legacy_single_protocol_profiles(&connection)?;
         migrate_legacy_minimax_m3_model(&connection)?;
+        migrate_codex_default_model_profile(&connection)?;
         ensure_default_profile(&connection)?;
         connection.execute_batch(AGENT_EVENT_INDEX_MIGRATION)?;
         connection.execute_batch(TODO_SNAPSHOTS_MIGRATION)?;
@@ -1154,8 +1155,8 @@ fn ensure_default_profile(connection: &Connection) -> Result<(), DatabaseError> 
                  id, name, provider, model, api_protocol, is_default, created_at, updated_at,
                  claude_enabled, claude_model, codex_enabled, codex_model
              )
-             VALUES ('codex-default', 'GPT-5.6 Sol', 'OpenAI', 'gpt-5.6-sol',
-                     'openai', 0, ?1, ?1, 0, '', 1, 'gpt-5.6-sol')",
+             VALUES ('codex-default', 'Codex configured default', 'OpenAI', '',
+                     'openai', 0, ?1, ?1, 0, '', 1, '')",
             [now],
         )?;
     }
@@ -1181,6 +1182,18 @@ fn migrate_legacy_minimax_m3_model(connection: &Connection) -> Result<(), Databa
          SET layout_json = replace(layout_json, ?1, ?2), updated_at = ?3
          WHERE instr(layout_json, ?1) > 0",
         params![LEGACY_MINIMAX_M3_MODEL, MINIMAX_M3_MODEL, now],
+    )?;
+    Ok(())
+}
+
+fn migrate_codex_default_model_profile(connection: &Connection) -> Result<(), DatabaseError> {
+    // Only the untouched seeded profile is ours to migrate; explicit user choices stay pinned.
+    connection.execute(
+        "UPDATE model_profiles SET name='Codex configured default', model='', codex_model=''
+        WHERE id='codex-default' AND name='GPT-5.6 Sol' AND provider='OpenAI'
+        AND model='gpt-5.6-sol' AND codex_model='gpt-5.6-sol' AND created_at=updated_at
+        AND credential_target IS NULL AND (codex_base_url IS NULL OR codex_base_url='')",
+        [],
     )?;
     Ok(())
 }
@@ -1974,6 +1987,33 @@ mod tests {
         assert_eq!(claude_model, MINIMAX_M3_MODEL);
         assert!(layout_json.contains(MINIMAX_M3_MODEL));
         assert!(!layout_json.contains(LEGACY_MINIMAX_M3_MODEL));
+    }
+
+    #[test]
+    fn migrates_only_the_untouched_codex_seed_to_the_cli_default() {
+        let connection = Connection::open_in_memory().unwrap();
+        connection.execute_batch("CREATE TABLE model_profiles(id TEXT, name TEXT, provider TEXT, model TEXT, codex_model TEXT, created_at INTEGER, updated_at INTEGER, credential_target TEXT, codex_base_url TEXT);
+            INSERT INTO model_profiles VALUES('codex-default','GPT-5.6 Sol','OpenAI','gpt-5.6-sol','gpt-5.6-sol',1,1,NULL,NULL);").unwrap();
+        migrate_codex_default_model_profile(&connection).unwrap();
+        let read = || {
+            connection
+                .query_row("SELECT codex_model FROM model_profiles", [], |row| {
+                    row.get::<_, String>(0)
+                })
+                .unwrap()
+        };
+        assert_eq!(read(), "");
+        connection.execute("UPDATE model_profiles SET name='GPT-5.6 Sol',model='gpt-5.6-sol',codex_model='gpt-5.6-sol',updated_at=2", []).unwrap();
+        migrate_codex_default_model_profile(&connection).unwrap();
+        assert_eq!(read(), "gpt-5.6-sol");
+        connection
+            .execute(
+                "UPDATE model_profiles SET updated_at=1,credential_target='user-key'",
+                [],
+            )
+            .unwrap();
+        migrate_codex_default_model_profile(&connection).unwrap();
+        assert_eq!(read(), "gpt-5.6-sol");
     }
 
     #[test]

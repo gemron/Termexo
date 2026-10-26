@@ -42,7 +42,6 @@ describe('One Ring integration panel', () => {
     doctor: ReturnType<typeof vi.fn>;
     list: ReturnType<typeof vi.fn>;
     status: ReturnType<typeof vi.fn>;
-    connect: ReturnType<typeof vi.fn>;
   };
   beforeEach(async () => {
     Object.defineProperty(window, '__TAURI_INTERNALS__', { value: {}, configurable: true });
@@ -51,7 +50,6 @@ describe('One Ring integration panel', () => {
       doctor: vi.fn().mockResolvedValue({ version: '0.1.0', node: 'v24', platform: 'linux' }),
       list: vi.fn().mockResolvedValue([{ ...workflow, title: workflow.plan.title }]),
       status: vi.fn().mockResolvedValue(workflow),
-      connect: vi.fn(),
     };
     await TestBed.configureTestingModule({
       imports: [OneRingPanelComponent],
@@ -65,6 +63,28 @@ describe('One Ring integration panel', () => {
   });
   afterEach(() => {
     Reflect.deleteProperty(window, '__TAURI_INTERNALS__');
+  });
+  it('opens the built-in engine without any plugin, Node or state directory form', () => {
+    expect(fixture.nativeElement.textContent).toContain('Termexo 内置编排');
+    expect(fixture.nativeElement.querySelector('input[name="pluginDirectory"]')).toBeNull();
+    expect(fixture.nativeElement.querySelector('input[name="nodeCommand"]')).toBeNull();
+    expect(fixture.nativeElement.querySelector('input[name="stateDirectory"]')).toBeNull();
+    expect(fixture.nativeElement.textContent).not.toContain('连接设置');
+    expect(fixture.nativeElement.querySelector('#one-ring-goal')).not.toBeNull();
+  });
+  it('reports a missing bundled engine as an installation problem instead of asking for paths', async () => {
+    service.connection.mockResolvedValue(null);
+    fixture.destroy();
+    fixture = TestBed.createComponent(OneRingPanelComponent);
+    fixture.componentRef.setInput('root', 'c:/project/');
+    fixture.detectChanges();
+    await fixture.whenStable();
+    fixture.detectChanges();
+    expect(fixture.nativeElement.querySelector('[role="alert"]').textContent).toContain(
+      '内置 One Ring',
+    );
+    expect(fixture.nativeElement.querySelector('input')).toBeNull();
+    expect(fixture.nativeElement.textContent).toContain('重试');
   });
   it('renders real verification evidence and retains the delivery approval phase after PASS', async () => {
     fixture.nativeElement.querySelector('.workflow').click();
@@ -88,7 +108,22 @@ describe('One Ring integration panel', () => {
       root: 'c:/project/',
       goal: 'Fix retry handling',
       workflowId: undefined,
+      implementer: { cli: 'codex' },
     });
+  });
+  it('explains a reconciled interruption and does not offer to open a removed CLI', async () => {
+    service.status.mockResolvedValue({ ...workflow, phase: 'BLOCKED', pendingStop: false,
+      runs: [{ id: 'run', role: 'implementer', status: 'INTERRUPTED', terminalId: 'old-worker' }] });
+    fixture.nativeElement.querySelector('.workflow').click();
+    await fixture.whenStable(); fixture.detectChanges();
+    expect(fixture.nativeElement.textContent).toContain('旧 Worker 已确认停止');
+    expect(fixture.nativeElement.textContent).toContain('原 CLI 会话已关闭');
+    expect(fixture.nativeElement.querySelector('.run button')).toBeNull();
+    fixture.componentRef.setInput('terminals', [{ id: 'old-worker' }]);
+    fixture.detectChanges();
+    const emitted = vi.fn(); fixture.componentInstance.workerTerminalRequested.subscribe(emitted);
+    fixture.nativeElement.querySelector('.run button').click();
+    expect(emitted).toHaveBeenCalledWith('old-worker');
   });
   it('blocks unvalidated Windows execution while keeping workflow inspection available', async () => {
     service.doctor.mockResolvedValue({ version: '0.1.0', node: 'v24', platform: 'win32' });
@@ -105,6 +140,49 @@ describe('One Ring integration panel', () => {
       true,
     );
     expect(fixture.nativeElement.querySelector('.workflow')).not.toBeNull();
+  });
+  it('enables Windows execution only when the plugin declares the required lifecycle capability', async () => {
+    service.doctor.mockResolvedValue({
+      version: '0.1.0',
+      node: 'v24',
+      platform: 'win32',
+      workerExecution: { supported: true, clis: ['codex'], lifecycle: 'windows-job-v1' },
+    });
+    fixture.destroy();
+    fixture = TestBed.createComponent(OneRingPanelComponent);
+    fixture.componentRef.setInput('root', 'c:/project/');
+    fixture.detectChanges();
+    await fixture.whenStable();
+    fixture.componentInstance['goal'].set('Fix retry handling');
+    fixture.detectChanges();
+    expect(
+      fixture.nativeElement.querySelector('[data-testid="one-ring-platform-limit"]'),
+    ).toBeNull();
+    expect(fixture.nativeElement.querySelector('[data-testid="one-ring-start"]').disabled).toBe(
+      false,
+    );
+  });
+  it.each([
+    { supported: false, clis: ['codex'], lifecycle: 'windows-job-v1' },
+    { supported: true, clis: ['pi'], lifecycle: 'windows-job-v1' },
+    { supported: true, clis: ['codex'], lifecycle: 'unknown' },
+  ])('keeps unsupported Windows capability declarations disabled: %j', async (workerExecution) => {
+    service.doctor.mockResolvedValue({
+      version: '0.1.0',
+      node: 'v24',
+      platform: 'win32',
+      workerExecution,
+    });
+    fixture.destroy();
+    fixture = TestBed.createComponent(OneRingPanelComponent);
+    fixture.componentRef.setInput('root', 'c:/project/');
+    fixture.detectChanges();
+    await fixture.whenStable();
+    fixture.componentInstance['goal'].set('Fix retry handling');
+    fixture.detectChanges();
+    expect(fixture.nativeElement.querySelector('[data-testid="one-ring-start"]').disabled).toBe(
+      true,
+    );
   });
   it('filters workflows by the current workspace and clears previous selection', async () => {
     fixture.nativeElement.querySelector('.workflow').click();

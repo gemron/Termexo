@@ -119,8 +119,20 @@ impl OpenCodeAdapter {
     /// probing for support up front, the first such failure retries once without the flag —
     /// one extra spawn only on old installs, none on current ones.
     fn run(&self, arguments: &[&str], timeout: Duration) -> Result<Output, OpenCodeError> {
+        self.run_at(arguments, timeout, None)
+    }
+
+    fn run_at(
+        &self,
+        arguments: &[&str],
+        timeout: Duration,
+        directory: Option<&str>,
+    ) -> Result<Output, OpenCodeError> {
         let executable = self.find_executable().ok_or(OpenCodeError::NotInstalled)?;
         let mut command = query_command(&executable);
+        if let Some(directory) = directory {
+            command.current_dir(directory);
+        }
         command.arg(PURE_MODE_FLAG).args(arguments);
         let output = run_with_timeout(&mut command, timeout)
             .map_err(|error| OpenCodeError::CommandFailed(error.to_string()))?;
@@ -130,6 +142,9 @@ impl OpenCodeAdapter {
                 .contains("unrecognized flag")
         {
             let mut fallback = query_command(&executable);
+            if let Some(directory) = directory {
+                fallback.current_dir(directory);
+            }
             fallback.args(arguments);
             return run_with_timeout(&mut fallback, timeout)
                 .map_err(|error| OpenCodeError::CommandFailed(error.to_string()));
@@ -151,6 +166,69 @@ impl OpenCodeAdapter {
             .as_deref()
             .and_then(opencode_major_version)
             .ok_or(OpenCodeError::VersionUnavailable)
+    }
+
+    pub fn worker_evidence(&self, session_id: &str) -> Result<Value, OpenCodeError> {
+        if !session_id.starts_with("ses_")
+            || !session_id
+                .chars()
+                .all(|c| c.is_ascii_alphanumeric() || c == '_')
+        {
+            return Err(OpenCodeError::CommandFailed(
+                "Invalid OpenCode session ID".into(),
+            ));
+        }
+        if self.plugin_api_version()? < 2 {
+            return Err(OpenCodeError::CommandFailed(
+                "One Ring requires OpenCode 2 session evidence".into(),
+            ));
+        }
+        let output = self.run(
+            &["session", "export", session_id, STANDALONE_FLAG],
+            SESSION_LIST_TIMEOUT,
+        )?;
+        if !output.status.success() {
+            let error = String::from_utf8_lossy(&output.stderr);
+            if error.contains("SessionNotFoundError") || error.contains("Session not found") {
+                return Ok(Value::Null);
+            }
+            return Err(OpenCodeError::SessionCommand(
+                String::from_utf8_lossy(&output.stderr).trim().into(),
+            ));
+        }
+        if output.stdout.len() > 16 * 1024 * 1024 {
+            return Err(OpenCodeError::SessionCommand(
+                "OpenCode session exceeds the evidence size limit".into(),
+            ));
+        }
+        let evidence: Value = serde_json::from_slice(&output.stdout)?;
+        if evidence["info"]["id"].as_str() != Some(session_id) {
+            return Err(OpenCodeError::SessionCommand(
+                "OpenCode returned another session".into(),
+            ));
+        }
+        Ok(evidence)
+    }
+
+    pub fn worker_models(&self, directory: Option<&str>) -> Result<Vec<String>, OpenCodeError> {
+        let output = self.run_at(
+            &["models", STANDALONE_FLAG],
+            SESSION_LIST_TIMEOUT,
+            directory,
+        )?;
+        if !output.status.success() {
+            return Err(OpenCodeError::CommandFailed(
+                String::from_utf8_lossy(&output.stderr).trim().into(),
+            ));
+        }
+        Ok(String::from_utf8_lossy(&output.stdout)
+            .lines()
+            .map(str::trim)
+            .filter(|line| {
+                !line.is_empty() && line.contains('/') && !line.contains(char::is_whitespace)
+            })
+            .map(str::to_owned)
+            .collect())
     }
 
     fn supports_private_server(&self) -> Result<bool, OpenCodeError> {

@@ -144,7 +144,7 @@ Trying it for the first time? [Tell us what worked or where you got stuck](https
 <details>
 <summary><strong>More features and screenshots</strong></summary>
 
-For the optional One Ring orchestration preview and Windows validation steps, see the [integration guide](docs/one-ring-integration.md) (Chinese).
+One Ring is built into Termexo, including its engine and runtime. No separate plugin, Node setup, or directory configuration is required. See the [built-in orchestration guide](docs/one-ring.md) (Chinese).
 
 ## What Works Today
 

@@ -1,4 +1,4 @@
-import { Component, computed, inject, input, output, signal } from '@angular/core';
+import { Component, computed, effect, inject, input, output, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 
 import { I18nService } from '../core/i18n/i18n.service';
@@ -6,7 +6,6 @@ import { TranslatePipe } from '../core/i18n/translate.pipe';
 import {
   AccountProfile,
   AgentInstallation,
-  CODEX_MODEL_SUGGESTIONS,
   CODEX_REASONING_EFFORT_LEVELS,
   isNativeModel,
   profileModel,
@@ -17,6 +16,7 @@ import {
 import { AGENT_ICONS } from '../core/models/workspace.models';
 import { IconComponent } from '../shared/icon/icon';
 import { LaunchDialogShellComponent } from './launch-dialog-shell';
+import { CodexModelCatalogService } from '../core/services/codex-model-catalog.service';
 
 export interface CodexLaunchDialogValue {
   name: string;
@@ -115,17 +115,19 @@ export interface CodexLaunchDialogValue {
             type="text"
             class="input input-bordered input-sm"
             list="codex-model-suggestions"
-            [placeholder]="'launch.codexModelPlaceholder' | t"
+            [placeholder]="configuredDefault() || ('launch.codexModelPlaceholder' | t)"
             [attr.aria-label]="'launch.codexModel' | t"
             [ngModel]="resolvedModel()"
             (ngModelChange)="model.set($event)"
           />
           <datalist id="codex-model-suggestions">
-            @for (suggestion of modelSuggestions; track suggestion) {
+            @for (suggestion of modelSuggestions(); track suggestion) {
               <option [value]="suggestion"></option>
             }
           </datalist>
           <small>{{ 'launch.codexModelHelp' | t }}</small>
+          <button type="button" class="btn btn-xs btn-ghost" (click)="refreshModels()" [disabled]="modelsLoading()">{{ modelsLoading() ? '读取模型…' : '刷新模型列表' }}</button>
+          @if (modelsError()) { <small role="status">{{ modelsError() }}</small> }
         </label>
         <label class="effort-field">
           <span>{{ 'settings.effortLevel' | t }}</span>
@@ -182,7 +184,35 @@ export class CodexLaunchDialogComponent {
   protected readonly profileId = signal('');
   protected readonly accountProfileId = signal('');
   protected readonly autoConfirm = signal(false);
-  protected readonly modelSuggestions = CODEX_MODEL_SUGGESTIONS;
+  private readonly catalogs = inject(CodexModelCatalogService);
+  protected readonly modelSuggestions = signal<string[]>([]);
+  protected readonly modelsLoading = signal(false);
+  protected readonly modelsError = signal('');
+  private catalogGeneration = 0;
+  protected readonly configuredDefault = signal('');
+
+  constructor() {
+    effect(() => { if (this.installation()?.healthy && this.resolvedAccountProfileId()) void this.refreshModels(); });
+  }
+
+  protected async refreshModels(): Promise<void> {
+    const account = this.resolvedAccountProfileId(), directory = this.workingDirectory();
+    const generation = ++this.catalogGeneration;
+    this.modelsLoading.set(true); this.modelsError.set(''); this.modelSuggestions.set([]); this.configuredDefault.set('');
+    const profile = this.codexProfiles().find(profile => profile.id === this.resolvedProfileId());
+    if (profile && !isNativeModel(profile, 'codex')) {
+      this.modelSuggestions.set(profile.codexModel ? [profile.codexModel] : []);
+      this.modelsLoading.set(false); return;
+    }
+    try {
+      const catalog = await this.catalogs.load(account, directory, true);
+      if (generation !== this.catalogGeneration) return;
+      this.modelSuggestions.set(catalog.models.map(model => model.id));
+      this.configuredDefault.set(catalog.configuredDefault || catalog.models.find(model => model.isDefault)?.id || '');
+    } catch {
+      if (generation === this.catalogGeneration) this.modelsError.set('无法读取 CLI 模型列表，可输入模型 ID，或留空沿用 Codex 配置。');
+    } finally { if (generation === this.catalogGeneration) this.modelsLoading.set(false); }
+  }
   protected readonly effort = signal('');
   protected readonly effortLevels = CODEX_REASONING_EFFORT_LEVELS;
   protected readonly codexAccounts = computed(() =>

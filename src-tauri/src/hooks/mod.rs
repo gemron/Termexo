@@ -73,6 +73,8 @@ const ANTIGRAVITY_STATUS_MEMORY_EXTENSION: &str = "json";
 
 const TERMEXO_CODEX_EVENT_FILE: &str = "TERMEXO_CODEX_EVENT_FILE";
 const TERMEXO_CODEX_TERMINAL_ID: &str = "TERMEXO_CODEX_TERMINAL_ID";
+#[cfg(windows)]
+const TERMEXO_CODEX_HOOK_MODULE: &str = "TERMEXO_CODEX_HOOK_MODULE";
 const CODEX_HOOK_EVENTS: [&str; 12] = [
     "SessionStart",
     "UserPromptSubmit",
@@ -191,6 +193,14 @@ impl HookEventStore {
     pub fn new(app_data_directory: &Path) -> Result<Self, HookError> {
         let runtime_directory = app_data_directory.join("runtime");
         fs::create_dir_all(&runtime_directory)?;
+        #[cfg(windows)]
+        {
+            let module = runtime_directory.join("codex-hook.mjs");
+            let source = include_str!("codex-hook.mjs");
+            if fs::read_to_string(&module).ok().as_deref() != Some(source) {
+                fs::write(module, source)?;
+            }
+        }
         let cursor_file = app_data_directory.join("claude-hook-events.cursor");
         let cursor = fs::read_to_string(&cursor_file)
             .ok()
@@ -312,14 +322,23 @@ impl HookEventStore {
             .collect())
     }
 
-    pub fn codex_hook_environment(&self, terminal_id: &str) -> [(String, String); 2] {
-        [
+    pub fn codex_hook_environment(&self, terminal_id: &str) -> Vec<(String, String)> {
+        #[allow(unused_mut)]
+        let mut environment = vec![
             (
                 TERMEXO_CODEX_EVENT_FILE.into(),
                 self.event_file.to_string_lossy().into_owned(),
             ),
             (TERMEXO_CODEX_TERMINAL_ID.into(), terminal_id.into()),
-        ]
+        ];
+        #[cfg(windows)]
+        environment.push((
+            TERMEXO_CODEX_HOOK_MODULE.into(),
+            Url::from_file_path(self.runtime_directory.join("codex-hook.mjs"))
+                .expect("application runtime directory is absolute")
+                .into(),
+        ));
+        environment
     }
 
     /// The variables the Antigravity status script reads out of its own environment.
@@ -1336,32 +1355,21 @@ fn command_quote(value: &str) -> String {
     format!("\"{}\"", value.replace('"', "\\\""))
 }
 
-fn codex_hook_command(executable: &Path) -> String {
+fn codex_hook_command(_executable: &Path) -> String {
     #[cfg(windows)]
     {
-        use base64::{engine::general_purpose::STANDARD, Engine};
-
-        // PowerShell and the npm .cmd shim strip nested double quotes from -c values.
-        // Encode only the hook script so the whole TOML override remains one argument,
-        // including when Termexo is installed under Program Files or a Unicode path.
-        let script = format!(
-            "& '{}' codex-hook-event; exit $LASTEXITCODE",
-            executable.to_string_lossy().replace('\'', "''")
-        );
-        let bytes = script
-            .encode_utf16()
-            .flat_map(u16::to_le_bytes)
-            .collect::<Vec<_>>();
-        format!(
-            "powershell.exe -NoLogo -NoProfile -NonInteractive -EncodedCommand {}",
-            STANDARD.encode(bytes)
-        )
+        // The desktop supplies its bundled Node on the terminal PATH. Write events in one
+        // lightweight process instead of starting PowerShell and the full desktop executable
+        // before and after every tool. Late expansion keeps file URL escapes and path quoting
+        // out of the npm shim, and also works when Codex invokes hooks through PowerShell.
+        // --eval=0 leaves the hook's stdin for the module instead of parsing it as JavaScript.
+        "cmd.exe /D /V:ON /C node --import=!TERMEXO_CODEX_HOOK_MODULE! --eval=0".into()
     }
     #[cfg(not(windows))]
     {
         format!(
             "{} codex-hook-event",
-            command_quote(&executable.to_string_lossy())
+            command_quote(&_executable.to_string_lossy())
         )
     }
 }
@@ -1960,19 +1968,14 @@ mod tests {
     fn codex_hooks_survive_the_npm_shim_and_preserve_hook_stdin() {
         let directory = test_directory("Program Files Termexo's $app & 中文");
         fs::create_dir_all(&directory).unwrap();
-        let executable = directory.join("termexo.cmd");
-        fs::write(
-            &executable,
-            "@echo off\r\nif not \"%~1\"==\"codex-hook-event\" exit /b 2\r\nset /p HOOK_PAYLOAD=\r\necho %HOOK_PAYLOAD%\r\n",
-        )
-        .unwrap();
+        let store = HookEventStore::new(&directory).unwrap();
         let shim = directory.join("codex.cmd");
         fs::write(
             &shim,
             "@echo off\r\n:args\r\nif \"%~1\"==\"\" exit /b 0\r\nif not \"%~1\"==\"-c\" exit /b 2\r\necho %~2\r\nshift\r\nshift\r\ngoto args\r\n",
         )
         .unwrap();
-        let configs = HookEventStore::codex_hook_configs_for_executable(&executable).unwrap();
+        let configs = store.codex_hook_configs().unwrap();
         let arguments = configs
             .iter()
             .map(|config| format!("-c '{}'", config.replace('\'', "''")))
@@ -2001,13 +2004,23 @@ mod tests {
             .unwrap();
         let mut child = hidden_command("cmd.exe")
             .args(["/D", "/S", "/C", command])
+            .envs(store.codex_hook_environment("terminal-large-hook"))
             .stdin(Stdio::piped())
             .stdout(Stdio::piped())
             .stderr(Stdio::piped())
             .spawn()
             .unwrap();
-        let payload = br#"{"hook_event_name":"SessionStart","session_id":"test-session"}"#;
-        child.stdin.take().unwrap().write_all(payload).unwrap();
+        let payload = json!({
+            "hook_event_name": "SessionStart",
+            "session_id": "test-session",
+            "tool_response": "中文\nquoted 'text' & $variables".repeat(20000),
+        });
+        child
+            .stdin
+            .take()
+            .unwrap()
+            .write_all(&serde_json::to_vec(&payload).unwrap())
+            .unwrap();
         let output = child.wait_with_output().unwrap();
         assert!(
             output.status.success(),
@@ -2016,15 +2029,59 @@ mod tests {
         );
         assert_eq!(
             serde_json::from_slice::<Value>(&output.stdout).unwrap(),
-            serde_json::from_slice::<Value>(payload).unwrap()
+            json!({})
         );
+        let stored: StoredHookEvent =
+            serde_json::from_str(fs::read_to_string(&store.event_file).unwrap().trim()).unwrap();
+        assert_eq!(stored.payload, payload);
+        assert_eq!(stored.agent_type.as_deref(), Some("codex"));
+        assert_eq!(stored.terminal_id, "terminal-large-hook");
+        assert!(!command.contains("powershell"));
 
-        fs::write(&executable, "@echo off\r\nexit /b 23\r\n").unwrap();
+        // Codex can invoke the same hook from a PowerShell session. In particular, a bare
+        // data: URL in a command is split at ';' by PowerShell before Node sees it.
+        let mut powershell = hidden_command("powershell.exe")
+            .args(["-NoProfile", "-NonInteractive", "-Command", command])
+            .envs(store.codex_hook_environment("terminal-powershell-hook"))
+            .stdin(Stdio::piped())
+            .stdout(Stdio::piped())
+            .stderr(Stdio::piped())
+            .spawn()
+            .unwrap();
+        powershell
+            .stdin
+            .take()
+            .unwrap()
+            .write_all(&serde_json::to_vec(&payload).unwrap())
+            .unwrap();
+        let output = powershell.wait_with_output().unwrap();
+        assert!(
+            output.status.success(),
+            "{}",
+            String::from_utf8_lossy(&output.stderr)
+        );
+        assert_eq!(
+            serde_json::from_slice::<Value>(&output.stdout).unwrap(),
+            json!({})
+        );
+        let events = fs::read_to_string(&store.event_file).unwrap();
+        let stored: StoredHookEvent = serde_json::from_str(events.lines().last().unwrap()).unwrap();
+        assert_eq!(stored.terminal_id, "terminal-powershell-hook");
+        assert_eq!(stored.payload, payload);
+
         let output = hidden_command("cmd.exe")
             .args(["/D", "/S", "/C", command])
+            .envs(store.codex_hook_environment("terminal-large-hook"))
+            .env(
+                TERMEXO_CODEX_HOOK_MODULE,
+                "file:///missing/termexo-codex-hook.mjs",
+            )
             .output()
             .unwrap();
-        assert_eq!(output.status.code(), Some(23));
+        assert!(
+            !output.status.success(),
+            "missing hook module must report failure"
+        );
         fs::remove_dir_all(directory).unwrap();
     }
 
@@ -2640,7 +2697,7 @@ mod tests {
                 .iter()
                 .map(|value| retarget(value))
                 .collect::<Vec<_>>(),
-            "codexEnvironment": HashMap::<_, _>::from(store.codex_hook_environment(HOOK_LAB_TERMINAL_ID)),
+            "codexEnvironment": store.codex_hook_environment(HOOK_LAB_TERMINAL_ID).into_iter().collect::<HashMap<_, _>>(),
             "openCodeConfigContent": opencode.config_content,
             "antigravityEnvironment": store.antigravity_environment(HOOK_LAB_TERMINAL_ID),
         });

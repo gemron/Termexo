@@ -92,7 +92,7 @@ mod tests {
             ..Default::default()
         };
         let list = list(&settings);
-        assert_eq!(list["tools"].as_array().unwrap().len(), 6);
+        assert_eq!(list["tools"].as_array().unwrap().len(), 8);
         for tool in list["tools"].as_array().unwrap() {
             assert!(tool.get("group").is_none());
         }

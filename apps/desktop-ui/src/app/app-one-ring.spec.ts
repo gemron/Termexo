@@ -7,6 +7,8 @@ import { AppStateService } from './core/services/app-state.service';
 import { WorkspaceRepository } from './core/services/workspace.repository';
 import type { OneRingCoordinatorRequest } from './core/models/one-ring.models';
 import type { CodexLaunchDialogValue } from './dialogs/codex-launch-dialog';
+import type { ModelProfile } from './core/models/agent.models';
+import { OneRingService } from './core/services/one-ring.service';
 
 interface Flow {
   createWorkspace(value: { name: string; projectPath: string }): Promise<void>;
@@ -15,6 +17,7 @@ interface Flow {
   closeCodexLaunch(): void;
   pendingOneRing: WritableSignal<OneRingCoordinatorRequest | null>;
   selectedTerminalDirectory: WritableSignal<string | null>;
+  codexLaunchOpen: WritableSignal<boolean>;
 }
 
 describe('One Ring coordinator launch', () => {
@@ -31,6 +34,7 @@ describe('One Ring coordinator launch', () => {
       imports: [App],
       providers: [
         { provide: WorkspaceRepository, useValue: { save: vi.fn().mockResolvedValue(undefined) } },
+        { provide: OneRingService, useValue: { findCoordinator: vi.fn().mockResolvedValue(null) } },
       ],
     });
     const fixture = TestBed.createComponent(App);
@@ -71,6 +75,14 @@ describe('One Ring coordinator launch', () => {
     await flow.launchCodex({ name: '' });
     expect(agents.prepareCodexLaunch).not.toHaveBeenCalled();
   });
+  it('preserves the user implementation profile and shows the explicitly selected coordinator model', async () => {
+    const chosen: OneRingCoordinatorRequest = { ...request, implementer: { cli: 'opencode', model: 'provider/approved-model' } };
+    vi.spyOn(agents, 'modelProfiles').mockReturnValue([{ id: 'profile', provider: 'OpenAI', codexEnabled: true, codexModel: 'profile-default' } as ModelProfile]);
+    await flow.openOneRingCoordinator(chosen);
+    await flow.launchCodex({ name: 'Selected', profileId: 'profile', model: 'selected-current-model' });
+    expect(agents.prepareCodexLaunch).toHaveBeenCalledWith(expect.objectContaining({ oneRing: chosen, model: 'selected-current-model' }));
+    expect(state.activeWorkspace()?.terminals[0]?.model).toBe('selected-current-model');
+  });
   it('clears cancelled One Ring intent before an ordinary Codex launch', async () => {
     await flow.openOneRingCoordinator(request);
     flow.closeCodexLaunch();
@@ -80,5 +92,23 @@ describe('One Ring coordinator launch', () => {
     expect(agents.prepareCodexLaunch).toHaveBeenCalledWith(
       expect.objectContaining({ oneRing: undefined, autoConfirm: true }),
     );
+  });
+  it('returns to an existing coordinator without opening another launch dialog, including repeated concurrent clicks', async () => {
+    const original = state.createTerminal({ id: 'original', agentType: 'codex', name: 'Original coordinator' })!;
+    state.createTerminal({ agentType: 'opencode', name: 'Implementation' });
+    vi.mocked(TestBed.inject(OneRingService).findCoordinator).mockResolvedValue(original.id);
+    const existing = { ...request, workflowId: 'workflow', coordinatorTerminalId: original.id };
+    await Promise.all([flow.openOneRingCoordinator(existing), flow.openOneRingCoordinator(existing)]);
+    expect(state.activeTerminal()?.id).toBe(original.id);
+    expect(state.activeWorkspace()?.terminals).toHaveLength(2);
+    expect(flow.codexLaunchOpen()).toBe(false);
+    expect(flow.pendingOneRing()).toBeNull();
+    expect(TestBed.inject(OneRingService).findCoordinator).toHaveBeenCalledTimes(1);
+    expect(agents.prepareCodexLaunch).not.toHaveBeenCalled();
+  });
+  it('offers a replacement only when the workflow has no remaining coordinator', async () => {
+    await flow.openOneRingCoordinator({ ...request, workflowId: 'closed-workflow' });
+    expect(flow.codexLaunchOpen()).toBe(true);
+    expect(flow.pendingOneRing()?.workflowId).toBe('closed-workflow');
   });
 });

@@ -6,7 +6,7 @@ mod tools;
 pub(crate) use proxy::run_proxy_from_cli;
 
 use std::collections::HashMap;
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU16, Ordering};
 use std::sync::{Arc, Mutex, RwLock};
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
@@ -21,6 +21,7 @@ use crate::remote::token::{generate_token, tokens_match};
 
 const SETTINGS_KEY: &str = "mcp-server";
 const CREDENTIAL_TARGET: &str = "mcp-server-token";
+const ONE_RING_CREDENTIAL_TARGET: &str = "one-ring-desktop-token";
 const REQUEST_EVENT: &str = "mcp-tool-request";
 const MAIN_WINDOW: &str = "main";
 const TOOL_TIMEOUT: Duration = Duration::from_secs(60);
@@ -75,10 +76,12 @@ pub struct McpManager {
     app: AppHandle,
     settings: RwLock<McpSettings>,
     token: RwLock<String>,
+    one_ring_token: RwLock<String>,
+    listener_port: AtomicU16,
     error: RwLock<Option<String>>,
     running: AsyncMutex<Option<tauri::async_runtime::JoinHandle<()>>>,
     pending: Mutex<HashMap<String, oneshot::Sender<ToolResult>>>,
-    /// Only one automation action enters the desktop at a time; this also bounds pending state.
+    /// Serialize mutations while allowing read-only observations of an active Worker.
     action: AsyncMutex<()>,
     changes: AsyncMutex<()>,
     ready: AtomicBool,
@@ -91,17 +94,29 @@ impl McpManager {
             .state::<WorkspaceDatabase>()
             .read_app_setting(SETTINGS_KEY)
             .map_err(|e| e.to_string())?;
-        let (settings, error) = match saved.map(|json| serde_json::from_str(&json)).transpose() {
-            Ok(settings) => (settings.unwrap_or_default(), None),
-            Err(error) => (
-                McpSettings::default(),
-                Some(format!("Invalid saved MCP settings: {error}")),
-            ),
-        };
+        let missing = saved.is_none();
+        let (settings, error): (McpSettings, Option<String>) =
+            match saved.map(|json| serde_json::from_str(&json)).transpose() {
+                Ok(settings) => (settings.unwrap_or_default(), None),
+                Err(error) => (
+                    McpSettings::default(),
+                    Some(format!("Invalid saved MCP settings: {error}")),
+                ),
+            };
+        if missing {
+            app.state::<WorkspaceDatabase>()
+                .write_app_setting(
+                    SETTINGS_KEY,
+                    &serde_json::to_string(&settings).map_err(|e| e.to_string())?,
+                )
+                .map_err(|e| e.to_string())?;
+        }
         Ok(Arc::new(Self {
             app,
             settings: RwLock::new(settings),
             token: RwLock::new(String::new()),
+            one_ring_token: RwLock::new(String::new()),
+            listener_port: AtomicU16::new(0),
             error: RwLock::new(error),
             running: AsyncMutex::new(None),
             pending: Mutex::new(HashMap::new()),
@@ -124,6 +139,18 @@ impl McpManager {
         !expected.is_empty() && tokens_match(&expected, token)
     }
 
+    pub fn one_ring_authorized(&self, token: &str) -> bool {
+        let expected = self
+            .one_ring_token
+            .read()
+            .unwrap_or_else(|e| e.into_inner());
+        !expected.is_empty() && tokens_match(&expected, token)
+    }
+
+    pub fn listener_port(&self) -> u16 {
+        self.listener_port.load(Ordering::Acquire)
+    }
+
     pub async fn status(&self) -> McpStatus {
         let settings = self.settings();
         let running = self
@@ -132,6 +159,7 @@ impl McpManager {
             .await
             .as_ref()
             .is_some_and(|task| !task.inner().is_finished());
+        let running = running && settings.enabled;
         McpStatus {
             url: format!("http://127.0.0.1:{}/mcp", settings.port),
             settings,
@@ -154,6 +182,16 @@ impl McpManager {
         request: &mut crate::commands::terminal::TerminalStartRequest,
         environment: &mut HashMap<String, String>,
     ) -> Result<(), String> {
+        if self
+            .app
+            .state::<WorkspaceDatabase>()
+            .read_app_setting(&format!("one_ring.worker.v1.{}", request.terminal_id))
+            .map_err(|e| e.to_string())?
+            .is_some()
+        {
+            // Interactive Workers keep their lifecycle hooks but cannot recursively control the desktop.
+            return Ok(());
+        }
         // The One Ring coordinator owns its workflow and approval, including after restore.
         if request.agent_type.as_deref() == Some("codex")
             && request
@@ -240,28 +278,63 @@ impl McpManager {
                 *self.error.write().unwrap_or_else(|e| e.into_inner()) = Some(error);
             }
         }
-        if !self.settings().enabled {
-            return Ok(());
-        }
         let credentials = self.app.state::<CredentialStore>();
-        let token = match credentials
-            .get_optional(CREDENTIAL_TARGET)
+        let internal_token = match credentials
+            .get_optional(ONE_RING_CREDENTIAL_TARGET)
             .map_err(|e| e.to_string())?
         {
             Some(token) => token,
             None => {
                 let token = generate_token().map_err(|e| e.to_string())?;
                 credentials
-                    .set(CREDENTIAL_TARGET, &token)
+                    .set(ONE_RING_CREDENTIAL_TARGET, &token)
                     .map_err(|e| e.to_string())?;
                 token
             }
         };
+        *self
+            .one_ring_token
+            .write()
+            .unwrap_or_else(|e| e.into_inner()) = internal_token;
+        let token = if self.settings().enabled {
+            match credentials
+                .get_optional(CREDENTIAL_TARGET)
+                .map_err(|e| e.to_string())?
+            {
+                Some(token) => token,
+                None => {
+                    let token = generate_token().map_err(|e| e.to_string())?;
+                    credentials
+                        .set(CREDENTIAL_TARGET, &token)
+                        .map_err(|e| e.to_string())?;
+                    token
+                }
+            }
+        } else {
+            String::new()
+        };
         *self.token.write().unwrap_or_else(|e| e.into_inner()) = token;
-        let listener =
-            tokio::net::TcpListener::bind((std::net::Ipv4Addr::LOCALHOST, self.settings().port))
-                .await
-                .map_err(|e| format!("Cannot start local MCP server: {e}"))?;
+        let port = if self.settings().enabled {
+            self.settings().port
+        } else {
+            0
+        };
+        let listener = tokio::net::TcpListener::bind((std::net::Ipv4Addr::LOCALHOST, port))
+            .await
+            .map_err(|e| format!("Cannot start local MCP server: {e}"))?;
+        let actual_port = listener.local_addr().map_err(|e| e.to_string())?.port();
+        self.listener_port.store(actual_port, Ordering::Release);
+        let database = self.app.state::<WorkspaceDatabase>();
+        if let Some(saved) = database
+            .read_app_setting("one_ring.desktop_bridge.v1")
+            .map_err(|e| e.to_string())?
+        {
+            let mut bridge: Value = serde_json::from_str(&saved).map_err(|e| e.to_string())?;
+            bridge["port"] = actual_port.into();
+            database
+                .write_app_setting("one_ring.desktop_bridge.v1", &bridge.to_string())
+                .map_err(|e| e.to_string())?;
+        }
         let manager = self.clone();
         *running = Some(tauri::async_runtime::spawn(async move {
             if let Err(error) = axum::serve(listener, server::router(manager.clone())).await {
@@ -275,16 +348,26 @@ impl McpManager {
     }
 
     pub async fn call(self: &Arc<Self>, name: &str, arguments: Value) -> ToolResult {
+        self.call_scoped(name, arguments, false).await
+    }
+
+    pub(super) async fn call_scoped(
+        self: &Arc<Self>,
+        name: &str,
+        arguments: Value,
+        internal: bool,
+    ) -> ToolResult {
         let tool = tools::catalog()
             .into_iter()
             .find(|tool| tool["name"] == name)
             .ok_or("Unknown MCP tool")?;
         tools::validate_arguments(&tool["inputSchema"], &arguments)?;
-        let _action = self
-            .action
-            .try_lock()
-            .map_err(|_| "Another MCP action is in progress; try again when it finishes")?;
-        let settings = self.settings();
+        let _action = action_guard(&self.action, name)?;
+        let settings = if internal {
+            server::one_ring_settings(self.listener_port())
+        } else {
+            self.settings()
+        };
         if !settings.enabled || !tools::allowed(&tool, &settings) {
             return Err("MCP access to this tool is disabled".into());
         }
@@ -335,6 +418,54 @@ impl McpManager {
         sender
             .send(result)
             .map_err(|_| "MCP caller disconnected".into())
+    }
+}
+
+fn action_guard<'a>(
+    action: &'a AsyncMutex<()>,
+    name: &str,
+) -> Result<Option<tokio::sync::MutexGuard<'a, ()>>, String> {
+    if matches!(
+        name,
+        "workspace_list"
+            | "terminal_list"
+            | "terminal_read"
+            | "agent_session_inspect"
+            | "agent_worker_models"
+    ) {
+        Ok(None)
+    } else {
+        action
+            .try_lock()
+            .map(Some)
+            .map_err(|_| "Another MCP action is in progress; try again when it finishes".into())
+    }
+}
+
+#[cfg(test)]
+mod action_tests {
+    use super::*;
+
+    #[tokio::test]
+    async fn observations_do_not_block_worker_actions_and_mutations_remain_exclusive() {
+        let action = AsyncMutex::new(());
+        let mutation = action_guard(&action, "agent_session_start").unwrap();
+        for tool in [
+            "workspace_list",
+            "terminal_list",
+            "terminal_read",
+            "agent_session_inspect",
+            "agent_worker_models",
+        ] {
+            assert!(action_guard(&action, tool).unwrap().is_none());
+        }
+        assert!(action_guard(&action, "terminal_close").is_err());
+        drop(mutation);
+        let read = action_guard(&action, "agent_worker_models").unwrap();
+        assert!(action_guard(&action, "agent_session_start")
+            .unwrap()
+            .is_some());
+        drop(read);
     }
 }
 

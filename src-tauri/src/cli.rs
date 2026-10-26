@@ -228,7 +228,10 @@ fn build_npm_plan(
         up_to_date,
         npm_path: npm_path.map(|path| path.to_string_lossy().into_owned()),
         npm_version,
-        command_preview: format!("npm install --global {package_spec} --no-fund --no-audit"),
+        command_preview: format!(
+            "npm {}",
+            npm_install_arguments(package_name, &package_spec).join(" ")
+        ),
         network_profile_id: network_profile.map(|profile| profile.id.clone()),
         network_profile_name: network_profile.map(|profile| profile.name.clone()),
         npm_registry: network_profile.and_then(|profile| profile.npm_registry.clone()),
@@ -347,13 +350,10 @@ pub fn execute_operation(
 
     let install = run_npm_command(
         &npm_path,
-        &[
-            "install",
-            "--global",
-            &plan.package_spec,
-            "--no-fund",
-            "--no-audit",
-        ],
+        &npm_install_arguments(&plan.package_name, &plan.package_spec)
+            .iter()
+            .map(String::as_str)
+            .collect::<Vec<_>>(),
         &environment,
         CLI_OPERATION_TIMEOUT,
     )?;
@@ -540,13 +540,10 @@ fn failed_result_with_rollback(
 
     let rollback = run_npm_command(
         npm_path,
-        &[
-            "install",
-            "--global",
-            &package_spec,
-            "--no-fund",
-            "--no-audit",
-        ],
+        &npm_install_arguments(&plan.package_name, &package_spec)
+            .iter()
+            .map(String::as_str)
+            .collect::<Vec<_>>(),
         environment,
         CLI_OPERATION_TIMEOUT,
     );
@@ -854,6 +851,23 @@ fn npm_command(npm_path: &Path) -> Command {
     Command::new(npm_path)
 }
 
+fn npm_install_arguments(package: &str, spec: &str) -> Vec<String> {
+    let mut args = vec![
+        "install".into(),
+        "--global".into(),
+        spec.into(),
+        "--no-fund".into(),
+        "--no-audit".into(),
+    ];
+    // OpenCode ships a placeholder until its package-specific postinstall copies the native binary.
+    // Recent npm versions otherwise report success while skipping that script.
+    if package == "@opencode/cli" {
+        args.push("--ignore-scripts=false".into());
+        args.push("--allow-scripts=@opencode/cli".into());
+    }
+    args
+}
+
 fn read_output(mut reader: impl Read) -> String {
     let mut output = Vec::new();
     let _ = reader.read_to_end(&mut output);
@@ -982,6 +996,18 @@ fn definition(agent_type: &str) -> Result<CliDefinition, String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn opencode_install_and_rollback_allow_only_the_required_package_script() {
+        let args = npm_install_arguments("@opencode/cli", "@opencode/cli@2.1.4");
+        assert!(args.contains(&"--allow-scripts=@opencode/cli".into()));
+        assert!(args.contains(&"--ignore-scripts=false".into()));
+        assert!(
+            !npm_install_arguments("@openai/codex", "@openai/codex@latest")
+                .iter()
+                .any(|arg| arg.starts_with("--allow-scripts"))
+        );
+    }
 
     #[cfg(windows)]
     use std::fs;

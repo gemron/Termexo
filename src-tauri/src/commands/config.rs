@@ -106,7 +106,11 @@ pub fn save_model_profile(
             profile.name
         ));
     }
-    if profile.codex_enabled && profile.codex_model.is_empty() {
+    if profile.codex_enabled
+        && profile.codex_model.is_empty()
+        && !(profile.provider.eq_ignore_ascii_case("OpenAI")
+            && profile.codex_base_url.as_deref().unwrap_or("").is_empty())
+    {
         return Err(format!(
             "模型 Profile「{}」已为 Codex 启用，必须填写 Codex 使用的模型。",
             profile.name

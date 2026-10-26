@@ -115,6 +115,7 @@ pub fn create_terminal(
             tracing::warn!(terminal_id = %request.terminal_id, "无法应用默认网络配置：{error}");
         }
     }
+    crate::process::apply_bundled_runtime(&mut environment);
     if request.agent_type.as_deref() == Some("opencode") {
         OpenCodeAdapter::new()
             .ensure_private_server(&mut request.command)

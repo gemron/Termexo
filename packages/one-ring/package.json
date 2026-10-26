@@ -1,0 +1,24 @@
+{
+  "name": "one-ring",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Termexo built-in One Ring orchestration engine.",
+  "engines": { "node": ">=24.0.0" },
+  "scripts": {
+    "build": "tsc --noEmit && node scripts/build.mjs",
+    "test": "node --import tsx --test tests/*.test.ts",
+    "test:e2e": "node --import tsx scripts/e2e.ts",
+    "test:windows": "node --import tsx scripts/windows-preflight.ts"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.28.0",
+    "zod": "^4.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^24.0.0",
+    "esbuild": "^0.25.0",
+    "tsx": "^4.0.0",
+    "typescript": "^5.9.0"
+  }
+}

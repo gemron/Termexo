@@ -2091,7 +2091,7 @@ export class AgentSettingsDialogComponent {
     this.codexModel = preset.codexModel;
     this.codexBaseUrl = preset.codexBaseUrl;
     this.claudeEnabled = Boolean(preset.claudeModel) || preset.provider === CUSTOM_PROVIDER;
-    this.codexEnabled = Boolean(preset.codexModel) || preset.provider === CUSTOM_PROVIDER;
+    this.codexEnabled = Boolean(preset.codexModel) || preset.provider === CUSTOM_PROVIDER || preset.provider === 'OpenAI';
   }
 
   protected presetDocsUrl(): string {
@@ -2141,7 +2141,7 @@ export class AgentSettingsDialogComponent {
     // An enabled side without a model would launch its agent with nothing to run.
     return (
       (!this.claudeEnabled || Boolean(this.claudeModel.trim())) &&
-      (!this.codexEnabled || Boolean(this.codexModel.trim()))
+      (!this.codexEnabled || Boolean(this.codexModel.trim()) || (this.modelProvider === 'OpenAI' && !this.codexBaseUrl.trim()))
     );
   }
 

@@ -12,6 +12,7 @@
     "vendor/win32-x64/termexo.exe",
     "vendor/win32-x64/conpty.dll",
     "vendor/win32-x64/OpenConsole.exe",
+    "vendor/win32-x64/one-ring/",
     "README.md"
   ],
   "os": [

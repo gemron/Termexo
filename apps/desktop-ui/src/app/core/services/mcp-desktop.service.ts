@@ -118,12 +118,14 @@ export class McpDesktopService {
     try {
       if (Date.now() > request.deadline)
         throw new Error('MCP request expired before the desktop received it');
-      if (this.executing) throw new Error('A previous desktop MCP action is still running');
-      this.executing = true;
-      try {
+      const readOnly = ['workspace_list', 'terminal_list', 'terminal_read', 'agent_session_inspect', 'agent_worker_models'].includes(request.name);
+      if (readOnly) {
         value = await this.execute(request.name, request.arguments);
-      } finally {
-        this.executing = false;
+      } else {
+        if (this.executing) throw new Error('A previous desktop MCP action is still running');
+        this.executing = true;
+        try { value = await this.execute(request.name, request.arguments); }
+        finally { this.executing = false; }
       }
     } catch (failure) {
       error = failure instanceof Error ? failure.message : String(failure);
@@ -163,6 +165,50 @@ export class McpDesktopService {
       }
       case 'terminal_create':
         return this.createTerminal(args);
+      case 'agent_worker_models': {
+        const workspace = this.workspace(String(args['workspaceId']));
+        if (args['cli'] === 'codex') return this.bridge.invoke('list_codex_models', {
+          accountProfileId: args['accountProfileId'] ?? null, workingDirectory: workspace.projectPath,
+        });
+        if (args['cli'] === 'opencode') {
+          const models = await this.bridge.invoke<string[]>('list_opencode_worker_models', { workingDirectory: workspace.projectPath });
+          return { source: 'opencode-cli', configuredDefault: null, models: models.map(id => ({ id })) };
+        }
+        throw new Error('不支持的 Worker CLI');
+      }
+      case 'agent_session_start':
+        return this.createInteractiveWorker(args);
+      case 'agent_session_inspect': {
+        const terminalId = String(args['terminalId']);
+        const live = await this.gateway.liveTerminals();
+        const terminal = this.state.workspaces().flatMap((workspace) => workspace.terminals)
+          .find((item) => item.id === terminalId);
+        if (!terminal) {
+          if (live.has(terminalId)) throw new Error('终端进程仍在运行，但会话记录不可用');
+          return { terminalId, status: 'STOPPED', live: false, stoppedConfirmed: true };
+        }
+        if (terminal.agentType === 'opencode') {
+          const evidence = terminal.nativeSessionId && live.has(terminal.id)
+            ? await this.bridge.invoke<unknown>('get_opencode_worker_evidence', { sessionId: terminal.nativeSessionId }) : null;
+          return { terminalId: terminal.id, agentType: 'opencode', status: terminal.status, live: live.has(terminal.id),
+            stoppedConfirmed: !live.has(terminal.id), sessionId: terminal.nativeSessionId, evidence };
+        }
+        if (terminal.agentType !== 'codex') throw new Error('当前结构化会话证据只支持 Codex / OpenCode');
+        const transcriptPath = terminal.nativeSessionId
+          ? await this.bridge.invoke<string | null>('get_worker_transcript_path', {
+              sessionId: terminal.nativeSessionId,
+              accountProfileId: terminal.accountProfileId ?? null,
+            })
+          : null;
+        return {
+          terminalId: terminal.id,
+          status: terminal.status,
+          live: live.has(terminal.id),
+          stoppedConfirmed: !live.has(terminal.id),
+          sessionId: terminal.nativeSessionId,
+          transcriptPath,
+        };
+      }
       case 'terminal_read': {
         this.terminal(String(args['terminalId']));
         const scrollback = await this.bridge.invoke<{
@@ -324,6 +370,55 @@ export class McpDesktopService {
       default:
         throw new Error(`Unknown MCP tool: ${name}`);
     }
+  }
+
+  private async createInteractiveWorker(args: Arguments): Promise<TerminalSession> {
+    const workspace = this.workspace(String(args['workspaceId']));
+    const terminalId = crypto.randomUUID();
+    const role = String(args['role']);
+    if (!['implementer', 'verifier'].includes(role)) throw new Error('不支持的 Worker 角色');
+    const cli = String(args['cli'] ?? 'codex');
+    if (!['codex', 'opencode'].includes(cli) || (cli === 'opencode' && role !== 'implementer')) throw new Error('不支持的 Worker CLI / 角色');
+    const accountProfileId = args['accountProfileId'] as string | undefined;
+    const launch = await this.bridge.invoke<{ command: string; nativeSessionId?: string }>(
+      'prepare_interactive_worker_launch',
+      {
+        request: {
+          terminalId,
+          workspaceId: workspace.id,
+          role,
+          cli,
+          instructionsPath: args['instructionsPath'],
+          model: args['model'] ?? null,
+          accountProfileId: accountProfileId ?? null,
+        },
+      },
+    );
+    const terminal = this.state.createTerminal(
+      {
+        id: terminalId,
+        agentType: cli as 'codex' | 'opencode',
+        nativeSessionId: launch.nativeSessionId,
+        name: String(args['name'] || `One Ring · ${role}`),
+        command: launch.command,
+        workingDirectory: String(args['workingDirectory']),
+        model: args['model'] as string | undefined,
+        accountProfileId,
+        autoConfirm: false,
+      },
+      workspace.id,
+    );
+    if (!terminal) throw new Error('无法创建交互 Worker 终端');
+    try {
+      await this.gateway.start(terminal, 120, 30, workspace.id);
+    } catch (error) {
+      this.state.removeTerminal(terminal.id);
+      await this.repository.flush();
+      throw error;
+    }
+    this.actions!.terminalCreated(workspace.id, terminal.id);
+    await this.repository.flush();
+    return terminal;
   }
 
   private async createTerminal(args: Arguments): Promise<TerminalSession> {

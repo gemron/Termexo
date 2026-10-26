@@ -6,6 +6,7 @@ import {
   type ModelProfile,
 } from '../core/models/agent.models';
 import { CodexLaunchDialogComponent, type CodexLaunchDialogValue } from './codex-launch-dialog';
+import { CodexModelCatalogService } from '../core/services/codex-model-catalog.service';
 
 const INSTALLATION: AgentInstallation = {
   agentType: 'codex',
@@ -55,10 +56,13 @@ describe('CodexLaunchDialogComponent', () => {
   let fixture: ComponentFixture<CodexLaunchDialogComponent>;
   let component: CodexLaunchDialogComponent;
   let root: HTMLElement;
+  const catalogs = { load: vi.fn() };
 
   beforeEach(async () => {
+    catalogs.load.mockResolvedValue({ source: 'codex-app-server', configuredDefault: null, models: [] });
     await TestBed.configureTestingModule({
       imports: [CodexLaunchDialogComponent],
+      providers: [{ provide: CodexModelCatalogService, useValue: catalogs }],
     }).compileComponents();
     fixture = TestBed.createComponent(CodexLaunchDialogComponent);
     component = fixture.componentInstance;
@@ -72,6 +76,31 @@ describe('CodexLaunchDialogComponent', () => {
 
   it('shows the model supplied by the selected profile before launch', () => {
     expect(root.querySelector<HTMLInputElement>('.model-field input')?.value).toBe('MiniMax-M3');
+  });
+
+  it('loads current CLI models without replacing a user-selected model', async () => {
+    catalogs.load.mockResolvedValue({ source: 'codex-app-server', configuredDefault: 'future-model', models: [{ id: 'future-model', isDefault: true }] });
+    fixture.componentRef.setInput('profiles', [{ ...OPENAI, codexModel: '', isDefault: true }]);
+    fixture.detectChanges();
+    await component['refreshModels'](); fixture.detectChanges();
+    expect(root.querySelectorAll('datalist option')).toHaveLength(1);
+    expect(root.querySelector('datalist option')?.getAttribute('value')).toBe('future-model');
+    expect(root.querySelector<HTMLInputElement>('.model-field input')?.placeholder).toBe('future-model');
+    component['model'].set('user-pinned-model');
+    await component['refreshModels'](); fixture.detectChanges();
+    await fixture.whenStable(); fixture.detectChanges();
+    expect(root.querySelector<HTMLInputElement>('.model-field input')?.value).toBe('user-pinned-model');
+  });
+
+  it('keeps manual input available when model discovery fails', async () => {
+    catalogs.load.mockRejectedValue(new Error('Disconnected'));
+    fixture.componentRef.setInput('profiles', [{ ...OPENAI, isDefault: true }]);
+    fixture.detectChanges(); await fixture.whenStable();
+    component['model'].set('manual-model');
+    await component['refreshModels'](); fixture.detectChanges();
+    await fixture.whenStable(); fixture.detectChanges();
+    expect(root.querySelector<HTMLInputElement>('.model-field input')?.value).toBe('manual-model');
+    expect(root.textContent).toContain('无法读取 CLI 模型列表');
   });
 
   it('identifies One Ring coordination and hides automatic confirmation', () => {

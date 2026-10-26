@@ -8,9 +8,16 @@ export interface OneRingCoordinatorRequest {
   root: string;
   goal: string;
   workflowId?: string;
+  coordinatorTerminalId?: string;
+  implementer?: { cli: 'codex' | 'opencode'; model?: string };
 }
 
 export interface OneRingDoctor {
+  workerExecution?: {
+    supported: boolean;
+    clis: string[];
+    lifecycle: string;
+  };
   version: string;
   node: string;
   platform: string;
@@ -36,6 +43,7 @@ export interface OneRingSummary {
 
 export interface OneRingWorkflow {
   id: string;
+  coordinatorTerminalId?: string;
   root: string;
   phase: string;
   revision: number;
@@ -43,7 +51,15 @@ export interface OneRingWorkflow {
   blockedReason?: string;
   pendingStop?: boolean;
   repairRound: number;
-  runs: { id: string; role: string; status: string; error?: string }[];
+  runs: {
+    id: string;
+    role: string;
+    status: string;
+    error?: string;
+    terminalId?: string;
+    sessionId?: string;
+    lifecycle?: string;
+  }[];
   verification?: {
     outcome: string;
     summary: string;

@@ -5,71 +5,24 @@
     <p>{{ root() }}</p>
   </div>
   <div class="actions">
-    @if (connected()) {
-      <button class="btn btn-sm btn-ghost" (click)="configuring.set(!configuring())">
-        连接设置
-      </button>
-      <button class="btn btn-sm btn-ghost" (click)="refresh()" [disabled]="busy()">
-        {{ busy() ? '读取中…' : '刷新' }}
-      </button>
-    }
+    <span class="muted">Termexo 内置编排</span>
+    <button class="btn btn-sm btn-ghost" (click)="reload()" [disabled]="busy()">
+      {{ busy() ? '读取中…' : connected() ? '刷新' : '重试' }}
+    </button>
     <button class="btn btn-sm btn-ghost" (click)="terminalRequested.emit()">返回终端</button>
   </div>
 </header>
 @if (mode === 'preview') {
-  <p class="notice">浏览器预览没有本地 CLI 连接。请在 Termexo 桌面应用中连接插件。</p>
+  <p class="notice">One Ring 已内置于 Termexo。请在桌面应用中使用本地 Agent 编排。</p>
 }
 @if (error()) {
   <p class="notice error" role="alert">{{ error() }}</p>
 }
-@if (configuring()) {
-  <form class="connection" (ngSubmit)="connect()">
-    <h2>连接已安装的 One Ring 插件</h2>
-    <p>
-      选择桌面主机上的完整插件目录，内含 plugin.json、server/index.mjs 和
-      skills。状态目录必须与协调会话一致。
-    </p>
-    <label
-      >插件目录<input
-        class="input input-bordered"
-        name="pluginDirectory"
-        [ngModel]="connection().pluginDirectory"
-        (ngModelChange)="updateConnection('pluginDirectory', $event)"
-        placeholder="C:\tools\one-ring\plugins\codex"
-        required
-    /></label>
-    <label
-      >Node.js 24+ 可执行文件<input
-        class="input input-bordered"
-        name="nodeCommand"
-        [ngModel]="connection().nodeCommand"
-        (ngModelChange)="updateConnection('nodeCommand', $event)"
-        placeholder="node 或 node.exe 的完整路径"
-        required
-    /></label>
-    <label
-      >One Ring 状态目录（绝对路径）<input
-        class="input input-bordered"
-        name="stateDirectory"
-        [ngModel]="connection().stateDirectory"
-        (ngModelChange)="updateConnection('stateDirectory', $event)"
-        placeholder="C:\Users\you\.one-ring"
-        required
-    /></label>
-    <button class="btn btn-sm btn-primary" type="submit" [disabled]="busy() || mode !== 'desktop'">
-      {{ busy() ? '验证连接…' : '验证并保存连接' }}
-    </button>
-    @if (mode === 'remote') {
-      <p>请在桌面端设置插件路径；远程端可查看已连接的工作流。</p>
-    }
-  </form>
-}
 @if (connected()) {
   @if (doctor(); as health) {
     <div class="health">
-      <span class="dot"></span>One Ring {{ health.version }} · {{ health.node }} ·
-      {{ health.platform
-      }}<span class="muted">{{ refreshedAt() ? '更新于 ' + refreshedAt() : '' }}</span>
+      <span class="dot"></span>One Ring 已就绪 · 内置引擎 {{ health.version }}
+      <span class="muted">{{ refreshedAt() ? '更新于 ' + refreshedAt() : '' }}</span>
     </div>
     @if (health.cli?.length) {
       <div class="cli-status">
@@ -82,9 +35,8 @@
     }
     @if (!executionSupported()) {
       <p class="notice" data-testid="one-ring-platform-limit">
-        此 One Ring 版本的 Worker 仅验证过
-        Linux。当前平台可以验证连接和读取工作流，暂不开放启动任务；需先完成 Windows
-        沙箱与进程生命周期适配。
+        当前插件尚未声明支持此平台的 Worker 执行。仍可验证连接和读取工作流；Windows
+        启动任务需要支持原生沙箱及进程生命周期管理的 One Ring 插件。
       </p>
     }
   }
@@ -98,6 +50,19 @@
       (ngModelChange)="goal.set($event)"
       placeholder="描述目标与验收标准，随后在 Codex 会话中审阅计划并确认。"
     ></textarea>
+    <label>实施者 CLI
+      <select class="select select-bordered" [ngModel]="implementerCli()" (ngModelChange)="chooseImplementer($event)">
+        <option value="codex">Codex</option><option value="opencode">OpenCode 2</option>
+      </select>
+    </label>
+    <label>实施者模型
+      <input class="input input-bordered" list="one-ring-implementer-models" [ngModel]="implementerModel()" (ngModelChange)="implementerModel.set($event)"
+        placeholder="可指定模型；留空由协调者建议，并在计划中确认" />
+      <datalist id="one-ring-implementer-models">
+        @for (model of openCodeModels(); track model) { <option [value]="model"></option> }
+      </datalist>
+    </label>
+    <p class="muted">协调者和独立验证者使用 Codex。实施者的 CLI、模型将写入计划，由你确认后执行。</p>
     <button
       class="btn btn-sm btn-primary"
       data-testid="one-ring-start"
@@ -107,7 +72,7 @@
       选择 Codex 账号与模型 →
     </button>
     <p class="muted">
-      当前支持 Codex Worker。计划、修复、恢复与交付确认在协调终端中完成。关闭协调会话会中断其
+      当前支持 Codex / OpenCode 实施者和 Codex 验证者。计划、修复、恢复与交付确认在协调终端中完成。关闭协调会话会中断其
       Worker。
     </p>
   </section>
@@ -148,6 +113,8 @@
         }
         @if (workflow.pendingStop) {
           <p class="notice">进程终止尚未确认，请在协调终端中检查。</p>
+        } @else if (workflow.phase === 'BLOCKED' && workflow.pendingStop === false) {
+          <p class="notice">旧 Worker 已确认停止。请打开协调会话，选择恢复或结束此工作流。</p>
         }
         <h3>验收标准</h3>
         <ol>
@@ -160,6 +127,15 @@
           <p class="run">
             <b>{{ run.role }}</b
             ><code>{{ run.status }}</code>
+            @if (run.terminalId) {
+              @if (terminalAvailable(run.terminalId)) {
+                <button class="btn btn-xs" (click)="workerTerminalRequested.emit(run.terminalId)">
+                  打开 CLI 会话
+                </button>
+              } @else {
+                <span class="muted">原 CLI 会话已关闭，执行记录已保留。</span>
+              }
+            }
             @if (run.error) {
               <span>{{ run.error }}</span>
             }

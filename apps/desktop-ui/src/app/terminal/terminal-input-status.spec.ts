@@ -175,6 +175,28 @@ describe('TerminalInputStatusTracker', () => {
       expect(statusAfter('\r', 'codex', 'WAITING_APPROVAL', CODEX_APPROVAL_DIALOG)).toBe('RUNNING');
     });
 
+    it('keeps a settled Codex turn settled when confirming the quota model menu', () => {
+      const quotaMenu = [
+        'Approaching rate limits',
+        'Switch to gpt-6-luna for lower credit usage?',
+        '  1. Switch to gpt-6-luna',
+        '› 2. Keep current model',
+        '  3. Keep current model (never show again)',
+        'enter select · esc back',
+      ];
+      for (const status of ['COMPLETED', 'IDLE'] as const) {
+        expect(statusAfter('\r', 'codex', status, quotaMenu)).toBeNull();
+      }
+      // Answering a question during active work can still resume the agent.
+      expect(statusAfter('\r', 'codex', 'WAITING_INPUT', quotaMenu)).toBe('THINKING');
+    });
+
+    it('still submits prompts when numbered output has no highlighted menu choice', () => {
+      expect(statusAfter('\r', 'codex', 'COMPLETED', ['1. First step', '2. Second step'])).toBe(
+        'THINKING',
+      );
+    });
+
     it('assumes an approval when no dialog can be read', () => {
       expect(statusAfter('\r', 'claude', 'WAITING_APPROVAL')).toBe('RUNNING');
       expect(statusAfter('\r', 'claude', 'WAITING_APPROVAL', CLAUDE_QUESTION_DIALOG)).toBe(

@@ -143,7 +143,7 @@ MCP 是 AI 与 Termexo 之间的连接。**你用日常语言提出要求，不�
 <details>
 <summary><strong>更多功能与截图</strong></summary>
 
-One Ring 编排接入预览及 Windows 验证步骤见 [One Ring 集成说明](docs/one-ring-integration.md)。
+One Ring 已内置于 Termexo：无需安装独立插件、配置 Node 或填写目录。使用方式见 [One Ring 内置编排](docs/one-ring.md)。
 
 ## 现在已经能做什么
 

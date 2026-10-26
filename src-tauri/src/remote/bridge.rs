@@ -53,8 +53,11 @@ pub const REMOTE_EVENTS: &[&str] = &[
 pub const REMOTE_ALLOWED: &[&str] = &[
     "get_one_ring_connection",
     "inspect_one_ring",
+    "find_one_ring_coordinator",
     "detect_claude",
     "detect_codex",
+    "list_codex_models",
+    "list_opencode_worker_models",
     "detect_opencode",
     "detect_grok",
     "detect_pi",
@@ -139,8 +142,10 @@ pub const REMOTE_ALLOWED: &[&str] = &[
 
 /// Commands a remote client must never reach, with the reason each one is held back.
 pub const REMOTE_DENIED: &[&str] = &[
+    "prepare_interactive_worker_launch",
+    "get_worker_transcript_path",
+    "get_opencode_worker_evidence",
     // Selects executable local plugin code on the desktop host.
-    "connect_one_ring",
     // MCP grants access to the desktop independently of a remote workbench session.
     "get_mcp_server_status",
     "update_mcp_server_settings",
