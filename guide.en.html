@@ -33,7 +33,7 @@
         </a>
         <nav aria-label="Guide navigation">
           <a href="./">Home</a>
-          <a class="guide-download" href="downloads/termexo-user-guide-en.pdf" download="Termexo-User-Guide-v0.10.15-en.pdf">Download PDF</a>
+          <a class="guide-download" href="downloads/termexo-user-guide-en.pdf" download="Termexo-User-Guide-v0.11.0-en.pdf">Download PDF</a>
         </nav>
         <div class="language-switch" role="group" aria-label="Guide language">
           <a href="guide.en.html" data-lang="en" lang="en" hreflang="en" aria-label="Read in English" aria-current="page" class="active">EN</a>
@@ -50,22 +50,22 @@
           <a href="#workbench">02　Workspaces &amp; terminals</a>
           <a href="#sessions">03　Resume sessions</a>
           <a href="#profiles">04　Accounts, models &amp; network</a>
-          <a href="#tasks">05　Tasks, Git &amp; handoffs</a>
+          <a href="#tasks">05　Tasks, Git &amp; project tools</a>
           <a href="#ai-control">06　AI control (MCP)</a>
           <a href="#remote">07　Mobile &amp; remote access</a>
           <a href="#faq">08　FAQ</a>
           <a href="#privacy">09　Data &amp; security</a>
         </nav>
-        <p class="guide-sidebar-note">Windows desktop edition<br />V0.10.15 · English</p>
+        <p class="guide-sidebar-note">Windows / macOS desktop edition<br />V0.11.0 · English</p>
       </aside>
       <article id="guide-content" class="guide-content" lang="en">
         <header class="guide-intro">
           <p class="guide-label">TERMEXO / USER GUIDE</p>
           <h1>User guide</h1>
           <p class="guide-lead">Start with your first workspace. Keep your terminals, Agents and project progress together.</p>
-          <p class="guide-meta">For V0.10.15 · Updated 2026-10-23 · Windows 10/11 x64</p>
+          <p class="guide-meta">For V0.11.0 · Updated 2026-10-27 · Windows x64 / macOS Apple Silicon and Intel</p>
           <div class="guide-actions" data-pdf-skip>
-            <a class="button primary" href="downloads/termexo-user-guide-en.pdf" download="Termexo-User-Guide-v0.10.15-en.pdf">Download English guide · PDF</a>
+            <a class="button primary" href="downloads/termexo-user-guide-en.pdf" download="Termexo-User-Guide-v0.11.0-en.pdf">Download English guide · PDF</a>
             <a class="button secondary" href="#quick-start">Start reading ↓</a>
           </div>
           <p class="guide-note" data-pdf-skip>The English PDF matches this page and works offline. Labels and button locations may vary by app language or version. The workbench screenshot shows the Chinese interface.</p>
@@ -73,14 +73,15 @@
 
         <section id="quick-start" class="guide-section">
           <h2>01 / Install and get started</h2>
-          <p>Termexo is a Windows workbench for real terminals and coding Agents. No Termexo account is required. To use an Agent, you still need its CLI and a signed-in account or a model provider's API key.</p>
+          <p>Termexo is a Windows and macOS workbench for real terminals and coding Agents. No Termexo account is required. To use an Agent, you still need its CLI and a signed-in account or a model provider's API key.</p>
           <h3>Choose an installation method</h3>
           <ul>
-            <li><strong>Download the installer:</strong> open the <a href="https://github.com/gemron/Termexo/releases/latest">latest GitHub release</a>, download the Windows x64 installer from Assets, and run it. The desktop app requires WebView2. Installer users do not need Rust or the source development toolchain.</li>
-            <li><strong>Run through npm:</strong> with Node.js 18.18 or later installed, run the following command in Windows PowerShell. The npm package includes the desktop executable; WebView2 is still required.</li>
+            <li><strong>Download the installer:</strong> open the <a href="https://github.com/gemron/Termexo/releases/latest">latest GitHub release</a>, choose Windows EXE/MSI or a Mac DMG for Apple Silicon (aarch64) or Intel (x64) from Assets. Windows needs WebView2; Mac builds need macOS 12+. Installer users do not need Rust or the source development toolchain.</li>
+            <li><strong>Run through npm:</strong> with Node.js 18.18 or later installed, run the following command in a Windows terminal or macOS Terminal. The same npm package includes Windows x64 and both complete Mac apps, selecting the matching application at startup.</li>
           </ul>
           <pre><code>npx termexo@latest</code></pre>
           <p>For a global command, run <code>npm install --global termexo</code>, then launch <code>termexo</code>. Run the installation command again to update a global installation.</p>
+          <p>On Mac, npm caches the matching complete app in <code>~/Library/Caches/Termexo/npm/</code>, preserving executable permissions and app resources. Windows code signing is awaiting approval. Mac builds use ad-hoc signing and are not notarized; macOS may require allowing the app in Privacy &amp; Security.</p>
           <h3>Your first session in three steps</h3>
           <ol>
             <li><strong>Create a workspace.</strong> Use the first-run guide to create a workspace. Enter a project name and select a project folder that actually exists on this computer.</li>
@@ -88,12 +89,7 @@
             <li><strong>Open a terminal.</strong> Click New on the tab bar, select an Agent, and confirm the working folder, account and model. Start it and enter a task. You can also open a regular terminal first to check the project path and command environment.</li>
           </ol>
           <p class="guide-callout">Start with a small check, such as: "Read this project and explain how to run its tests. Do not change any files yet." Confirm the folder, account and connection before assigning code changes.</p>
-          <h3>Installing an Agent's CLI</h3>
-          <p>Use Settings → Install & update. Install a missing Agent with one click or check an existing version. Close settings and return to see the result. Versions, commands and logs are in Advanced options & details.</p>
-          <ul>
-            <li><strong>The official npm package:</strong> a version can be named and a failed install is rolled back to the previous one. Needs Node.js and npm, and uses the proxy and registry settings in effect.</li>
-            <li><strong>Official Windows installers:</strong> Claude Code, Codex and Antigravity offer vendor installers without version pinning or rollback. For installed Antigravity, Check & update runs its official updater. OpenCode, Pi Agent and Grok Build use npm.</li>
-          </ul>
+
         </section>
 
         <section id="workbench" class="guide-section" data-pdf-page>
@@ -101,7 +97,7 @@
           <p>A workspace groups a project folder, terminal tabs and a layout. Create separate workspaces for different projects, then rename or color-code them. Drag workspace rows to reorder projects; the row menu appears on hover or keyboard focus. Switching projects does not require rearranging every terminal.</p>
           <figure>
             <img src="assets/termexo-workbench.png" alt="Termexo workbench in Chinese: workspaces on the left, terminal grid in the center, status and session information on the right" width="1800" height="1125" loading="lazy" />
-            <figcaption>Workspaces organize projects; tabs organize terminals; the grid controls which terminals you see. Screenshot: Chinese interface.</figcaption>
+            <figcaption>Workspaces organize projects; tabs organize terminals; the grid controls which terminals you see. Screenshot: an earlier Windows interface in Chinese; layout may vary by version.</figcaption>
           </figure>
           <h3>Arrange your workbench</h3>
           <ul>
@@ -112,11 +108,12 @@
           <h3>Understand status alerts</h3>
           <ul>
             <li><strong>Running / thinking:</strong> the Agent is processing a task or using tools.</li>
-            <li><strong>Waiting for input / approval:</strong> read the request in that terminal. Input, approval and completion notices keep the taskbar flashing until acknowledged or cleared, even after activating the window.</li>
+            <li><strong>Waiting for input / approval:</strong> read the request in that terminal. On Windows, input, approval and completion notices keep the taskbar flashing until acknowledged or cleared, even after activating the window.</li>
             <li><strong>Completed / failed / stopped:</strong> inspect terminal output and file changes before accepting, troubleshooting or restarting. A status badge does not prove the code passed validation.</li>
           </ul>
           <p class="guide-callout">Automatic confirmation reduces approval prompts and expands what an Agent may execute without asking each time. Keep manual confirmation for unfamiliar or sensitive projects. An AUTO badge is not a security review.</p>
           <p>Workspace Agent icons follow terminal order and use state colors; hover to see the latest window name. When an Agent finishes, Confirm completion clears its notice; it does not replace task verification. Git confirms the selected terminal's branch; an unconfirmed branch or a non-Git folder stays blank.</p>
+
         </section>
 
         <section id="sessions" class="guide-section" data-pdf-page>
@@ -127,7 +124,7 @@
             <li>Select Resume and confirm the launch options. Termexo uses the CLI's native resume capability, then lets you continue in a terminal.</li>
           </ol>
           <p>Termexo discovers native session records read-only; it does not rewrite history to simulate recovery. Resuming context depends on the original session files, account, CLI version and project path still being available.</p>
-          <p class="guide-callout">Restoring a workspace layout does not bring an exited process back to life. After closing the app or restarting Windows, unsaved work in a regular shell cannot be recovered from the layout. Use native session recovery for an Agent's saved context.</p>
+          <p class="guide-callout">Restoring a workspace layout does not bring an exited process back to life. After closing the app or restarting the computer, unsaved work in a regular shell cannot be recovered from the layout. Use native session recovery for an Agent's saved context.</p>
         </section>
 
         <section id="profiles" class="guide-section">
@@ -140,7 +137,7 @@
             <li>Check that the protocol matches the selected Agent. A compatible Claude Code backend must support the relevant Anthropic API. An arbitrary model URL is not necessarily usable.</li>
             <li>Save the profile, select it when starting or resuming a terminal, and send a short test request. Before switching an existing terminal, read the app's notice and make sure the current task can be interrupted.</li>
           </ol>
-          <p>API keys are stored in Windows Credential Manager. The allowance panel shows reported quota for supported profiles, with Antigravity queried directly through its HTTP Quota endpoint. Grok Build's usage card recognizes an exhausted free allowance; an unavailable percentage is shown as unavailable, not as 0% used. Values marked as estimates or unavailable are not official billing data.</p>
+          <p>API keys are stored in Windows Credential Manager or macOS Keychain. The allowance panel shows reported quota for supported profiles, with Antigravity queried directly through its HTTP Quota endpoint. Grok Build's usage card recognizes an exhausted free allowance; an unavailable percentage is shown as unavailable, not as 0% used. Values marked as estimates or unavailable are not official billing data.</p>
           <h3>Antigravity's models and status feed</h3>
           <p>Antigravity does not use Termexo's model profiles. Its model and reasoning effort are chosen in the new-terminal dialog, from what the agy on this machine offers.</p>
           <p>It also has no per-launch configuration of any kind, so for a terminal to know whether it is thinking, running a tool or waiting for an answer, Termexo writes into the status line in agy's own settings. This is on by default and can be turned off in Settings, which puts back whatever status line you had. Termexo only recognises the block it wrote itself and never touches one of your own.</p>
@@ -149,7 +146,7 @@
         </section>
 
         <section id="tasks" class="guide-section" data-pdf-page>
-          <h2>05 / Tasks, Git and handoffs</h2>
+          <h2>05 / Tasks, Git and project tools</h2>
           <h3>Assign a task to an Agent</h3>
           <ol>
             <li>Open the task board and create a task with a clear goal, project folder, priority and acceptance criteria. For example: "Add a search box; an empty query shows all items; tests pass."</li>
@@ -167,6 +164,11 @@
             <li>Preview the package and check its goal, completed work, validation results, risks and next steps. Then export Markdown/JSON or pass it to another Agent to continue.</li>
           </ul>
           <p>Automatic redaction cannot guarantee removal of every secret. Before sharing, manually check for API keys, access tokens, internal addresses, customer data and source-code access restrictions. A handoff is a context document, not a lossless conversion of a native session file.</p>
+          <h3>Content previews and saved project actions</h3>
+          <p>Create content preview tabs from the tab bar. Open several files, images or websites, adjust the preview width, and highlight code while preserving its original lines, spaces and indentation. Agents can also open project and web previews through MCP.</p>
+          <p>Saved actions keep Agent selection or startup, discovery and review in one window. Select all, edit individual entries and remove duplicates before confirming from the fixed footer.</p>
+          <h3>Notifications</h3>
+          <p>Windows uses system notifications and taskbar attention; macOS uses Notification Center, subject to system settings. The toolbar master switch pauses or resumes configured third-party channels. Messages include time and session context. Desktop WeChat delivery is available on Windows, and each channel still requires its own opt-in.</p>
         </section>
 
         <section id="ai-control" class="guide-section" data-pdf-page>
@@ -234,7 +236,7 @@
           <ul>
             <li>Is the desktop app still running? Is the computer asleep? Does the remote service show an error?</li>
             <li>Does the link use the actual LAN IP? <code>0.0.0.0</code> is a listening setting, not the address to open on a phone. On a phone, <code>localhost</code> refers to the phone itself.</li>
-            <li>Can the devices reach each other? Guest Wi-Fi may isolate clients. Check that Windows Firewall permits the selected port on the trusted network; do not disable the entire firewall.</li>
+            <li>Can the devices reach each other? Guest Wi-Fi may isolate clients. Check that the Windows or macOS firewall permits the selected port on the trusted network; do not disable the entire firewall.</li>
             <li>Has the port, IP address or token changed? Does the URL's protocol match the HTTPS setting?</li>
           </ul>
           <h3>Limits and disconnecting</h3>
@@ -245,6 +247,12 @@
 
         <section id="faq" class="guide-section" data-pdf-page>
           <h2>08 / Frequently asked questions</h2>
+          <h3>Installing an Agent's CLI</h3>
+          <p>Use Settings → Install & update. Install a missing Agent with one click or check an existing version. Close settings and return to see the result. Versions, commands and logs are in Advanced options & details.</p>
+          <ul>
+            <li><strong>The official npm package:</strong> a version can be named and a failed install is rolled back to the previous one. Needs Node.js and npm, and uses the proxy and registry settings in effect.</li>
+            <li><strong>Vendor installers:</strong> macOS uses the vendors' shell installation/update scripts. On Windows, Claude Code, Codex and Antigravity offer vendor installers without version pinning or rollback. For installed Antigravity, Check & update runs its official updater. OpenCode, Pi Agent and Grok Build use npm.</li>
+          </ul>
           <h3>An Agent is not detected, or its command will not start.</h3>
           <p>Check its installation status in Settings, then confirm that the CLI can start in a system terminal. Run detection again after installation. Check PATH, Node/npm, the working folder and network settings. If npm cannot install it, try the vendor's own script instead, bearing in mind that the two install separate executables and PATH decides which one runs when both are present. Antigravity's command-line tool is not on PATH, and Termexo looks for it where its installer puts it. For sign-in failures, confirm that the selected isolated account has completed authorization.</p>
           <h3>History is missing, or resuming reports an invalid session.</h3>
@@ -254,28 +262,29 @@
           <h3>I can see the terminal on my phone, but cannot copy or paste.</h3>
           <p>Browser clipboard access depends on a secure context and permissions. Use HTTPS and grant permission when prompted. If it remains unavailable, select text to copy or paste manually. Drag with a finger to scroll the terminal on a narrow screen.</p>
           <h3>How do I update Termexo?</h3>
+          <p>On macOS, update manually through a new DMG or npm; the current app does not offer automatic updates. Windows system-proxy discovery does not apply to Mac network settings.</p>
           <p>Installer users can download from the <a href="https://github.com/gemron/Termexo/releases/latest">latest release page</a>. npm users can run <code>npx termexo@latest</code> or update the global installation. Save files and finish or hand off running tasks before updating. Updating Termexo and updating an Agent CLI are separate operations; upgrade CLIs in their own management entry.</p>
         </section>
 
         <section id="privacy" class="guide-section" data-pdf-page>
           <h2>09 / Data and security</h2>
           <ul>
-            <li>Termexo works locally by default, with no Termexo account or mandatory cloud sync. Workspace state stays on the host, and API keys are stored in Windows Credential Manager.</li>
+            <li>Termexo works locally by default, with no Termexo account or mandatory cloud sync. Workspace state stays on the host, and API keys are stored in Windows Credential Manager or macOS Keychain.</li>
             <li>The Storage panel in Settings names the data directory, lists what is in it with the size of each file, and gives the running executable's own path and version. The database is the thing worth watching.</li>
             <li>The data directory can be moved to another drive: choose an empty directory and Termexo copies everything there and records it for the next start. Nothing is deleted by the move: the panel names the previous copy, which you reclaim yourself once you are satisfied. The target directory must be empty.</li>
             <li>Agent CLIs still send requests to the model services you choose. Which code and context leave the computer depends on the CLI, provider configuration and privacy policy.</li>
             <li>The public website has separate third-party visit statistics. These do not track desktop or remote-workbench sessions and are not download counts.</li>
           </ul>
-          <p>Report problems through <a href="https://github.com/gemron/Termexo/issues">GitHub Issues</a>. Include your Termexo, Windows and CLI versions, reproduction steps, expected and actual behavior, and redacted error details. Hide accounts, keys, tokens, QR codes and sensitive paths before submitting.</p>
+          <p>Report problems through <a href="https://github.com/gemron/Termexo/issues">GitHub Issues</a>. Include your Termexo, operating system, CPU architecture and CLI versions, reproduction steps, expected and actual behavior, and redacted error details. Hide accounts, keys, tokens, QR codes and sensitive paths before submitting.</p>
           <p>Latest online guide: <a href="https://www.termexo.com/guide.en.html">https://www.termexo.com/guide.en.html</a><br />Release history: <a href="https://github.com/gemron/Termexo/releases">GitHub Releases</a></p>
         </section>
       </article>
     </main>
     <footer class="guide-footer">
-      <div class="shell guide-footer-links"><span>Termexo User Guide · V0.10.15</span><a href="#guide-content">Back to top ↑</a><a href="downloads/termexo-user-guide-en.pdf" download="Termexo-User-Guide-v0.10.15-en.pdf">Download PDF</a></div>
+      <div class="shell guide-footer-links"><span>Termexo User Guide · V0.11.0</span><a href="#guide-content">Back to top ↑</a><a href="downloads/termexo-user-guide-en.pdf" download="Termexo-User-Guide-v0.11.0-en.pdf">Download PDF</a></div>
       <div class="shell site-counter">
         <p>Website visits (PV): <span id="busuanzi_value_site_pv" class="site-counter-value">—</span></p>
-        <p>Third-party website statistics only; “—” means unavailable.</p>
+        <p>Third-party website statistics only; “-” means unavailable.</p>
       </div>
     </footer>
   </body>

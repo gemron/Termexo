@@ -33,7 +33,7 @@
         </a>
         <nav aria-label="文档导航">
           <a href="./">返回官网</a>
-          <a class="guide-download" href="downloads/termexo-user-guide.pdf" download="Termexo-使用说明-v0.10.15.pdf">下载 PDF</a>
+          <a class="guide-download" href="downloads/termexo-user-guide.pdf" download="Termexo-使用说明-v0.11.0.pdf">下载 PDF</a>
         </nav>
         <div class="language-switch" role="group" aria-label="文档语言">
           <a href="guide.en.html" data-lang="en" lang="en" hreflang="en" aria-label="Read in English">EN</a>
@@ -50,22 +50,22 @@
           <a href="#workbench">02　工作空间与终端</a>
           <a href="#sessions">03　恢复会话</a>
           <a href="#profiles">04　账号、模型与网络</a>
-          <a href="#tasks">05　任务、Git 与交接</a>
+          <a href="#tasks">05　任务、Git 与项目工具</a>
           <a href="#ai-control">06　AI 操控（MCP）</a>
           <a href="#remote">07　手机与远程访问</a>
           <a href="#faq">08　常见问题</a>
           <a href="#privacy">09　数据与安全</a>
         </nav>
-        <p class="guide-sidebar-note">适用于 Windows 桌面版<br />V0.10.15 · 简体中文</p>
+        <p class="guide-sidebar-note">Windows / macOS 桌面版<br />V0.11.0 · 简体中文</p>
       </aside>
       <article id="guide-content" class="guide-content" lang="zh-CN">
         <header class="guide-intro">
           <p class="guide-label">TERMEXO / USER GUIDE</p>
           <h1>使用说明</h1>
           <p class="guide-lead">从第一个工作空间开始，把终端、Agent 和项目进度放在一起。</p>
-          <p class="guide-meta">适用版本 V0.10.15 · 更新日期 2026-10-23 · Windows 10/11 x64</p>
+          <p class="guide-meta">适用版本 V0.11.0 · 更新日期 2026-10-27 · Windows x64 / macOS Apple Silicon、Intel</p>
           <div class="guide-actions" data-pdf-skip>
-            <a class="button primary" href="downloads/termexo-user-guide.pdf" download="Termexo-使用说明-v0.10.15.pdf">下载使用说明 · PDF</a>
+            <a class="button primary" href="downloads/termexo-user-guide.pdf" download="Termexo-使用说明-v0.11.0.pdf">下载使用说明 · PDF</a>
             <a class="button secondary" href="#quick-start">开始阅读 ↓</a>
           </div>
           <p class="guide-note" data-pdf-skip>PDF 与本页内容同步，可离线阅读。本文以中文界面为例；其他版本的按钮位置可能略有不同。</p>
@@ -73,14 +73,15 @@
 
         <section id="quick-start" class="guide-section">
           <h2>01 / 安装与第一次运行</h2>
-          <p>Termexo 是管理真实终端与编程 Agent 的 Windows 工作台。无需注册 Termexo 账号；使用 Agent 时，仍需对应 CLI 及其登录账号或供应商 API Key。</p>
+          <p>Termexo 是管理真实终端与编程 Agent 的 Windows / macOS 工作台。无需注册 Termexo 账号；使用 Agent 时，仍需对应 CLI 及其登录账号或供应商 API Key。</p>
           <h3>选择一种安装方式</h3>
           <ul>
-            <li><strong>下载安装包：</strong>打开 <a href="https://github.com/gemron/Termexo/releases/latest">GitHub 最新版本</a>，在 Assets 中下载 Windows x64 安装包并运行。运行桌面应用需要 WebView2；普通安装包使用者不需要 Rust 或源码开发工具。</li>
-            <li><strong>通过 npm 运行：</strong>在已安装 Node.js 18.18 或更高版本的 Windows PowerShell 中执行以下命令。npm 包已包含桌面程序，同样需要 WebView2。</li>
+            <li><strong>下载安装包：</strong>打开 <a href="https://github.com/gemron/Termexo/releases/latest">GitHub 最新版本</a>，在 Assets 中选择 Windows EXE/MSI，或 Apple Silicon（aarch64）与 Intel（x64）的 Mac DMG。Windows 需要 WebView2，Mac 需要 macOS 12+；普通安装包使用者不需要 Rust 或源码开发工具。</li>
+            <li><strong>通过 npm 运行：</strong>在已安装 Node.js 18.18 或更高版本的 Windows 终端或 macOS Terminal 中执行以下命令。同一个 npm 包包含 Windows x64 和两种 Mac 架构的完整应用，启动时自动选择对应版本。</li>
           </ul>
           <pre><code>npx termexo@latest</code></pre>
           <p>如习惯全局命令，也可执行 <code>npm install --global termexo</code>，之后运行 <code>termexo</code>。更新全局安装时再次执行安装命令。</p>
+          <p>Mac 通过 npm 启动时，会将对应架构的完整应用缓存到 <code>~/Library/Caches/Termexo/npm/</code>，保留可执行权限和应用资源。Windows 正式签名正在等待审核；Mac 采用 ad-hoc 临时签名，尚未公证，首次打开可能需要在“隐私与安全性”中允许运行。</p>
           <h3>第一次使用：完成这三步</h3>
           <ol>
             <li><strong>创建工作空间。</strong>在首次启动引导中创建工作空间，填写项目名称并选择这台电脑上实际存在的项目目录。</li>
@@ -88,12 +89,7 @@
             <li><strong>新建终端。</strong>点击标签栏的「新建」，选择 Agent，确认工作目录、账号与模型，启动后输入任务。也可以先选择普通终端，检查项目目录与命令环境。</li>
           </ol>
           <p class="guide-callout">先用一条小任务验证环境，例如「阅读这个项目，说明如何运行测试，先不要修改文件」。确认目录、账号和连接正确后，再安排修改代码的任务。</p>
-          <h3>安装 Agent 的 CLI</h3>
-          <p>在「设置 → 安装与更新」选择 Agent：未安装时一键安装，已有版本先检查。关闭设置后仍可查看结果。指定版本、命令和日志在高级选项中。</p>
-          <ul>
-            <li><strong>官方 npm 包：</strong>可以指定版本，失败时自动回滚到原来的版本；需要本机的 Node.js 与 npm，并使用当前生效的代理与 registry。</li>
-            <li><strong>厂商安装与升级：</strong>Claude Code、Codex CLI 和 Antigravity 可使用官方 Windows 安装方式，不支持指定版本或失败回滚。已安装的 Antigravity 点击「检查并更新」运行官方升级；OpenCode、Pi Agent 与 Grok Build 使用 npm。</li>
-          </ul>
+
         </section>
 
         <section id="workbench" class="guide-section" data-pdf-page>
@@ -101,7 +97,7 @@
           <p>一个工作空间对应一组项目目录、终端标签和布局。不同项目可以分别创建工作空间，并为它们改名、换色；拖拽工作区条目调整顺序，鼠标悬停或键盘聚焦时可打开更多菜单。切换项目不必重新排列所有终端。</p>
           <figure>
             <img src="assets/termexo-workbench.png" alt="Termexo 工作台：左侧工作空间、中间多终端网格、右侧状态与会话信息" width="1800" height="1125" loading="lazy" />
-            <figcaption>工作空间组织项目，标签组织终端，网格决定当前看到哪些终端。</figcaption>
+            <figcaption>工作空间组织项目，标签组织终端，网格决定当前看到哪些终端。截图为早期 Windows 界面，布局可能随版本变化。</figcaption>
           </figure>
           <h3>安排你的工作台</h3>
           <ul>
@@ -112,11 +108,12 @@
           <h3>看懂状态提醒</h3>
           <ul>
             <li><strong>运行 / 思考：</strong>Agent 正在处理任务或执行工具。</li>
-            <li><strong>等待输入 / 等待授权：</strong>定位到对应终端阅读请求。等待输入、授权及任务完成提醒会让任务栏图标持续闪动，直到你确认或清除消息；切回窗口不会自动取消提醒。</li>
+            <li><strong>等待输入 / 等待授权：</strong>定位到对应终端阅读请求。Windows 上的等待输入、授权及任务完成提醒会让任务栏图标持续闪动，直到你确认或清除消息；切回窗口不会自动取消提醒。</li>
             <li><strong>已完成 / 失败 / 已停止：</strong>检查终端输出和文件变更，决定验收、排错或重新启动。状态提示不等于代码已经验证通过。</li>
           </ul>
           <p class="guide-callout">自动确认会减少逐次授权提示，也会扩大 Agent 自动执行操作的范围。首次使用或处理敏感项目时，建议保留人工确认；不要把 AUTO 标记理解成安全审查。</p>
           <p>工作区按终端顺序显示带状态颜色的 Agent 图标，悬停可查看最新窗口名称。Agent 已完成时，可在对应终端点击「确认完成」清除提醒；这不代替任务验收。当前选中终端的分支由 Git 确认，未确认或非 Git 目录时留空。</p>
+
         </section>
 
         <section id="sessions" class="guide-section" data-pdf-page>
@@ -140,7 +137,7 @@
             <li>确认协议与所选 Agent 相匹配。Claude Code 的兼容后端需要支持相应 Anthropic 接口；不是任意模型地址都能直接使用。</li>
             <li>保存后，在启动或恢复终端时选择 Profile，先发起一条简短请求验证。切换现有终端前，阅读界面提示并确认当前任务可以中断。</li>
           </ol>
-          <p>API Key 由 Windows 凭据管理器保存。余量面板按 Profile 显示支持查询的额度，Antigravity 的余量直接通过 HTTP Quota 接口查询。Grok Build 用量卡片可识别免费额度已用尽；若没有可用百分比，会显示无法查询，不会把未知额度当成 0% 已使用。界面标为估算或不可用的数据，不应当作官方账单。</p>
+          <p>API Key 由 Windows 凭据管理器或 macOS 钥匙串保存。余量面板按 Profile 显示支持查询的额度，Antigravity 的余量直接通过 HTTP Quota 接口查询。Grok Build 用量卡片可识别免费额度已用尽；若没有可用百分比，会显示无法查询，不会把未知额度当成 0% 已使用。界面标为估算或不可用的数据，不应当作官方账单。</p>
           <h3>Antigravity 的模型与状态回传</h3>
           <p>Antigravity 不使用 Termexo 的模型 Profile。它的模型与推理强度在新建终端的对话框里选择，可选项由本机的 agy 自己提供。</p>
           <p>它也没有按次启动的配置方式，所以要让终端知道它在思考、在跑工具还是在等你回答，Termexo 需要写入 agy 自己设置里的状态行。这一项默认开启，可以在设置中关闭；关闭时会还原你原本的状态行。Termexo 只认自己写的那一段，不会动你自己配置的状态行。</p>
@@ -149,7 +146,7 @@
         </section>
 
         <section id="tasks" class="guide-section" data-pdf-page>
-          <h2>05 / 任务、Git 与交接</h2>
+          <h2>05 / 任务、Git 与项目工具</h2>
           <h3>把任务交给 Agent</h3>
           <ol>
             <li>进入任务看板，新建任务，写清目标、项目目录、优先级和验收标准，例如「新增搜索框；空输入显示全部；测试通过」。</li>
@@ -167,6 +164,11 @@
             <li>先预览交接包，核对目标、已做事项、验证结果、风险和下一步，再导出 Markdown/JSON，或交给另一 Agent 继续。</li>
           </ul>
           <p>自动脱敏不能保证覆盖所有秘密。分享前人工检查 API Key、访问令牌、内部地址、客户数据和源代码权限。交接包是上下文文档，不是原生会话文件的无损转换。</p>
+          <h3>内容预览与常用操作</h3>
+          <p>从标签栏新建内容预览，可同时打开多个文件、图片或网站标签，并拖动调整预览宽度。代码只添加语法高亮，保留原始换行、空格和缩进；Agent 也可通过 MCP 打开项目或网页预览。</p>
+          <p>常用操作在同一窗口完成 Agent 选择或启动、识别与审核，支持全选、逐项编辑和自动去重，确认按钮固定在底部。</p>
+          <h3>通知与提醒</h3>
+          <p>Windows 使用系统通知与任务栏提醒，macOS 使用通知中心；实际显示受系统设置影响。顶部的第三方通知开关统一暂停或恢复已配置渠道，消息包含时间与会话信息。桌面微信通知仅在 Windows 上提供，各渠道仍需单独启用。</p>
         </section>
 
         <section id="ai-control" class="guide-section" data-pdf-page>
@@ -234,7 +236,7 @@
           <ul>
             <li>桌面应用是否仍在运行，电脑是否休眠，远程服务是否显示错误。</li>
             <li>链接是否用了实际局域网 IP。<code>0.0.0.0</code> 是监听设置，不是手机应打开的地址；手机上的 <code>localhost</code> 指的是手机自身。</li>
-            <li>两端网络是否可互通，访客 Wi-Fi 是否启用了设备隔离，Windows 防火墙是否允许所选端口在可信网络中访问。不要为此关闭整个防火墙。</li>
+            <li>两端网络是否可互通，访客 Wi-Fi 是否启用了设备隔离，Windows 或 macOS 防火墙是否允许所选端口在可信网络中访问。不要为此关闭整个防火墙。</li>
             <li>端口或 IP 是否已改变，令牌是否已更换，HTTPS 与链接协议是否匹配。</li>
           </ul>
           <h3>使用边界与退出</h3>
@@ -245,6 +247,12 @@
 
         <section id="faq" class="guide-section" data-pdf-page>
           <h2>08 / 常见问题</h2>
+          <h3>安装 Agent 的 CLI</h3>
+          <p>在「设置 → 安装与更新」选择 Agent：未安装时一键安装，已有版本先检查。关闭设置后仍可查看结果。指定版本、命令和日志在高级选项中。</p>
+          <ul>
+            <li><strong>官方 npm 包：</strong>可以指定版本，失败时自动回滚到原来的版本；需要本机的 Node.js 与 npm，并使用当前生效的代理与 registry。</li>
+            <li><strong>厂商安装与升级：</strong>macOS 使用厂商提供的 shell 安装与更新脚本；Windows 上 Claude Code、Codex CLI 和 Antigravity 可使用官方安装方式，不支持指定版本或失败回滚。已安装的 Antigravity 点击「检查并更新」运行官方升级；OpenCode、Pi Agent 与 Grok Build 使用 npm。</li>
+          </ul>
           <h3>提示未检测到 Agent，或命令无法启动？</h3>
           <p>先在设置中确认安装状态，再检查对应 CLI 是否能在系统终端启动。安装后重新检测；核对 PATH、Node/npm 环境、工作目录和网络配置。用 npm 装不上时可以改用厂商官方脚本，但两种方式装的是两份可执行文件，同时存在时实际运行哪一份由 PATH 决定。Antigravity 的命令行工具不在 PATH 上，Termexo 会到它安装器的固定位置去找。登录失败时，确认当前选择的隔离账号已完成授权。</p>
           <h3>会话中心找不到历史，或恢复时提示会话无效？</h3>
@@ -254,28 +262,29 @@
           <h3>手机能看终端，但复制粘贴受限？</h3>
           <p>浏览器剪贴板受安全上下文和权限限制。使用 HTTPS，按浏览器提示授权；仍不可用时手动选择复制或粘贴。窄屏终端可用手指拖拽滚动。</p>
           <h3>如何更新 Termexo？</h3>
+          <p>macOS 当前通过新版 DMG 或 npm 手动更新，应用内不提供自动更新；Windows 系统代理导入也不适用于 Mac 网络设置。</p>
           <p>安装包用户从 <a href="https://github.com/gemron/Termexo/releases/latest">最新版本页面</a>下载安装；npm 用户运行 <code>npx termexo@latest</code>，或更新全局安装。更新前保存文件，结束或交接正在运行的任务。应用更新与 Agent CLI 升级是两件事，CLI 在相应管理入口单独升级。</p>
         </section>
 
-        <section id="privacy" class="guide-section">
+        <section id="privacy" class="guide-section" data-pdf-page>
           <h2>09 / 数据与安全</h2>
           <ul>
-            <li>Termexo 默认本地工作，没有 Termexo 账号或强制云同步；工作空间等状态保存在本机，API Key 由 Windows 凭据管理器保存。</li>
+            <li>Termexo 默认本地工作，没有 Termexo 账号或强制云同步；工作空间等状态保存在本机，API Key 由 Windows 凭据管理器或 macOS 钥匙串保存。</li>
             <li>设置里的「存储」面板说明数据目录在哪、里面有哪些文件、各占多大，以及当前运行的可执行文件路径与版本。数据库是最值得关注的一项。</li>
             <li>数据目录可以迁移到别的磁盘：选一个空目录，Termexo 会把内容复制过去并记录下来，下次启动使用新位置。迁移不会删除原来的副本，面板会告诉你它在哪，确认无误后再由你自行清理。目标目录必须为空。</li>
             <li>Agent CLI 仍会按你选择的模型服务发送请求。哪些代码和上下文会离开电脑，取决于 CLI、供应商配置及其隐私政策。</li>
             <li>官网有独立的第三方访问统计；它不是桌面应用或远程工作台的会话统计，也不代表下载量。</li>
           </ul>
-          <p>遇到问题可在 <a href="https://github.com/gemron/Termexo/issues">GitHub Issues</a> 提交：注明 Termexo/Windows/CLI 版本、复现步骤、预期和实际结果，附脱敏后的错误信息。提交前遮盖账号、密钥、令牌、二维码与敏感路径。</p>
+          <p>遇到问题可在 <a href="https://github.com/gemron/Termexo/issues">GitHub Issues</a> 提交：注明 Termexo、操作系统、芯片架构与 CLI 版本、复现步骤、预期和实际结果，附脱敏后的错误信息。提交前遮盖账号、密钥、令牌、二维码与敏感路径。</p>
           <p>在线最新版：<a href="https://www.termexo.com/guide.html">https://www.termexo.com/guide.html</a><br />版本更新记录：<a href="https://github.com/gemron/Termexo/releases">GitHub Releases</a></p>
         </section>
       </article>
     </main>
     <footer class="guide-footer">
-      <div class="shell guide-footer-links"><span>Termexo 使用说明 · V0.10.15</span><a href="#guide-content">回到顶部 ↑</a><a href="downloads/termexo-user-guide.pdf" download="Termexo-使用说明-v0.10.15.pdf">下载 PDF</a></div>
+      <div class="shell guide-footer-links"><span>Termexo 使用说明 · V0.11.0</span><a href="#guide-content">回到顶部 ↑</a><a href="downloads/termexo-user-guide.pdf" download="Termexo-使用说明-v0.11.0.pdf">下载 PDF</a></div>
       <div class="shell site-counter">
         <p><span>官网累计访问量（PV）：</span> <span id="busuanzi_value_site_pv" class="site-counter-value">—</span></p>
-        <p>第三方统计仅记录官网访问；“—”表示暂不可用。</p>
+        <p>第三方统计仅记录官网访问；“-”表示暂不可用。</p>
       </div>
     </footer>
   </body>

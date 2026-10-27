@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta
       name="description"
-      content="Let one AI operate Claude Code, Codex, OpenCode, Pi Agent, Grok Build and Antigravity terminals through Termexo MCP. Send instructions, read real output and keep your Windows workbench in view."
+      content="Let one AI operate Claude Code, Codex, OpenCode, Pi Agent, Grok Build and Antigravity terminals through Termexo MCP. Send instructions, read real output and keep your Windows or macOS workbench in view."
     />
     <meta name="theme-color" content="#edf4f8" />
     <meta property="og:type" content="website" />
@@ -15,7 +15,7 @@
     />
     <meta
       property="og:description"
-      content="Connect an AI to Termexo MCP, send instructions to five kinds of coding agent terminals and read their real replies. A local Windows workbench with optional phone access."
+      content="Connect an AI to Termexo MCP, send instructions to six kinds of coding agent terminals and read their real replies. A local Windows and macOS workbench with optional phone access."
     />
     <meta
       property="og:image"
@@ -25,7 +25,7 @@
     <meta name="twitter:card" content="summary_large_image" />
     <meta
       name="twitter:title"
-      content="Termexo — One AI, five kinds of agent terminals, connected through MCP"
+      content="Termexo — One AI, six kinds of agent terminals, connected through MCP"
     />
     <meta
       name="twitter:description"
@@ -46,11 +46,11 @@
         "@context": "https://schema.org",
         "@type": "SoftwareApplication",
         "name": "Termexo",
-        "softwareVersion": "0.10.15",
+        "softwareVersion": "0.11.0",
         "url": "https://www.termexo.com/",
-        "description": "A local-first Windows workbench whose MCP server lets a connected AI read and operate Claude Code, Codex, OpenCode, Pi Agent, Grok Build and Antigravity terminals and manage tasks. The workbench also offers native session recovery and optional remote access.",
+        "description": "A local-first Windows and macOS workbench whose MCP server lets a connected AI read and operate Claude Code, Codex, OpenCode, Pi Agent, Grok Build and Antigravity terminals and manage tasks. The workbench also offers native session recovery and optional remote access.",
         "applicationCategory": "DeveloperApplication",
-        "operatingSystem": "Windows 10, Windows 11",
+        "operatingSystem": "Windows 10/11 x64, macOS 12+ (Apple Silicon and Intel)",
         "license": "https://github.com/gemron/Termexo/blob/main/LICENSE",
         "downloadUrl": "https://github.com/gemron/Termexo/releases/latest",
         "sameAs": [
@@ -65,7 +65,7 @@
     <link rel="canonical" href="https://www.termexo.com/" />
     <link rel="icon" href="assets/termexo-mark.svg" type="image/svg+xml" />
     <link rel="stylesheet" href="styles.css?v=c64af7392e7e" />
-    <script src="app.js?v=30f50816a465" defer></script>
+    <script src="app.js?v=61d83c240e8d" defer></script>
     <script src="analytics.js" defer></script>
   </head>
   <body class="home-page">
@@ -78,7 +78,7 @@
             <img src="assets/termexo-mark.svg" alt="" />
           </span>
           <span>Termexo</span>
-          <small>0.10.15</small>
+          <small>0.11.0</small>
         </a>
 
         <nav
@@ -136,14 +136,14 @@
           <div class="eyebrow">
             <span class="live-dot"></span>
             <span data-i18n="eyebrow"
-              >WINDOWS / MCP AGENT CONTROL</span
+              >WINDOWS + MACOS / MCP AGENT CONTROL</span
             >
           </div>
           <h1>
             <span data-i18n="heroLine1">Let AI operate your agents.</span>
             <em data-i18n="heroLine2">Send work. Read results.</em>
           </h1>
-          <p class="hero-lead" data-i18n="heroLead">Connect an AI to Termexo MCP. Ask it to find a Claude Code, Codex, OpenCode, Pi Agent, Grok Build or Antigravity terminal, send an instruction and read the real reply. Keep tasks, sessions and optional phone access in one Windows workspace.</p>
+          <p class="hero-lead" data-i18n="heroLead">Connect an AI to Termexo MCP. Ask it to find a Claude Code, Codex, OpenCode, Pi Agent, Grok Build or Antigravity terminal, send an instruction and read the real reply. Keep tasks, sessions and optional phone access together on Windows or macOS.</p>
           <ul class="hero-agents" aria-label="Supported agents">
             <li>
               <img src="assets/agent-claude.svg" alt="" width="22" height="22" loading="lazy" />
@@ -174,7 +174,7 @@
               target="_blank"
               rel="noreferrer"
             >
-              <span data-i18n="heroDownload">Download for Windows</span>
+              <span data-i18n="heroDownload">Download for Windows / macOS</span>
               <svg viewBox="0 0 24 24" aria-hidden="true">
                 <path d="m9 7 5 5-5 5m7 0h3" />
               </svg>
@@ -191,7 +191,7 @@
           </div>
           <a class="hero-demo-link" href="#workbench-demo" data-i18n="heroDemo">Watch the 30-second workbench demo →</a>
           <div class="install-command" aria-label="npm command">
-            <span>PS</span>
+            <span aria-hidden="true">&gt;_</span>
             <code>npx termexo@latest</code>
             <button type="button" data-copy-command>
               <span data-copy-label data-i18n="copyCommand" aria-live="polite"
@@ -199,6 +199,7 @@
               >
             </button>
           </div>
+          <p class="hero-remote-note" data-i18n="platformSupport">Windows x64 · macOS 12+ on Apple Silicon / Intel · npm on both</p>
           <p class="hero-remote-note" data-i18n="heroRemoteNote">Phone access is optional. Keep your PC running and use a reachable HTTPS relay plus a desktop access token, or connect directly over a trusted LAN or VPN.</p>
           <a
             class="hero-guide-link"
@@ -215,7 +216,7 @@
             >
               <img
                 src="https://api.producthunt.com/widgets/embed-image/v1/featured.svg?post_id=1212781&amp;theme=light&amp;t=1785690737740"
-                alt="Termexo - A local Windows workbench for Claude Code and Codex | Product Hunt"
+                alt="Termexo on Product Hunt"
                 width="250"
                 height="54"
                 decoding="async"
@@ -228,7 +229,7 @@
                   >Local-first · MIT open source</b
                 ></span
               >
-              <span><i></i><b>Windows 10 / 11</b></span>
+              <span><i></i><b>Windows / macOS</b></span>
               <span
                 ><i></i><b data-i18n="metaNpm">One command to start</b></span
               >
@@ -314,8 +315,7 @@
                 <div class="monitor-foot"></div>
               </div>
               <p class="scene-desktop-note" data-i18n="sceneDesktopNote">
-                Your agents and project stay on the host. No session to move or
-                restart.
+                Your agents and project stay on the host. No session to move or restart.
               </p>
             </div>
             <div class="mobile-scene">
@@ -414,7 +414,7 @@
               <span class="mcp-flow-label" data-i18n="mcpHubLabel">THE LOCAL CONNECTION</span>
               <strong>Termexo MCP</strong>
               <p data-i18n="mcpHubBody">Find the terminal → send input → submit Enter → read output</p>
-              <span class="mcp-local-badge" data-i18n="mcpLocal">Runs on your Windows PC</span>
+              <span class="mcp-local-badge" data-i18n="mcpLocal">Runs locally on Windows and macOS</span>
             </div>
             <span class="mcp-flow-arrow" aria-hidden="true">⇄</span>
             <div class="mcp-flow-stage">
@@ -497,7 +497,7 @@
             <ul>
               <li><h4 data-i18n="enterpriseTasksTitle">Project work engineers can follow</h4><p data-i18n="enterpriseTasksBody">Group business projects into workspaces. Engineers use the task board and agent status to assign work, review results, and prepare handoffs.</p></li>
               <li><h4 data-i18n="enterpriseProfilesTitle">Providers and environments in one place</h4><p data-i18n="enterpriseProfilesBody">Manage model, account, and network profiles for different providers and compatible gateways, with quota visibility where supported.</p></li>
-              <li><h4 data-i18n="enterpriseRemoteTitle">Access to the development PC you manage</h4><p data-i18n="enterpriseRemoteBody">Run the workbench on your organization's Windows PC. Use your own relay or trusted LAN / VPN to reconnect to long-running tasks.</p></li>
+              <li><h4 data-i18n="enterpriseRemoteTitle">Access to the development PC you manage</h4><p data-i18n="enterpriseRemoteBody">Run the workbench on your organization's Windows PC or Mac. Use your own relay or trusted LAN / VPN to reconnect to long-running tasks.</p></li>
             </ul>
           </article>
         </div>
@@ -537,16 +537,14 @@
             <strong>∞</strong>
             <span data-i18n="metricTabsTitle">Open as many as you want</span>
             <p data-i18n="metricTabsBody">
-              Every session stays alive in a tab. Show the ones you are watching
-              right now.
+              Every session stays alive in a tab. Show the ones you are watching right now.
             </p>
           </article>
           <article class="metric reveal" data-delay="1">
             <strong>6 × 6</strong>
             <span data-i18n="metricGridTitle">Arrange your own grid</span>
             <p data-i18n="metricGridBody">
-              Anything from 1 to 6 rows and columns. Each project remembers its
-              own layout.
+              Anything from 1 to 6 rows and columns. Each project remembers its own layout.
             </p>
           </article>
           <article class="metric reveal" data-delay="2">
@@ -555,8 +553,7 @@
               >Swap the model, keep the CLI</span
             >
             <p data-i18n="metricModelBody">
-              Same Claude Code you already know, pointed at a different
-              provider.
+              Same Claude Code you already know, pointed at a different provider.
             </p>
           </article>
           <article class="metric reveal" data-delay="3">
@@ -576,19 +573,14 @@
             It tells you when an agent is stuck.
           </h2>
           <p data-i18n="attentionLead">
-            An agent sitting on an approval prompt helps nobody if you are
-            looking at a different window. Termexo flashes the taskbar, sends a
-            system notification, and keeps a banner on screen until you deal
-            with it — for every project you have open, not just the one in front
-            of you.
+            Keep approval, input and completion notices visible across projects with persistent banners and native system notifications. On Windows, the taskbar also flashes until the notice is handled.
           </p>
           <ul>
             <li data-i18n="attentionPoint1">
-              Waiting for approval, waiting for input, and finished all look
-              different at a glance
+              Waiting for approval, waiting for input, and finished all look different at a glance
             </li>
             <li data-i18n="attentionPoint2">
-              Works even when the Termexo window is already focused
+              Keep pending notices in view while you work in other terminals
             </li>
             <li data-i18n="attentionPoint3">
               Click the banner to jump straight to that terminal
@@ -627,8 +619,7 @@
             <span
               ><i></i>
               <span data-i18n="sessionCaption"
-                >Every local session, searchable and one click from
-                resuming</span
+                >Every local session, searchable and one click from resuming</span
               ></span
             >
           </figcaption>
@@ -639,10 +630,7 @@
           >
           <h2 data-i18n="sessionTitle">Pick up yesterday's conversation.</h2>
           <p data-i18n="sessionLead">
-            Search saved Claude Code, Codex, OpenCode, Grok Build, and
-            Antigravity sessions across projects. Termexo uses each CLI's own
-            resume command to reopen the native context, without changing
-            session files.
+            Search saved Claude Code, Codex, OpenCode, Pi Agent, Grok Build, and Antigravity sessions across projects. Termexo uses each CLI's own resume command to reopen the native context, without changing session files.
           </p>
           <ul>
             <li data-i18n="sessionPoint1">
@@ -652,8 +640,7 @@
               Resumes through each supported CLI's native command
             </li>
             <li data-i18n="sessionPoint3">
-              Your session files are read-only — Termexo never edits or deletes
-              them
+              Your session files are read-only — Termexo never edits or deletes them
             </li>
           </ul>
         </div>
@@ -666,18 +653,14 @@
           >
           <h2 data-i18n="modelTitle">Same CLI. Different model.</h2>
           <p data-i18n="modelLead">
-            Keep using Claude Code, but point it at DeepSeek, MiniMax, GLM, or
-            your own compatible gateway. Save each one as a profile and switch
-            between them in two clicks — no reinstalling, no editing config
-            files by hand.
+            Keep using Claude Code, but point it at DeepSeek, MiniMax, GLM, or your own compatible gateway. Save each one as a profile and switch between them in two clicks — no reinstalling, no editing config files by hand.
           </p>
           <ul>
             <li data-i18n="modelPoint1">
               Anthropic, DeepSeek, MiniMax, GLM, or any compatible endpoint
             </li>
             <li data-i18n="modelPoint2">
-              API keys go into Windows Credential Manager, never a plain text
-              file
+              API keys go into Windows Credential Manager or macOS Keychain
             </li>
             <li data-i18n="modelPoint3">
               Switch every Claude terminal in a project at once
@@ -696,8 +679,7 @@
             <span
               ><i></i>
               <span data-i18n="modelCaption"
-                >Keys are stored by Windows — the app only ever sees whether one
-                exists</span
+                >Your operating system stores API keys; the interface shows whether a key is configured</span
               ></span
             >
           </figcaption>
@@ -717,8 +699,7 @@
             <span
               ><i></i>
               <span data-i18n="taskCaption"
-                >A task carries its acceptance criteria from todo through to
-                verified</span
+                >A task carries its acceptance criteria from todo through to verified</span
               ></span
             >
           </figcaption>
@@ -729,17 +710,14 @@
           >
           <h2 data-i18n="taskTitle">Hand the work to an agent.</h2>
           <p data-i18n="taskLead">
-            Write down what needs doing and what counts as done, pick the agent
-            and the project, and the task opens as a real terminal. It reports
-            its own progress back to the board, so you can see what is running
-            without reading every terminal at once.
+            Write down what needs doing and what counts as done, pick the agent and the project, and the task opens as a real terminal. It reports its own progress back to the board, so you can see what is running without reading every terminal at once.
           </p>
           <ul>
             <li data-i18n="taskPoint1">
               Todo, executing, completed, verified — the terminal moves the card
             </li>
             <li data-i18n="taskPoint2">
-              Send a task to Claude Code, Codex, OpenCode, or Grok Build
+              Send a task to Claude Code, Codex, OpenCode, Pi Agent, or Grok Build
             </li>
             <li data-i18n="taskPoint3">
               Reject a result with a note and it goes back for another round
@@ -761,7 +739,7 @@
             <li data-i18n="remotePoint3">Keep your desktop on and Termexo connected; relay login and the desktop access token are separate checks</li>
           </ul>
           <div class="relay-links"><a href="https://github.com/gemron/termexo-relay" target="_blank" rel="noopener noreferrer" data-i18n="relayDeploy">Deploy your relay ↗</a><a href="guide.en.html#remote" data-i18n="relaySetup">Read the connection guide ↗</a></div>
-          <p class="relay-compatibility" data-i18n="relayCompatibility">Relay: Linux / macOS / Windows, x64 / arm64 and containers. Desktop app: Windows 10 / 11.</p>
+          <p class="relay-compatibility" data-i18n="relayCompatibility">Desktop app: Windows x64 and macOS Apple Silicon / Intel. Relay: Linux / macOS / Windows, x64 / arm64 and containers.</p>
         </div>
         <figure class="settings-frame reveal" data-delay="1">
           <img
@@ -775,8 +753,7 @@
             <span
               ><i></i>
               <span data-i18n="remoteCaption"
-                >The same terminal the desktop is running, one screen at a
-                time.</span
+                >The same terminal the desktop is running, one screen at a time.</span
               ></span
             >
           </figcaption>
@@ -795,13 +772,36 @@
               </h2>
             </div>
             <p data-i18n="capabilitiesLead">
-              Most of the friction with coding agents is not the model. It is
-              remembering which terminal was doing what, and setting it all up
-              again tomorrow.
+              Most of the friction with coding agents is not the model. It is remembering which terminal was doing what, and setting it all up again tomorrow.
             </p>
           </div>
 
           <div class="bento-grid">
+            <article class="bento reveal">
+              <span class="card-tag now" data-i18n="now">WORKS TODAY</span>
+              <div class="card-icon" aria-hidden="true">&lt;/&gt;</div>
+              <h3 data-i18n="featurePreviewTitle">Preview content beside your terminals</h3>
+              <p data-i18n="featurePreviewBody">Open several file, image or website previews in their own tabs. Resize the panel and highlight code while preserving every line and space. Agents can open previews through MCP.</p>
+            </article>
+            <article class="bento reveal">
+              <span class="card-tag now" data-i18n="now">WORKS TODAY</span>
+              <div class="card-icon" aria-hidden="true">⌘</div>
+              <h3 data-i18n="featureActionsTitle">Save and review project actions</h3>
+              <p data-i18n="featureActionsBody">Discover actions without switching away to start an Agent. Select all, edit entries and remove duplicates before confirming from the same window.</p>
+            </article>
+            <article class="bento reveal">
+              <span class="card-tag now" data-i18n="now">WORKS TODAY</span>
+              <div class="card-icon" aria-hidden="true">◉</div>
+              <h3 data-i18n="featureNotificationsTitle">Pause third-party notifications</h3>
+              <p data-i18n="featureNotificationsBody">A toolbar switch controls configured channels. Messages include time and session context; desktop WeChat notifications are available on Windows.</p>
+            </article>
+            <article class="bento reveal">
+              <span class="card-tag now" data-i18n="now">WORKS TODAY</span>
+              <div class="card-icon" aria-hidden="true">↗</div>
+              <h3 data-i18n="featurePlatformsTitle">One command on Windows or Mac</h3>
+              <p data-i18n="featurePlatformsBody">Choose Windows EXE/MSI or a Mac DMG for Apple Silicon or Intel. The npm package includes all three apps and starts the matching one locally.</p>
+            </article>
+
             <article class="bento bento-large reveal">
               <span class="card-tag now" data-i18n="now">WORKS TODAY</span>
               <div class="card-icon" aria-hidden="true">⌘</div>
@@ -809,9 +809,7 @@
                 Close it. Reopen it. Still there.
               </h3>
               <p data-i18n="featureWorkspaceBody">
-                Project folder, grid layout, terminals, and colours come back
-                with the workspace. Drag workspace rows to put projects in
-                your preferred order.
+                Project folder, grid layout, terminals, and colours come back with the workspace. Drag workspace rows to put projects in your preferred order.
               </p>
               <div class="workspace-stack" aria-hidden="true">
                 <span style="--tone: #58c7a0"
@@ -831,8 +829,7 @@
               <div class="card-icon orange" aria-hidden="true">↻</div>
               <h3 data-i18n="featureSessionTitle">Nothing you close is lost</h3>
               <p data-i18n="featureSessionBody">
-                Find any past Claude Code, Codex, OpenCode, Grok Build, or Antigravity
-                sessions across your projects and reopen their native history.
+                Find past Claude Code, Codex, OpenCode, Pi Agent, Grok Build, or Antigravity sessions across your projects and reopen their native history.
               </p>
               <code>claude --resume · codex resume · opencode --session</code>
             </article>
@@ -847,9 +844,7 @@
                 <div class="card-icon violet" aria-hidden="true">☑</div>
                 <h3 data-i18n="featureTasksTitle">Hand a task to an agent</h3>
                 <p data-i18n="featureTasksBody">
-                  Write down the task and what counts as done, pick an agent,
-                  and it opens as a real terminal that reports its own progress
-                  back to the board.
+                  Write down the task and what counts as done, pick an agent, and it opens as a real terminal that reports its own progress back to the board.
                 </p>
               </div>
             </article>
@@ -861,8 +856,7 @@
                 Try a cheaper model on the same task
               </h3>
               <p data-i18n="featureModelBody">
-                Point the same CLI at a different provider, switch back if the
-                result is worse, and keep every key in secure storage.
+                Point the same CLI at a different provider, switch back if the result is worse, and keep every key in secure storage.
               </p>
               <div class="provider-row" aria-hidden="true">
                 <i>A</i><i>D</i><i>M</i><i>G</i><i>+</i>
@@ -889,8 +883,7 @@
                   Know the moment it needs you
                 </h3>
                 <p data-i18n="featureStatusBody">
-                  Waiting, thinking, needs approval, done, failed — shown in the
-                  tab, the panel, and the taskbar, across every project at once.
+                  Waiting, thinking, needs approval, done, failed: visible across projects, with system notifications and Windows taskbar attention.
                 </p>
               </div>
             </article>
@@ -900,8 +893,7 @@
               <div class="card-icon cyan" aria-hidden="true">文</div>
               <h3 data-i18n="featureLanguageTitle">Works in your language</h3>
               <p data-i18n="featureLanguageBody">
-                Follow Windows automatically or switch between Chinese, English,
-                Spanish, French, German, Japanese, and Korean at any time.
+                Follow your system language or switch between Chinese, English, Spanish, French, German, Japanese and Korean at any time.
               </p>
               <div class="language-pills" aria-hidden="true">
                 <span>中</span><span>EN</span><span>ES</span><span>FR</span
@@ -931,9 +923,7 @@
                   See your quota before you burn it
                 </h3>
                 <p data-i18n="featureQuotaBody">
-                  Check supported providers' reported quota and reset time.
-                  Grok Build shows an exhausted free allowance; unavailable
-                  percentages stay unavailable.
+                  Check supported providers' reported quota and reset time. Grok Build shows an exhausted free allowance; unavailable percentages stay unavailable.
                 </p>
               </div>
             </article>
@@ -953,7 +943,7 @@
               <span class="card-tag now" data-i18n="now">WORKS TODAY</span>
               <div class="card-icon green" aria-hidden="true">⌘</div>
               <h3 data-i18n="featureMcpTitle">Let one agent operate another</h3>
-              <p data-i18n="featureMcpBody">Connect through local MCP to send instructions to existing terminals for all five supported agents and read their output. Manage tasks or permitted settings too; choose access scopes yourself.</p>
+              <p data-i18n="featureMcpBody">Connect through local MCP to send instructions to existing terminals for all six supported agents and read their output. Manage tasks or permitted settings too; choose access scopes yourself.</p>
               <a href="guide.en.html#ai-control" data-i18n="mcpGuide">Set up MCP →</a>
             </article>
           </div>
@@ -970,9 +960,7 @@
               <h2 data-i18n="roadmapTitle">What comes next.</h2>
             </div>
             <p data-i18n="roadmapLead">
-              Everything above already works. Here is what has shipped, and what
-              is being built next — anything still marked planned is not being
-              sold as finished.
+              Everything above already works. Here is what has shipped, and what is being built next — anything still marked planned is not being sold as finished.
             </p>
           </div>
 
@@ -983,9 +971,7 @@
                 Run several agents side by side
               </h3>
               <p data-i18n="roadmap02Body">
-                Claude and Codex detection, separate logins, resume, custom
-                grids, model profiles, seven interface languages, and everything
-                saved locally.
+                Claude and Codex detection, separate logins, resume, custom grids, model profiles, seven interface languages, and everything saved locally.
               </p>
             </article>
             <article class="roadmap-item shipped reveal" data-delay="1">
@@ -994,17 +980,14 @@
                 Accounts, installs, and networks
               </h3>
               <p data-i18n="roadmap04Body">
-                Install or upgrade the CLIs in one click, keep several logins
-                apart, set up proxies for a company network, and watch how much
-                plan quota is left.
+                Install or upgrade the CLIs in one click, keep several logins apart, set up proxies for a company network, and watch how much plan quota is left.
               </p>
             </article>
             <article class="roadmap-item shipped reveal" data-delay="2">
               <div><span>V0.5–0.6</span><b data-i18n="shipped">SHIPPED</b></div>
               <h3 data-i18n="roadmap06Title">Handing work between agents</h3>
               <p data-i18n="roadmap06Body">
-                Session summaries, moving a task from one agent to another,
-                routing work, and notifications.
+                Session summaries, moving a task from one agent to another, routing work, and notifications.
               </p>
             </article>
             <article class="roadmap-item shipped reveal" data-delay="3">
@@ -1022,7 +1005,7 @@
             <article class="roadmap-item shipped reveal" data-delay="3">
               <div><span>V0.10.10</span><b data-i18n="shipped">SHIPPED</b></div>
               <h3 data-i18n="roadmapMcpTitle">Local MCP control, connected automatically</h3>
-              <p data-i18n="roadmapMcpBody">19 tools for terminals, tasks and settings. Enable the server, select permissions, then launch Claude Code, Codex, OpenCode, Pi Agent, Grok Build or Antigravity. Restart existing Agents to connect.</p>
+              <p data-i18n="roadmapMcpBody">19 tools for terminals, tasks and settings. Enable the server, select permissions, then launch Claude Code, Codex, OpenCode, Grok Build or Antigravity. Restart existing Agents to connect.</p>
             </article>
             <article class="roadmap-item current reveal" data-delay="3">
               <div><span>V0.10.11</span><b data-i18n="shipped">SHIPPED</b></div>
@@ -1045,9 +1028,14 @@
               <p data-i18n="roadmapSetupBody">Install and update six Agents with clear guidance, use the official Antigravity updater, and keep pending reminders flashing until acknowledged.</p>
             </article>
             <article class="roadmap-item current reveal" data-delay="3">
-              <div><span>V0.10.15</span><b data-i18n="current">YOU ARE HERE</b></div>
+              <div><span>V0.10.15</span><b data-i18n="shipped">SHIPPED</b></div>
               <h3 data-i18n="roadmapLatestTitle">Organized projects and clearer account setup</h3>
               <p data-i18n="roadmapLatestBody">Workspace folders, tags and icons, account login choices, model discovery and upgrade suggestions, and confirmation before closing active Agent terminals.</p>
+            </article>
+            <article class="roadmap-item current reveal" data-delay="3">
+              <div><span>V0.11.0</span><b data-i18n="current">YOU ARE HERE</b></div>
+              <h3 data-i18n="roadmap11Title">macOS, content previews and smoother saved actions</h3>
+              <p data-i18n="roadmap11Body">v0.11.0 adds Apple Silicon and Intel packages, multiple preview tabs with code highlighting, a continuous saved-action review and third-party notification controls. GitHub Actions builds desktop installers and publishes the Windows/macOS npm package.</p>
             </article>
           </div>
         </div>
@@ -1058,7 +1046,8 @@
           <span class="section-index" data-i18n="indexPrivacy"
             >09 / PRIVACY</span
           >
-          <h2 data-i18n="principlesTitle">Your work. On your computer.</h2>
+          <h2 data-i18n="principlesTitle">Your work.
+On your computer.</h2>
           <p data-i18n="principlesLead">Termexo runs locally by default. Enable remote access when you need it: use your own relay or a trusted LAN / VPN, control the desktop access token, and disconnect from Settings. Your agent CLIs still connect to the model services you configure.</p>
         </div>
         <div class="principles-list">
@@ -1067,8 +1056,7 @@
             <div>
               <h3 data-i18n="principle1Title">Local by default</h3>
               <p data-i18n="principle1Body">
-                Your project paths, sessions, terminal state, and settings sit
-                in a file on your disk. There is no cloud service to sign into.
+                Your project paths, sessions, terminal state, and settings sit in a file on your disk. There is no cloud service to sign into.
               </p>
             </div>
           </article>
@@ -1076,12 +1064,10 @@
             <span>02</span>
             <div>
               <h3 data-i18n="principle2Title">
-                Your API keys are not in a config files
+                Your API keys are not in a config file
               </h3>
               <p data-i18n="principle2Body">
-                Keys go into Windows Credential Manager. The app stores only a
-                reference, and the interface can tell you a key exists but never
-                show it back.
+                API keys go into Windows Credential Manager or macOS Keychain. The app stores a reference; the interface can tell you a key exists without returning its plaintext.
               </p>
             </div>
           </article>
@@ -1092,9 +1078,7 @@
                 Your agent files are read-only
               </h3>
               <p data-i18n="principle3Body">
-                Termexo reads what Claude Code and Codex write, and uses their
-                own resume commands. It never rewrites, renames, or deletes your
-                session history.
+                Termexo reads what Claude Code and Codex write, and uses their own resume commands. It never rewrites, renames, or deletes your session history.
               </p>
             </div>
           </article>
@@ -1105,11 +1089,10 @@
         <div>
           <span class="section-index" data-i18n="indexCta">BUILD WITH US</span>
           <h2 data-i18n="ctaTitle">One command. No account.</h2>
-          <p data-i18n="ctaLead">The npm package includes the Windows app. Start locally without a Termexo account, then connect a self-hosted relay when you need access across networks.</p>
+          <p data-i18n="ctaLead">The npm package includes Windows x64 and complete macOS apps for Apple Silicon and Intel. The same command starts the matching app locally, without a Termexo account.</p>
+          <p class="hero-remote-note" data-i18n="platformLimits">Windows signing is awaiting approval. Mac builds use ad-hoc signing and are not notarized; macOS may require allowing the app in Privacy &amp; Security.</p>
           <p data-i18n="supportProject">
-            Built in the open, under the MIT license. If Termexo helps your
-            workflow, a GitHub Star helps others discover it. Bug reports and
-            contributions are welcome too.
+            Built in the open, under the MIT license. If Termexo helps your workflow, a GitHub Star helps others discover it. Bug reports and contributions are welcome too.
           </p>
         </div>
         <div class="cta-actions">
