@@ -866,9 +866,11 @@ mod tests {
         assert!(fresh.command.contains("-c 'model_provider="));
         assert!(fresh.command.contains("https://api.deepseek.com/v1"));
         assert!(!fresh.command.contains(" resume "));
-        assert!(fresh
-            .command
-            .ends_with(" -- 'Use One Ring; read C:\\task''s notes.md; keep $() literal'"));
+        #[cfg(windows)]
+        let prompt_suffix = " -- 'Use One Ring; read C:\\task''s notes.md; keep $() literal'";
+        #[cfg(unix)]
+        let prompt_suffix = " -- 'Use One Ring; read C:\\task'\\''s notes.md; keep $() literal'";
+        assert!(fresh.command.ends_with(prompt_suffix));
 
         let resumed = adapter
             .build_launch_command(&CodexLaunchOptions {
