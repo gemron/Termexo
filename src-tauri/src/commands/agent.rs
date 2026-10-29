@@ -787,7 +787,7 @@ pub fn prepare_interactive_worker_launch(
             workspace_id: Some(request.workspace_id),
             session_id: None,
             model: request.model,
-            profile_id: None,
+            profile_id: Some("__termexo_cli_native__".into()),
             account_profile_id: request.account_profile_id,
             auto_confirm: false,
             reasoning_effort: None,
@@ -1411,7 +1411,15 @@ fn relaunch_environment_with_opencode_adapter(
     opencode: &OpenCodeAdapter,
 ) -> Result<HashMap<String, String>, String> {
     match request.agent_type {
-        "claude" | "codex" => model_agent_relaunch_environment(database, credentials, request),
+        "claude" | "codex" => {
+            let mut environment = model_agent_relaunch_environment(database, credentials, request)?;
+            // Another viewer can consume the one-shot launch stash before this caller starts
+            // the PTY. Never fall back to an outer Termexo session's inherited hook identity.
+            if request.agent_type == "codex" {
+                environment.extend(hooks.codex_hook_environment(request.terminal_id));
+            }
+            Ok(environment)
+        }
         "opencode" => opencode_launch_environment(
             database,
             credentials,
@@ -2176,6 +2184,28 @@ mod tests {
         let chosen = select_profile(&profiles, None, |profile| profile.claude_enabled);
 
         assert_eq!(chosen.map(|profile| profile.id), Some("glm".into()));
+    }
+
+    #[test]
+    fn rebuilds_codex_hook_identity_after_the_launch_stash_is_consumed() {
+        let directory = std::env::temp_dir().join(format!("termexo-codex-relaunch-{}", std::process::id()));
+        std::fs::create_dir_all(&directory).unwrap();
+        let database = WorkspaceDatabase::open(directory.join("agentdock.db")).unwrap();
+        let hooks = HookEventStore::new(&directory).unwrap();
+        let stash = LaunchEnvironmentStore::default();
+        stash.put("worker".into(), hooks.codex_hook_environment("worker").into_iter().collect()).unwrap();
+        assert!(!stash.take("worker").unwrap().is_empty());
+        assert!(stash.take("worker").unwrap().is_empty());
+        let environment = relaunch_environment(&database, &CredentialStore, &hooks, &RelaunchRequest {
+            terminal_id: "worker", agent_type: "codex", native_session_id: None,
+            account_profile_id: None, model_profile_id: Some("__termexo_cli_native__"), workspace_id: None,
+        }).unwrap();
+        assert_eq!(environment.get("TERMEXO_CODEX_TERMINAL_ID").map(String::as_str), Some("worker"));
+        assert_eq!(environment.get("TERMEXO_CODEX_EVENT_FILE"), Some(&directory.join("claude-hook-events.jsonl").to_string_lossy().into_owned()));
+        #[cfg(windows)]
+        assert!(environment.get("TERMEXO_CODEX_HOOK_MODULE").unwrap().starts_with("file:///"));
+        drop(database);
+        std::fs::remove_dir_all(directory).unwrap();
     }
 
     /// A restored Antigravity terminal once started with none of this, which let the CLI's

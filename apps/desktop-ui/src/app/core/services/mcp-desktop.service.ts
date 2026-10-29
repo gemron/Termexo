@@ -1,6 +1,7 @@
 import { WechatNotificationsService } from './wechat-notifications.service';
 import { ProjectPreviewService } from './project-preview.service';
 import { CommonActionsService } from './common-actions.service';
+import { CLI_NATIVE_PROFILE_ID } from '../models/launch-model-choice';
 import { DestroyRef, inject, Injectable, InjectionToken, type WritableSignal } from '@angular/core';
 
 import { I18nService, type LanguagePreference } from '../i18n/i18n.service';
@@ -480,6 +481,7 @@ export class McpDesktopService {
         workingDirectory: String(args['workingDirectory']),
         model: args['model'] as string | undefined,
         accountProfileId,
+        profileId: cli === 'codex' ? CLI_NATIVE_PROFILE_ID : undefined,
         autoConfirm: false,
       },
       workspace.id,

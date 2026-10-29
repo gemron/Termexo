@@ -154,7 +154,7 @@ describe('McpDesktopService', () => {
       }),
     );
     expect(gateway.start).toHaveBeenCalledWith(
-      expect.objectContaining({ id: terminal.id, agentType: 'codex' }),
+      expect.objectContaining({ id: terminal.id, agentType: 'codex', profileId: '__termexo_cli_native__' }),
       120,
       30,
       'w2',

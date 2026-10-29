@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { execFileSync } from 'node:child_process';
+import { execFileSync, spawnSync } from 'node:child_process';
 import { mkdirSync, mkdtempSync, realpathSync } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -16,8 +16,9 @@ test('Git root checks accept Windows case aliases while rejecting actual subdire
   if (process.platform === 'win32') {
     const alias = root.toUpperCase();
     assert.equal(path.relative(workspaceRoot(alias), canonical), '');
-    const short = execFileSync('cmd.exe', ['/d', '/c', `for %I in ("${root}") do @echo %~sI`], { encoding: 'utf8', windowsHide: true, windowsVerbatimArguments: true }).trim();
-    assert.equal(workspaceRoot(short), canonical);
+    const short = spawnSync('cmd.exe', ['/d', '/c', `for %I in ("${root}") do @echo %~sI`], { encoding: 'utf8', windowsHide: true, windowsVerbatimArguments: true });
+    assert.equal(short.status, 0, short.stderr);
+    assert.equal(workspaceRoot(short.stdout.trim()), canonical);
   }
   assert.throws(() => workspaceRoot(nested), /not a subdirectory/);
 });
