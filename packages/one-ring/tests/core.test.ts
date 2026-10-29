@@ -28,7 +28,7 @@ function setup(runtime?: Runtime, coordinatorTerminalId?: string) {
   const store = new Store(path.join(temporary, 'state'));
   const engine = new Engine(store, runtime || new FakeRuntime());
   const workflow = engine.create(root, basicPlan, coordinatorTerminalId);
-  return { root, store, engine, workflow };
+  return { root: workflow.root, store, engine, workflow };
 }
 class FakeRuntime implements Runtime {
   calls: RunRequest[] = [];
