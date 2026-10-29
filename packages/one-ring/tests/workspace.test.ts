@@ -11,10 +11,13 @@ test('Git root checks accept Windows case aliases while rejecting actual subdire
   execFileSync('git', ['init', '--quiet', root]);
   const nested = path.join(root, 'nested');
   mkdirSync(nested);
-  assert.equal(workspaceRoot(root), realpathSync(root));
+  const canonical = realpathSync.native(root);
+  assert.equal(workspaceRoot(root), canonical);
   if (process.platform === 'win32') {
     const alias = root.toUpperCase();
-    assert.equal(path.relative(workspaceRoot(alias), root), '');
+    assert.equal(path.relative(workspaceRoot(alias), canonical), '');
+    const short = execFileSync('cmd.exe', ['/d', '/c', `for %I in ("${root}") do @echo %~sI`], { encoding: 'utf8', windowsHide: true }).trim();
+    assert.equal(workspaceRoot(short), canonical);
   }
   assert.throws(() => workspaceRoot(nested), /not a subdirectory/);
 });

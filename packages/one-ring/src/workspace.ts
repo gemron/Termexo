@@ -7,8 +7,8 @@ import type { Snapshot } from './protocol.js';
 export const digest = (value: unknown): string => createHash('sha256').update(typeof value === 'string' ? value : JSON.stringify(value)).digest('hex');
 function git(root: string, args: string[]): Buffer { return execFileSync('git', ['-C', root, ...args], { maxBuffer: 64 * 1024 * 1024, stdio: ['ignore', 'pipe', 'pipe'] }); }
 export function workspaceRoot(input: string): string {
-  const root = realpathSync(input);
-  const top = realpathSync(git(root, ['rev-parse', '--show-toplevel']).toString().trim());
+  const root = realpathSync.native(input);
+  const top = realpathSync.native(git(root, ['rev-parse', '--show-toplevel']).toString().trim());
   if (path.relative(root, top) !== '') throw new Error(`Use the Git working-tree root, not a subdirectory (requested ${root}; Git root ${top}).`);
   return root;
 }
