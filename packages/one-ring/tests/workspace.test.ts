@@ -16,7 +16,7 @@ test('Git root checks accept Windows case aliases while rejecting actual subdire
   if (process.platform === 'win32') {
     const alias = root.toUpperCase();
     assert.equal(path.relative(workspaceRoot(alias), canonical), '');
-    const short = execFileSync('cmd.exe', ['/d', '/c', `for %I in ("${root}") do @echo %~sI`], { encoding: 'utf8', windowsHide: true }).trim();
+    const short = execFileSync('cmd.exe', ['/d', '/c', `for %I in ("${root}") do @echo %~sI`], { encoding: 'utf8', windowsHide: true, windowsVerbatimArguments: true }).trim();
     assert.equal(workspaceRoot(short), canonical);
   }
   assert.throws(() => workspaceRoot(nested), /not a subdirectory/);
