@@ -424,6 +424,10 @@ await hooks.dispose();
   const eventGate = new Promise((resolve) => {
     releaseEvents = resolve;
   });
+  let finishEvents;
+  const eventsFinished = new Promise((resolve) => {
+    finishEvents = resolve;
+  });
   const cleanup = await v2.setup({
     session: {
       hook: async (name, callback) => {
@@ -465,6 +469,9 @@ await hooks.dispose();
           type: 'session.execution.succeeded',
           data: { sessionID: 'ses_v2' },
         };
+        // Serial asynchronous event writes can outlast the idle settle interval on CI.
+        // Keep this stream slower than the former fixed wait so the drain is exercised.
+        await new Promise((resolve) => setTimeout(resolve, PAST_SETTLE_MS + SETTLE_MS));
         yield { type: 'session.created', data: { sessionID: 'ses_v2_failed' } };
         yield {
           type: 'session.execution.started',
@@ -489,13 +496,25 @@ await hooks.dispose();
           type: 'session.execution.interrupted',
           data: { sessionID: 'ses_v2_cancelled' },
         };
+        // The consumer resumes the generator only after handling the last yielded event.
+        finishEvents();
       },
     },
   });
   const mark = recorded().length;
   await registered.prompt({ sessionID: 'ses_v2' });
   releaseEvents();
-  await settle();
+  let deadline;
+  try {
+    await Promise.race([
+      eventsFinished,
+      new Promise((_, reject) => {
+        deadline = setTimeout(() => reject(new Error('V2 replay did not drain its event stream')), 5000);
+      }),
+    ]);
+  } finally {
+    clearTimeout(deadline);
+  }
   const events = recordedSince(mark);
   check(events.includes('agent.thinking'), `a V2 prompt did not start thinking (${events})`);
   check(

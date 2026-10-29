@@ -1,5 +1,47 @@
 [
   {
+    "name": "agent_worker_models", "group": "terminal",
+    "description": "Read the selected workspace and account's CLI model catalog without starting a model turn. Catalog entries do not prove inference entitlement.",
+    "inputSchema": { "type": "object", "properties": {
+      "workspaceId": { "type": "string", "minLength": 1 }, "cli": { "type": "string", "enum": ["codex", "opencode"] },
+      "accountProfileId": { "type": "string" }
+    }, "required": ["workspaceId", "cli"], "additionalProperties": false },
+    "annotations": { "readOnlyHint": true, "destructiveHint": false, "idempotentHint": true, "openWorldHint": false }
+  },
+  {
+    "name": "agent_session_start",
+    "group": "terminal",
+    "description": "Start a native interactive Codex Worker or OpenCode 2 implementer. OpenCode requires an explicit provider/model. Keeps the CLI available for user takeover; does not approve a workflow.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "workspaceId": { "type": "string", "minLength": 1 },
+        "name": { "type": "string", "minLength": 1, "maxLength": 120 },
+        "role": { "type": "string", "enum": ["implementer", "verifier"] },
+        "cli": { "type": "string", "enum": ["codex", "opencode"] },
+        "instructionsPath": { "type": "string", "minLength": 1 },
+        "workingDirectory": { "type": "string", "minLength": 1 },
+        "model": { "type": "string" },
+        "accountProfileId": { "type": "string" }
+      },
+      "required": ["workspaceId", "role", "instructionsPath", "workingDirectory"],
+      "additionalProperties": false
+    },
+    "annotations": { "readOnlyHint": false, "destructiveHint": true, "idempotentHint": false, "openWorldHint": true }
+  },
+  {
+    "name": "agent_session_inspect",
+    "group": "terminal",
+    "description": "Inspect a real Codex terminal and locate its native read-only transcript for structured execution evidence. An idle terminal alone is not proof of success.",
+    "inputSchema": {
+      "type": "object",
+      "properties": { "terminalId": { "type": "string", "minLength": 1 } },
+      "required": ["terminalId"],
+      "additionalProperties": false
+    },
+    "annotations": { "readOnlyHint": true, "destructiveHint": false, "idempotentHint": true, "openWorldHint": false }
+  },
+  {
     "name": "workspace_list",
     "group": "workspace",
     "description": "List workspaces and their project paths and terminal IDs.",

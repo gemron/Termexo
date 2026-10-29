@@ -1,0 +1,188 @@
+<header>
+  <div>
+    <span class="eyebrow">ONE RING · 至尊魔戒</span>
+    <h1>统筹众 CLI，循证交付</h1>
+    <p>{{ root() }}</p>
+  </div>
+  <div class="actions">
+    <span class="muted">Termexo 内置编排</span>
+    <button class="btn btn-sm btn-ghost" (click)="reload()" [disabled]="busy()">
+      {{ busy() ? '读取中…' : connected() ? '刷新' : '重试' }}
+    </button>
+    <button class="btn btn-sm btn-ghost" (click)="terminalRequested.emit()">返回终端</button>
+  </div>
+</header>
+@if (mode === 'preview') {
+  <p class="notice">One Ring 已内置于 Termexo。请在桌面应用中使用本地 Agent 编排。</p>
+}
+@if (error()) {
+  <p class="notice error" role="alert">{{ error() }}</p>
+}
+@if (connected()) {
+  @if (doctor(); as health) {
+    <div class="health">
+      <span class="dot"></span>One Ring 已就绪 · 内置引擎 {{ health.version }}
+      <span class="muted">{{ refreshedAt() ? '更新于 ' + refreshedAt() : '' }}</span>
+    </div>
+    @if (health.cli?.length) {
+      <div class="cli-status">
+        @for (cli of health.cli; track cli.cli) {
+          <span [title]="cli.error || cli.execution"
+            ><b>{{ cli.cli }}</b> · {{ cli.installed ? cli.version : '未检测到' }}</span
+          >
+        }
+      </div>
+    }
+    @if (!executionSupported()) {
+      <p class="notice" data-testid="one-ring-platform-limit">
+        当前插件尚未声明支持此平台的 Worker 执行。仍可验证连接和读取工作流；Windows
+        启动任务需要支持原生沙箱及进程生命周期管理的 One Ring 插件。
+      </p>
+    }
+  }
+  <section class="new-task">
+    <label for="one-ring-goal">新建编排任务</label>
+    <textarea
+      id="one-ring-goal"
+      class="textarea textarea-bordered"
+      rows="3"
+      [ngModel]="goal()"
+      (ngModelChange)="goal.set($event)"
+      placeholder="描述目标与验收标准，随后在 Codex 会话中审阅计划并确认。"
+    ></textarea>
+    <label>实施者 CLI
+      <select class="select select-bordered" [ngModel]="implementerCli()" (ngModelChange)="chooseImplementer($event)">
+        <option value="codex">Codex</option><option value="opencode">OpenCode 2</option>
+      </select>
+    </label>
+    <label>实施者模型
+      <input class="input input-bordered" list="one-ring-implementer-models" [ngModel]="implementerModel()" (ngModelChange)="implementerModel.set($event)"
+        placeholder="可指定模型；留空由协调者建议，并在计划中确认" />
+      <datalist id="one-ring-implementer-models">
+        @for (model of openCodeModels(); track model) { <option [value]="model"></option> }
+      </datalist>
+    </label>
+    <p class="muted">协调者和独立验证者使用 Codex。实施者的 CLI、模型将写入计划，由你确认后执行。</p>
+    <button
+      class="btn btn-sm btn-primary"
+      data-testid="one-ring-start"
+      [disabled]="!goal().trim() || busy() || !executionSupported()"
+      (click)="start()"
+    >
+      选择 Codex 账号与模型 →
+    </button>
+    <p class="muted">
+      当前支持 Codex / OpenCode 实施者和 Codex 验证者。计划、修复、恢复与交付确认在协调终端中完成。关闭协调会话会中断其
+      Worker。
+    </p>
+  </section>
+  <div class="workflow-grid">
+    <section class="workflow-list">
+      <h2>
+        当前项目工作流 <small>{{ visibleWorkflows().length }}</small>
+      </h2>
+      @for (workflow of visibleWorkflows(); track workflow.id) {
+        <button
+          class="workflow"
+          [class.selected]="selectedId() === workflow.id"
+          (click)="select(workflow.id)"
+        >
+          <strong>{{ workflow.title }}</strong
+          ><span>{{ phaseLabel(workflow.phase) }} · r{{ workflow.revision }}</span
+          ><code>{{ workflow.id }}</code>
+        </button>
+      } @empty {
+        <p class="muted">当前目录尚无工作流。创建计划后，它会显示在这里。</p>
+      }
+    </section>
+    <section class="workflow-detail">
+      @if (selected(); as workflow) {
+        <div class="detail-heading">
+          <h2>{{ workflow.plan.title }}</h2>
+          <b class="phase" [class.complete]="workflow.phase === 'COMPLETED'">{{
+            phaseLabel(workflow.phase)
+          }}</b>
+        </div>
+        <p>{{ workflow.plan.goal }}</p>
+        <p class="muted">
+          计划 v{{ workflow.plan.version }} · 状态 r{{ workflow.revision }} · 修复
+          {{ workflow.repairRound }} 轮
+        </p>
+        @if (workflow.blockedReason) {
+          <p class="notice error">{{ workflow.blockedReason }}</p>
+        }
+        @if (workflow.pendingStop) {
+          <p class="notice">进程终止尚未确认，请在协调终端中检查。</p>
+        } @else if (workflow.phase === 'BLOCKED' && workflow.pendingStop === false) {
+          <p class="notice">旧 Worker 已确认停止。请打开协调会话，选择恢复或结束此工作流。</p>
+        }
+        <h3>验收标准</h3>
+        <ol>
+          @for (criterion of workflow.plan.criteria; track $index) {
+            <li>{{ criterion }}</li>
+          }
+        </ol>
+        <h3>实施与验证会话</h3>
+        @for (run of workflow.runs; track run.id) {
+          <p class="run">
+            <b>{{ run.role }}</b
+            ><code>{{ run.status }}</code>
+            @if (run.terminalId) {
+              @if (terminalAvailable(run.terminalId)) {
+                <button class="btn btn-xs" (click)="workerTerminalRequested.emit(run.terminalId)">
+                  打开 CLI 会话
+                </button>
+              } @else {
+                <span class="muted">原 CLI 会话已关闭，执行记录已保留。</span>
+              }
+            }
+            @if (run.error) {
+              <span>{{ run.error }}</span>
+            }
+          </p>
+        } @empty {
+          <p class="muted">尚未执行。</p>
+        }
+        @if (workflow.verification; as report) {
+          <h3>验证结果 · {{ report.outcome }}</h3>
+          <p>{{ report.summary }}</p>
+          @for (criterion of report.criteria; track criterion.id) {
+            <p>
+              <b>{{ criterion.id }} · {{ criterion.status }}</b
+              ><br />{{ criterion.evidence }}
+            </p>
+          }
+          @for (check of report.checks; track $index) {
+            <p>
+              <code>{{ check.command }}</code> · exit {{ check.exitCode }}<br />{{ check.summary }}
+            </p>
+          }
+          @if (report.issues.length) {
+            <h3>待处理问题</h3>
+            <ul>
+              @for (issue of report.issues; track $index) {
+                <li>{{ issue }}</li>
+              }
+            </ul>
+          }
+        }
+        @if (
+          !['COMPLETED', 'CANCELLED', 'FAILED', 'BUILDING', 'VERIFYING'].includes(workflow.phase)
+        ) {
+          <button
+            class="btn btn-sm btn-outline"
+            [disabled]="busy() || !executionSupported()"
+            (click)="start(workflow)"
+          >
+            打开协调会话处理此工作流
+          </button>
+        }
+        <p class="muted">
+          终端退出或验证 PASS 均不代表交付已获确认。面板以 One Ring 的实际阶段为准。
+        </p>
+      } @else {
+        <p class="muted">选择一个工作流，查看计划、执行记录与验证证据。</p>
+      }
+    </section>
+  </div>
+}

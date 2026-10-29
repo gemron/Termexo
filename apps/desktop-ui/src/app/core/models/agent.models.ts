@@ -208,6 +208,7 @@ export interface ClaudeLaunchRequest {
   sessionId?: string;
   name?: string;
   profileId?: string;
+  model?: string;
   mcpProfileId?: string;
   accountProfileId?: string;
   autoConfirm?: boolean;
@@ -240,6 +241,7 @@ export interface ClaudeBackgroundSession {
 }
 
 export interface CodexLaunchRequest {
+  oneRing?: import('./one-ring.models').OneRingCoordinatorRequest;
   terminalId: string;
   workspaceId?: string;
   sessionId?: string;
@@ -469,7 +471,7 @@ export const PROVIDER_PRESETS: readonly ProviderPreset[] = [
     label: 'OpenAI 官方',
     claudeModel: '',
     claudeBaseUrl: '',
-    codexModel: 'gpt-5.6-sol',
+    codexModel: '',
     codexBaseUrl: '',
   },
   {
@@ -558,13 +560,6 @@ export function groupProfilesByProvider(
       left.provider.localeCompare(right.provider),
   );
 }
-
-/** Offered as `<datalist>` hints wherever a Codex model can be typed by hand. */
-export const CODEX_MODEL_SUGGESTIONS: readonly string[] = [
-  'gpt-5.6-sol',
-  'gpt-5.6-terra',
-  'gpt-5.6-luna',
-];
 
 /**
  * Reasoning depth each CLI accepts at launch, weakest first.

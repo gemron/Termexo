@@ -156,6 +156,22 @@ export class TerminalInputStatusTracker {
     if (data === AGENT_INTERRUPT_SEQUENCE) {
       return INTERRUPTIBLE_STATUSES.has(status) ? 'IDLE' : null;
     }
+    if (
+      agentType === 'codex' &&
+      (status === 'IDLE' || status === 'COMPLETED') &&
+      isSubmission(data)
+    ) {
+      // Model/quota menus can appear after a completed turn. Confirming their highlighted
+      // choice submits no prompt; leave the settled status until a real lifecycle event.
+      const options = context.readApprovalOptions();
+      if (
+        options.length > 1 &&
+        options.some((option) => option.selected) &&
+        options.every((option) => option.approves === null)
+      ) {
+        return null;
+      }
+    }
     if (status !== 'WAITING_APPROVAL') {
       // Local commands such as /recap consume Enter without a task lifecycle. Claude's
       // UserPromptSubmit hook sets THINKING when a model turn actually begins.

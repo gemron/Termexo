@@ -15,6 +15,19 @@ use super::{tools, McpManager, McpSettings};
 pub(super) trait McpBackend: Send + Sync + 'static {
     fn settings(&self) -> McpSettings;
     fn authorized(&self, token: &str) -> bool;
+    fn internal_authorized(&self, _token: &str) -> bool {
+        false
+    }
+    fn listener_port(&self) -> u16 {
+        self.settings().port
+    }
+    fn call_internal(
+        self: Arc<Self>,
+        name: String,
+        arguments: Value,
+    ) -> impl std::future::Future<Output = Result<Value, String>> + Send {
+        self.call(name, arguments)
+    }
     fn call(
         self: Arc<Self>,
         name: String,
@@ -23,6 +36,19 @@ pub(super) trait McpBackend: Send + Sync + 'static {
 }
 
 impl McpBackend for McpManager {
+    fn listener_port(&self) -> u16 {
+        self.listener_port()
+    }
+    fn internal_authorized(&self, token: &str) -> bool {
+        self.one_ring_authorized(token)
+    }
+    async fn call_internal(
+        self: Arc<Self>,
+        name: String,
+        arguments: Value,
+    ) -> Result<Value, String> {
+        self.call_scoped(&name, arguments, true).await
+    }
     fn settings(&self) -> McpSettings {
         self.settings()
     }
@@ -72,21 +98,35 @@ fn validate_headers(headers: &HeaderMap, port: u16) -> Result<(), StatusCode> {
     Ok(())
 }
 
-fn authorize<B: McpBackend>(manager: &B, headers: &HeaderMap) -> Result<(), StatusCode> {
-    let settings = manager.settings();
-    if !settings.enabled {
-        return Err(StatusCode::SERVICE_UNAVAILABLE);
+pub(super) fn one_ring_settings(port: u16) -> McpSettings {
+    McpSettings {
+        enabled: true,
+        auto_connect_agents: false,
+        port,
+        terminal_access: true,
+        task_access: false,
+        settings_access: false,
     }
-    validate_headers(headers, settings.port)?;
+}
+
+fn authorize<B: McpBackend>(manager: &B, headers: &HeaderMap) -> Result<bool, StatusCode> {
+    let settings = manager.settings();
+    validate_headers(headers, manager.listener_port())?;
     let token = headers
         .get(header::AUTHORIZATION)
         .and_then(|v| v.to_str().ok())
         .and_then(|v| v.strip_prefix("Bearer "))
         .unwrap_or("");
+    if manager.internal_authorized(token) {
+        return Ok(true);
+    }
+    if !settings.enabled {
+        return Err(StatusCode::SERVICE_UNAVAILABLE);
+    }
     if !manager.authorized(token) {
         return Err(StatusCode::UNAUTHORIZED);
     }
-    Ok(())
+    Ok(false)
 }
 
 async fn no_stream<B: McpBackend>(State(manager): State<Arc<B>>, headers: HeaderMap) -> StatusCode {
@@ -144,9 +184,15 @@ async fn handle<B: McpBackend>(
     headers: HeaderMap,
     body: Bytes,
 ) -> Response {
-    if let Err(status) = authorize(manager.as_ref(), &headers) {
-        return status.into_response();
-    }
+    let internal = match authorize(manager.as_ref(), &headers) {
+        Ok(internal) => internal,
+        Err(status) => return status.into_response(),
+    };
+    let access = if internal {
+        one_ring_settings(manager.listener_port())
+    } else {
+        manager.settings()
+    };
     if !headers
         .get(header::CONTENT_TYPE)
         .and_then(|v| v.to_str().ok())
@@ -203,7 +249,7 @@ async fn handle<B: McpBackend>(
             if params.get("cursor").is_some() {
                 Err((-32602, "This server does not use pagination cursors".into()))
             } else {
-                Ok(tools::list(&manager.settings()))
+                Ok(tools::list(&access))
             }
         }
         "tools/call" => {
@@ -220,12 +266,16 @@ async fn handle<B: McpBackend>(
                 Some(tool) => match tools::validate_arguments(&tool["inputSchema"], &arguments) {
                     Err(message) => Err((-32602, message)),
                     Ok(()) => {
-                        if !tools::allowed(&tool, &manager.settings()) {
+                        if !tools::allowed(&tool, &access) {
                             Ok(tool_result(Err(
                                 "MCP access to this tool is disabled".into()
                             )))
                         } else {
-                            Ok(tool_result(manager.call(name.into(), arguments).await))
+                            Ok(tool_result(if internal {
+                                manager.call_internal(name.into(), arguments).await
+                            } else {
+                                manager.call(name.into(), arguments).await
+                            }))
                         }
                     }
                 },
@@ -255,6 +305,9 @@ mod tests {
     }
 
     impl McpBackend for TestBackend {
+        fn internal_authorized(&self, token: &str) -> bool {
+            token == "one-ring-test-token"
+        }
         fn settings(&self) -> McpSettings {
             self.settings.read().unwrap().clone()
         }
@@ -384,6 +437,65 @@ mod tests {
                 .status(),
             StatusCode::SERVICE_UNAVAILABLE
         );
+        server.abort();
+    }
+
+    #[tokio::test]
+    async fn builtin_bridge_works_with_public_mcp_disabled_and_cannot_access_tasks_or_settings() {
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let port = listener.local_addr().unwrap().port();
+        let backend = Arc::new(TestBackend {
+            settings: RwLock::new(McpSettings {
+                enabled: false,
+                terminal_access: false,
+                port,
+                ..Default::default()
+            }),
+            token: RwLock::new("public-token".into()),
+            calls: AtomicUsize::new(0),
+        });
+        let endpoint = router(backend.clone());
+        let server = tokio::spawn(async move {
+            axum::serve(listener, endpoint).await.unwrap();
+        });
+        let client = reqwest::Client::builder().no_proxy().build().unwrap();
+        let url = format!("http://127.0.0.1:{port}/mcp");
+        let request = |message: Value| {
+            client
+                .post(&url)
+                .bearer_auth("one-ring-test-token")
+                .header("Accept", "application/json, text/event-stream")
+                .json(&message)
+        };
+        let discovered: Value = request(json!({"jsonrpc":"2.0","id":1,"method":"tools/list"}))
+            .send()
+            .await
+            .unwrap()
+            .json()
+            .await
+            .unwrap();
+        let names: Vec<_> = discovered["result"]["tools"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|tool| tool["name"].as_str().unwrap())
+            .collect();
+        assert!(names.contains(&"agent_session_start"));
+        assert!(!names.contains(&"settings_update"));
+        assert!(!names.contains(&"task_execute"));
+        let denied: Value = request(json!({"jsonrpc":"2.0","id":2,"method":"tools/call","params":{"name":"settings_get","arguments":{}}})).send().await.unwrap().json().await.unwrap();
+        assert_eq!(denied["result"]["isError"], true);
+        assert_eq!(backend.calls.load(Ordering::Relaxed), 0);
+        let response = client
+            .post(&url)
+            .bearer_auth("public-token")
+            .header("Accept", "application/json, text/event-stream")
+            .json(&json!({"jsonrpc":"2.0","id":3,"method":"ping"}))
+            .send()
+            .await
+            .unwrap();
+        assert_eq!(response.status(), StatusCode::SERVICE_UNAVAILABLE);
+        assert!(!backend.settings().enabled);
         server.abort();
     }
 

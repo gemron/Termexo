@@ -63,6 +63,15 @@ jobs:
       - name: Install frontend dependencies
         run: npm --prefix apps/desktop-ui ci
 
+      - name: Prepare built-in One Ring resources
+        run: npm run one-ring:stage
+
+      - name: Test built-in One Ring engine
+        run: npm run one-ring:test
+
+      - name: Test One Ring desktop bridge
+        run: node --test scripts/one-ring-bridge.test.mjs
+
       - name: Run native Rust tests
         run: cargo test --manifest-path src-tauri/Cargo.toml --lib --locked --target "$TARGET" -- --quiet
 

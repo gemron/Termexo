@@ -354,7 +354,7 @@ mod tests {
         let fixture = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
             .join("src/wechat/target-activation.tests.ps1");
         let output = crate::process::hidden_command("powershell.exe")
-            .args(["-NoProfile", "-NonInteractive", "-File"])
+            .args(["-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-File"])
             .arg(fixture)
             .output()
             .unwrap();
@@ -391,7 +391,7 @@ mod tests {
         let fixture =
             std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("src/wechat/delivery.tests.ps1");
         let output = crate::process::hidden_command("powershell.exe")
-            .args(["-NoProfile", "-NonInteractive", "-File"])
+            .args(["-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-File"])
             .arg(fixture)
             .output()
             .unwrap();

@@ -171,11 +171,15 @@ import { TerminalWorkbenchComponent } from './terminal/terminal-workbench';
 import { TerminalCloseConfirmComponent } from './terminal/terminal-close-confirm';
 import type { CloseConfirmAnchor } from './terminal/terminal-close-request';
 import { TodoBoardComponent } from './todo/todo-board';
+import { OneRingPanelComponent } from './one-ring/one-ring-panel';
+import { sameOneRingRoot, type OneRingCoordinatorRequest } from './core/models/one-ring.models';
+import { OneRingService } from './core/services/one-ring.service';
+import { CLI_NATIVE_PROFILE_ID, explicitCliModel } from './core/models/launch-model-choice';
 import { WorkspaceSidebarComponent } from './workspace/workspace-sidebar';
 import { GitWorkbenchComponent } from './git/git-workbench';
 
 type SidebarResizeTarget = 'workspace' | 'inspector' | 'preview';
-type WorkspaceView = 'terminal' | 'tasks' | 'git' | 'preview';
+type WorkspaceView = 'terminal' | 'tasks' | 'git' | 'preview' | 'one-ring';
 
 /** How a resume should proceed once the CLI's hold on the session has been dealt with. */
 interface BackgroundReclaim {
@@ -301,6 +305,7 @@ function readStoredString(key: string, fallback: string): string {
     TerminalWorkbenchComponent,
     TerminalCloseConfirmComponent,
     TodoBoardComponent,
+    OneRingPanelComponent,
     TranslatePipe,
     WebviewUpgradeDialogComponent,
     WorkspaceSidebarComponent,
@@ -381,6 +386,7 @@ export class App {
   protected readonly createWorkspaceError = signal<string | null>(null);
   private readonly pendingOnboardingAgent = signal<AgentType | null>(null);
   protected readonly workspaceView = signal<WorkspaceView>('terminal');
+  protected readonly pendingOneRing = signal<OneRingCoordinatorRequest | null>(null);
   protected readonly busyTodoTaskId = signal<string | null>(null);
   protected readonly editingWorkspaceId = signal<string | null>(null);
   protected readonly claudeLaunchOpen = signal(false);
@@ -1040,6 +1046,7 @@ export class App {
   }
 
   protected async openCodexLaunch(): Promise<void> {
+    this.pendingOneRing.set(null);
     this.agentMenuOpen.set(false);
     const workingDirectory = this.state.activeWorkspace()?.projectPath;
     if (!workingDirectory) {
@@ -1301,8 +1308,13 @@ export class App {
 
   protected async launchCodex(value: CodexLaunchDialogValue): Promise<void> {
     const workspace = this.state.activeWorkspace();
-    const workingDirectory = this.selectedTerminalDirectory();
+    const oneRing = this.pendingOneRing();
+    const workingDirectory = oneRing?.root ?? this.selectedTerminalDirectory();
     if (!workspace || !workingDirectory || this.launchingCodex()) {
+      return;
+    }
+    if (oneRing && !sameOneRingRoot(oneRing.root, workspace.projectPath)) {
+      this.showToast('当前项目已切换，请关闭对话框后重新发起 One Ring 任务。', 'attention');
       return;
     }
 
@@ -1322,29 +1334,31 @@ export class App {
         ? this.agents.modelProfiles().find((item) => item.id === value.profileId)
         : undefined;
       const launch = await this.agents.prepareCodexLaunch({
+        oneRing: oneRing ?? undefined,
         terminalId,
         workspaceId: workspace.id,
         model: value.model,
         profileId: value.profileId,
         accountProfileId: value.accountProfileId,
-        autoConfirm: value.autoConfirm,
+        autoConfirm: oneRing ? false : value.autoConfirm,
         reasoningEffort: value.reasoningEffort,
       });
       const terminal = this.state.createTerminal({
         id: terminalId,
         agentType: 'codex',
-        name: value.name || undefined,
+        name: oneRing ? `One Ring · ${value.name || 'Coordinator'}` : value.name || undefined,
         command: launch.command,
         model:
-          (profile ? profileModel(profile, 'codex') : undefined) ??
-          value.model ??
+          value.model ||
+          (profile ? profileModel(profile, 'codex') : undefined) ||
           this.i18n.t('terminal.defaultCodexModel'),
         workingDirectory,
         profileId: value.profileId,
         accountProfileId: value.accountProfileId,
-        autoConfirm: value.autoConfirm,
+        autoConfirm: oneRing ? false : value.autoConfirm,
       });
       this.codexLaunchOpen.set(false);
+      this.pendingOneRing.set(null);
       this.selectedTerminalDirectory.set(null);
       if (terminal) {
         this.armStartupDialogs(terminal.id);
@@ -1359,11 +1373,39 @@ export class App {
   }
 
   protected closeCodexLaunch(): void {
+    this.pendingOneRing.set(null);
     this.codexLaunchOpen.set(false);
     this.selectedTerminalDirectory.set(null);
     if (this.pendingCommonActionLaunch) {
       this.pendingCommonActionLaunch = null;
       this.commonActionsOpen.set(true);
+    }
+  }
+
+  private readonly oneRingService = inject(OneRingService);
+  private openingOneRingCoordinator = false;
+  protected async openOneRingCoordinator(request: OneRingCoordinatorRequest): Promise<void> {
+    if (this.launchingCodex() || this.codexLaunchOpen() || this.openingOneRingCoordinator) return;
+    this.openingOneRingCoordinator = true;
+    try {
+      const workspace = this.state.activeWorkspace();
+      if (!workspace || !sameOneRingRoot(workspace.projectPath, request.root)) return;
+      if (request.workflowId) {
+        const id = await this.oneRingService.findCoordinator(request, workspace.terminals.map(t => t.id));
+        if (this.state.activeWorkspace()?.id !== workspace.id) return;
+        if (id && this.state.activeWorkspace()?.terminals.some(t => t.id === id && t.agentType === 'codex')) {
+          this.revealCreatedTerminal(id);
+          return;
+        }
+      }
+      await this.openCodexLaunch();
+      if (this.codexLaunchOpen()) {
+        this.pendingOneRing.set(request);
+      }
+    } catch (error) {
+      this.showToast(this.errorMessage(error), 'error');
+    } finally {
+      this.openingOneRingCoordinator = false;
     }
   }
 
@@ -1387,6 +1429,7 @@ export class App {
         terminalId,
         workspaceId: workspace.id,
         name: value.name || undefined,
+        model: value.model,
         profileId: value.profileId,
         mcpProfileId: value.mcpProfileId,
         accountProfileId: value.accountProfileId,
@@ -1399,7 +1442,7 @@ export class App {
         agentType: 'claude',
         name: value.name || undefined,
         command: launch.command,
-        model: profile ? profileModel(profile, 'claude') : 'Claude Sonnet',
+        model: value.model || (profile ? profileModel(profile, 'claude') : this.i18n.t('terminal.defaultClaudeModel')),
         workingDirectory,
         profileId: value.profileId,
         mcpProfileId: value.mcpProfileId,
@@ -1521,11 +1564,11 @@ export class App {
         name: value.session.title,
         command: launch.command,
         model:
+          value.model ||
           (profile
             ? profileModel(profile, agentType === 'claude' ? 'claude' : 'codex')
-            : undefined) ??
-          value.model ??
-          value.session.modelName ??
+            : undefined) ||
+          value.session.modelName ||
           (agentType === 'claude'
             ? 'Claude Sonnet'
             : agentType === 'codex'
@@ -1646,6 +1689,10 @@ export class App {
    * board or the Git view, where no terminal is drawn at all — the new one opened behind whichever
    * view was in front, and nothing said so.
    */
+  protected openOneRingWorkerTerminal(terminalId: string): void {
+    this.revealCreatedTerminal(terminalId);
+  }
+
   private revealCreatedTerminal(terminalId: string): void {
     this.workspaceView.set('terminal');
     this.selectTerminal(terminalId);
@@ -2878,6 +2925,7 @@ export class App {
         ? await this.agents.prepareLaunch({
             terminalId: original.id,
             workspaceId,
+            model: original.profileId === CLI_NATIVE_PROFILE_ID ? explicitCliModel(original.model) : undefined,
             profileId: original.profileId,
             mcpProfileId: original.mcpProfileId,
             accountProfileId,
@@ -2886,6 +2934,7 @@ export class App {
         : await this.agents.prepareCodexLaunch({
             terminalId: original.id,
             workspaceId,
+            model: original.profileId === CLI_NATIVE_PROFILE_ID ? explicitCliModel(original.model) : undefined,
             profileId: original.profileId,
             accountProfileId,
             autoConfirm: original.autoConfirm,
@@ -4172,7 +4221,7 @@ export class App {
       return {
         workspaceId,
         terminal,
-        profile:
+        profile: terminal.profileId === CLI_NATIVE_PROFILE_ID ? undefined :
           profiles.find((candidate) => candidate.id === terminal.profileId) ?? defaultProfile,
         sessionId: task
           ? compatibleTodoSessionId(task, this.agents.sessions(), this.agents.events())
@@ -4190,10 +4239,10 @@ export class App {
     let skipped = 0;
     const results = await Promise.allSettled(
       planned.map(async ({ workspaceId, terminal, profile, sessionId }) => {
-        if (!profile) {
+        if (!profile && terminal.profileId !== CLI_NATIVE_PROFILE_ID) {
           throw new Error(this.i18n.t('restore.noModelProfile', { name: terminal.name }));
         }
-        if (needsCredential(profile, 'claude')) {
+        if (profile && needsCredential(profile, 'claude')) {
           throw new Error(this.i18n.t('restore.invalidCredential', { name: profile.name }));
         }
 
@@ -4208,7 +4257,8 @@ export class App {
           terminalId: terminal.id,
           workspaceId,
           sessionId,
-          profileId: profile.id,
+          profileId: terminal.profileId === CLI_NATIVE_PROFILE_ID ? CLI_NATIVE_PROFILE_ID : profile!.id,
+          model: terminal.profileId === CLI_NATIVE_PROFILE_ID ? explicitCliModel(terminal.model) : undefined,
           mcpProfileId: terminal.mcpProfileId,
           accountProfileId: terminal.accountProfileId,
           autoConfirm: terminal.autoConfirm,
@@ -4217,8 +4267,8 @@ export class App {
         });
         if (
           !this.state.updateRestoredTerminalLaunch(terminal.id, launch.command, {
-            profileId: profile.id,
-            model: profileModel(profile, 'claude'),
+            profileId: terminal.profileId === CLI_NATIVE_PROFILE_ID ? CLI_NATIVE_PROFILE_ID : profile!.id,
+            model: terminal.profileId === CLI_NATIVE_PROFILE_ID ? terminal.model : profileModel(profile!, 'claude'),
             nativeSessionId: sessionId,
           })
         ) {
@@ -4363,12 +4413,11 @@ export class App {
           terminalId: terminal.id,
           workspaceId,
           sessionId,
-          profileId: profile?.id,
+          profileId: terminal.profileId === CLI_NATIVE_PROFILE_ID ? CLI_NATIVE_PROFILE_ID : profile?.id,
           model:
             terminal.model &&
             !terminal.model.includes('默认模型') &&
-            !terminal.model.toLowerCase().includes('default model') &&
-            !profile
+            !terminal.model.toLowerCase().includes('default model')
               ? terminal.model
               : undefined,
           accountProfileId: terminal.accountProfileId,
@@ -4376,8 +4425,8 @@ export class App {
         });
         if (
           !this.state.updateRestoredTerminalLaunch(terminal.id, launch.command, {
-            profileId: profile?.id,
-            model: profile ? profileModel(profile, 'codex') : terminal.model,
+            profileId: terminal.profileId === CLI_NATIVE_PROFILE_ID ? CLI_NATIVE_PROFILE_ID : profile?.id,
+            model: terminal.model || (profile ? profileModel(profile, 'codex') : undefined) || this.i18n.t('terminal.defaultCodexModel'),
             nativeSessionId: sessionId,
           })
         ) {

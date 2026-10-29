@@ -2,7 +2,7 @@ import { TestBed } from '@angular/core/testing';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type { GlobalTerminalNotice } from '../models/terminal-notifications';
-import { DesktopNotificationService } from './desktop-notification.service';
+import { DesktopNotificationService, DESKTOP_NOTIFICATION_WINDOW } from './desktop-notification.service';
 
 const native = vi.hoisted(() => ({
   invoke: vi.fn(),
@@ -46,7 +46,10 @@ describe('DesktopNotificationService persistent taskbar attention', () => {
       value: { invoke: native.invoke },
       configurable: true,
     });
-    TestBed.configureTestingModule({});
+    TestBed.configureTestingModule({ providers: [{ provide: DESKTOP_NOTIFICATION_WINDOW, useValue: {
+      requestUserAttention: native.requestUserAttention,
+      onFocusChanged: async (callback: typeof native.focusChanged) => { native.focusChanged = callback; return () => {}; },
+    } }] });
     service = TestBed.inject(DesktopNotificationService);
   });
 

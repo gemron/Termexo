@@ -5,6 +5,8 @@
   "private": true,
   "license": "MIT",
   "scripts": {
+    "one-ring:stage": "node scripts/stage-one-ring.mjs",
+    "one-ring:test": "npm --prefix packages/one-ring test",
     "dev": "npm --prefix apps/desktop-ui start -- --host 127.0.0.1 --port 4200",
     "build": "npm --prefix apps/desktop-ui run build",
     "capture:readme": "npm --prefix apps/desktop-ui run capture:readme",

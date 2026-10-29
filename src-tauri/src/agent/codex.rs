@@ -311,6 +311,10 @@ impl AgentAdapter for CodexCliAdapter {
             command.push_str(&shell_quote(session_id));
         }
         append_option(&mut command, "--model", options.model.as_deref());
+        if let Some(prompt) = options.initial_prompt.as_deref() {
+            command.push_str(" -- ");
+            command.push_str(&shell_quote(prompt));
+        }
 
         Ok(AgentLaunchSpec {
             command,
@@ -832,6 +836,7 @@ mod tests {
 
         let fresh = adapter
             .build_launch_command(&CodexLaunchOptions {
+                initial_prompt: Some("Use One Ring; read C:\\task's notes.md; keep $() literal".into()),
                 session_id: None,
                 model: Some("gpt-5.6-sol".into()),
                 notify_config: Some(
@@ -861,9 +866,15 @@ mod tests {
         assert!(fresh.command.contains("-c 'model_provider="));
         assert!(fresh.command.contains("https://api.deepseek.com/v1"));
         assert!(!fresh.command.contains(" resume "));
+        #[cfg(windows)]
+        let prompt_suffix = " -- 'Use One Ring; read C:\\task''s notes.md; keep $() literal'";
+        #[cfg(unix)]
+        let prompt_suffix = " -- 'Use One Ring; read C:\\task'\\''s notes.md; keep $() literal'";
+        assert!(fresh.command.ends_with(prompt_suffix));
 
         let resumed = adapter
             .build_launch_command(&CodexLaunchOptions {
+                initial_prompt: None,
                 session_id: Some("019f9978-f46b-7d50-93b6-927b7eefcb1f".into()),
                 model: None,
                 notify_config: None,

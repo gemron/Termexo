@@ -4,9 +4,9 @@
   "version": "0.11.0",
   "identifier": "dev.agentdock.desktop",
   "build": {
-    "beforeDevCommand": "npm --prefix apps/desktop-ui start -- --host 127.0.0.1 --port 4200",
+    "beforeDevCommand": "npm run one-ring:stage && npm --prefix apps/desktop-ui start -- --host 127.0.0.1 --port 4200",
     "devUrl": "http://127.0.0.1:4200",
-    "beforeBuildCommand": "npm --prefix apps/desktop-ui run build",
+    "beforeBuildCommand": "npm run one-ring:stage && npm --prefix apps/desktop-ui run build",
     "frontendDist": "../apps/desktop-ui/dist/desktop-ui/browser"
   },
   "app": {
@@ -42,6 +42,7 @@
       "icons/icon.ico"
     ],
     "resources": {
+      "vendor/one-ring/": "one-ring/",
       "icons/128x128.png": "icons/128x128.png",
       "vendor/conpty/conpty.dll": "conpty.dll",
       "vendor/conpty/OpenConsole.exe": "OpenConsole.exe"

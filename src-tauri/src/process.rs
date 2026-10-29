@@ -6,9 +6,42 @@
 
 use std::ffi::OsStr;
 use std::io::{self, Read};
+use std::path::{Path, PathBuf};
 use std::process::{Child, Command, Output, Stdio};
+use std::sync::OnceLock;
 use std::thread;
 use std::time::{Duration, Instant};
+
+static BUNDLED_NODE_DIRECTORY: OnceLock<PathBuf> = OnceLock::new();
+
+pub fn configure_bundled_node(executable: &Path) {
+    if executable.is_file() {
+        if let Some(directory) = executable.parent() {
+            let _ = BUNDLED_NODE_DIRECTORY.set(directory.to_path_buf());
+        }
+    }
+}
+
+fn runtime_path(existing: Option<&OsStr>) -> Option<std::ffi::OsString> {
+    let directory = BUNDLED_NODE_DIRECTORY.get()?;
+    let mut entries = vec![directory.clone()];
+    if let Some(existing) = existing {
+        entries.extend(std::env::split_paths(existing).filter(|entry| entry != directory));
+    }
+    std::env::join_paths(entries).ok()
+}
+
+pub fn apply_bundled_runtime(environment: &mut std::collections::HashMap<String, String>) {
+    let existing = environment
+        .iter()
+        .find(|(key, _)| key.eq_ignore_ascii_case("PATH"))
+        .map(|(_, value)| value.clone());
+    let inherited = std::env::var_os("PATH");
+    if let Some(path) = runtime_path(existing.as_deref().map(OsStr::new).or(inherited.as_deref())) {
+        environment.retain(|key, _| !key.eq_ignore_ascii_case("PATH"));
+        environment.insert("PATH".into(), path.to_string_lossy().into_owned());
+    }
+}
 
 /// How often a timed wait re-checks a child that has not exited yet.
 const POLL_INTERVAL: Duration = Duration::from_millis(25);
@@ -16,6 +49,9 @@ const POLL_INTERVAL: Duration = Duration::from_millis(25);
 /// Builds a command that spawns no console window on Windows.
 pub fn hidden_command(program: impl AsRef<OsStr>) -> Command {
     let mut command = Command::new(program);
+    if let Some(path) = runtime_path(std::env::var_os("PATH").as_deref()) {
+        command.env("PATH", path);
+    }
     hide_window(&mut command);
     command
 }
