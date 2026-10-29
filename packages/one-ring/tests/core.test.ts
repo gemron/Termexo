@@ -1,4 +1,4 @@
-import { test } from 'node:test';
+import { test as nativeTest } from 'node:test';
 import assert from 'node:assert/strict';
 import { mkdtempSync, mkdirSync, writeFileSync, cpSync, readFileSync } from 'node:fs';
 import os from 'node:os';
@@ -9,7 +9,15 @@ import { Store } from '../src/store.js';
 import { RunFailure, type Runtime, type RunRequest, type RunResult } from '../src/runtime.js';
 import type { PlanInput, Verification } from '../src/protocol.js';
 
+// Workflow creation intentionally requires the native Linux/Windows Worker lifecycle.
+const test = ['linux', 'win32'].includes(process.platform) ? nativeTest : nativeTest.skip;
+
 export const basicPlan: PlanInput = { title: 'Retry policy', goal: 'Fix retry parsing.', criteria: ['Zero is accepted.', 'Invalid inputs default to three.'], steps: ['Implement boundaries.', 'Test and document.'], implementer: { cli: 'codex' }, verifier: { cli: 'codex' } };
+nativeTest('unsupported platforms reject Worker workflows before touching the project', { skip: process.platform !== 'darwin' }, () => {
+  const store = new Store(mkdtempSync(path.join(os.tmpdir(), 'one-ring-platform-')));
+  try { assert.throws(() => new Engine(store).create('/nonexistent-project', basicPlan), /Linux and Windows only/); }
+  finally { store.close(); }
+});
 function setup(runtime?: Runtime, coordinatorTerminalId?: string) {
   const temporary = mkdtempSync(path.join(os.tmpdir(), 'one-ring-core-'));
   const root = path.join(temporary, 'work');

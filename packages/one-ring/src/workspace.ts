@@ -9,7 +9,7 @@ function git(root: string, args: string[]): Buffer { return execFileSync('git', 
 export function workspaceRoot(input: string): string {
   const root = realpathSync(input);
   const top = realpathSync(git(root, ['rev-parse', '--show-toplevel']).toString().trim());
-  if (root !== top) throw new Error('Use the Git working-tree root, not a subdirectory.');
+  if (path.relative(root, top) !== '') throw new Error(`Use the Git working-tree root, not a subdirectory (requested ${root}; Git root ${top}).`);
   return root;
 }
 export function snapshot(root: string): Snapshot {
