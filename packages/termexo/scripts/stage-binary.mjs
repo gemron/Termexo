@@ -1,6 +1,7 @@
 import { copyFile, cp, mkdir, open, stat } from 'node:fs/promises';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { ONE_RING_FILES } from '../lib/windows-payload.js';
 
 const packageRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const repositoryRoot = resolve(packageRoot, '..', '..');
@@ -68,7 +69,7 @@ for (const { source, name, minimumBytes, missing } of PAYLOAD) {
 }
 
 const oneRing = resolve(repositoryRoot, 'src-tauri/vendor/one-ring');
-for (const file of ['plugin.json', 'server/index.mjs', 'runtime/node.exe', 'skills/one-ring/SKILL.md', 'runtime/LICENSE.txt']) {
+for (const file of ONE_RING_FILES) {
   const artifact = await stat(resolve(oneRing, file)).catch(() => null);
   if (!artifact?.isFile()) throw new Error(`Missing built-in One Ring resource ${file}; run npm run one-ring:stage before packaging.`);
 }

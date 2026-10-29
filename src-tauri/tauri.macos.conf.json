@@ -36,6 +36,6 @@
     }
   },
   "build": {
-    "beforeBuildCommand": "npm --prefix apps/desktop-ui run build -- --configuration macos"
+    "beforeBuildCommand": "npm run one-ring:stage && npm --prefix apps/desktop-ui run build -- --configuration macos"
   }
 }

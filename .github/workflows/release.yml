@@ -104,6 +104,8 @@ jobs:
           import assert from 'node:assert/strict';
           import { createHash } from 'node:crypto';
           import { copyFileSync, mkdirSync, readFileSync } from 'node:fs';
+          import { dirname } from 'node:path';
+          import { validateWindowsPayloadInventory } from './packages/termexo/lib/windows-payload.js';
           const { VERSION: version, GITHUB_SHA: commit } = process.env;
           const sha256 = (bytes) => createHash('sha256').update(bytes).digest('hex');
           mkdirSync('release-assets');
@@ -142,10 +144,12 @@ jobs:
           assert.equal(info.commit, commit);
           assert.equal(info.target, 'x86_64-pc-windows-msvc');
           mkdirSync('packages/termexo/vendor/win32-x64', { recursive: true });
-          assert.equal(info.files.length, 3);
-          for (const name of ['termexo.exe', 'conpty.dll', 'OpenConsole.exe']) {
-            assert.equal(sha256(readFileSync(`${npmDir}/${name}`)), info.files.find(f => f.name === name)?.sha256);
-            copyFileSync(`${npmDir}/${name}`, `packages/termexo/vendor/win32-x64/${name}`);
+          validateWindowsPayloadInventory(info.files);
+          for (const { name, sha256: expectedHash } of info.files) {
+            assert.equal(sha256(readFileSync(`${npmDir}/${name}`)), expectedHash, `${name}: checksum mismatch`);
+            const destination = `packages/termexo/vendor/win32-x64/${name}`;
+            mkdirSync(dirname(destination), { recursive: true });
+            copyFileSync(`${npmDir}/${name}`, destination);
           }
           for (const [arch, archiveArch] of [['arm64', 'arm64'], ['x64', 'x86_64']]) {
             mkdirSync(`packages/termexo/vendor/darwin-${arch}`, { recursive: true });
@@ -164,6 +168,7 @@ jobs:
           import { createHash } from 'node:crypto';
           import { execFileSync } from 'node:child_process';
           import { readFileSync, readdirSync, writeFileSync } from 'node:fs';
+          import { validateWindowsPayloadInventory } from './packages/termexo/lib/windows-payload.js';
           const { VERSION: version, GITHUB_SHA: commit } = process.env;
           const archive = `release-assets/termexo-${version}.tgz`;
           const sha256 = (bytes) => createHash('sha256').update(bytes).digest('hex');
@@ -174,7 +179,8 @@ jobs:
           assert.deepEqual(pkg.os, ['win32', 'darwin']);
           const info = JSON.parse(readFileSync('downloaded/Termexo-npm-windows/build-info.json', 'utf8'));
           assert.equal(sha256(unpack('vendor/win32-x64/termexo.exe')), info.executableSha256, 'npm must contain the executable from this Windows build');
-          for (const name of ['conpty.dll', 'OpenConsole.exe']) assert.equal(sha256(unpack(`vendor/win32-x64/${name}`)), info.files.find(f => f.name === name).sha256);
+          validateWindowsPayloadInventory(info.files);
+          for (const { name, sha256: expectedHash } of info.files) assert.equal(sha256(unpack(`vendor/win32-x64/${name}`)), expectedHash, `${name}: packaged checksum mismatch`);
           for (const [arch, archiveArch] of [['arm64', 'arm64'], ['x64', 'x86_64']]) {
             assert.equal(sha256(unpack(`vendor/darwin-${arch}/Termexo.app.tar.gz`)), sha256(readFileSync(`release-assets/Termexo_${version}_${archiveArch}.app.tar.gz`)));
           }

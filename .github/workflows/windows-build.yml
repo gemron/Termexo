@@ -88,6 +88,15 @@ jobs:
       - name: Install frontend dependencies
         run: npm --prefix apps/desktop-ui ci
 
+      - name: Prepare built-in One Ring resources
+        run: npm run one-ring:stage
+
+      - name: Test built-in One Ring engine
+        run: npm run one-ring:test
+
+      - name: Test One Ring desktop bridge
+        run: node --test scripts/one-ring-bridge.test.mjs
+
       - name: Run native Rust tests
         run: cargo test --manifest-path src-tauri/Cargo.toml --lib --locked --target "$env:TARGET" -- --quiet
 
@@ -276,6 +285,7 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw 'Windows npm staging failed' }
           New-Item -ItemType Directory -Path artifacts/npm-windows -Force | Out-Null
           Copy-Item -LiteralPath packages/termexo/vendor/win32-x64/termexo.exe, packages/termexo/vendor/win32-x64/conpty.dll, packages/termexo/vendor/win32-x64/OpenConsole.exe -Destination artifacts/npm-windows
+          Copy-Item -LiteralPath packages/termexo/vendor/win32-x64/one-ring -Destination artifacts/npm-windows -Recurse
           $version = (Get-Content -LiteralPath package.json -Raw | ConvertFrom-Json).version
           $binary = "src-tauri/target/$env:TARGET/release/termexo.exe"
           $metadata = [ordered]@{
@@ -283,8 +293,9 @@ jobs:
             commit = $env:GITHUB_SHA
             target = $env:TARGET
             executableSha256 = (Get-FileHash -LiteralPath $binary -Algorithm SHA256).Hash.ToLowerInvariant()
-            files = @(Get-ChildItem -LiteralPath artifacts/npm-windows -File | ForEach-Object {
-              [ordered]@{ name = $_.Name; sha256 = (Get-FileHash -LiteralPath $_.FullName -Algorithm SHA256).Hash.ToLowerInvariant() }
+            files = @(Get-ChildItem -LiteralPath artifacts/npm-windows -File -Recurse | ForEach-Object {
+              $relative = [System.IO.Path]::GetRelativePath((Join-Path (Get-Location) 'artifacts/npm-windows'), $_.FullName).Replace('\', '/')
+              [ordered]@{ name = $relative; sha256 = (Get-FileHash -LiteralPath $_.FullName -Algorithm SHA256).Hash.ToLowerInvariant() }
             })
           } | ConvertTo-Json -Depth 4
           [System.IO.File]::WriteAllText((Join-Path (Get-Location) 'artifacts/npm-windows/build-info.json'), $metadata, [System.Text.UTF8Encoding]::new($false))
