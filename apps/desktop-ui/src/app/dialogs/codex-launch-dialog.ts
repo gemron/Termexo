@@ -1,4 +1,4 @@
-import { Component, computed, inject, input, output, signal } from '@angular/core';
+import { Component, computed, effect, inject, input, output, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 
 import { I18nService } from '../core/i18n/i18n.service';
@@ -6,7 +6,6 @@ import { TranslatePipe } from '../core/i18n/translate.pipe';
 import {
   AccountProfile,
   AgentInstallation,
-  CODEX_MODEL_SUGGESTIONS,
   CODEX_REASONING_EFFORT_LEVELS,
   isNativeModel,
   profileModel,
@@ -17,6 +16,8 @@ import {
 import { AGENT_ICONS } from '../core/models/workspace.models';
 import { IconComponent } from '../shared/icon/icon';
 import { LaunchDialogShellComponent } from './launch-dialog-shell';
+import { CodexModelCatalogService } from '../core/services/codex-model-catalog.service';
+import { launchProfileId, officialModelId, OFFICIAL_MODEL_PREFIX } from '../core/models/launch-model-choice';
 
 export interface CodexLaunchDialogValue {
   name: string;
@@ -34,7 +35,7 @@ export interface CodexLaunchDialogValue {
   template: `
     <app-launch-dialog-shell
       [icon]="agentIcon"
-      [heading]="'launch.newCodex' | t"
+      [heading]="oneRing() ? 'One Ring · Codex Coordinator' : ('launch.newCodex' | t)"
       [detecting]="'launch.detectingCodex' | t"
       [installation]="installation()"
       [workingDirectory]="workingDirectory()"
@@ -47,6 +48,9 @@ export interface CodexLaunchDialogValue {
       (directoryChangeRequested)="directoryChangeRequested.emit()"
     >
       <div class="form-grid">
+        @if (oneRing()) {
+          <p class="wide">此会话通过 One Ring 编排任务。计划、修复和交付需要单独确认。</p>
+        }
         <label class="wide session-name-field">
           <span>{{ 'launch.sessionName' | t }}</span>
           <input
@@ -59,24 +63,27 @@ export interface CodexLaunchDialogValue {
           />
         </label>
         <label class="profile-field">
-          <span>{{ 'launch.modelProfile' | t }}</span>
+          <span>{{ 'launch.modelChoice' | t }}</span>
           <select
             class="select select-bordered select-sm"
             [ngModel]="resolvedProfileId()"
             (ngModelChange)="onProfileChange($event)"
           >
-            @for (profile of codexProfiles(); track profile.id) {
+            <optgroup [label]="'launch.officialModels' | t">
+              <option value="official:">{{ 'launch.cliDefaultModel' | t }}{{ configuredDefault() ? ' · ' + configuredDefault() : '' }}</option>
+              @for (model of officialModels(); track model) { <option [value]="'official:' + model">{{ model }}</option> }
+            </optgroup>
+            <optgroup [label]="'launch.savedProfiles' | t">
+              @for (profile of codexProfiles(); track profile.id) {
               <option [value]="profile.id">
                 {{ profile.name }} · {{ modelOf(profile) }}
                 @if (isNativeModel(profile)) {
                   ({{ 'settings.nativeModel' | t }})
                 }
               </option>
-            }
+              }
+            </optgroup>
           </select>
-          @if (!codexProfiles().length) {
-            <small class="account-warning">{{ 'launch.noModelProfile' | t }}</small>
-          }
         </label>
         <label class="account-field">
           <span>{{ 'launch.chatgptAccount' | t }}</span>
@@ -112,17 +119,19 @@ export interface CodexLaunchDialogValue {
             type="text"
             class="input input-bordered input-sm"
             list="codex-model-suggestions"
-            [placeholder]="'launch.codexModelPlaceholder' | t"
+            [placeholder]="configuredDefault() || ('launch.codexModelPlaceholder' | t)"
             [attr.aria-label]="'launch.codexModel' | t"
             [ngModel]="resolvedModel()"
             (ngModelChange)="model.set($event)"
           />
           <datalist id="codex-model-suggestions">
-            @for (suggestion of modelSuggestions; track suggestion) {
+            @for (suggestion of modelSuggestions(); track suggestion) {
               <option [value]="suggestion"></option>
             }
           </datalist>
           <small>{{ 'launch.codexModelHelp' | t }}</small>
+          <button type="button" class="btn btn-xs btn-ghost" (click)="refreshModels()" [disabled]="modelsLoading()">{{ modelsLoading() ? '读取模型…' : '刷新模型列表' }}</button>
+          @if (modelsError()) { <small role="status">{{ modelsError() }}</small> }
         </label>
         <label class="effort-field">
           <span>{{ 'settings.effortLevel' | t }}</span>
@@ -137,17 +146,19 @@ export interface CodexLaunchDialogValue {
             }
           </select>
         </label>
-        <label class="wide checkbox-control auto-confirm-control">
-          <input
-            type="checkbox"
-            [ngModel]="autoConfirm()"
-            (ngModelChange)="autoConfirm.set($event)"
-          />
-          <span>
-            <strong>{{ 'launch.autoConfirm' | t }}</strong>
-            <small>{{ 'launch.autoConfirmHelp' | t }}</small>
-          </span>
-        </label>
+        @if (!oneRing()) {
+          <label class="wide checkbox-control auto-confirm-control">
+            <input
+              type="checkbox"
+              [ngModel]="autoConfirm()"
+              (ngModelChange)="autoConfirm.set($event)"
+            />
+            <span>
+              <strong>{{ 'launch.autoConfirm' | t }}</strong>
+              <small>{{ 'launch.autoConfirmHelp' | t }}</small>
+            </span>
+          </label>
+        }
       </div>
     </app-launch-dialog-shell>
   `,
@@ -166,6 +177,7 @@ export class CodexLaunchDialogComponent {
   readonly accountProfiles = input<AccountProfile[]>([]);
   readonly workingDirectory = input('');
   readonly launching = input(false);
+  readonly oneRing = input(false);
   readonly launched = output<CodexLaunchDialogValue>();
   readonly cancelled = output<void>();
 
@@ -176,7 +188,34 @@ export class CodexLaunchDialogComponent {
   protected readonly profileId = signal('');
   protected readonly accountProfileId = signal('');
   protected readonly autoConfirm = signal(false);
-  protected readonly modelSuggestions = CODEX_MODEL_SUGGESTIONS;
+  private readonly catalogs = inject(CodexModelCatalogService);
+  protected readonly modelSuggestions = signal<string[]>([]);
+  protected readonly modelsLoading = signal(false);
+  protected readonly modelsError = signal('');
+  private catalogGeneration = 0;
+  protected readonly configuredDefault = signal('');
+  protected readonly officialModels = computed(() => {
+    const selected = officialModelId(this.resolvedProfileId());
+    return [...new Set([...this.modelSuggestions(), ...(selected ? [selected] : [])])];
+  });
+
+  constructor() {
+    effect(() => { if (this.installation()?.healthy && this.resolvedAccountProfileId()) void this.refreshModels(); });
+  }
+
+  protected async refreshModels(): Promise<void> {
+    const account = this.resolvedAccountProfileId(), directory = this.workingDirectory();
+    const generation = ++this.catalogGeneration;
+    this.modelsLoading.set(true); this.modelsError.set(''); this.modelSuggestions.set([]); this.configuredDefault.set('');
+    try {
+      const catalog = await this.catalogs.load(account, directory, true);
+      if (generation !== this.catalogGeneration) return;
+      this.modelSuggestions.set(catalog.models.map(model => model.id));
+      this.configuredDefault.set(catalog.configuredDefault || catalog.models.find(model => model.isDefault)?.id || '');
+    } catch {
+      if (generation === this.catalogGeneration) this.modelsError.set('无法读取 CLI 模型列表，可输入模型 ID，或留空沿用 Codex 配置。');
+    } finally { if (generation === this.catalogGeneration) this.modelsLoading.set(false); }
+  }
   protected readonly effort = signal('');
   protected readonly effortLevels = CODEX_REASONING_EFFORT_LEVELS;
   protected readonly codexAccounts = computed(() =>
@@ -196,13 +235,15 @@ export class CodexLaunchDialogComponent {
       this.profileId() ||
       this.codexProfiles().find((profile) => profile.isDefault)?.id ||
       this.codexProfiles()[0]?.id ||
-      '',
+      OFFICIAL_MODEL_PREFIX,
   );
   protected readonly resolvedModel = computed(() => {
     const explicit = this.model().trim();
     if (explicit) {
       return explicit;
     }
+    const native = officialModelId(this.resolvedProfileId());
+    if (native !== undefined) return native;
     const profile = this.codexProfiles().find(
       (candidate) => candidate.id === this.resolvedProfileId(),
     );
@@ -237,6 +278,8 @@ export class CodexLaunchDialogComponent {
 
   protected onProfileChange(profileId: string): void {
     this.profileId.set(profileId);
+    const native = officialModelId(profileId);
+    if (native !== undefined) { this.model.set(native); return; }
     const profile = this.codexProfiles().find((p) => p.id === profileId);
     if (profile) {
       // A model name belongs to its provider. Retaining the previous profile's value can launch an
@@ -252,7 +295,7 @@ export class CodexLaunchDialogComponent {
     this.launched.emit({
       name: this.name().trim(),
       model: this.resolvedModel() || undefined,
-      profileId: this.resolvedProfileId() || undefined,
+      profileId: launchProfileId(this.resolvedProfileId()),
       accountProfileId: this.resolvedAccountProfileId() || undefined,
       autoConfirm: this.autoConfirm() || undefined,
       reasoningEffort: this.effort() || undefined,

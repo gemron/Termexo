@@ -1,0 +1,17 @@
+{
+  "$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
+  "name": "one-ring",
+  "version": "0.1.0",
+  "description": "至尊魔戒：在本地 Codex 中规划、调度独立 Coding CLI、验证并交付。",
+  "extensions": {
+    "com.openai": {
+      "requires_local_executor": true,
+      "onboardingSkill": "./skills/setup/SKILL.md",
+      "interface": {
+        "displayName": "One Ring · 至尊魔戒",
+        "shortDescription": "统筹 Coding CLI，完成有证据的交付",
+        "brandColor": "#D5BB80"
+      }
+    }
+  }
+}

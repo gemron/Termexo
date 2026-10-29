@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 use std::path::PathBuf;
 
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use tauri::State;
 
@@ -255,6 +255,8 @@ pub struct PrepareClaudeLaunchRequest {
     pub session_id: Option<String>,
     pub name: Option<String>,
     pub profile_id: Option<String>,
+    /// Explicit official model selected without a saved provider profile.
+    pub model: Option<String>,
     pub mcp_profile_id: Option<String>,
     pub account_profile_id: Option<String>,
     #[serde(default)]
@@ -275,6 +277,8 @@ pub struct PrepareClaudeLaunchRequest {
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct PrepareCodexLaunchRequest {
+    #[serde(default)]
+    pub one_ring: Option<crate::one_ring::CoordinatorRequest>,
     pub terminal_id: String,
     pub workspace_id: Option<String>,
     pub session_id: Option<String>,
@@ -397,9 +401,15 @@ pub fn prepare_claude_launch(
         &CLAUDE_EFFORT_LEVELS,
     );
     let model = claude_launch_model(
-        profile
-            .as_ref()
-            .map_or("", |profile| profile.claude_model.as_str()),
+        request
+            .model
+            .as_deref()
+            .filter(|model| !model.trim().is_empty())
+            .unwrap_or_else(|| {
+                profile
+                    .as_ref()
+                    .map_or("", |profile| profile.claude_model.as_str())
+            }),
         context_1m,
     );
 
@@ -487,6 +497,9 @@ pub fn prepare_codex_launch(
     launch_environment: State<'_, LaunchEnvironmentStore>,
     hooks: State<'_, HookEventStore>,
 ) -> Result<AgentLaunchSpec, String> {
+    let worker_role = database
+        .read_app_setting(&format!("one_ring.worker.v1.{}", request.terminal_id))
+        .map_err(|e| e.to_string())?;
     let profiles = database
         .list_model_profiles()
         .map_err(|error| error.to_string())?;
@@ -534,6 +547,32 @@ pub fn prepare_codex_launch(
         .filter(|value| !value.trim().is_empty())
         .or_else(|| profile.as_ref().map(|profile| profile.codex_model.clone()));
     let mut provider_configs = codex_provider_configs(profile.as_ref())?;
+    if let Some(role) = worker_role.as_deref() {
+        provider_configs.extend(codex_worker_configs(role)?);
+    }
+    let one_ring =
+        crate::one_ring::coordinator_config(&database, &request.terminal_id, request.one_ring)?;
+    if let Some((config, _)) = &one_ring {
+        provider_configs.push(config.clone());
+        if let Some(bridge) = database
+            .read_app_setting("one_ring.desktop_bridge.v1")
+            .map_err(|e| e.to_string())?
+        {
+            let bridge: serde_json::Value =
+                serde_json::from_str(&bridge).map_err(|e| e.to_string())?;
+            for (key, field) in [
+                ("TERMEXO_EXECUTABLE", "executable"),
+                ("TERMEXO_DATABASE", "database"),
+            ] {
+                if let Some(value) = bridge[field].as_str() {
+                    environment.insert(key.into(), value.into());
+                }
+            }
+            if let Some(account) = &request.account_profile_id {
+                environment.insert("TERMEXO_ACCOUNT_PROFILE_ID".into(), account.clone());
+            }
+        }
+    }
     if let (Some(profile), Some(model)) = (profile.as_ref(), effective_model.as_deref()) {
         if let Some(metadata) = codex_model_metadata(profile, model) {
             let catalog_path = hooks
@@ -588,14 +627,280 @@ pub fn prepare_codex_launch(
     }
     adapter
         .build_launch_command(&CodexLaunchOptions {
+            initial_prompt: if session_id.is_none() {
+                one_ring.as_ref().map(|(_, prompt)| prompt.clone())
+            } else {
+                None
+            },
             session_id,
             model: effective_model,
             notify_config: Some(notify_config),
             hook_configs,
             provider_configs,
-            auto_confirm: request.auto_confirm,
+            auto_confirm: request.auto_confirm && one_ring.is_none() && worker_role.is_none(),
         })
         .map_err(|error| error.to_string())
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct InteractiveWorkerRequest {
+    pub terminal_id: String,
+    pub workspace_id: String,
+    pub role: String,
+    #[serde(default = "default_worker_cli")]
+    pub cli: String,
+    pub instructions_path: String,
+    pub model: Option<String>,
+    pub account_profile_id: Option<String>,
+}
+
+fn default_worker_cli() -> String {
+    "codex".into()
+}
+
+fn codex_worker_configs(role: &str) -> Result<Vec<String>, String> {
+    let sandbox = match role {
+        "implementer" => "workspace-write",
+        "verifier" => "read-only",
+        _ => return Err("无效的 Worker 角色".into()),
+    };
+    Ok(vec![
+        format!("sandbox_mode='{sandbox}'"),
+        "approval_policy='on-request'".into(),
+        "mcp_servers={}".into(),
+        "features.plugins=false".into(),
+        "features.multi_agent=false".into(),
+    ])
+}
+
+#[derive(Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct OpenCodeWorkerContext {
+    model: String,
+    instructions_path: String,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct InteractiveWorkerLaunch {
+    pub command: String,
+    pub native_session_id: Option<String>,
+}
+
+#[tauri::command(async)]
+pub fn prepare_interactive_worker_launch(
+    request: InteractiveWorkerRequest,
+    database: State<'_, WorkspaceDatabase>,
+    hooks: State<'_, HookEventStore>,
+    credentials: State<'_, CredentialStore>,
+    launch_environment: State<'_, LaunchEnvironmentStore>,
+) -> Result<InteractiveWorkerLaunch, String> {
+    let sandbox = match request.role.as_str() {
+        "implementer" => "workspace-write",
+        "verifier" => "read-only",
+        _ => return Err("不支持的 One Ring Worker 角色。".into()),
+    };
+    let instructions = std::path::PathBuf::from(&request.instructions_path);
+    if !instructions.is_absolute() || !instructions.is_file() {
+        return Err("Worker 任务说明必须是已存在文件的绝对路径。".into());
+    }
+    if !matches!(request.cli.as_str(), "codex" | "opencode")
+        || (request.cli == "opencode" && request.role != "implementer")
+    {
+        return Err("当前支持 Codex 实施/验证，以及 OpenCode 实施。".into());
+    }
+    if request.cli == "opencode" {
+        let model = request
+            .model
+            .as_deref()
+            .filter(|model| model.contains('/') && !model.chars().any(char::is_whitespace))
+            .ok_or("OpenCode 实施者需要在计划中明确 provider/model。")?;
+        let adapter = OpenCodeAdapter::new();
+        if adapter.plugin_api_version().map_err(|e| e.to_string())? < 2 {
+            return Err("One Ring 交互实施需要 OpenCode 2。".into());
+        }
+        let session_id = format!("ses_{}", request.terminal_id.replace('-', ""));
+        let mut environment = opencode_launch_environment(
+            &database,
+            &credentials,
+            &hooks,
+            &request.terminal_id,
+            Some(&request.workspace_id),
+            Some(&session_id),
+            &adapter,
+        )?;
+        let config = opencode_worker_config(
+            environment
+                .get("OPENCODE_CONFIG_CONTENT")
+                .map(String::as_str),
+            model,
+            &instructions,
+        )?;
+        environment.insert("OPENCODE_CONFIG_CONTENT".into(), config);
+        database
+            .write_app_setting(
+                &format!("one_ring.worker.v1.{}", request.terminal_id),
+                &request.role,
+            )
+            .map_err(|e| e.to_string())?;
+        database
+            .write_app_setting(
+                &format!("one_ring.opencode_worker.v1.{}", request.terminal_id),
+                &serde_json::to_string(&OpenCodeWorkerContext {
+                    model: model.into(),
+                    instructions_path: request.instructions_path.clone(),
+                })
+                .map_err(|e| e.to_string())?,
+            )
+            .map_err(|e| e.to_string())?;
+        launch_environment
+            .put(request.terminal_id.clone(), environment)
+            .map_err(|e| e.to_string())?;
+        let mut launch = adapter
+            .build_launch_command(&OpenCodeLaunchOptions {
+                session_id: Some(session_id.clone()),
+                model: None,
+                continue_last: false,
+                auto_confirm: false,
+            })
+            .map_err(|e| e.to_string())?;
+        let prompt = format!("Read and follow the One Ring implementer instructions in {}. End with only the required JSON report and keep this interactive CLI open.", request.instructions_path);
+        launch
+            .command
+            .push_str(&format!(" --prompt '{}'", prompt.replace('\'', "''")));
+        return Ok(InteractiveWorkerLaunch {
+            command: launch.command,
+            native_session_id: Some(session_id),
+        });
+    }
+    database
+        .write_app_setting(
+            &format!("one_ring.worker.v1.{}", request.terminal_id),
+            &request.role,
+        )
+        .map_err(|e| e.to_string())?;
+    let mut launch = prepare_codex_launch(
+        PrepareCodexLaunchRequest {
+            one_ring: None,
+            terminal_id: request.terminal_id,
+            workspace_id: Some(request.workspace_id),
+            session_id: None,
+            model: request.model,
+            profile_id: None,
+            account_profile_id: request.account_profile_id,
+            auto_confirm: false,
+            reasoning_effort: None,
+        },
+        database,
+        credentials,
+        launch_environment,
+        hooks,
+    )?;
+    let prompt = format!("Read and follow the One Ring {} instructions at {}. Remain in this interactive session and return the required JSON report when done.", request.role, serde_json::to_string(&request.instructions_path).map_err(|e| e.to_string())?);
+    let quote = |value: &str| format!("'{}'", value.replace('\'', "''"));
+    launch.command.push_str(&format!(" --sandbox {sandbox} --ask-for-approval on-request -c {} --disable plugins --disable multi_agent -- {}", quote("mcp_servers={}"), quote(&prompt)));
+    Ok(InteractiveWorkerLaunch {
+        command: launch.command,
+        native_session_id: None,
+    })
+}
+
+fn opencode_worker_config(
+    existing: Option<&str>,
+    model: &str,
+    instructions: &std::path::Path,
+) -> Result<String, String> {
+    let mut config: serde_json::Value =
+        serde_json::from_str(existing.unwrap_or("{}")).map_err(|e| e.to_string())?;
+    let object = config
+        .as_object_mut()
+        .ok_or("OpenCode config must be an object")?;
+    object.insert("model".into(), serde_json::json!(model));
+    object.insert("mcp".into(), serde_json::json!({}));
+    object.insert("permission".into(), serde_json::json!({ "*": "deny", "read": "allow", "glob": "allow", "grep": "allow", "list": "allow", "edit": "allow", "write": "allow", "apply_patch": "allow", "bash": "ask", "lsp": "allow", "todowrite": "allow", "question": "ask", "task": "deny", "external_directory": "deny" }));
+    let instruction_directory = instructions
+        .parent()
+        .ok_or("Worker instructions need a parent directory")?
+        .to_string_lossy()
+        .replace('\\', "/");
+    let pattern = format!("{instruction_directory}/**");
+    config["permission"]["external_directory"] =
+        serde_json::json!({ "*": "deny", pattern.clone(): "allow" });
+    for tool in ["edit", "write", "apply_patch"] {
+        config["permission"][tool] = serde_json::json!({ "*": "allow", pattern.clone(): "deny" });
+    }
+    serde_json::to_string(&config).map_err(|e| e.to_string())
+}
+
+#[tauri::command(async)]
+pub fn get_opencode_worker_evidence(session_id: String) -> Result<serde_json::Value, String> {
+    OpenCodeAdapter::new()
+        .worker_evidence(&session_id)
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command(async)]
+pub fn list_opencode_worker_models(
+    working_directory: Option<String>,
+) -> Result<Vec<String>, String> {
+    OpenCodeAdapter::new()
+        .worker_models(working_directory.as_deref())
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command(async)]
+pub fn list_codex_models(
+    account_profile_id: Option<String>,
+    working_directory: Option<String>,
+    database: State<'_, WorkspaceDatabase>,
+    credentials: State<'_, CredentialStore>,
+) -> Result<Value, String> {
+    let executable = CodexCliAdapter::new()
+        .detect()
+        .map_err(|e| e.to_string())?
+        .executable_path
+        .ok_or("未安装 Codex CLI")?;
+    let mut command = crate::process::hidden_command("node");
+    command.args([
+        "--input-type=module",
+        "-e",
+        include_str!("codex-catalog.mjs"),
+        &executable,
+    ]);
+    command.envs(account_profile_environment(
+        &database,
+        account_profile_id.as_deref(),
+        "codex",
+    )?);
+    command.envs(network_environment(&database, &credentials, None)?);
+    if let Some(directory) = working_directory.filter(|directory| !directory.trim().is_empty()) {
+        command.current_dir(directory);
+    }
+    let output = crate::process::run_with_timeout(&mut command, std::time::Duration::from_secs(22))
+        .map_err(|e| e.to_string())?;
+    if !output.status.success() {
+        return Err(String::from_utf8_lossy(&output.stderr).trim().into());
+    }
+    serde_json::from_slice(&output.stdout).map_err(|e| e.to_string())
+}
+
+#[tauri::command(async)]
+pub fn get_worker_transcript_path(
+    session_id: String,
+    account_profile_id: Option<String>,
+    database: State<'_, WorkspaceDatabase>,
+) -> Result<Option<String>, String> {
+    let environment =
+        account_profile_environment(&database, account_profile_id.as_deref(), "codex")?;
+    let adapter = environment
+        .get("CODEX_HOME")
+        .map(|home| CodexCliAdapter::with_home(home.into()))
+        .unwrap_or_default();
+    adapter
+        .session_transcript_path(&session_id)
+        .map(|path| path.map(|p| p.to_string_lossy().into_owned()))
+        .map_err(|e| e.to_string())
 }
 
 #[tauri::command(async)]
@@ -613,6 +918,7 @@ pub fn prepare_opencode_launch(
         &request.terminal_id,
         request.workspace_id.as_deref(),
         request.session_id.as_deref(),
+        &OpenCodeAdapter::new(),
     )?;
     log_proxy_environment(&environment);
     launch_environment
@@ -980,6 +1286,7 @@ fn opencode_launch_environment(
     terminal_id: &str,
     workspace_id: Option<&str>,
     session_id: Option<&str>,
+    adapter: &OpenCodeAdapter,
 ) -> Result<HashMap<String, String>, String> {
     let mut environment = network_environment(database, credentials, workspace_id)?;
     // The CLI talks to its private server over loopback. Exclude it even when the selected
@@ -1012,12 +1319,32 @@ fn opencode_launch_environment(
             terminal_id,
             session_id,
             std::env::var("OPENCODE_CONFIG_CONTENT").ok().as_deref(),
-            OpenCodeAdapter::new()
+            adapter
                 .plugin_api_version()
                 .map_err(|error| error.to_string())?,
         )
         .map_err(|error| error.to_string())?;
     environment.insert("OPENCODE_CONFIG_CONTENT".into(), runtime.config_content);
+    if database
+        .read_app_setting(&format!("one_ring.worker.v1.{terminal_id}"))
+        .map_err(|e| e.to_string())?
+        .is_some()
+    {
+        let context = database
+            .read_app_setting(&format!("one_ring.opencode_worker.v1.{terminal_id}"))
+            .map_err(|e| e.to_string())?
+            .ok_or("OpenCode Worker 上下文缺失，请通过协调会话重新创建 Worker。")?;
+        let context: OpenCodeWorkerContext =
+            serde_json::from_str(&context).map_err(|e| e.to_string())?;
+        let config = opencode_worker_config(
+            environment
+                .get("OPENCODE_CONFIG_CONTENT")
+                .map(String::as_str),
+            &context.model,
+            std::path::Path::new(&context.instructions_path),
+        )?;
+        environment.insert("OPENCODE_CONFIG_CONTENT".into(), config);
+    }
     Ok(environment)
 }
 
@@ -1031,6 +1358,11 @@ fn select_profile(
     requested_id: Option<&str>,
     serves_agent: impl Fn(&ModelProfile) -> bool,
 ) -> Option<ModelProfile> {
+    // Native launches deliberately bypass every saved provider, including a custom default.
+    // This marker is kept on the terminal so restore/account changes retain the same routing.
+    if requested_id == Some("__termexo_cli_native__") {
+        return None;
+    }
     let usable = |profile: &&ModelProfile| serves_agent(profile);
     requested_id
         .and_then(|profile_id| {
@@ -1062,6 +1394,22 @@ pub(crate) fn relaunch_environment(
     hooks: &HookEventStore,
     request: &RelaunchRequest<'_>,
 ) -> Result<HashMap<String, String>, String> {
+    relaunch_environment_with_opencode_adapter(
+        database,
+        credentials,
+        hooks,
+        request,
+        &OpenCodeAdapter::new(),
+    )
+}
+
+fn relaunch_environment_with_opencode_adapter(
+    database: &WorkspaceDatabase,
+    credentials: &CredentialStore,
+    hooks: &HookEventStore,
+    request: &RelaunchRequest<'_>,
+    opencode: &OpenCodeAdapter,
+) -> Result<HashMap<String, String>, String> {
     match request.agent_type {
         "claude" | "codex" => model_agent_relaunch_environment(database, credentials, request),
         "opencode" => opencode_launch_environment(
@@ -1071,6 +1419,7 @@ pub(crate) fn relaunch_environment(
             request.terminal_id,
             request.workspace_id,
             request.native_session_id,
+            opencode,
         ),
         "pi" => {
             hooks
@@ -1392,6 +1741,62 @@ fn anthropic_profile_environment(
 mod tests {
     use super::*;
     use crate::config::NetworkProfile;
+
+    #[test]
+    fn opencode_worker_keeps_status_plugin_and_pins_model_without_enabling_orchestration() {
+        let config: Value = serde_json::from_str(
+            &opencode_worker_config(
+                Some(r#"{"plugins":["file:///status"],"mcp":{"other":{}}}"#),
+                "provider/model",
+                std::path::Path::new("C:/state/run/instructions.md"),
+            )
+            .unwrap(),
+        )
+        .unwrap();
+        assert_eq!(config["model"], "provider/model");
+        assert_eq!(config["plugins"][0], "file:///status");
+        assert_eq!(config["permission"]["*"], "deny");
+        assert_eq!(config["permission"]["task"], "deny");
+        assert_eq!(config["permission"]["bash"], "ask");
+        assert_eq!(
+            config["permission"]["external_directory"]["C:/state/run/**"],
+            "allow"
+        );
+        assert_eq!(config["permission"]["edit"]["C:/state/run/**"], "deny");
+        assert_eq!(config["mcp"], json!({}));
+    }
+
+    #[test]
+    fn codex_worker_role_restrictions_are_reusable_for_resumed_launches() {
+        let verifier = codex_worker_configs("verifier").unwrap();
+        assert!(verifier.contains(&"sandbox_mode='read-only'".into()));
+        assert!(verifier.contains(&"mcp_servers={}".into()));
+        assert!(verifier.contains(&"features.multi_agent=false".into()));
+        assert!(codex_worker_configs("implementer")
+            .unwrap()
+            .contains(&"sandbox_mode='workspace-write'".into()));
+        assert!(codex_worker_configs("coordinator").is_err());
+    }
+
+    #[test]
+    fn official_model_selection_cannot_fall_back_to_custom_default_credentials_or_provider() {
+        let mut custom = profile("custom-default", "custom");
+        custom.is_default = true;
+        let profiles = vec![custom];
+        assert!(select_profile(&profiles, Some("__termexo_cli_native__"), |_| true).is_none());
+        assert_eq!(
+            codex_provider_configs(None).unwrap(),
+            vec![format!(
+                "model_provider={}",
+                toml_literal("openai").unwrap()
+            )]
+        );
+        assert!(claude_profile_environment(None, false).is_empty());
+        let request: PrepareClaudeLaunchRequest = serde_json::from_value(json!({
+            "terminalId": "official-terminal", "profileId": "__termexo_cli_native__", "model": "claude-current"
+        })).unwrap();
+        assert_eq!(request.model.as_deref(), Some("claude-current"));
+    }
 
     /// A provider serving both agents, which is how the presets configure one.
     fn profile(id: &str, provider: &str) -> ModelProfile {
@@ -1825,8 +2230,7 @@ mod tests {
     fn restores_opencode_proxy_and_terminal_plugin() {
         // The relaunch probes the real CLI's version, so the test needs one installed.
         let installed = std::env::var_os("PATH").is_some_and(|path| {
-            std::env::split_paths(&path)
-                .any(|directory| directory.join("opencode").is_file())
+            std::env::split_paths(&path).any(|directory| directory.join("opencode").is_file())
                 || std::env::split_paths(&path)
                     .any(|directory| directory.join("opencode.exe").is_file())
         });
@@ -1843,6 +2247,27 @@ mod tests {
         std::fs::create_dir_all(&directory).unwrap();
         let database = WorkspaceDatabase::open(directory.join("termexo.db")).unwrap();
         let hooks = HookEventStore::new(&directory).unwrap();
+        // Exercise restoration against a controlled CLI rather than a developer's installation.
+        let executable = directory.join(if cfg!(windows) {
+            "opencode.cmd"
+        } else {
+            "opencode"
+        });
+        std::fs::write(
+            &executable,
+            if cfg!(windows) {
+                "@echo off\r\necho 2.0.0\r\n"
+            } else {
+                "#!/bin/sh\necho 2.0.0\n"
+            },
+        )
+        .unwrap();
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            std::fs::set_permissions(&executable, std::fs::Permissions::from_mode(0o755)).unwrap();
+        }
+        let adapter = OpenCodeAdapter::with_executable(executable);
         database
             .save_network_profile(&NetworkProfile {
                 id: "proxy".into(),
@@ -1866,7 +2291,7 @@ mod tests {
             })
             .unwrap();
 
-        let environment = relaunch_environment(
+        let environment = relaunch_environment_with_opencode_adapter(
             &database,
             &CredentialStore,
             &hooks,
@@ -1878,6 +2303,7 @@ mod tests {
                 model_profile_id: None,
                 workspace_id: Some("workspace-1"),
             },
+            &adapter,
         )
         .unwrap();
 
@@ -1909,6 +2335,42 @@ mod tests {
         let plugin = std::fs::read_to_string(plugin_path);
         assert!(plugin.is_ok());
         assert!(plugin.unwrap().contains("ses_123"));
+        database
+            .write_app_setting("one_ring.worker.v1.terminal-1", "implementer")
+            .unwrap();
+        database
+            .write_app_setting(
+                "one_ring.opencode_worker.v1.terminal-1",
+                &serde_json::to_string(&OpenCodeWorkerContext {
+                    model: "provider/approved-model".into(),
+                    instructions_path: directory
+                        .join("instructions.md")
+                        .to_string_lossy()
+                        .into_owned(),
+                })
+                .unwrap(),
+            )
+            .unwrap();
+        let restored_worker = relaunch_environment_with_opencode_adapter(
+            &database,
+            &CredentialStore,
+            &hooks,
+            &RelaunchRequest {
+                terminal_id: "terminal-1",
+                agent_type: "opencode",
+                native_session_id: Some("ses_123"),
+                account_profile_id: None,
+                model_profile_id: None,
+                workspace_id: Some("workspace-1"),
+            },
+            &adapter,
+        )
+        .unwrap();
+        let restored: Value =
+            serde_json::from_str(restored_worker.get("OPENCODE_CONFIG_CONTENT").unwrap()).unwrap();
+        assert_eq!(restored["model"], "provider/approved-model");
+        assert_eq!(restored["permission"]["task"], "deny");
+        assert_eq!(restored["permission"]["*"], "deny");
         drop(database);
         std::fs::remove_dir_all(&directory).ok();
     }

@@ -71,6 +71,8 @@ pub struct ClaudeLaunchOptions {
 #[derive(Debug, Clone, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct CodexLaunchOptions {
+    #[serde(default)]
+    pub initial_prompt: Option<String>,
     pub session_id: Option<String>,
     pub model: Option<String>,
     pub notify_config: Option<String>,

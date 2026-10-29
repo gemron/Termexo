@@ -1,4 +1,5 @@
 import { runtimeMode } from '../core/services/tauri-runtime';
+import { CodexModelCatalogService } from '../core/services/codex-model-catalog.service';
 import { DatePipe } from '@angular/common';
 import {
   afterNextRender,
@@ -19,7 +20,6 @@ import {
   type AgentInstallation,
   type AgentProtocol,
   type AgentSession,
-  CODEX_MODEL_SUGGESTIONS,
   isNativeModel,
   profileModel,
   profileServes,
@@ -364,7 +364,7 @@ function presentationOf(agentType: NativeAgentType): AgentPresentation {
                         (ngModelChange)="codexModel.set($event)"
                       />
                       <datalist id="resume-codex-model-suggestions">
-                        @for (suggestion of codexModelSuggestions; track suggestion) {
+                        @for (suggestion of codexModelSuggestions(); track suggestion) {
                           <option [value]="suggestion"></option>
                         }
                       </datalist>
@@ -527,7 +527,9 @@ export class SessionCenterDialogComponent {
   protected readonly onlyWorkspace = signal(true);
   protected readonly agentFilter = signal<SessionAgentFilter>('all');
   protected readonly optionsExpanded = signal(false);
-  protected readonly codexModelSuggestions = CODEX_MODEL_SUGGESTIONS;
+  private readonly catalogs = inject(CodexModelCatalogService);
+  protected readonly codexModelSuggestions = signal<string[]>([]);
+  private catalogGeneration = 0;
   protected readonly profileId = signal('');
   protected readonly mcpProfileId = signal('');
   protected readonly claudeAccountProfileId = signal('');
@@ -746,6 +748,16 @@ export class SessionCenterDialogComponent {
   );
 
   constructor() {
+    effect(() => {
+      const account = this.resolvedCodexAccountProfileId(), directory = this.projectPath();
+      const generation = ++this.catalogGeneration;
+      this.codexModelSuggestions.set([]);
+      const profile = this.openaiProfiles().find(profile => profile.id === this.resolvedCodexProfileId());
+      if (profile && !isNativeModel(profile, 'codex')) return;
+      if (account) void this.catalogs.load(account, directory).then(catalog => {
+        if (generation === this.catalogGeneration) this.codexModelSuggestions.set(catalog.models.map(model => model.id));
+      }).catch(() => {});
+    });
     // `autofocus` only applies while the document is being parsed, so a dialog created later never
     // receives it. Focusing the search field also puts Escape inside the dialog, where it closes
     // this dialog instead of reaching the workbench shortcut on the window.

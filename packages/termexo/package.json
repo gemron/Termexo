@@ -14,6 +14,7 @@
     "vendor/win32-x64/OpenConsole.exe",
     "vendor/darwin-arm64/Termexo.app.tar.gz",
     "vendor/darwin-x64/Termexo.app.tar.gz",
+    "vendor/win32-x64/one-ring/",
     "README.md"
   ],
   "os": [

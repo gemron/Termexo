@@ -55,6 +55,7 @@ describe('isTodoAgentTerminal', () => {
     expect(isTodoAgentTerminal(terminal('claude'))).toBe(true);
     expect(isTodoAgentTerminal(terminal('codex'))).toBe(true);
     expect(isTodoAgentTerminal(terminal('opencode'))).toBe(true);
+    expect(isTodoAgentTerminal(terminal('pi'))).toBe(true);
   });
 
   it('rejects a plain shell, which has no Agent to send a task to', () => {
@@ -64,6 +65,42 @@ describe('isTodoAgentTerminal', () => {
 
 describe('TodoService', () => {
   beforeEach(() => window.localStorage.clear());
+
+  it.each([
+    ['task.completed', 'completed', 'completed'],
+    ['agent.failed', 'executing', 'failed'],
+    ['agent.interrupted', 'executing', 'waiting'],
+  ])(
+    'tracks a Pi task after %s without requiring a Termexo model profile',
+    (eventType, stage, executionState) => {
+      const service = new TodoService();
+      service.initialize([workspace]);
+      const task = service.createTask(workspace.id, {
+        ...draft(service.projectsFor(workspace.id)[0].id),
+        agentType: 'pi',
+        profileId: '',
+        modelName: '',
+      })!;
+      service.beginExecution(task.id, { terminalId: 'pi-terminal' });
+      service.markPromptDelivered(task.id, 'pi-terminal');
+      service.applyAgentEvent({
+        eventKey: `pi:${eventType}`,
+        agentType: 'pi',
+        terminalId: 'pi-terminal',
+        nativeSessionId: 'pi-native-session',
+        eventType,
+        detail: {},
+        createdAt: Date.now() + 1_000,
+      });
+      expect(service.task(task.id)).toMatchObject({
+        stage,
+        executionState,
+        nativeSessionId: 'pi-native-session',
+        nativeSessionAgentType: 'pi',
+        promptDeliveryState: 'delivered',
+      });
+    },
+  );
 
   it('creates a default project, supports multiple projects, and persists tasks', () => {
     const service = new TodoService();

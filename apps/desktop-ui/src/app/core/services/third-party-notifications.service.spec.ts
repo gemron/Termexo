@@ -5,16 +5,11 @@ import { ThirdPartyNotificationsService } from './third-party-notifications.serv
 import { WechatNotificationsService } from './wechat-notifications.service';
 
 const backend = vi.hoisted(() => ({ invoke: vi.fn() }));
-vi.mock('@tauri-apps/api/core', () => ({ invoke: backend.invoke }));
 
 describe('third party notification master gate', () => {
   let gate: ThirdPartyNotificationsService;
   beforeEach(() => {
-    // Lazy chunks may bundle core; normalize its native invoke options at the transport boundary.
-    Object.defineProperty(window, '__TAURI_INTERNALS__', {
-      value: { invoke: (command: string, args?: Record<string, unknown>) => backend.invoke(command, args) },
-      configurable: true,
-    });
+    Object.defineProperty(window, '__TAURI_INTERNALS__', { value: { invoke: backend.invoke }, configurable: true });
     backend.invoke.mockReset().mockImplementation(async (command, args) => {
       if (command === 'read_third_party_notifications') return { enabled: true };
       if (command === 'set_third_party_notifications_enabled') return { enabled: args.enabled };

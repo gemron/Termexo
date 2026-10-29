@@ -1,4 +1,4 @@
-import { Component, computed, inject, input, output, signal } from '@angular/core';
+import { Component, computed, effect, inject, input, output, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 
 import { I18nService } from '../core/i18n/i18n.service';
@@ -17,10 +17,13 @@ import {
 import { AGENT_ICONS } from '../core/models/workspace.models';
 import { IconComponent } from '../shared/icon/icon';
 import { LaunchDialogShellComponent } from './launch-dialog-shell';
+import { ModelCatalogService } from '../core/services/model-catalog.service';
+import { launchProfileId, officialModelId, OFFICIAL_MODEL_PREFIX } from '../core/models/launch-model-choice';
 
 export interface ClaudeLaunchDialogValue {
   name: string;
   profileId?: string;
+  model?: string;
   mcpProfileId?: string;
   accountProfileId?: string;
   autoConfirm?: boolean;
@@ -66,25 +69,31 @@ const CONTEXT_1M_OFF = 'off';
             (ngModelChange)="name.set($event)"
           />
         </label>
-        <label>
-          <span>{{ 'launch.modelProfile' | t }}</span>
+        <label class="profile-field">
+          <span>{{ 'launch.modelChoice' | t }}</span>
           <select
             class="select select-bordered select-sm"
             [ngModel]="resolvedProfileId()"
             (ngModelChange)="profileId.set($event)"
           >
-            @for (profile of claudeProfiles(); track profile.id) {
+            <optgroup [label]="'launch.officialModels' | t">
+              <option value="official:">{{ 'launch.cliDefaultModel' | t }}</option>
+              @for (model of officialModels(); track model.id) { <option [value]="'official:' + model.id">{{ model.name }} · {{ model.id }}</option> }
+              @if (pinnedOfficialModel(); as model) { <option [value]="'official:' + model">{{ model }}</option> }
+            </optgroup>
+            <optgroup [label]="'launch.savedProfiles' | t">
+              @for (profile of claudeProfiles(); track profile.id) {
               <option [value]="profile.id">
                 {{ profile.name }} · {{ modelOf(profile) }}
                 @if (isNativeModel(profile)) {
                   ({{ 'settings.nativeModel' | t }})
                 }
               </option>
-            }
+              }
+            </optgroup>
           </select>
-          @if (!claudeProfiles().length) {
-            <small class="account-warning">{{ 'launch.noModelProfile' | t }}</small>
-          }
+          @if (catalog.loading()) { <small>{{ 'launch.loadingModels' | t }}</small> }
+          <button type="button" class="btn btn-xs btn-ghost" (click)="catalog.refresh(true)" [disabled]="catalog.loading()">{{ 'launch.refreshModels' | t }}</button>
         </label>
         <label>
           <span>{{ 'launch.loginAccount' | t }}</span>
@@ -190,6 +199,14 @@ export class ClaudeLaunchDialogComponent {
   readonly cancelled = output<void>();
 
   private readonly i18n = inject(I18nService);
+  protected readonly catalog = inject(ModelCatalogService);
+  protected readonly officialModels = computed(() => this.catalog.choices('Anthropic', 'claude'));
+  protected readonly pinnedOfficialModel = computed(() => {
+    const id = officialModelId(this.resolvedProfileId());
+    return id && !this.officialModels().some(model => model.id === id) ? id : null;
+  });
+
+  constructor() { effect(() => { if (this.installation()?.healthy) void this.catalog.refresh(); }); }
 
   protected readonly name = signal('');
   protected readonly profileId = signal('');
@@ -218,7 +235,7 @@ export class ClaudeLaunchDialogComponent {
       this.profileId() ||
       this.claudeProfiles().find((profile) => profile.isDefault)?.id ||
       this.claudeProfiles()[0]?.id ||
-      '',
+      OFFICIAL_MODEL_PREFIX,
   );
   protected readonly canLaunch = computed(
     () => Boolean(this.installation()?.healthy) && Boolean(this.resolvedProfileId()),
@@ -248,7 +265,8 @@ export class ClaudeLaunchDialogComponent {
     }
     this.launched.emit({
       name: this.name().trim(),
-      profileId: this.resolvedProfileId() || undefined,
+      profileId: launchProfileId(this.resolvedProfileId()),
+      model: officialModelId(this.resolvedProfileId()) || undefined,
       mcpProfileId: this.mcpProfileId() || undefined,
       accountProfileId: this.resolvedAccountProfileId() || undefined,
       autoConfirm: this.autoConfirm() || undefined,

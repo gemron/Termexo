@@ -4,15 +4,10 @@ import { ThirdPartyNotificationsService } from '../core/services/third-party-not
 import { ThirdPartyNotificationsToggleComponent } from './third-party-notifications-toggle';
 
 const backend = vi.hoisted(() => ({ invoke: vi.fn() }));
-vi.mock('@tauri-apps/api/core', () => ({ invoke: backend.invoke }));
 
 describe('topbar third party notification switch', () => {
   beforeEach(() => {
-    // Lazy chunks may bundle core; normalize its native invoke options at the transport boundary.
-    Object.defineProperty(window, '__TAURI_INTERNALS__', {
-      value: { invoke: (command: string, args?: Record<string, unknown>) => backend.invoke(command, args) },
-      configurable: true,
-    });
+    Object.defineProperty(window, '__TAURI_INTERNALS__', { value: { invoke: backend.invoke }, configurable: true });
     backend.invoke.mockReset().mockImplementation(async (command, args) => ({
       enabled: command === 'read_third_party_notifications' ? true : args.enabled,
     }));
@@ -41,7 +36,7 @@ describe('topbar third party notification switch', () => {
     await settle(fixture);
     expect(button.getAttribute('aria-checked')).toBe('false');
     expect(button.title).toContain('各渠道原有配置');
-    expect(backend.invoke).toHaveBeenCalledWith('set_third_party_notifications_enabled', { enabled: false });
+    expect(backend.invoke).toHaveBeenCalledWith('set_third_party_notifications_enabled', { enabled: false }, undefined);
   });
 
   it('keeps the real state on failure, reports it, and permits retry', async () => {

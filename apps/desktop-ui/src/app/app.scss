@@ -940,7 +940,8 @@ app-inspector-panel {
     min-height: 0;
   }
 
-  > app-git-workbench {
+  > app-git-workbench,
+  > app-one-ring-panel {
     display: block;
     width: 100%;
     height: 100%;
