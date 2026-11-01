@@ -1,9 +1,7 @@
-//! Whether the installed WebView2 runtime can render Termexo's interface.
+//! Whether the installed webview runtime can render Termexo's interface.
 //!
-//! The whole window is a WebView2, so its Chromium version decides what the stylesheets are
-//! allowed to say. A runtime that is missing entirely leaves nothing to show a message in, and
-//! one that is merely too old renders a window whose colours quietly fall apart — neither
-//! explains itself, so both are reported here and answered with the download page.
+//! On Windows the Chromium version determines CSS support, and an old WebView2 needs an upgrade.
+//! Unix uses the platform's WebKit runtime; its version must never be compared to Chromium's.
 
 use serde::Serialize;
 
@@ -22,9 +20,9 @@ pub const DOWNLOAD_URL: &str = "https://developer.microsoft.com/microsoft-edge/w
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct WebviewStatus {
-    /// Full runtime version, absent when no WebView2 is installed at all.
+    /// Full runtime version, absent when the native webview runtime is unavailable.
     pub version: Option<String>,
-    /// Chromium major taken from that version; absent for the same reason.
+    /// Chromium major on Windows; absent on WebKit platforms or when the version is unreadable.
     pub major: Option<u32>,
     pub minimum_major: u32,
     /// False when the runtime is missing, unreadable, or older than the minimum.
@@ -35,16 +33,32 @@ pub struct WebviewStatus {
 /// Reports the runtime this process is rendering on.
 pub fn status() -> WebviewStatus {
     let version = tauri::webview_version().ok();
-    let major = version.as_deref().and_then(chromium_major);
+    let major = if cfg!(windows) {
+        version.as_deref().and_then(chromium_major)
+    } else {
+        None
+    };
+    let supported = supports_runtime(version.as_deref());
     WebviewStatus {
         version,
         major,
         minimum_major: MINIMUM_CHROMIUM_MAJOR,
         // An unreadable version is treated as unsupported: the alternative is staying silent
         // about a runtime that may well be the reason the window looks wrong.
-        supported: cfg!(target_os = "macos")
-            || major.is_some_and(|major| major >= MINIMUM_CHROMIUM_MAJOR),
+        supported,
         download_url: DOWNLOAD_URL,
+    }
+}
+
+fn supports_runtime(version: Option<&str>) -> bool {
+    // Linux and macOS use WebKit, whose version is unrelated to Chromium's major number.
+    // Their native runtime is supplied by the OS/package manager, not the WebView2 installer.
+    match version {
+        Some(version) if !cfg!(windows) => !version.trim().is_empty(),
+        Some(version) => {
+            chromium_major(version).is_some_and(|major| major >= MINIMUM_CHROMIUM_MAJOR)
+        }
+        None => false,
     }
 }
 
@@ -121,11 +135,13 @@ mod tests {
 
     #[test]
     fn a_runtime_below_the_minimum_is_not_supported() {
-        let status = status();
-        if let Some(major) = status.major {
-            assert_eq!(status.supported, major >= MINIMUM_CHROMIUM_MAJOR);
+        assert!(!supports_runtime(None));
+        assert!(!supports_runtime(Some("")));
+        if cfg!(windows) {
+            assert!(!supports_runtime(Some("110.0.0.0")));
+            assert!(supports_runtime(Some("111.0.0.0")));
         } else {
-            assert!(!status.supported);
+            assert!(supports_runtime(Some("2.52.6")));
         }
     }
 }

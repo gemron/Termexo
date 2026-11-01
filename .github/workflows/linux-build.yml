@@ -1,0 +1,89 @@
+name: Build and test Linux desktop
+
+on:
+  workflow_dispatch:
+  workflow_call:
+  pull_request:
+    paths:
+      - ".github/workflows/linux-build.yml"
+      - "apps/desktop-ui/**"
+      - "crates/**"
+      - "packages/one-ring/**"
+      - "scripts/**"
+      - "src-tauri/**"
+      - "package.json"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: linux-build-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    env:
+      CI: "true"
+      CARGO_BUILD_JOBS: "2"
+      CARGO_PROFILE_DEV_DEBUG: "0"
+      GDK_BACKEND: x11
+      # Xvfb has no native DMABUF presentation path.
+      WEBKIT_DISABLE_DMABUF_RENDERER: "1"
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v7
+        with:
+          node-version: "24"
+          cache: npm
+          cache-dependency-path: apps/desktop-ui/package-lock.json
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri -> target
+          key: linux-x86_64
+      - name: Install native build and desktop test dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential pkg-config libwebkit2gtk-4.1-dev \
+            libayatana-appindicator3-dev librsvg2-dev libxdo-dev libssl-dev libdbus-1-dev \
+            gnome-keyring fontconfig fonts-dejavu-core xdg-utils webkit2gtk-driver xvfb
+      - run: npm --prefix apps/desktop-ui ci
+      - run: npm run one-ring:stage
+      - run: npm test
+      - run: npm run one-ring:test
+      - run: node --test scripts/one-ring-bridge.test.mjs scripts/linux-real-agent-smoke.test.mjs
+      - name: Run native tests
+        run: cargo test --manifest-path src-tauri/Cargo.toml --lib --locked
+      - name: Test the Secret Service credential backend
+        env:
+          XDG_DATA_HOME: ${{ runner.temp }}/termexo-keyring
+        run: |
+          mkdir -p "$XDG_DATA_HOME"
+          dbus-run-session -- bash -eu -c '
+            printf "\n" | gnome-keyring-daemon --unlock --components=secrets \
+              --control-directory="$XDG_DATA_HOME/control"
+            cargo test --manifest-path src-tauri/Cargo.toml --lib --locked \
+              config::tests::secure_storage_round_trips_a_credential -- --ignored --exact
+          '
+      - name: Build Debian package
+        run: npm run tauri:build -- --bundles deb
+      - name: Install the native WebDriver adapter
+        run: cargo install tauri-driver --locked
+      - name: Exercise the real desktop and PTY
+        run: |
+          dpkg-deb -x src-tauri/target/release/bundle/deb/*.deb "$RUNNER_TEMP/termexo-linux-package"
+          TERMEXO_DESKTOP_BINARY="$RUNNER_TEMP/termexo-linux-package/usr/bin/termexo" \
+            dbus-run-session -- xvfb-run -a npm run test:desktop:linux
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: Termexo-Linux-x86_64
+          path: |
+            src-tauri/target/release/bundle/deb/*.deb
+            validation-results/linux/
+          if-no-files-found: warn
+          retention-days: 14

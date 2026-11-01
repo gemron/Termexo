@@ -99,7 +99,16 @@ pub(crate) fn open_url(url: &str) -> Result<(), String> {
         .map_err(|error| format!("无法打开发布页面：{error}"))
 }
 
-#[cfg(not(any(windows, target_os = "macos")))]
+#[cfg(target_os = "linux")]
+pub(crate) fn open_url(url: &str) -> Result<(), String> {
+    std::process::Command::new("xdg-open")
+        .arg(url)
+        .spawn()
+        .map(|_| ())
+        .map_err(|error| format!("无法打开链接，请确认已安装 xdg-utils：{error}"))
+}
+
+#[cfg(not(any(windows, target_os = "macos", target_os = "linux")))]
 pub(crate) fn open_url(_url: &str) -> Result<(), String> {
     Err("当前平台不支持打开发布页面。".into())
 }

@@ -175,7 +175,70 @@ mod platform {
     }
 }
 
-#[cfg(not(any(windows, target_os = "macos")))]
+#[cfg(target_os = "linux")]
+mod platform {
+    use super::SystemFont;
+
+    // Fontconfig's MONO (100), DUAL (90), and CHARCELL (110) all have fixed cell widths.
+    const FIXED_SPACING: &[&str] = &["90", "100", "110"];
+
+    pub fn enumerate() -> Result<Vec<SystemFont>, String> {
+        let output = std::process::Command::new("fc-list")
+            .args(["--format", "%{family[0]}\t%{spacing}\n"])
+            .output()
+            .map_err(|error| format!("无法读取系统字体，请确认已安装 fontconfig：{error}"))?;
+        if !output.status.success() {
+            return Err("无法读取系统字体：fc-list 执行失败。".into());
+        }
+        Ok(parse_fonts(&String::from_utf8_lossy(&output.stdout)))
+    }
+
+    fn parse_fonts(output: &str) -> Vec<SystemFont> {
+        let mut families = std::collections::BTreeMap::<String, SystemFont>::new();
+        for line in output.lines() {
+            let Some((name, spacing)) = line.split_once('\t') else {
+                continue;
+            };
+            let name = name.trim();
+            let monospaced = FIXED_SPACING.contains(&spacing.trim());
+            families
+                .entry(name.to_lowercase())
+                .and_modify(|font| font.monospaced |= monospaced)
+                .or_insert_with(|| SystemFont {
+                    name: name.into(),
+                    monospaced,
+                });
+        }
+        families.into_values().collect()
+    }
+
+    #[cfg(test)]
+    mod tests {
+        use super::*;
+
+        #[test]
+        fn fontconfig_faces_merge_and_fixed_spacing_is_recognised() {
+            let fonts = parse_fonts(
+                "Example Mono\t\nExample Mono\t100\nExample Sans\t\nCJK\t90\nCell\t110\ninvalid\n",
+            );
+            assert_eq!(fonts.len(), 4);
+            assert!(fonts
+                .iter()
+                .any(|font| font.name == "Example Mono" && font.monospaced));
+            assert!(fonts
+                .iter()
+                .any(|font| font.name == "Example Sans" && !font.monospaced));
+            assert!(fonts
+                .iter()
+                .any(|font| font.name == "CJK" && font.monospaced));
+            assert!(fonts
+                .iter()
+                .any(|font| font.name == "Cell" && font.monospaced));
+        }
+    }
+}
+
+#[cfg(not(any(windows, target_os = "macos", target_os = "linux")))]
 mod platform {
     use super::SystemFont;
 

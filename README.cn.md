@@ -323,6 +323,8 @@ Termexo 将扩展写入自己的运行时目录，以 `--extension` 注入每个
 
 macOS 源码构建需要 macOS 12+ 与 Xcode 命令行工具。下方 Windows 专属运行时要求不适用于 Mac 构建。
 
+Linux 现支持从源码构建；依赖安装、`.deb` 打包和真实 WebKit/PTY 冒烟测试见 [Linux 构建与运行验证](docs/linux.md)。
+
 - Windows 10 build 17763（2018 年 10 月）或更高——终端所依赖的伪控制台从这个版本开始才有；
 - WebView2 运行时需 Chromium 111 或更高——界面的配色用 `color-mix()` 和 `oklch()` 表达，更旧的
   运行时会直接丢弃这些声明。遇到旧版本时 Termexo 会提示并提供下载入口；Windows 11 自带，安装包

@@ -340,6 +340,8 @@ These requirements are for contributors building Termexo, not for installing the
 
 macOS source builds require macOS 12+ and Xcode command-line tools. The Windows-specific runtime requirements below do not apply to Mac builds.
 
+Linux source builds are also available; see [Linux build and desktop testing](docs/linux.md) for dependencies, `.deb` packaging, and real WebKit/PTY smoke tests.
+
 - Windows 10 build 17763 (October 2018) or newer, the first to carry the pseudo console the
   terminals run on;
 - the WebView2 runtime at Chromium 111 or newer — the interface states its colours through

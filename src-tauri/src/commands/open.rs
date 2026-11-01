@@ -17,12 +17,36 @@ const EXECUTABLE_EXTENSIONS: &[&str] = &[
 /// necessarily be registered for. `.app` bundles are directories and are revealed already.
 #[cfg(target_os = "macos")]
 const MACOS_EXECUTABLE_EXTENSIONS: &[&str] = &[
-    "command", "terminal", "tool", "sh", "zsh", "bash", "pkg", "mpkg", "dmg", "workflow",
-    "action", "scpt", "scptd", "applescript", "app", "jar", "py", "pl", "rb",
+    "command",
+    "terminal",
+    "tool",
+    "sh",
+    "zsh",
+    "bash",
+    "pkg",
+    "mpkg",
+    "dmg",
+    "workflow",
+    "action",
+    "scpt",
+    "scptd",
+    "applescript",
+    "app",
+    "jar",
+    "py",
+    "pl",
+    "rb",
 ];
 
 #[cfg(not(target_os = "macos"))]
 const MACOS_EXECUTABLE_EXTENSIONS: &[&str] = &[];
+
+#[cfg(target_os = "linux")]
+const LINUX_EXECUTABLE_EXTENSIONS: &[&str] = &[
+    "desktop", "appimage", "run", "sh", "bash", "zsh", "fish", "py", "pl", "rb", "deb", "rpm",
+];
+#[cfg(not(target_os = "linux"))]
+const LINUX_EXECUTABLE_EXTENSIONS: &[&str] = &[];
 
 /// Whether the path names something the platform would run if it were opened.
 fn is_executable_extension(path: &Path) -> bool {
@@ -32,6 +56,7 @@ fn is_executable_extension(path: &Path) -> bool {
             EXECUTABLE_EXTENSIONS
                 .iter()
                 .chain(MACOS_EXECUTABLE_EXTENSIONS)
+                .chain(LINUX_EXECUTABLE_EXTENSIONS)
                 .any(|known| extension.eq_ignore_ascii_case(known))
         })
 }
@@ -181,12 +206,34 @@ fn open_with_default_program(path: &Path) -> Result<(), String> {
         .map_err(|error| format!("无法打开该文件：{error}"))
 }
 
-#[cfg(not(any(windows, target_os = "macos")))]
+#[cfg(target_os = "linux")]
+fn reveal(path: &Path) -> Result<(), String> {
+    // Opening the containing directory works even without a FileManager1 D-Bus service.
+    // Never hand an executable itself to xdg-open, including .desktop launchers.
+    let directory = if path.is_dir() {
+        path
+    } else {
+        path.parent()
+            .ok_or_else(|| "无法确定文件所在目录。".to_string())?
+    };
+    open_with_default_program(directory)
+}
+
+#[cfg(target_os = "linux")]
+fn open_with_default_program(path: &Path) -> Result<(), String> {
+    std::process::Command::new("xdg-open")
+        .arg(path)
+        .spawn()
+        .map(|_| ())
+        .map_err(|error| format!("无法打开该文件，请确认已安装 xdg-utils：{error}"))
+}
+
+#[cfg(not(any(windows, target_os = "macos", target_os = "linux")))]
 fn reveal(_path: &Path) -> Result<(), String> {
     Err("当前平台不支持在文件管理器中定位。".into())
 }
 
-#[cfg(not(any(windows, target_os = "macos")))]
+#[cfg(not(any(windows, target_os = "macos", target_os = "linux")))]
 fn open_with_default_program(_path: &Path) -> Result<(), String> {
     Err("当前平台不支持打开文件。".into())
 }
@@ -195,10 +242,31 @@ fn open_with_default_program(_path: &Path) -> Result<(), String> {
 mod tests {
     use super::*;
 
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn linux_launchers_and_scripts_are_revealed_instead_of_executed() {
+        for name in [
+            "untrusted.desktop",
+            "tool.AppImage",
+            "install.sh",
+            "package.deb",
+        ] {
+            assert!(is_executable_extension(Path::new(name)), "{name}");
+        }
+        assert!(!is_executable_extension(Path::new("README.md")));
+    }
+
     #[cfg(target_os = "macos")]
     #[test]
     fn macos_files_that_run_when_opened_are_recognised() {
-        for name in ["fix.command", "x.TERMINAL", "setup.pkg", "a.dmg", "run.scpt", "job.workflow"] {
+        for name in [
+            "fix.command",
+            "x.TERMINAL",
+            "setup.pkg",
+            "a.dmg",
+            "run.scpt",
+            "job.workflow",
+        ] {
             assert!(is_executable_extension(Path::new(name)), "{name}");
         }
         for name in ["notes.md", "image.png", "main.rs", "README"] {
@@ -211,7 +279,8 @@ mod tests {
     fn a_file_with_an_execute_bit_counts_as_executable() {
         use std::os::unix::fs::PermissionsExt;
 
-        let directory = std::env::temp_dir().join(format!("termexo-open-exec-{}", std::process::id()));
+        let directory =
+            std::env::temp_dir().join(format!("termexo-open-exec-{}", std::process::id()));
         std::fs::create_dir_all(&directory).unwrap();
         let plain = directory.join("notes");
         let program = directory.join("tool-without-extension");

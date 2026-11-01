@@ -1244,7 +1244,9 @@ fn append_proxy_diagnostic(line: &str) {
 fn dirs_app_data() -> Option<PathBuf> {
     #[cfg(target_os = "macos")]
     return crate::platform::macos_data_dir();
-    #[cfg(not(target_os = "macos"))]
+    #[cfg(target_os = "linux")]
+    return crate::platform::linux_data_dir();
+    #[cfg(windows)]
     std::env::var_os("APPDATA").map(|base| PathBuf::from(base).join("dev.agentdock.desktop"))
 }
 

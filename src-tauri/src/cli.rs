@@ -923,6 +923,7 @@ fn run_command(
         .stdout(Stdio::piped())
         .stderr(Stdio::piped());
     hide_window(&mut command);
+    crate::process::isolate_process_tree(&mut command);
 
     let mut child = command
         .spawn()
@@ -958,6 +959,8 @@ fn run_command(
         thread::sleep(Duration::from_millis(100));
     };
 
+    #[cfg(unix)]
+    terminate_process_tree(&mut child);
     Ok(CommandResult {
         success: status.success(),
         stdout: stdout_reader.join().unwrap_or_default(),
