@@ -1,7 +1,10 @@
 import { createId } from './identifiers';
 import { Workspace } from './workspace.models';
+import { previewShellSyntax } from './shell-command';
 
-const DEFAULT_PROJECT_PATH = 'D:\\dev\\termexo';
+const WINDOWS_PREVIEW = previewShellSyntax() === 'powershell';
+const DEFAULT_PROJECT_PATH = WINDOWS_PREVIEW ? 'D:\\dev\\termexo' : '/home/demo/termexo';
+const DEFAULT_PREVIEW_SHELL = WINDOWS_PREVIEW ? 'powershell.exe' : '/bin/bash';
 
 export function createDefaultWorkspaces(): Workspace[] {
   const now = Date.now();
@@ -25,7 +28,7 @@ export function createDefaultWorkspaces(): Workspace[] {
           id: createId(),
           name: 'Claude - Core',
           workingDirectory: DEFAULT_PROJECT_PATH,
-          shell: 'powershell.exe',
+          shell: DEFAULT_PREVIEW_SHELL,
           agentType: 'claude',
           status: 'STARTING',
           model: 'Claude Sonnet',
@@ -37,7 +40,7 @@ export function createDefaultWorkspaces(): Workspace[] {
           id: createId(),
           name: 'Codex - Tests',
           workingDirectory: DEFAULT_PROJECT_PATH,
-          shell: 'powershell.exe',
+          shell: DEFAULT_PREVIEW_SHELL,
           agentType: 'codex',
           status: 'STARTING',
           model: 'GPT Codex',

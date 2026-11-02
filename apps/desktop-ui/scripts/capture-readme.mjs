@@ -3,10 +3,10 @@ import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { chromium } from 'playwright-core';
+import { resolveBrowserExecutable } from './lib/browser-executable.mjs';
 
 const APP_URL = process.env.TERMEXO_URL ?? 'http://127.0.0.1:4200';
-const EDGE_PATH =
-  process.env.EDGE_PATH ?? 'C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe';
+const BROWSER_PATH = resolveBrowserExecutable();
 const scriptDirectory = dirname(fileURLToPath(import.meta.url));
 const repositoryRoot = resolve(scriptDirectory, '../../..');
 const imageDirectory = resolve(repositoryRoot, 'docs/images');
@@ -14,12 +14,12 @@ const imageDirectory = resolve(repositoryRoot, 'docs/images');
 await mkdir(imageDirectory, { recursive: true });
 
 const browser = await chromium.launch({
-  executablePath: EDGE_PATH,
+  executablePath: BROWSER_PATH,
   headless: true,
 });
 
 try {
-  const page = await browser.newPage({
+  const page = await browser.newPage({ locale: 'zh-CN',
     viewport: { width: 1440, height: 900 },
     colorScheme: 'dark',
   });

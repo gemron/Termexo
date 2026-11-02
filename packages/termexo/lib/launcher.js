@@ -78,10 +78,10 @@ export function openDownloadPage(
   platform = process.platform,
 ) {
   const child = spawnProcess(
-    platform === 'darwin' ? '/usr/bin/open' : 'rundll32.exe',
-    platform === 'darwin'
-      ? [RELEASES_URL]
-      : ['url.dll,FileProtocolHandler', RELEASES_URL],
+    platform === 'darwin' ? '/usr/bin/open' : platform === 'linux' ? 'xdg-open' : 'rundll32.exe',
+    platform === 'win32'
+      ? ['url.dll,FileProtocolHandler', RELEASES_URL]
+      : [RELEASES_URL],
     {
       detached: true,
       stdio: 'ignore',

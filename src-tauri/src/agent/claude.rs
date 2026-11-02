@@ -1,12 +1,12 @@
-use crate::platform::{shell_invoke, shell_quote};
+use super::cli::{command_paths, query_command as cli_command};
+use crate::platform::{paths_equal, shell_invoke, shell_quote};
+use crate::process::run_with_timeout;
 use std::cmp::Reverse;
 use std::env;
-use std::ffi::OsStr;
 use std::fs::{self, File};
 use std::io::{BufRead, BufReader};
 use std::path::{Path, PathBuf};
-use std::process::Command;
-use std::time::{SystemTime, UNIX_EPOCH};
+use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use serde::Serialize;
 use serde_json::Value;
@@ -14,6 +14,8 @@ use thiserror::Error;
 
 use super::{AgentAdapter, AgentInstallation, AgentLaunchSpec, AgentSession, ClaudeLaunchOptions};
 
+const VERSION_TIMEOUT: Duration = Duration::from_secs(10);
+const SESSION_QUERY_TIMEOUT: Duration = Duration::from_secs(20);
 const AGENT_TYPE: &str = "claude";
 const SESSION_STATUS: &str = "HISTORICAL";
 const MAX_TITLE_LENGTH: usize = 96;
@@ -105,11 +107,14 @@ impl ClaudeCodeAdapter {
             candidates.extend(command_paths("claude"));
         }
 
-        candidates.into_iter().find(|path| path.is_file())
+        candidates
+            .into_iter()
+            .find(|path| crate::platform::is_executable_file(path))
     }
 
     fn read_version(&self, executable: &Path) -> Option<String> {
-        let output = cli_command(executable).arg("--version").output().ok()?;
+        let output =
+            run_with_timeout(cli_command(executable).arg("--version"), VERSION_TIMEOUT).ok()?;
         if !output.status.success() {
             return None;
         }
@@ -127,10 +132,11 @@ impl ClaudeCodeAdapter {
      */
     pub fn background_session(&self, session_id: &str) -> Option<ClaudeBackgroundSession> {
         let executable = self.find_executable()?;
-        let output = cli_command(&executable)
-            .args([AGENTS_SUBCOMMAND, JSON_FLAG])
-            .output()
-            .ok()?;
+        let output = run_with_timeout(
+            cli_command(&executable).args([AGENTS_SUBCOMMAND, JSON_FLAG]),
+            SESSION_QUERY_TIMEOUT,
+        )
+        .ok()?;
         if !output.status.success() {
             return None;
         }
@@ -143,14 +149,14 @@ impl ClaudeCodeAdapter {
     /// Ends a background session so a Termexo terminal can resume its id again.
     pub fn stop_background_session(&self, short_id: &str) -> Result<(), ClaudeError> {
         let executable = self.find_executable().ok_or(ClaudeError::NotInstalled)?;
-        let output = cli_command(&executable)
-            .arg(STOP_SUBCOMMAND)
-            .arg(short_id)
-            .output()
-            .map_err(|source| ClaudeError::SessionIo {
-                path: short_id.to_owned(),
-                source,
-            })?;
+        let output = run_with_timeout(
+            cli_command(&executable).arg(STOP_SUBCOMMAND).arg(short_id),
+            SESSION_QUERY_TIMEOUT,
+        )
+        .map_err(|source| ClaudeError::SessionIo {
+            path: short_id.to_owned(),
+            source,
+        })?;
 
         if output.status.success() {
             return Ok(());
@@ -262,10 +268,7 @@ impl AgentAdapter for ClaudeCodeAdapter {
             .as_deref()
             .filter(|value| !value.trim().is_empty())
         {
-            command.push_str(&format!(
-                " {ATTACH_SUBCOMMAND} {}",
-                shell_quote(short_id)
-            ));
+            command.push_str(&format!(" {ATTACH_SUBCOMMAND} {}", shell_quote(short_id)));
             return Ok(AgentLaunchSpec {
                 command,
                 executable_path: executable.to_string_lossy().into_owned(),
@@ -302,58 +305,6 @@ impl AgentAdapter for ClaudeCodeAdapter {
     }
 }
 
-fn command_paths(command: &str) -> Vec<PathBuf> {
-    #[cfg(windows)]
-    {
-        let mut paths = env::current_dir()
-            .ok()
-            .map(|directory| vec![directory.join(command)])
-            .unwrap_or_default();
-        if let Some(search_path) = env::var_os("PATH") {
-            paths.extend(env::split_paths(&search_path).map(|directory| directory.join(command)));
-        }
-        paths
-    }
-
-    #[cfg(not(windows))]
-    {
-        let output = command_without_window("which").arg(command).output();
-
-        output
-            .ok()
-            .filter(|result| result.status.success())
-            .map(|result| {
-                String::from_utf8_lossy(&result.stdout)
-                    .lines()
-                    .map(str::trim)
-                    .filter(|line| !line.is_empty())
-                    .map(PathBuf::from)
-                    .collect()
-            })
-            .unwrap_or_default()
-    }
-}
-
-/**
- * A command that runs the CLI itself.
- *
- * Windows installs Claude Code as an npm `.cmd` shim, which CreateProcess cannot execute, so on
- * that path the shim is handed to `cmd.exe` instead of being launched directly.
- */
-fn cli_command(executable: &Path) -> Command {
-    #[cfg(windows)]
-    if executable
-        .extension()
-        .is_some_and(|extension| extension.eq_ignore_ascii_case("cmd"))
-    {
-        let mut command = command_without_window("cmd.exe");
-        command.args(["/d", "/c", "call"]).arg(executable);
-        return command;
-    }
-
-    command_without_window(executable)
-}
-
 fn parse_background_sessions(payload: &str) -> Vec<ClaudeBackgroundSession> {
     let Ok(Value::Array(entries)) = serde_json::from_str::<Value>(payload) else {
         return Vec::new();
@@ -385,22 +336,8 @@ fn is_busy(entry: &Value) -> bool {
     field("status") == BUSY_STATUS || field("state") == WORKING_STATE
 }
 
-fn command_without_window(program: impl AsRef<OsStr>) -> Command {
-    let mut command = Command::new(program);
-    #[cfg(windows)]
-    {
-        use std::os::windows::process::CommandExt;
-
-        const CREATE_NO_WINDOW: u32 = 0x0800_0000;
-        command.creation_flags(CREATE_NO_WINDOW);
-    }
-    command
-}
-
 fn home_directory() -> Option<PathBuf> {
-    env::var_os("USERPROFILE")
-        .or_else(|| env::var_os("HOME"))
-        .map(PathBuf::from)
+    crate::platform::home_dir()
 }
 
 fn collect_transcripts(
@@ -585,16 +522,6 @@ fn system_time_millis(value: SystemTime) -> i64 {
         .unwrap_or_default()
 }
 
-fn paths_equal(left: &str, right: &str) -> bool {
-    let normalize = |value: &str| {
-        value
-            .trim_end_matches(['\\', '/'])
-            .replace('/', "\\")
-            .to_lowercase()
-    };
-    normalize(left) == normalize(right)
-}
-
 fn append_option(command: &mut String, flag: &str, value: Option<&str>) {
     if let Some(value) = value.filter(|value| !value.trim().is_empty()) {
         command.push(' ');
@@ -632,7 +559,7 @@ mod tests {
         let mut file = File::create(&transcript).unwrap();
         writeln!(
             file,
-            r#"{{"type":"user","cwd":"D:\\dev\\Termexo","gitBranch":"main","message":{{"content":"Implement session restore"}}}}"#
+            r#"{{"type":"user","cwd":"/work/Termexo","gitBranch":"main","message":{{"content":"Implement session restore"}}}}"#
         )
         .unwrap();
         writeln!(
@@ -643,7 +570,7 @@ mod tests {
         let original = fs::read_to_string(&transcript).unwrap();
 
         let sessions = ClaudeCodeAdapter::new()
-            .scan_directory(&directory, Some("D:/dev/Termexo"))
+            .scan_directory(&directory, Some("/work/Termexo/"))
             .unwrap();
 
         assert_eq!(sessions.len(), 1);
@@ -652,6 +579,12 @@ mod tests {
         assert_eq!(sessions[0].message_count, 2);
         assert_eq!(sessions[0].model_name.as_deref(), Some("claude-sonnet-4-6"));
         assert_eq!(fs::read_to_string(&transcript).unwrap(), original);
+
+        #[cfg(unix)]
+        assert!(ClaudeCodeAdapter::new()
+            .scan_directory(&directory, Some("/work/termexo"))
+            .unwrap()
+            .is_empty());
 
         fs::remove_dir_all(directory).unwrap();
     }

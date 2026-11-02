@@ -5262,6 +5262,7 @@ dependencies = [
  "keyring",
  "libc",
  "notify",
+ "notify-rust",
  "objc2-core-foundation",
  "objc2-core-text",
  "portable-pty",

@@ -1,13 +1,13 @@
 import { chromium } from 'playwright-core';
+import { resolveBrowserExecutable } from './lib/browser-executable.mjs';
 
 const APP_URL = process.env.TERMEXO_URL ?? 'http://127.0.0.1:4200';
-const EDGE_PATH =
-  process.env.EDGE_PATH ?? 'C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe';
+const BROWSER_PATH = resolveBrowserExecutable();
 
-const browser = await chromium.launch({ executablePath: EDGE_PATH, headless: true });
+const browser = await chromium.launch({ executablePath: BROWSER_PATH, headless: true });
 
 try {
-  const page = await browser.newPage({ viewport: { width: 1180, height: 760 } });
+  const page = await browser.newPage({ locale: 'zh-CN', viewport: { width: 1180, height: 760 } });
   const errors = [];
   page.on('console', (message) => {
     if (message.type() === 'error') errors.push(message.text());
@@ -62,11 +62,10 @@ try {
   if ((await promptDialog.locator('.asset-text').count()) !== 1) {
     throw new Error('prompt search did not narrow the result set');
   }
-  await promptDialog.locator('.asset-actions button').nth(1).click();
-  const favoriteActive = await promptDialog
-    .locator('.asset-actions button')
-    .nth(1)
-    .evaluate((item) => item.classList.contains('active'));
+  await promptDialog.getByTitle('收藏提示词', { exact: true }).click();
+  const favorite = promptDialog.locator('.asset-actions button.active[title="取消收藏"]');
+  await favorite.waitFor();
+  const favoriteActive = await favorite.evaluate((item) => item.classList.contains('active'));
   if (!favoriteActive) throw new Error('prompt favorite state did not update');
   await promptDialog.locator('header > button').click();
 

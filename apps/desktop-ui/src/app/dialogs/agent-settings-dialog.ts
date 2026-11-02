@@ -1147,7 +1147,7 @@ const DEFAULT_ALERT_THRESHOLD = 80;
                       </div>
                       <label>
                         <span>{{ 'settings.enterpriseCa' | t }}</span>
-                        <input placeholder="C:\\certs\\internal-ca.pem" [(ngModel)]="npmCaPath" />
+                        <input placeholder="/path/to/internal-ca.pem" [(ngModel)]="npmCaPath" />
                       </label>
                     </div>
 

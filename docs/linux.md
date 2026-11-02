@@ -2,8 +2,9 @@
 
 Linux builds use GTK 3 and WebKitGTK 4.1. The source build supports native PTYs,
 Secret Service credentials, Fontconfig font discovery, and opening paths/URLs through
-`xdg-open`. The existing npm distribution still contains Windows and macOS applications;
-build Linux from source or use the artifact from the Linux workflow.
+`xdg-open`. The source now also includes Linux x64 npm distribution. The release
+workflow combines it with Windows/macOS payloads; existing published npm versions
+are unchanged until a new release is built and published.
 
 ## Build and run
 
@@ -13,7 +14,7 @@ On Ubuntu/Debian:
 
 ```sh
 sudo apt-get update
-sudo apt-get install -y build-essential pkg-config libwebkit2gtk-4.1-dev \
+sudo apt-get install -y bash curl build-essential pkg-config libwebkit2gtk-4.1-dev \
   libayatana-appindicator3-dev librsvg2-dev libxdo-dev libssl-dev libdbus-1-dev \
   gnome-keyring fontconfig xdg-utils
 npm --prefix apps/desktop-ui ci
@@ -42,6 +43,44 @@ npm run tauri:build -- --debug      # Faster debug .deb in src-tauri/target/debu
 Linux packaging excludes Windows ConPTY resources and bundles the Linux Node runtime
 and One Ring engine. The `.deb` declares GTK/WebKitGTK, font and desktop utility
 dependencies. Windows-only features such as WeChat window automation remain unavailable.
+
+### Linux npm distribution
+
+After building the `.deb`, prepare a Linux-only npm archive and test a real installation:
+
+```sh
+npm run npm:stage:linux
+npm run npm:pack:linux
+npm run test:npm:linux
+npm install --global ./validation-results/linux-npm/termexo-0.11.0.tgz
+termexo
+```
+
+The stage command validates the `.deb` version/architecture, executable permissions,
+complete One Ring resources, and the x86_64 ELF headers of both binaries. It produces
+the Linux app archive, `.deb`, build record and SHA256 checksums. The npm launcher
+extracts the entire `usr/` tree to `$XDG_CACHE_HOME/Termexo/npm/` (or `~/.cache`),
+preserving executable modes and Tauri's resource layout; no root access or runtime
+application download is needed. It checks graphical-session availability and uses
+bounded `ldd` probes to explain missing shared libraries. Only Linux x64 with glibc
+is bundled; other architectures and musl require a source build.
+Local build records mark a dirty workspace explicitly; release artifacts come from the
+tagged CI commit. Updating an npm installation uses `npm install --global termexo@latest`
+and restarting the app; the Windows-only in-app automatic updater is not used on Unix.
+
+Unlike `.deb` installation, npm cannot install GTK/WebKit or a keyring provider.
+For Ubuntu 24.04+, install these first:
+
+```sh
+sudo apt-get install libwebkit2gtk-4.1-0 libgtk-3-0t64 libayatana-appindicator3-1 \
+  libsecret-1-0 gnome-keyring fontconfig xdg-utils
+```
+
+`test:npm:linux` installs the local tarball offline into an isolated global prefix,
+checks the installed CLI and headless diagnostics, starts the actual GUI, then drives
+the exact cached application using WebKitWebDriver and the eight-case Bash matrix.
+Paths deliberately include spaces, apostrophes and Unicode. Reports are saved under
+`validation-results/linux-npm/`. The CI workflow performs the same test under Xvfb.
 
 ### Graphics compatibility
 
@@ -105,6 +144,92 @@ and the default smoke run because it requires credentials and consumes model usa
 
 Local validation passed with Codex CLI 0.166.0 and GPT-6.1-Sol, including actual
 Linux command execution and the desktop's completed status.
+
+### Bash command audit
+
+The Linux/Bash audit covers all six desktop launch adapters, account login commands,
+CLI discovery, installer previews, generated hooks, and common-action recognition.
+New terminals ask the host to resolve its default shell; legacy saved PowerShell
+names still migrate on Unix. Linux discovery follows PATH order, checks execute
+permissions, and does not implicitly search the project directory. HOME resolution
+uses the native OS convention rather than preferring a Windows USERPROFILE value.
+Unix session filtering preserves directory case and literal backslashes; Antigravity
+workspace file URIs decode Unicode and reserved filename characters through the URL parser.
+Claude/Codex version and account probes have bounded execution times.
+Closing a terminal whose short-lived command has already exited also succeeds on Linux;
+other process-termination errors remain visible.
+
+Vendor shell installers run through Bash with `pipefail`; a failed curl download
+cannot be hidden by an empty successful Bash process. Browser previews choose `.sh`
+and POSIX quoting on Linux/macOS. Common-action recognition asks the agent to confirm
+the host shell instead of prescribing PowerShell. Vendor URLs were checked for
+availability; the audit does not reinstall or upgrade the user's CLIs.
+
+The following optional check executes the generated commands through real Bash PTYs
+using recording CLI fixtures, including executable paths with quotes/spaces/Unicode
+and arguments containing apostrophes, `$HOME`, `!`, and command substitutions:
+
+```sh
+TERMEXO_SMOKE_BASH_MATRIX=1 \
+  TERMEXO_DESKTOP_BINARY=src-tauri/target/release/termexo \
+  TERMEXO_SMOKE_OUTPUT=validation-results/linux-bash \
+  npm run test:desktop:linux
+```
+
+It checks six launch commands and Claude/Codex login commands and records literal
+argv in `bash-matrix.json`. This certifies command transport through Bash, not real
+authentication or model compatibility for the recording fixtures. Run authenticated
+Codex checks separately; the two modes cannot be combined.
+
+Local audit validation on 2026-11-02 used Ubuntu 26.04, Bash 5.3.9, Node 24.21.0,
+and Codex CLI 0.166.0. Rust passed 465 tests (5 ignored), the frontend passed 819
+tests across 99 files, command/bridge Node checks passed 10 tests, the npm launcher
+passed 16 tests, and One Ring passed 51 tests (8 skipped). Frontend production and
+Linux `.deb` builds also passed. Both native suites ran the extracted `.deb` executable
+and passed all 14 desktop checks; the Bash suite additionally passed all 8 argv cases,
+and the authenticated Codex suite verified the exact final reply after Bash tool execution.
+No test-owned processes remained after cleanup. Local reports are under
+`validation-results/linux-bash-audit/` and `validation-results/linux-bash-real-agent/`.
+
+The follow-up on 2026-11-03 passed 823 frontend tests across 100 files, 465 Rust
+tests (5 ignored), and 23 npm launcher tests. The rebuilt application was packed,
+installed offline through npm, launched through its installed command, and passed
+15 native desktop checks plus the eight Bash argv cases from its extracted cache.
+An authenticated Codex run from that same npm payload returned the exact random
+fixture contents, and a native notification was acknowledged over the session D-Bus.
+Reports are in `validation-results/linux-npm/` and its `real-agent/` subdirectory.
+All four browser suites (`e2e:smoke`, `e2e:responsive`, `e2e:v05`, `e2e:todos`)
+also passed on Linux Chromium after updating their current menu, directory-prompt,
+model-editor and task lifecycle interactions. The install panel remains disabled
+in browser preview; actual installation/launch is covered by the native npm test.
+
+On Linux, notifications use the session notification daemon. On Unix, denied or
+unavailable system notifications retain the in-app notice without opening a modal
+dialog. Intentional PTY shutdown carries an explicit stop reason, so it becomes
+STOPPED instead of a failed-agent alert. Unexpected unsuccessful exits still fail.
+For an optional real notification delivery check in a desktop session, add
+`TERMEXO_SMOKE_NOTIFICATION=1` to a native smoke run; it requires a running notification
+daemon and displays one normal test notification.
+
+Browser preview scripts (`e2e:smoke`, `e2e:responsive`, `e2e:v05`, `e2e:todos`,
+`capture:readme`) find Chromium/Chrome/Edge on Linux, macOS and Windows, or use the
+Playwright browser cache. `BROWSER_PATH` overrides detection; `EDGE_PATH` remains
+supported. Chinese selector-based checks use an explicit Chinese browser locale.
+Platform detection alone does not guarantee that every older UI assertion matches
+the current interface.
+
+The browser suites use the current in-app directory prompt instead of `window.prompt`
+and build fixture paths from the host repository/temp directory. The responsive check
+keeps the short-window workbench itself above the 720px breakpoint after accounting
+for sidebars; it also checks the separate narrow-window layout.
+
+The following remain explicitly platform-specific:
+
+- Linux npm payloads currently target x64/glibc only; Linux ARM and musl are not bundled.
+- WebView2/CDP desktop recording (`capture:demo`, `e2e:desktop`, `e2e:desktop:v05`)
+  remains Windows-only. Linux native testing uses `test:desktop:linux` instead.
+- MSI/NSIS/ConPTY/MSVC scripts, Windows WeChat window automation, and macOS signing
+  stay platform-specific. Their presence is not evidence of a Linux execution path.
 
 ```sh
 npm test

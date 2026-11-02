@@ -1,13 +1,13 @@
-use crate::platform::{shell_invoke, shell_quote};
+use super::cli::{command_paths, query_command as cli_command};
+use crate::platform::{paths_equal, shell_invoke, shell_quote};
+use crate::process::run_with_timeout;
 use std::cmp::Reverse;
 use std::collections::HashMap;
 use std::env;
-use std::ffi::OsStr;
 use std::fs::{self, File};
 use std::io::{BufRead, BufReader};
 use std::path::{Path, PathBuf};
-use std::process::Command;
-use std::time::{SystemTime, UNIX_EPOCH};
+use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use serde::Deserialize;
 use serde_json::Value;
@@ -15,6 +15,7 @@ use thiserror::Error;
 
 use super::{AgentAdapter, AgentInstallation, AgentLaunchSpec, AgentSession, CodexLaunchOptions};
 
+const VERSION_TIMEOUT: Duration = Duration::from_secs(10);
 const AGENT_TYPE: &str = "codex";
 const CONFIG_FILE_NAME: &str = "config.toml";
 const SESSION_STATUS: &str = "HISTORICAL";
@@ -65,7 +66,7 @@ impl CodexCliAdapter {
 
     fn find_executable(&self) -> Option<PathBuf> {
         if let Some(executable) = self.executable_override.as_ref() {
-            return executable.is_file().then(|| executable.clone());
+            return crate::platform::is_executable_file(executable).then(|| executable.clone());
         }
 
         let mut candidates = Vec::new();
@@ -97,33 +98,14 @@ impl CodexCliAdapter {
             candidates.extend(command_paths("codex"));
         }
 
-        candidates.into_iter().find(|path| path.is_file())
+        candidates
+            .into_iter()
+            .find(|path| crate::platform::is_executable_file(path))
     }
 
     fn read_version(&self, executable: &Path) -> Option<String> {
-        #[cfg(windows)]
-        let output = if executable
-            .extension()
-            .is_some_and(|extension| extension.eq_ignore_ascii_case("cmd"))
-        {
-            let mut command = command_without_window("cmd.exe");
-            command
-                .args(["/d", "/c", "call"])
-                .arg(executable)
-                .arg("--version");
-            command.output().ok()?
-        } else {
-            let mut command = command_without_window(executable);
-            command.arg("--version");
-            command.output().ok()?
-        };
-
-        #[cfg(not(windows))]
-        let output = {
-            let mut command = command_without_window(executable);
-            command.arg("--version");
-            command.output().ok()?
-        };
+        let output =
+            run_with_timeout(cli_command(executable).arg("--version"), VERSION_TIMEOUT).ok()?;
 
         if !output.status.success() {
             return None;
@@ -571,63 +553,8 @@ fn system_time_millis(value: SystemTime) -> i64 {
         .unwrap_or_default()
 }
 
-fn paths_equal(left: &str, right: &str) -> bool {
-    let normalize = |value: &str| {
-        value
-            .trim_end_matches(['\\', '/'])
-            .replace('/', "\\")
-            .to_lowercase()
-    };
-    normalize(left) == normalize(right)
-}
-
-fn command_paths(command: &str) -> Vec<PathBuf> {
-    #[cfg(windows)]
-    {
-        let mut paths = env::current_dir()
-            .ok()
-            .map(|directory| vec![directory.join(command)])
-            .unwrap_or_default();
-        if let Some(search_path) = env::var_os("PATH") {
-            paths.extend(env::split_paths(&search_path).map(|directory| directory.join(command)));
-        }
-        paths
-    }
-
-    #[cfg(not(windows))]
-    {
-        let output = command_without_window("which").arg(command).output();
-        output
-            .ok()
-            .filter(|result| result.status.success())
-            .map(|result| {
-                String::from_utf8_lossy(&result.stdout)
-                    .lines()
-                    .map(str::trim)
-                    .filter(|line| !line.is_empty())
-                    .map(PathBuf::from)
-                    .collect()
-            })
-            .unwrap_or_default()
-    }
-}
-
-fn command_without_window(program: impl AsRef<OsStr>) -> Command {
-    let mut command = Command::new(program);
-    #[cfg(windows)]
-    {
-        use std::os::windows::process::CommandExt;
-
-        const CREATE_NO_WINDOW: u32 = 0x0800_0000;
-        command.creation_flags(CREATE_NO_WINDOW);
-    }
-    command
-}
-
 fn home_directory() -> Option<PathBuf> {
-    env::var_os("USERPROFILE")
-        .or_else(|| env::var_os("HOME"))
-        .map(PathBuf::from)
+    crate::platform::home_dir()
 }
 
 fn append_option(command: &mut String, flag: &str, value: Option<&str>) {
@@ -671,7 +598,7 @@ mod tests {
         let mut file = File::create(&transcript).unwrap();
         writeln!(
             file,
-            r#"{{"timestamp":"2026-07-27T10:00:00Z","type":"session_meta","payload":{{"id":"019f9978-f46b-7d50-93b6-927b7eefcb1f","cwd":"D:\\dev\\Termexo","model_provider":"openai","git":{{"branch":"main"}}}}}}"#
+            r#"{{"timestamp":"2026-07-27T10:00:00Z","type":"session_meta","payload":{{"id":"019f9978-f46b-7d50-93b6-927b7eefcb1f","cwd":"/work/Termexo","model_provider":"openai","git":{{"branch":"main"}}}}}}"#
         )
         .unwrap();
         writeln!(
@@ -688,8 +615,13 @@ mod tests {
 
         let executable = directory.join(if cfg!(windows) { "codex.cmd" } else { "codex" });
         fs::write(&executable, "").unwrap();
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            fs::set_permissions(&executable, fs::Permissions::from_mode(0o755)).unwrap();
+        }
         let adapter = CodexCliAdapter::with_paths(executable, directory.clone());
-        let sessions = adapter.list_sessions(Some("D:/dev/Termexo")).unwrap();
+        let sessions = adapter.list_sessions(Some("/work/Termexo/")).unwrap();
 
         assert_eq!(sessions.len(), 1);
         assert_eq!(
@@ -700,6 +632,12 @@ mod tests {
         assert_eq!(sessions[0].model_name.as_deref(), Some("gpt-5.6-sol"));
         assert_eq!(sessions[0].message_count, 1);
         assert_eq!(fs::read_to_string(&transcript).unwrap(), original);
+
+        #[cfg(unix)]
+        assert!(adapter
+            .list_sessions(Some("/work/termexo"))
+            .unwrap()
+            .is_empty());
 
         fs::remove_dir_all(directory).unwrap();
     }
@@ -750,6 +688,11 @@ mod tests {
 
         let executable = directory.join(if cfg!(windows) { "codex.cmd" } else { "codex" });
         fs::write(&executable, "").unwrap();
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            fs::set_permissions(&executable, fs::Permissions::from_mode(0o755)).unwrap();
+        }
         let adapter = CodexCliAdapter::with_paths(executable, directory.clone());
         let sessions = adapter.list_sessions(None).unwrap();
 
@@ -832,6 +775,11 @@ mod tests {
         fs::create_dir_all(&directory).unwrap();
         let executable = directory.join(if cfg!(windows) { "codex.cmd" } else { "codex" });
         fs::write(&executable, "").unwrap();
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            fs::set_permissions(&executable, fs::Permissions::from_mode(0o755)).unwrap();
+        }
         let adapter = CodexCliAdapter::with_paths(executable.clone(), directory.clone());
 
         let fresh = adapter

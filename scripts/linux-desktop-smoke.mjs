@@ -8,15 +8,19 @@ import { join, resolve } from 'node:path';
 import { setTimeout as delay } from 'node:timers/promises';
 import { fileURLToPath } from 'node:url';
 import { runRealCodexSmoke } from './linux-real-agent-smoke.mjs';
+import { prepareBashMatrix, runBashMatrix } from './linux-bash-matrix.mjs';
 
 assert.equal(process.platform, 'linux', 'This smoke test requires Linux.');
 const repository = fileURLToPath(new URL('../', import.meta.url));
 const realCodex = process.env.TERMEXO_SMOKE_REAL_AGENT === 'codex';
+const bashMatrix = process.env.TERMEXO_SMOKE_BASH_MATRIX === '1';
+assert(!(realCodex && bashMatrix), 'Run real agents and recording CLI fixtures separately.');
 const codexHome = process.env.CODEX_HOME ?? join(homedir(), '.codex');
 const output = resolve(repository, process.env.TERMEXO_SMOKE_OUTPUT ?? 'validation-results/linux');
 const state = await mkdtemp(join(tmpdir(), 'termexo-linux-smoke-'));
 const project = join(state, 'project 空格');
 await Promise.all([mkdir(output, { recursive: true }), mkdir(project), mkdir(join(state, 'home'))]);
+const fixtures = bashMatrix ? await prepareBashMatrix(state, repository) : null;
 await writeFile(join(output, 'report.json'), `${JSON.stringify({ status: 'running', state })}\n`);
 const port = await freePort();
 const nativePort = await freePort();
@@ -38,6 +42,7 @@ const driver = spawn(process.env.TAURI_DRIVER ?? 'tauri-driver', driverArgs, {
     SHELL: '',
     TAURI_WEBVIEW_AUTOMATION: 'true',
     ...(realCodex ? { CODEX_HOME: codexHome } : {}),
+    ...(fixtures?.environment ?? {}),
   },
   // Own a process group so even a browser stuck before session creation is cleaned up.
   detached: true,
@@ -228,6 +233,16 @@ try {
     preserveRepositoryBaseline: false,
   });
   assert(!(await invoke('list_live_terminals')).some((item) => item.terminalId === terminalId));
+  await until(
+    () => evaluate(() => Boolean(document.querySelector('.status-indicator[data-status="STOPPED"]'))),
+    'intentional terminal close is stopped rather than failed',
+  );
+  const notification = process.env.TERMEXO_SMOKE_NOTIFICATION === '1'
+    ? await invoke('show_desktop_notification', {
+        title: 'Termexo Linux notification test',
+        body: 'Native notification delivery completed. No action is required.',
+      }).then(() => ({ status: 'passed', transport: 'session D-Bus' }))
+    : null;
   const realAgent = realCodex
     ? await runRealCodexSmoke({
         invoke,
@@ -238,6 +253,9 @@ try {
         screenshot: async () =>
           Buffer.from(await request('GET', `/session/${session}/screenshot`), 'base64'),
       })
+    : null;
+  const bashCommands = fixtures
+    ? await runBashMatrix({ invoke, until, fixtures, project, workspace, output })
     : null;
   const report = {
     status: 'passed',
@@ -253,6 +271,8 @@ try {
     fontFamilies: fonts.length,
     oneRing: health,
     realAgent,
+    bashCommands,
+    notification,
     checks: [
       'native WebKit window',
       'Unix PTY backend',
@@ -268,6 +288,7 @@ try {
       'SQLite workspace restore',
       'PTY reattachment after webview reload',
       'PTY close',
+      'intentional close reports STOPPED',
     ],
   };
   await writeFile(join(output, 'report.json'), `${JSON.stringify(report, null, 2)}\n`);

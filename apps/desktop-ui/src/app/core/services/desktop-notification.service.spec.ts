@@ -2,11 +2,13 @@ import { TestBed } from '@angular/core/testing';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type { GlobalTerminalNotice } from '../models/terminal-notifications';
-import { DesktopNotificationService, DESKTOP_NOTIFICATION_WINDOW } from './desktop-notification.service';
+import { DesktopNotificationService, DESKTOP_NOTIFICATION_WINDOW, DESKTOP_NOTIFICATION_DIALOG_FALLBACK } from './desktop-notification.service';
 
 const native = vi.hoisted(() => ({
   invoke: vi.fn(),
   requestUserAttention: vi.fn(),
+  permission: vi.fn(),
+  message: vi.fn(),
   focusChanged: undefined as ((event: { payload: boolean }) => void) | undefined,
 }));
 
@@ -20,9 +22,10 @@ vi.mock('@tauri-apps/api/window', () => ({
   }),
 }));
 vi.mock('@tauri-apps/plugin-notification', () => ({
-  isPermissionGranted: async () => true,
-  requestPermission: async () => 'granted',
+  isPermissionGranted: () => native.permission(),
+  requestPermission: async () => 'denied',
 }));
+vi.mock('@tauri-apps/plugin-dialog', () => ({ message: native.message }));
 
 const notice = (
   status: GlobalTerminalNotice['status'],
@@ -41,12 +44,14 @@ describe('DesktopNotificationService persistent taskbar attention', () => {
   beforeEach(() => {
     native.invoke.mockReset().mockResolvedValue(undefined);
     native.requestUserAttention.mockReset();
+    native.permission.mockReset().mockResolvedValue(true);
+    native.message.mockReset().mockResolvedValue(undefined);
     native.focusChanged = undefined;
     Object.defineProperty(window, '__TAURI_INTERNALS__', {
       value: { invoke: native.invoke },
       configurable: true,
     });
-    TestBed.configureTestingModule({ providers: [{ provide: DESKTOP_NOTIFICATION_WINDOW, useValue: {
+    TestBed.configureTestingModule({ providers: [{ provide: DESKTOP_NOTIFICATION_DIALOG_FALLBACK, useValue: false }, { provide: DESKTOP_NOTIFICATION_WINDOW, useValue: {
       requestUserAttention: native.requestUserAttention,
       onFocusChanged: async (callback: typeof native.focusChanged) => { native.focusChanged = callback; return () => {}; },
     } }] });
@@ -135,6 +140,22 @@ describe('DesktopNotificationService persistent taskbar attention', () => {
     service = TestBed.inject(DesktopNotificationService);
     service.syncTaskbarAttention([notice('COMPLETED')]);
     await settle();
+    expect(native.invoke).not.toHaveBeenCalled();
+  });
+
+  it('keeps Unix notification delivery failures nonmodal', async () => {
+    const warning = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    native.invoke.mockRejectedValueOnce(new Error('No session notification daemon'));
+    await service.notify([notice('FAILED')]);
+    expect(native.message).not.toHaveBeenCalled();
+    expect(warning).toHaveBeenCalled();
+    warning.mockRestore();
+  });
+
+  it('does not open a Unix dialog when desktop notification permission is denied', async () => {
+    native.permission.mockResolvedValue(false);
+    await service.notify([notice('COMPLETED')]);
+    expect(native.message).not.toHaveBeenCalled();
     expect(native.invoke).not.toHaveBeenCalled();
   });
 });

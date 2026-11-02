@@ -872,7 +872,7 @@ export class App {
     if (!terminalEventMatchesSession(event, terminal)) {
       return;
     }
-    const status = event.success ? 'STOPPED' : 'FAILED';
+    const status = event.intentional || event.success ? 'STOPPED' : 'FAILED';
     this.state.markTerminalExited(event.terminalId, status);
     this.todos.handleTerminalStatus(event.terminalId, status);
     this.agentStartup.cancel(event.terminalId);

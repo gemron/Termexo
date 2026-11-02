@@ -1,16 +1,16 @@
 import { chromium } from 'playwright-core';
+import { resolveBrowserExecutable } from './lib/browser-executable.mjs';
 
 const APP_URL = process.env.TERMEXO_URL ?? 'http://127.0.0.1:4200';
-const EDGE_PATH =
-  process.env.EDGE_PATH ?? 'C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe';
+const BROWSER_PATH = resolveBrowserExecutable();
 
 const browser = await chromium.launch({
-  executablePath: EDGE_PATH,
+  executablePath: BROWSER_PATH,
   headless: true,
 });
 
 try {
-  const page = await browser.newPage({ viewport: { width: 1440, height: 900 } });
+  const page = await browser.newPage({ locale: 'zh-CN', viewport: { width: 1440, height: 900 } });
   const errors = [];
 
   page.on('console', (message) => {
@@ -300,7 +300,8 @@ try {
     }),
   );
 
-  await page.setViewportSize({ width: 1220, height: 480 });
+  // Keep the workbench itself above 720px after both sidebars take their columns.
+  await page.setViewportSize({ width: 1440, height: 480 });
   const sidebarsReopened = await page.evaluate(() => {
     const root = document.querySelector('app-root');
     const app = root && globalThis.ng?.getComponent(root);
@@ -318,7 +319,7 @@ try {
   results.push(
     await inspectViewport({
       label: 'short-window',
-      width: 1220,
+      width: 1440,
       height: 480,
       expected: {
         workspaceSidebar: true,

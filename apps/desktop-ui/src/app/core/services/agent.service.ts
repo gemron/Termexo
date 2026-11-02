@@ -39,6 +39,7 @@ import {
 import { AGENT_LABELS } from '../models/workspace.models';
 import { invoke, listen } from './backend-bridge';
 import { hasBackend, isTauriRuntime } from './tauri-runtime';
+import { previewShellSyntax, quoteShellArgument as shellQuote } from '../models/shell-command';
 
 /**
  * What the browser preview reports for each managed CLI.
@@ -328,7 +329,7 @@ export class AgentService {
     if (!hasBackend()) {
       return {
         command: `claude${request.autoConfirm ? ' --permission-mode auto' : ''}${
-          request.sessionId ? ` --resume '${request.sessionId}'` : ''
+          request.sessionId ? ` --resume ${shellQuote(request.sessionId)}` : ''
         }`,
         executablePath: 'claude',
       };
@@ -363,8 +364,8 @@ export class AgentService {
     if (!hasBackend()) {
       return {
         command: `codex${request.autoConfirm ? ' --approve-for-me' : ''}${
-          request.sessionId ? ` resume '${request.sessionId}'` : ''
-        }${request.model ? ` --model '${request.model}'` : ''}`,
+          request.sessionId ? ` resume ${shellQuote(request.sessionId)}` : ''
+        }${request.model ? ` --model ${shellQuote(request.model)}` : ''}`,
         executablePath: 'codex',
       };
     }
@@ -374,10 +375,10 @@ export class AgentService {
   async prepareAntigravityLaunch(request: AntigravityLaunchRequest): Promise<AgentLaunchSpec> {
     if (!hasBackend()) {
       return {
-        command: `agy${request.sessionId ? ` --conversation '${request.sessionId}'` : ''}${
+        command: `agy${request.sessionId ? ` --conversation ${shellQuote(request.sessionId)}` : ''}${
           request.continueLast && !request.sessionId ? ' --continue' : ''
-        }${request.model ? ` --model '${request.model}'` : ''}${
-          request.effort ? ` --effort '${request.effort}'` : ''
+        }${request.model ? ` --model ${shellQuote(request.model)}` : ''}${
+          request.effort ? ` --effort ${shellQuote(request.effort)}` : ''
         }${request.autoConfirm ? ' --dangerously-skip-permissions' : ''}`,
         executablePath: 'agy',
       };
@@ -388,9 +389,9 @@ export class AgentService {
   async prepareOpenCodeLaunch(request: OpenCodeLaunchRequest): Promise<AgentLaunchSpec> {
     if (!hasBackend()) {
       return {
-        command: `opencode${request.sessionId ? ` --session '${request.sessionId}'` : ''}${
+        command: `opencode${request.sessionId ? ` --session ${shellQuote(request.sessionId)}` : ''}${
           request.continueLast && !request.sessionId ? ' --continue' : ''
-        }${request.model ? ` --model '${request.model}'` : ''}${
+        }${request.model ? ` --model ${shellQuote(request.model)}` : ''}${
           request.autoConfirm ? ' --auto' : ''
         }`,
         executablePath: 'opencode',
@@ -401,9 +402,8 @@ export class AgentService {
 
   async preparePiLaunch(request: PiLaunchRequest): Promise<AgentLaunchSpec> {
     if (!hasBackend()) {
-      const quote = (value: string) => `'${value.replaceAll("'", "''")}'`;
       return {
-        command: `pi${request.sessionId ? ` --session ${quote(request.sessionId)}` : request.continueLast ? ' --continue' : ''}${request.model ? ` --model ${quote(request.model)}` : ''}`,
+        command: `pi${request.sessionId ? ` --session ${shellQuote(request.sessionId)}` : request.continueLast ? ' --continue' : ''}${request.model ? ` --model ${shellQuote(request.model)}` : ''}`,
         executablePath: 'pi',
       };
     }
@@ -413,7 +413,7 @@ export class AgentService {
   async prepareGrokLaunch(request: GrokLaunchRequest): Promise<AgentLaunchSpec> {
     if (!hasBackend()) {
       return {
-        command: `grok${request.sessionId ? ` --resume '${request.sessionId}'` : request.continueLast ? ' --continue' : request.newSessionId ? ` --session-id '${request.newSessionId}'` : ''}${request.model ? ` --model '${request.model}'` : ''}${request.autoConfirm ? ' --always-approve' : ''}`,
+        command: `grok${request.sessionId ? ` --resume ${shellQuote(request.sessionId)}` : request.continueLast ? ' --continue' : request.newSessionId ? ` --session-id ${shellQuote(request.newSessionId)}` : ''}${request.model ? ` --model ${shellQuote(request.model)}` : ''}${request.autoConfirm ? ' --always-approve' : ''}`,
         executablePath: 'grok',
       };
     }
@@ -438,8 +438,10 @@ export class AgentService {
     if (!hasBackend()) {
       const installation = this.installationFor(request.agentType);
       const preview = CLI_PREVIEWS[request.agentType];
+      const windows = previewShellSyntax() === 'powershell';
       const script = preview.package ? request.installer === 'script' : true;
-      const source = (script ? preview.script : preview.package) ?? '';
+      const source = (script && !windows ? preview.script?.replace(/\.ps1$/, '.sh')
+        : script ? preview.script : preview.package) ?? '';
       const targetVersion = script ? 'latest' : request.targetVersion?.trim() || 'latest';
       const nativeUpdate = request.agentType === 'antigravity' && installation?.installed;
       const updatePath = installation?.executablePath ?? 'agy';
@@ -459,10 +461,14 @@ export class AgentService {
         npmPath: script ? undefined : 'browser-preview/npm',
         npmVersion: script ? undefined : 'preview',
         commandPreview: nativeUpdate
-          ? `powershell -NoProfile -ExecutionPolicy Bypass -Command "& '${updatePath.replaceAll("'", "''")}' update; exit $LASTEXITCODE"`
+          ? windows
+            ? `powershell -NoProfile -ExecutionPolicy Bypass -Command "& ${shellQuote(updatePath)} update; exit $LASTEXITCODE"`
+            : `${shellQuote(updatePath)} update`
           : script
-            ? `powershell -NoProfile -ExecutionPolicy Bypass -Command "irm ${source} | iex"`
-            : `npm install --global ${source}@${targetVersion} --no-fund --no-audit`,
+            ? windows
+              ? `powershell -NoProfile -ExecutionPolicy Bypass -Command "irm ${source} | iex"`
+              : `bash -o pipefail -c ${shellQuote(`curl -fsSL ${shellQuote(source)} | bash`)}`
+            : `npm install --global ${shellQuote(`${source}@${targetVersion}`)} --no-fund --no-audit`,
         networkProfileId: this.networkProfileItems().find(
           (profile) =>
             profile.enabled &&

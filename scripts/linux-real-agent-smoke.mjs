@@ -39,7 +39,7 @@ export async function runRealCodexSmoke({ invoke, until, workspace, project, out
           id: terminalId,
           name: 'Real Codex',
           agentType: 'codex',
-          shell: '/bin/sh',
+          shell: '/bin/bash',
           status: 'STARTING',
           command,
           accountProfileId: 'codex-system',

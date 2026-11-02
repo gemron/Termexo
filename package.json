@@ -20,7 +20,10 @@
     "tauri:dev": "node scripts/run-tauri.mjs dev",
     "tauri:build": "node scripts/run-tauri.mjs build",
     "tauri:dev:mac": "npm --prefix apps/desktop-ui run tauri:dev --",
-    "tauri:build:mac": "npm --prefix apps/desktop-ui run tauri:build --"
+    "tauri:build:mac": "npm --prefix apps/desktop-ui run tauri:build --",
+    "npm:stage:linux": "node packages/termexo/scripts/stage-linux.mjs",
+    "npm:pack:linux": "node packages/termexo/scripts/pack-linux.mjs",
+    "test:npm:linux": "node scripts/linux-npm-smoke.mjs"
   },
   "engines": {
     "node": "^22.22.3 || ^24.15.0 || >=26.0.0"

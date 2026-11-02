@@ -143,12 +143,9 @@ pub(super) fn inject(
         Some(agent @ ("grok" | "antigravity")) => {
             let home = || {
                 environment
-                    .get("USERPROFILE")
-                    .or_else(|| environment.get("HOME"))
-                    .cloned()
-                    .or_else(|| std::env::var("USERPROFILE").ok())
-                    .or_else(|| std::env::var("HOME").ok())
+                    .get(if cfg!(windows) { "USERPROFILE" } else { "HOME" })
                     .map(PathBuf::from)
+                    .or_else(crate::platform::home_dir)
                     .ok_or("Cannot find agent home directory")
             };
             let path = if agent == "grok" {
@@ -612,7 +609,7 @@ mod tests {
         };
         let mut environment = HashMap::from([
             (
-                "USERPROFILE".into(),
+                if cfg!(windows) { "USERPROFILE" } else { "HOME" }.into(),
                 root.join("profile").to_string_lossy().into_owned(),
             ),
             (

@@ -1,4 +1,4 @@
-use crate::platform::shell_invoke;
+use crate::platform::{paths_equal, shell_invoke};
 use std::cmp::Reverse;
 use std::env;
 use std::fs::{self, File};
@@ -44,7 +44,7 @@ impl PiAdapter {
 
     fn find_executable(&self) -> Option<PathBuf> {
         if let Some(path) = &self.executable_override {
-            return path.is_file().then(|| path.clone());
+            return crate::platform::is_executable_file(path).then(|| path.clone());
         }
         let mut candidates = Vec::new();
         if let Some(path) = env::var_os(PI_PATH_ENV) {
@@ -66,7 +66,9 @@ impl PiAdapter {
         }
         #[cfg(not(windows))]
         candidates.extend(command_paths("pi"));
-        candidates.into_iter().find(|path| path.is_file())
+        candidates
+            .into_iter()
+            .find(|path| crate::platform::is_executable_file(path))
     }
 
     fn agent_dir(&self) -> Option<PathBuf> {
@@ -77,11 +79,7 @@ impl PiAdapter {
                     .filter(|value| !value.is_empty())
                     .map(expand_home)
             })
-            .or_else(|| {
-                env::var_os("USERPROFILE")
-                    .or_else(|| env::var_os("HOME"))
-                    .map(|home| PathBuf::from(home).join(".pi/agent"))
-            })
+            .or_else(|| crate::platform::home_dir().map(|home| home.join(".pi/agent")))
     }
 
     fn sessions_dir(&self) -> Option<PathBuf> {
@@ -109,8 +107,8 @@ impl PiAdapter {
 fn expand_home(path: std::ffi::OsString) -> PathBuf {
     let path = PathBuf::from(path);
     if let Ok(relative) = path.strip_prefix("~") {
-        if let Some(home) = env::var_os("USERPROFILE").or_else(|| env::var_os("HOME")) {
-            return PathBuf::from(home).join(relative);
+        if let Some(home) = crate::platform::home_dir() {
+            return home.join(relative);
         }
     }
     path
@@ -213,15 +211,6 @@ impl AgentAdapter for PiAdapter {
             command,
             executable_path: executable.to_string_lossy().into_owned(),
         })
-    }
-}
-
-fn paths_equal(left: &str, right: &str) -> bool {
-    let normalize = |path: &str| path.trim_end_matches(['/', '\\']).replace('\\', "/");
-    if cfg!(windows) {
-        normalize(left).eq_ignore_ascii_case(&normalize(right))
-    } else {
-        normalize(left) == normalize(right)
     }
 }
 
@@ -398,9 +387,9 @@ mod tests {
     #[test]
     fn imports_native_sessions_without_modifying_them_and_filters_by_cwd() {
         let fixture = Fixture::new();
-        let path = fixture.write_session("older", "C:/repo", "2026-10-01T10:00:00Z");
+        let path = fixture.write_session("older", "/work/repo", "2026-10-01T10:00:00Z");
         let original = fs::read(&path).unwrap();
-        fixture.write_session("newer", "C:/other", "2026-10-02T10:00:00Z");
+        fixture.write_session("newer", "/work/other", "2026-10-02T10:00:00Z");
         fs::write(
             fixture.root.join("sessions/project/broken.jsonl"),
             "not JSON",
@@ -409,7 +398,7 @@ mod tests {
         let sessions = fixture.adapter.list_sessions(None).unwrap();
         assert_eq!(sessions.len(), 2);
         assert_eq!(sessions[0].native_session_id, "newer");
-        let filtered = fixture.adapter.list_sessions(Some("C:\\repo\\")).unwrap();
+        let filtered = fixture.adapter.list_sessions(Some("/work/repo/")).unwrap();
         assert_eq!(filtered.len(), 1);
         assert_eq!(filtered[0].id, "pi:older");
         assert_eq!(filtered[0].title, "命名的 Pi 会话");

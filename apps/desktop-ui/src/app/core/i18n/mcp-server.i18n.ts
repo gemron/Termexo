@@ -22,7 +22,7 @@ const MCP_TRANSLATIONS = {
     'mcpServer.statusHint':
       'Running means Termexo is ready for connections. Verify the AI connection with the example below.',
     'mcpServer.tryTitle': 'Try this first',
-    'mcpServer.tryHint': 'Send this in the AI terminal, not in a PowerShell or CMD shell.',
+    'mcpServer.tryHint': 'Send this in the AI terminal, not in a plain command shell.',
     'mcpServer.firstPrompt':
       'Use Termexo MCP to list my workspaces and terminals, and tell me which are running. Do not change anything yet.',
     'mcpServer.copyPrompt': 'Copy example message',
@@ -101,7 +101,7 @@ const MCP_TRANSLATIONS = {
     'mcpServer.statusHint':
       '「运行中」表示 Termexo 已准备好接受连接；AI 是否连上，还要用下方示例试一次。',
     'mcpServer.tryTitle': '先发这句话，试试是否连上',
-    'mcpServer.tryHint': '发给 AI 终端里的 AI，不要粘贴到普通 PowerShell 或 CMD 命令行。',
+    'mcpServer.tryHint': '发给 AI 终端里的 AI，不要粘贴到普通 Bash、PowerShell 或 CMD 命令行。',
     'mcpServer.firstPrompt':
       '请通过 Termexo MCP 列出我的工作区和终端，告诉我哪些正在运行。先不要修改任何内容。',
     'mcpServer.copyPrompt': '复制这句话',

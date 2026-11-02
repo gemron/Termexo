@@ -8,7 +8,8 @@
 
 - Windows x64：NSIS EXE、MSI。
 - macOS：Apple Silicon、Intel 的 DMG 与 `.app.tar.gz`。
-- npm：`termexo`，内含同一次 Windows 构建的主程序及 ConPTY 组件，以及两种 macOS 架构的完整应用压缩包。
+- Linux x64/glibc：`.deb` 与保留完整应用目录的 `.tar.gz`，以及真实桌面和 npm 安装测试。
+- npm：`termexo`，内含同一次构建的 Windows 主程序及 ConPTY 组件、两种 macOS 架构的应用压缩包，以及 Linux x64 完整应用压缩包。
 - GitHub Release：以上文件、各平台构建记录和统一的 `SHA256SUMS.txt`。
 
 前端单元测试与所有平台的 Rust 测试通过后，工作流校验安装包和 npm 包的版本、
@@ -16,11 +17,16 @@
 npm 使用 OIDC 和来源证明，不需要保存长期 npm 令牌。
 发布后会等待 npm 完成处理，并校验公开版本的包完整性，再公开 GitHub Release。
 
-Windows 和 Mac 均可使用 `npx termexo` 或 `npm install --global termexo`。
+新的联合发布包含 Windows、Mac 和 Linux x64，可使用 `npx termexo` 或 `npm install --global termexo`；已发布的旧版本不会自动新增 Linux 载荷。
 Mac 首次启动时按 Node.js 架构选择应用，将其解压到
 `~/Library/Caches/Termexo/npm/` 后通过系统 `open` 命令启动。
 解压保留权限、符号链接、应用资源和签名，无需运行时下载。
 macOS 构建任务会验证解压后的可执行权限、架构和签名。
+
+Linux 保留 `.deb` 中 `usr/bin` 与 `usr/lib/Termexo` 的相对结构，首次启动解压到
+`$XDG_CACHE_HOME/Termexo/npm/`（默认 `~/.cache/Termexo/npm/`）。npm 不安装系统库；
+GTK 3、WebKitGTK 4.1 和 Secret Service 依赖由发行版包管理器提供，详见 [Linux 说明](linux.md)。
+Linux 构建记录与两个压缩包的校验和参与联合发布验证，npm 包中的 Linux 归档也会与构建产物逐字节比对。
 
 ## npm 首次配置
 

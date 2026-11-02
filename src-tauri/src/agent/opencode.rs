@@ -1,4 +1,4 @@
-use crate::platform::shell_invoke;
+use crate::platform::{paths_equal, shell_invoke};
 use std::cmp::Reverse;
 use std::env;
 #[cfg(test)]
@@ -75,7 +75,7 @@ impl OpenCodeAdapter {
 
     fn find_executable(&self) -> Option<PathBuf> {
         if let Some(executable) = self.executable_override.as_ref() {
-            return executable.is_file().then(|| executable.clone());
+            return crate::platform::is_executable_file(executable).then(|| executable.clone());
         }
 
         let mut candidates = Vec::new();
@@ -111,7 +111,9 @@ impl OpenCodeAdapter {
         #[cfg(not(windows))]
         candidates.extend(command_paths("opencode"));
 
-        candidates.into_iter().find(|path| path.is_file())
+        candidates
+            .into_iter()
+            .find(|path| crate::platform::is_executable_file(path))
     }
 
     /// Runs a read-only OpenCode query, bounded so a stuck CLI cannot hang the caller.
@@ -367,16 +369,6 @@ fn parse_sessions(
     Ok(sessions)
 }
 
-fn paths_equal(left: &str, right: &str) -> bool {
-    let normalize = |value: &str| {
-        value
-            .trim_end_matches(['\\', '/'])
-            .replace('/', "\\")
-            .to_lowercase()
-    };
-    normalize(left) == normalize(right)
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -581,10 +573,10 @@ mod tests {
     #[test]
     fn parses_and_filters_official_session_json() {
         let value = r#"[
-          {"id":"ses_new","title":"New","updated":2000,"created":1000,"projectId":"p1","directory":"D:\\dev\\Termexo"},
-          {"id":"ses_old","title":"Old","updated":1000,"created":500,"projectId":"p2","directory":"D:\\dev\\Other"}
+          {"id":"ses_new","title":"New","updated":2000,"created":1000,"projectId":"p1","directory":"/work/Termexo"},
+          {"id":"ses_old","title":"Old","updated":1000,"created":500,"projectId":"p2","directory":"/work/Other"}
         ]"#;
-        let sessions = parse_sessions(value, Some("D:/dev/Termexo")).unwrap();
+        let sessions = parse_sessions(value, Some("/work/Termexo/")).unwrap();
         assert_eq!(sessions.len(), 1);
         assert_eq!(sessions[0].native_session_id, "ses_new");
         assert_eq!(sessions[0].title, "New");

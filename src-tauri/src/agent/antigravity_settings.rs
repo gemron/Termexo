@@ -49,7 +49,7 @@ pub struct AntigravityStatusFeed {
 
 /// The settings file the CLI reads, which is beside its own data.
 pub fn settings_path() -> Option<PathBuf> {
-    let home = std::env::var_os("USERPROFILE").or_else(|| std::env::var_os("HOME"))?;
+    let home = crate::platform::home_dir()?;
     Some(
         PathBuf::from(home)
             .join(".gemini")
@@ -185,12 +185,18 @@ fn status_line_block(executable: &Path) -> Value {
 /// program name — the command fails on every invocation, and the CLI disables the status line
 /// after thirty of them. The path therefore has to survive unquoted, so one holding a space is
 /// written in its 8.3 short form instead.
+#[cfg(windows)]
 fn command_path(executable: &Path) -> String {
     let path = executable.to_string_lossy().into_owned();
     if !path.contains(' ') {
         return path;
     }
     short_path(executable).unwrap_or(path)
+}
+
+#[cfg(not(windows))]
+fn command_path(executable: &Path) -> String {
+    crate::platform::shell_quote(&executable.to_string_lossy())
 }
 
 /// The 8.3 form of an existing path, when Windows still keeps one for it.
@@ -218,11 +224,6 @@ fn short_path(path: &Path) -> Option<String> {
     };
     // Short-name creation can be switched off per volume, in which case the long path comes back.
     (!short.contains(' ')).then_some(short)
-}
-
-#[cfg(not(windows))]
-fn short_path(_path: &Path) -> Option<String> {
-    None
 }
 
 /// Whether a status line block is one Termexo installed.
@@ -265,19 +266,32 @@ fn write_settings(
     Ok(())
 }
 
-fn paths_equal(left: &str, right: &str) -> bool {
-    let normalize = |value: &str| {
-        value
-            .trim_end_matches(['\\', '/'])
-            .replace('/', "\\")
-            .to_lowercase()
-    };
-    normalize(left) == normalize(right)
-}
+use crate::platform::paths_equal;
 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[cfg(unix)]
+    #[test]
+    fn unix_status_command_runs_from_a_path_with_quotes_spaces_and_shell_characters() {
+        use std::os::unix::fs::PermissionsExt;
+        let root = std::env::temp_dir().join(format!("termexo-agy-bash-{}", std::process::id()));
+        let directory = root.join("Termexo's ! $HOME 中文");
+        fs::create_dir_all(&directory).unwrap();
+        let executable = directory.join("termexo");
+        fs::write(&executable, "#!/bin/sh\nprintf '%s' \"$1\"\n").unwrap();
+        fs::set_permissions(&executable, fs::Permissions::from_mode(0o755)).unwrap();
+        let block = status_line_block(&executable);
+        let mut command = std::process::Command::new("/bin/bash");
+        command.args(["-c", block["command"].as_str().unwrap()]);
+        let output =
+            crate::process::run_with_timeout(&mut command, std::time::Duration::from_secs(2))
+                .unwrap();
+        fs::remove_dir_all(root).unwrap();
+        assert!(output.status.success());
+        assert_eq!(output.stdout, STATUS_SUBCOMMAND.as_bytes());
+    }
 
     /// Writes a settings file for one case and returns its path.
     fn settings_file(case: &str, contents: &str) -> PathBuf {
@@ -309,6 +323,7 @@ mod tests {
 
     /// The CLI escapes the command again before running it, so a quote of ours reaches `cmd` as
     /// part of the program name and every update fails.
+    #[cfg(windows)]
     #[test]
     fn the_command_is_written_without_quotes() {
         let block = status_line_block(Path::new(r"C:\Termexo\termexo.exe"));
@@ -320,6 +335,7 @@ mod tests {
 
     /// Windows can have short names switched off, and a path that does not exist has none at all;
     /// the command is still written, because an unquoted long path is what `cmd` copes with best.
+    #[cfg(windows)]
     #[test]
     fn a_path_with_spaces_falls_back_to_itself_when_it_has_no_short_form() {
         let long = Path::new(r"C:\Program Files\Nowhere At All\termexo.exe");
@@ -440,9 +456,10 @@ mod tests {
             .filter_map(Value::as_str)
             .any(|existing| paths_equal(existing, "c:/users/me"));
 
-        assert!(
+        assert_eq!(
             already,
-            "the same path in another shape is still the same workspace"
+            cfg!(windows),
+            "Windows path folding must not apply to Unix workspaces"
         );
         write_settings(&path, &settings).unwrap();
     }

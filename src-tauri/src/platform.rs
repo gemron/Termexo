@@ -25,22 +25,46 @@ pub fn home_dir() -> Option<PathBuf> {
     std::env::home_dir()
 }
 
+/// Compare saved native paths without applying Windows case/separator rules to Unix filenames.
+pub fn paths_equal(left: &str, right: &str) -> bool {
+    #[cfg(windows)]
+    {
+        let normalize = |value: &str| {
+            value
+                .trim_end_matches(['\\', '/'])
+                .replace('/', "\\")
+                .to_lowercase()
+        };
+        normalize(left) == normalize(right)
+    }
+    #[cfg(not(windows))]
+    {
+        std::path::Path::new(left) == std::path::Path::new(right)
+    }
+}
+
 /// The user's own shell: `$SHELL` when it points at something runnable, otherwise the fallback.
 #[cfg(unix)]
 pub fn default_shell() -> String {
     env::var("SHELL")
         .ok()
-        .filter(|shell| is_executable_file(std::path::Path::new(shell)))
+        .filter(|shell| {
+            std::path::Path::new(shell).is_absolute()
+                && is_executable_file(std::path::Path::new(shell))
+        })
         .unwrap_or_else(|| FALLBACK_SHELL.into())
 }
 
 #[cfg(unix)]
-fn is_executable_file(path: &std::path::Path) -> bool {
+pub fn is_executable_file(path: &std::path::Path) -> bool {
     use std::os::unix::fs::PermissionsExt;
-    path.is_absolute()
-        && path
-            .metadata()
-            .is_ok_and(|metadata| metadata.is_file() && metadata.permissions().mode() & 0o111 != 0)
+    path.metadata()
+        .is_ok_and(|metadata| metadata.is_file() && metadata.permissions().mode() & 0o111 != 0)
+}
+
+#[cfg(not(unix))]
+pub fn is_executable_file(path: &std::path::Path) -> bool {
+    path.is_file()
 }
 
 #[cfg(windows)]
@@ -53,6 +77,9 @@ pub fn default_shell() -> String {
 /// Workspaces store `powershell.exe` as the shell, and a workspace written on Windows (or by the
 /// frontend's default) must still open here, so Windows-only shells map to the user's own shell.
 pub fn resolve_shell(requested: &str) -> String {
+    if requested.trim().is_empty() {
+        return default_shell();
+    }
     #[cfg(unix)]
     {
         let name = requested
@@ -61,7 +88,7 @@ pub fn resolve_shell(requested: &str) -> String {
             .unwrap_or(requested)
             .to_ascii_lowercase();
         let windows_only = name.starts_with("powershell") || name == "cmd" || name == "cmd.exe";
-        if requested.trim().is_empty() || windows_only {
+        if windows_only {
             return default_shell();
         }
     }
@@ -206,6 +233,27 @@ pub fn inherit_login_environment() {}
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[cfg(unix)]
+    #[test]
+    fn unix_project_paths_preserve_case_and_literal_backslashes() {
+        assert!(!paths_equal("/tmp/Project", "/tmp/project"));
+        assert!(!paths_equal("/tmp/project\\name", "/tmp/project/name"));
+        assert!(paths_equal("/tmp/project/", "/tmp/project"));
+        assert!(!paths_equal("/", ""));
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn windows_project_paths_ignore_case_and_separator_style() {
+        assert!(paths_equal("C:\\Project\\", "c:/project"));
+    }
+
+    #[test]
+    fn empty_shell_requests_use_the_host_default_on_every_platform() {
+        assert_eq!(resolve_shell(""), default_shell());
+        assert_eq!(resolve_shell("  "), default_shell());
+    }
 
     #[cfg(target_os = "linux")]
     #[test]

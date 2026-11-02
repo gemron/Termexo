@@ -19,6 +19,10 @@ import {
   startRecording,
 } from './lib/screen-recorder.mjs';
 
+if (process.platform !== 'win32') {
+  throw new Error('Desktop demo recording uses Windows/WebView2. On Linux run npm run test:desktop:linux.');
+}
+
 /**
  * Records the V0.6 feature demos against the real desktop build.
  *

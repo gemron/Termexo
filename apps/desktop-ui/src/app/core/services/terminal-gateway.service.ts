@@ -27,6 +27,7 @@ export interface TerminalExitEvent {
   runtimeRevision: number;
   exitCode: number;
   success: boolean;
+  intentional?: boolean;
 }
 
 /** What `create_terminal` reports back: whether it adopted a PTY that was already running. */

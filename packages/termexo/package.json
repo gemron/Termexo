@@ -1,7 +1,7 @@
 {
   "name": "termexo",
   "version": "0.11.0",
-  "description": "Run the Termexo AI development workspace directly from npm on Windows and macOS",
+  "description": "Run the Termexo AI development workspace directly from npm on Windows, macOS and Linux",
   "type": "module",
   "bin": {
     "termexo": "bin/termexo.js"
@@ -15,11 +15,13 @@
     "vendor/darwin-arm64/Termexo.app.tar.gz",
     "vendor/darwin-x64/Termexo.app.tar.gz",
     "vendor/win32-x64/one-ring/",
+    "vendor/linux-x64/Termexo.tar.gz",
     "README.md"
   ],
   "os": [
     "win32",
-    "darwin"
+    "darwin",
+    "linux"
   ],
   "engines": {
     "node": ">=18.18.0"

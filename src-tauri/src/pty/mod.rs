@@ -5,6 +5,7 @@ use std::collections::HashMap;
 use std::io::{Read, Write};
 #[cfg(unix)]
 use std::path::{Path, PathBuf};
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
 use std::thread;
 
@@ -106,6 +107,7 @@ struct TerminalExitEvent {
     runtime_revision: u64,
     exit_code: i32,
     success: bool,
+    intentional: bool,
 }
 
 /// What a client needs to catch up with a terminal it was not connected to.
@@ -511,6 +513,8 @@ struct PtyProcess {
     /// The child itself is owned by the exit watcher, which blocks on it; closing a terminal only
     /// ever needs to kill it.
     killer: Box<dyn ChildKiller + Send + Sync>,
+    /// Shared with the waiter so a requested stop is not mistaken for a failed launch.
+    stop_requested: Arc<AtomicBool>,
     /// Which launch of this terminal is running. A reconnect with a newer revision must replace
     /// the process rather than attach to the previous one.
     runtime_revision: u64,
@@ -717,12 +721,14 @@ impl PtyManager {
             },
             reader,
         );
+        let stop_requested = Arc::new(AtomicBool::new(false));
         spawn_exit_watcher(
             request.terminal_id.clone(),
             request.runtime_revision,
             app,
             self.hub.clone(),
             child,
+            stop_requested.clone(),
         );
 
         sessions.insert(
@@ -731,6 +737,7 @@ impl PtyManager {
                 writer,
                 master: pair.master,
                 killer,
+                stop_requested,
                 runtime_revision: request.runtime_revision,
                 history,
                 // Whoever launched the terminal is working in it, so it starts out theirs.
@@ -865,6 +872,7 @@ impl PtyManager {
         let mut session = sessions
             .remove(terminal_id)
             .ok_or_else(|| PtyError::NotFound(terminal_id.into()))?;
+        session.stop_requested.store(true, Ordering::Release);
         normalize_kill_result(session.killer.kill())
     }
 }
@@ -894,7 +902,11 @@ fn normalize_kill_result(result: std::io::Result<()>) -> Result<(), PtyError> {
         Ok(())
     }
     #[cfg(not(windows))]
-    result.map_err(|error| PtyError::Backend(error.to_string()))
+    match result {
+        // The exit watcher may have reaped a short-lived command before its tab is closed.
+        Err(error) if error.raw_os_error() == Some(libc::ESRCH) => Ok(()),
+        other => other.map_err(|error| PtyError::Backend(error.to_string())),
+    }
 }
 
 /// Waits for the terminal's process and reports how it ended.
@@ -908,6 +920,7 @@ fn spawn_exit_watcher(
     app: AppHandle,
     hub: Arc<RemoteEventHub>,
     mut child: Box<dyn Child + Send>,
+    stop_requested: Arc<AtomicBool>,
 ) {
     thread::spawn(move || {
         let (exit_code, success) = match child.wait() {
@@ -922,6 +935,7 @@ fn spawn_exit_watcher(
             runtime_revision,
             exit_code,
             success,
+            intentional: stop_requested.load(Ordering::Acquire),
         };
         hub.publish(EVENT_TERMINAL_EXIT, &event);
         let _ = app.emit(EVENT_TERMINAL_EXIT, &event);
@@ -1220,6 +1234,7 @@ mod tests {
                 writer: Arc::new(Mutex::new(pair.master.take_writer().unwrap())),
                 master: pair.master,
                 killer: Box::new(AttachmentKiller),
+                stop_requested: Arc::new(AtomicBool::new(false)),
                 runtime_revision: 0,
                 history: Arc::new(Mutex::new(history)),
                 // Disconnecting the driving viewer releases ownership, but does not resize the PTY.
@@ -1367,6 +1382,14 @@ mod tests {
         let result = normalize_kill_result(Err(std::io::Error::from_raw_os_error(5)));
 
         assert!(matches!(result, Err(PtyError::Backend(_))));
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn closing_an_already_exited_terminal_succeeds() {
+        let result = normalize_kill_result(Err(std::io::Error::from_raw_os_error(libc::ESRCH)));
+
+        assert!(result.is_ok());
     }
 
     /// Feeds a snapshot to a terminal that has seen nothing, the way a reloading client does.

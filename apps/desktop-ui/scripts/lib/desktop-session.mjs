@@ -74,13 +74,14 @@ export function resolveDebugPort() {
  */
 export async function startDesktopSession({
   repositoryRoot,
-  executablePath = resolveExecutablePath(repositoryRoot),
+  executablePath,
   debugPort = resolveDebugPort(),
   environment = {},
 } = {}) {
   if (process.platform !== 'win32') {
-    throw new Error('Driving the Termexo desktop build requires Windows and WebView2.');
+    throw new Error('This CDP workflow requires Windows/WebView2. On Linux run npm run test:desktop:linux.');
   }
+  executablePath ??= resolveExecutablePath(repositoryRoot);
 
   const debugUrl = `http://127.0.0.1:${debugPort}`;
   const child = spawn(executablePath, [], {

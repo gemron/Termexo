@@ -13,6 +13,7 @@
       <span
         class="status-indicator"
         [attr.data-status]="session().status"
+        [attr.data-tone]="statusTone()"
         [title]="statusLabel(session().status)"
         aria-hidden="true"
       >

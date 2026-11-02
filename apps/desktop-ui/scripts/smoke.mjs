@@ -2,19 +2,32 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
 import { chromium } from 'playwright-core';
+import { resolveBrowserExecutable } from './lib/browser-executable.mjs';
 
 const APP_URL = process.env.TERMEXO_URL ?? process.env.AGENTDOCK_URL ?? 'http://127.0.0.1:4200';
-const EDGE_PATH =
-  process.env.EDGE_PATH ?? 'C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe';
+const BROWSER_PATH = resolveBrowserExecutable();
 
 const browser = await chromium.launch({
-  executablePath: EDGE_PATH,
+  executablePath: BROWSER_PATH,
   headless: true,
 });
 
 try {
-  const page = await browser.newPage({ viewport: { width: 1440, height: 900 } });
+  const page = await browser.newPage({ locale: 'zh-CN', viewport: { width: 1440, height: 900 } });
   const errors = [];
+  const confirmDirectory = async (directory) => {
+    const prompt = page.locator('app-directory-prompt-dialog [role="dialog"]');
+    await prompt.waitFor();
+    if (directory) await prompt.getByRole('textbox').fill(directory);
+    await prompt.getByRole('button', { name: '使用此目录', exact: true }).click();
+    await prompt.waitFor({ state: 'detached' });
+  };
+  const openNewMenu = () => page.getByTestId('new-terminal-menu').click();
+  const createShell = async () => {
+    await openNewMenu();
+    await page.locator('.agent-menu [data-agent="shell"]').click();
+    await confirmDirectory();
+  };
   const assertWithinViewport = async (locator, label) => {
     await locator.waitFor();
     await page.waitForTimeout(180);
@@ -139,13 +152,11 @@ try {
   const createWorkspaceDialog = page.getByRole('dialog', { name: '新建工作区' });
   await createWorkspaceDialog.waitFor();
   await assertWithinViewport(createWorkspaceDialog, 'create workspace dialog');
-  page.once('dialog', (dialog) => dialog.accept('D:\\smoke-workspace'));
   await createWorkspaceDialog.getByRole('button', { name: '选择目录', exact: true }).click();
-  await createWorkspaceDialog.getByLabel('工作空间项目目录').waitFor({ state: 'visible' });
-  if (
-    (await createWorkspaceDialog.getByLabel('工作空间项目目录').inputValue()) !==
-    'D:\\smoke-workspace'
-  ) {
+  const smokeDirectory = join(tmpdir(), 'smoke-workspace');
+  await confirmDirectory(smokeDirectory);
+  await createWorkspaceDialog.getByLabel('工作区项目目录').waitFor({ state: 'visible' });
+  if ((await createWorkspaceDialog.getByLabel('工作区项目目录').inputValue()) !== smokeDirectory) {
     throw new Error('workspace directory picker did not populate the project path');
   }
   if ((await createWorkspaceDialog.locator('input').first().inputValue()) !== 'smoke-workspace') {
@@ -163,16 +174,18 @@ try {
     .filter({ hasText: 'Smoke Workspace' });
   await smokeWorkspaceEntry.waitFor();
   await smokeWorkspaceEntry.hover();
-  await smokeWorkspaceEntry.getByRole('button', { name: '删除工作空间', exact: true }).click();
-  const deleteWorkspaceDialog = page.getByRole('dialog', { name: '删除工作空间' });
+  await smokeWorkspaceEntry.locator('.workspace-more').click();
+  await smokeWorkspaceEntry.getByRole('button', { name: '删除工作区', exact: true }).click();
+  const deleteWorkspaceDialog = page.getByRole('dialog', { name: '删除工作区' });
   await deleteWorkspaceDialog.waitFor();
   await assertWithinViewport(deleteWorkspaceDialog, 'delete workspace dialog');
-  await deleteWorkspaceDialog.getByRole('button', { name: '删除工作空间', exact: true }).click();
+  await deleteWorkspaceDialog.getByRole('button', { name: '删除工作区', exact: true }).click();
   await smokeWorkspaceEntry.waitFor({ state: 'detached' });
 
   const firstWorkspaceEntry = page.locator('.workspace-entry').first();
   await firstWorkspaceEntry.locator('.workspace-copy').click();
   await firstWorkspaceEntry.hover();
+  await firstWorkspaceEntry.locator('.workspace-more').click();
   await firstWorkspaceEntry.getByRole('button', { name: '编辑工作区', exact: true }).click();
   const editWorkspaceDialog = page.getByRole('dialog', { name: '编辑工作区' });
   await editWorkspaceDialog.waitFor();
@@ -219,8 +232,7 @@ try {
   }
   const initialTerminalCount = await page.locator('.terminal-panel').count();
   const toolbar = page.getByRole('toolbar', { name: '工作区工具' });
-  page.once('dialog', (dialog) => dialog.accept(dialog.defaultValue()));
-  await toolbar.getByRole('button', { name: '新建终端', exact: true }).click();
+  await createShell();
   const createdTerminal = page.locator('.terminal-panel').nth(initialTerminalCount);
   await createdTerminal.waitFor();
   await createdTerminal.getByText('运行中', { exact: true }).waitFor();
@@ -231,10 +243,13 @@ try {
   }
 
   // A tab closes from the strip itself, which is the only way to close one the layout hides.
-  page.once('dialog', (dialog) => dialog.accept(dialog.defaultValue()));
-  await page.locator('.tab-bar .add-tab').click();
+  await createShell();
   await page.locator('.terminal-panel').nth(updatedTerminalCount).waitFor();
   await page.locator('.tab-strip .tab-slot').last().locator('.tab-close').click();
+  await page
+    .getByRole('alertdialog', { name: '关闭终端' })
+    .getByRole('button', { name: '仍然关闭', exact: true })
+    .click();
   await page.waitForTimeout(120);
   const countAfterTabClose = await page.locator('.terminal-panel').count();
   if (countAfterTabClose !== updatedTerminalCount) {
@@ -346,7 +361,9 @@ try {
       throw new Error('terminal instance was unavailable before switching workspaces');
     }
     await workspaceItemsForSwitch.nth(1).click({ position: { x: 12, y: 12 } });
-    await page.locator('app-terminal-workbench:not(.workspace-hidden) .empty-state').waitFor();
+    await page
+      .locator('app-terminal-workbench:not(.workspace-hidden) app-workspace-onboarding')
+      .waitFor();
     await workspaceItemsForSwitch.first().click({ position: { x: 12, y: 12 } });
     const restoredActivePanel = page.locator('.terminal-panel.active');
     await restoredActivePanel.waitFor();
@@ -442,8 +459,11 @@ try {
   if (!seededAgentEvents) {
     throw new Error('Agent event state was unavailable for activity smoke setup');
   }
-  await page.locator('.activity .event-row').nth(11).waitFor();
-  if ((await page.locator('.activity .event-row').count()) !== 12) {
+  const activityToggle = page.locator('.section-toggle[data-section="activity"]');
+  if ((await activityToggle.getAttribute('aria-expanded')) !== 'true') await activityToggle.click();
+  const activityRows = activityToggle.locator('..').locator('.event-row');
+  await activityRows.nth(11).waitFor();
+  if ((await activityRows.count()) !== 12) {
     throw new Error('recent activity did not render the expanded event history');
   }
 
@@ -525,6 +545,7 @@ try {
     throw new Error('workspace menu contains nested interactive buttons');
   }
   await firstWorkspaceMenuEntry.hover();
+  await firstWorkspaceMenuEntry.locator('.workspace-more').click();
   await page.waitForTimeout(180);
   const workspaceActions = firstWorkspaceMenuEntry.locator('.workspace-actions');
   const [workspaceEntryBox, workspaceActionsBox, workspaceActionsOpacity] = await Promise.all([
@@ -548,6 +569,11 @@ try {
     );
   }
 
+  await page.evaluate(() =>
+    globalThis.ng
+      .getComponent(document.querySelector('app-root'))
+      .showToast('Browser smoke notification'),
+  );
   const toast = page.locator('.app-toast-region > .app-toast.alert');
   await toast.waitFor();
   const toastBox = await toast.boundingBox();
@@ -590,9 +616,9 @@ try {
   ) {
     throw new Error('workspace sidebar width did not respond to dragging');
   }
-  await page.getByRole('button', { name: '折叠工作区侧栏' }).click();
+  await page.getByTestId('workspace-sidebar-toggle').click();
   await workspaceSidebar.waitFor({ state: 'detached' });
-  await page.getByRole('button', { name: '展开工作区侧栏' }).click();
+  await page.getByTestId('workspace-sidebar-toggle').click();
   await workspaceSidebar.waitFor();
 
   const inspectorPanel = page.locator('app-inspector-panel');
@@ -601,15 +627,14 @@ try {
   await page.getByRole('button', { name: '展开 Agent 侧栏' }).click();
   await inspectorPanel.waitFor();
 
-  await toolbar.getByRole('button', { name: 'Agent', exact: true }).click();
+  await openNewMenu();
   const agentMenu = page.locator('.agent-menu');
   await agentMenu.waitFor();
   await assertWithinViewport(agentMenu, 'Agent menu');
   if ((await agentMenu.getByText(/Gemini|Google CLI/i).count()) !== 0) {
     throw new Error('removed Google CLI feature is still visible');
   }
-  page.once('dialog', (dialog) => dialog.accept(dialog.defaultValue()));
-  await page.getByRole('button', { name: /Claude Code/ }).click();
+  await page.locator('.agent-menu [data-agent="claude"]').click();
   const launchDialog = page.getByRole('dialog', { name: '新建 Claude 会话' });
   await launchDialog.waitFor();
   if (await launchDialog.getByRole('button', { name: '启动会话' }).isEnabled()) {
@@ -617,17 +642,15 @@ try {
   }
   await launchDialog.getByRole('button', { name: '关闭' }).click();
 
-  await toolbar.getByRole('button', { name: 'Agent', exact: true }).click();
-  page.once('dialog', (dialog) => dialog.accept(dialog.defaultValue()));
-  await page.getByRole('button', { name: /Codex CLI/ }).click();
+  await openNewMenu();
+  await page.locator('.agent-menu [data-agent="codex"]').click();
   const codexLaunchDialog = page.getByRole('dialog', { name: '新建 Codex 会话' });
   await codexLaunchDialog.waitFor();
   await codexLaunchDialog.getByLabel('Codex 模型').fill('gpt-5.6-sol');
   await codexLaunchDialog.getByRole('button', { name: '关闭' }).click();
 
-  await toolbar.getByRole('button', { name: 'Agent', exact: true }).click();
-  page.once('dialog', (dialog) => dialog.accept(dialog.defaultValue()));
-  await page.getByRole('button', { name: /OpenCode/ }).click();
+  await openNewMenu();
+  await page.locator('.agent-menu [data-agent="opencode"]').click();
   const openCodeLaunchDialog = page.getByRole('dialog', { name: '新建 OpenCode 会话' });
   await openCodeLaunchDialog.waitFor();
   if (await openCodeLaunchDialog.getByRole('button', { name: '启动' }).isEnabled()) {
@@ -635,7 +658,8 @@ try {
   }
   await openCodeLaunchDialog.getByRole('button', { name: '关闭' }).click();
 
-  await toolbar.getByRole('button', { name: /批量切换|Switch all/ }).click();
+  await page.locator('.tab-strip').getByRole('tab').filter({ hasText: 'Claude - Core' }).click();
+  await page.locator('.terminal-panel .model-chip').first().click();
   const modelSwitchDialog = page.getByRole('dialog', {
     name: '切换 Claude Code 后端模型',
   });
@@ -666,7 +690,7 @@ try {
   await page.keyboard.press('Escape');
   await gridDimensions.waitFor({ state: 'detached' });
 
-  await toolbar.getByRole('button', { name: '恢复', exact: true }).click();
+  await page.getByTestId('session-center-open').click();
   const sessionDialog = page.getByRole('dialog', { name: 'Agent 会话中心' });
   await sessionDialog.waitFor();
   await sessionDialog.getByText('当前工作区没有本地会话').waitFor();
@@ -696,7 +720,7 @@ try {
   await settingsDialog.getByRole('button', { name: '登录账号', exact: true }).click();
   await settingsDialog.getByRole('button', { name: '添加隔离账号', exact: true }).click();
   await settingsDialog.getByLabel('账号名称', { exact: true }).fill('Smoke ChatGPT');
-  await settingsDialog.locator('.account-editor select').selectOption('codex');
+  await settingsDialog.getByRole('combobox', { name: /^CLI 类型/ }).selectOption('codex');
   await settingsDialog.getByLabel('设为此 CLI 的默认登录账号', { exact: true }).check();
   const saveAccountButton = settingsDialog.getByRole('button', {
     name: '保存账号',
@@ -719,11 +743,7 @@ try {
   await settingsDialog.getByRole('button', { name: '模型 Profile' }).click();
   await settingsDialog.getByRole('button', { name: /新建 Profile/ }).click();
   await settingsDialog.getByLabel('名称', { exact: true }).fill('Smoke Profile');
-  await settingsDialog
-    .locator('fieldset.agent-endpoint:not(.disabled)')
-    .first()
-    .getByLabel('模型', { exact: true })
-    .fill('sonnet');
+  await settingsDialog.getByLabel('模型 ID（可修改） · Claude', { exact: true }).fill('sonnet');
   const saveProfileButton = settingsDialog.getByRole('button', { name: '保存 Profile' });
   await saveProfileButton.click();
   await settingsDialog
@@ -761,16 +781,29 @@ try {
     })
     .waitFor();
 
-  await settingsDialog.getByRole('button', { name: 'CLI 安装与升级', exact: true }).click();
-  await settingsDialog.getByLabel('CLI 目标版本', { exact: true }).fill('latest');
-  await settingsDialog.getByRole('button', { name: '生成安装计划', exact: true }).click();
-  await settingsDialog.getByText('@anthropic-ai/claude-code@latest', { exact: true }).waitFor();
-  const executeCliButton = settingsDialog.getByRole('button', { name: '确认并安装', exact: true });
-  if (!(await executeCliButton.isDisabled())) {
-    throw new Error('CLI mutation became available before explicit confirmation');
+  await settingsDialog.getByRole('button', { name: '安装与更新', exact: true }).click();
+  const installPanel = settingsDialog.locator('app-agent-install-panel');
+  await installPanel.locator('summary').click();
+  await installPanel.getByRole('combobox', { name: /^安装方式/ }).selectOption('npm');
+  await installPanel.getByPlaceholder('latest').fill('latest');
+  if (
+    !(await installPanel.locator('.primary-actions > button.primary').isDisabled()) ||
+    !(await installPanel.getByRole('button', { name: '检查此配置', exact: true }).isDisabled())
+  ) {
+    throw new Error('CLI mutations must remain disabled in browser preview mode');
   }
-  await settingsDialog.locator('.cli-confirmation input').check();
-  await executeCliButton.click({ trial: true });
+  const cliPreview = await page.evaluate(async () => {
+    const app = globalThis.ng.getComponent(document.querySelector('app-root'));
+    return app.agents.previewCliOperation({
+      agentType: 'claude',
+      installer: 'npm',
+      targetVersion: 'latest',
+    });
+  });
+  if (!cliPreview.commandPreview.includes("'@anthropic-ai/claude-code@latest'"))
+    throw new Error(
+      `npm command preview lost its quoted package argument: ${JSON.stringify(cliPreview)}`,
+    );
 
   const compactDialogBox = await settingsDialog.boundingBox();
   if (
