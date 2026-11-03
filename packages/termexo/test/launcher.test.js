@@ -118,7 +118,8 @@ test('Windows npm launch forwards the exact host Node path without a shell', () 
   assert.equal(invocation.command, 'C:\\npm\\termexo.exe');
   assert.deepEqual(invocation.args, []);
   assert.equal(invocation.options.env.TERMEXO_NPM_NODE, node);
-  assert.equal(invocation.options.env.PATH, process.env.PATH);
+  const pathKey = Object.keys(process.env).find((name) => name.toLowerCase() === 'path');
+  if (pathKey) assert.equal(invocation.options.env[pathKey], process.env[pathKey]);
   assert.equal(invocation.options.shell, undefined);
 });
 
