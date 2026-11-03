@@ -15,6 +15,7 @@
     "vendor/darwin-arm64/Termexo.app.tar.gz",
     "vendor/darwin-x64/Termexo.app.tar.gz",
     "vendor/win32-x64/one-ring/",
+    "!vendor/win32-x64/one-ring/runtime/node.exe",
     "vendor/linux-x64/Termexo.tar.gz",
     "README.md"
   ],
@@ -24,7 +25,7 @@
     "linux"
   ],
   "engines": {
-    "node": ">=18.18.0"
+    "node": ">=24.0.0"
   },
   "scripts": {
     "test": "node --test",

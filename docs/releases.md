@@ -18,6 +18,7 @@ npm 使用 OIDC 和来源证明，不需要保存长期 npm 令牌。
 发布后会等待 npm 完成处理，并校验公开版本的包完整性，再公开 GitHub Release。
 
 新的联合发布包含 Windows、Mac 和 Linux x64，可使用 `npx termexo` 或 `npm install --global termexo`；已发布的旧版本不会自动新增 Linux 载荷。
+npm 启动器要求 Node.js 24 或更高版本。Windows npm 分发复用启动器所用的 Node 可执行文件，避免重复打包运行时；EXE/MSI 仍内置运行时。发布前将 npm 归档限制在 180 MB 内，为上传请求中的编码开销留出空间。
 Mac 首次启动时按 Node.js 架构选择应用，将其解压到
 `~/Library/Caches/Termexo/npm/` 后通过系统 `open` 命令启动。
 解压保留权限、符号链接、应用资源和签名，无需运行时下载。

@@ -110,7 +110,7 @@ jobs:
           import { createHash } from 'node:crypto';
           import { copyFileSync, mkdirSync, readFileSync } from 'node:fs';
           import { dirname } from 'node:path';
-          import { validateWindowsPayloadInventory } from './packages/termexo/lib/windows-payload.js';
+          import { validateWindowsPayloadInventory, WINDOWS_NPM_PAYLOAD_FILES } from './packages/termexo/lib/windows-payload.js';
           const { VERSION: version, GITHUB_SHA: commit } = process.env;
           const sha256 = (bytes) => createHash('sha256').update(bytes).digest('hex');
           mkdirSync('release-assets');
@@ -154,6 +154,7 @@ jobs:
           validateWindowsPayloadInventory(info.files);
           for (const { name, sha256: expectedHash } of info.files) {
             assert.equal(sha256(readFileSync(`${npmDir}/${name}`)), expectedHash, `${name}: checksum mismatch`);
+            if (!WINDOWS_NPM_PAYLOAD_FILES.includes(name)) continue;
             const destination = `packages/termexo/vendor/win32-x64/${name}`;
             mkdirSync(dirname(destination), { recursive: true });
             copyFileSync(`${npmDir}/${name}`, destination);
@@ -177,19 +178,23 @@ jobs:
           import { createHash } from 'node:crypto';
           import { execFileSync } from 'node:child_process';
           import { readFileSync, readdirSync, writeFileSync } from 'node:fs';
-          import { validateWindowsPayloadInventory } from './packages/termexo/lib/windows-payload.js';
+          import { validateWindowsPayloadInventory, WINDOWS_NPM_PAYLOAD_FILES } from './packages/termexo/lib/windows-payload.js';
           const { VERSION: version, GITHUB_SHA: commit } = process.env;
           const archive = `release-assets/termexo-${version}.tgz`;
+          assert.ok(readFileSync(archive).length <= 180_000_000, 'npm archive exceeds the 180 MB upload budget; reduce duplicate payloads before publishing');
           const sha256 = (bytes) => createHash('sha256').update(bytes).digest('hex');
           const unpack = (path) => execFileSync('tar', ['-xOf', archive, `package/${path}`], { maxBuffer: 128 * 1024 * 1024 });
           const pkg = JSON.parse(unpack('package.json'));
           assert.equal(pkg.name, 'termexo');
           assert.equal(pkg.version, version);
           assert.deepEqual(pkg.os, ['win32', 'darwin', 'linux']);
+          assert.equal(pkg.engines.node, '>=24.0.0');
+          const packedPaths = execFileSync('tar', ['-tzf', archive], { encoding: 'utf8' }).trim().split(/\r?\n/);
+          assert.ok(!packedPaths.includes('package/vendor/win32-x64/one-ring/runtime/node.exe'), 'npm must reuse its host Node runtime on Windows');
           const info = JSON.parse(readFileSync('downloaded/Termexo-npm-windows/build-info.json', 'utf8'));
           assert.equal(sha256(unpack('vendor/win32-x64/termexo.exe')), info.executableSha256, 'npm must contain the executable from this Windows build');
           validateWindowsPayloadInventory(info.files);
-          for (const { name, sha256: expectedHash } of info.files) assert.equal(sha256(unpack(`vendor/win32-x64/${name}`)), expectedHash, `${name}: packaged checksum mismatch`);
+          for (const { name, sha256: expectedHash } of info.files.filter(({ name }) => WINDOWS_NPM_PAYLOAD_FILES.includes(name))) assert.equal(sha256(unpack(`vendor/win32-x64/${name}`)), expectedHash, `${name}: packaged checksum mismatch`);
           for (const [arch, archiveArch] of [['arm64', 'arm64'], ['x64', 'x86_64']]) {
             assert.equal(sha256(unpack(`vendor/darwin-${arch}/Termexo.app.tar.gz`)), sha256(readFileSync(`release-assets/Termexo_${version}_${archiveArch}.app.tar.gz`)));
           }
@@ -210,6 +215,7 @@ jobs:
           else
             gh release create "$GITHUB_REF_NAME" --verify-tag --draft --title "Termexo v$VERSION" --notes-file "docs/releases/v$VERSION.md"
           fi
+          gh release edit "$GITHUB_REF_NAME" --title "Termexo v$VERSION" --notes-file "docs/releases/v$VERSION.md"
           gh release upload "$GITHUB_REF_NAME" release-assets/* --clobber
       - name: Check whether this exact npm package is already published
         id: npm-state

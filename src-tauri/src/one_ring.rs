@@ -107,12 +107,7 @@ pub fn initialize_bundled(
     app_data: &std::path::Path,
 ) -> Result<Connection, String> {
     let plugin = resources.join("one-ring");
-    let node = plugin
-        .join("runtime")
-        .join(if cfg!(windows) { "node.exe" } else { "node" });
-    if !node.is_file() {
-        return Err("安装包缺少内置 One Ring 运行时，请重新安装 Termexo。".into());
-    }
+    let node = node_runtime_path(resources)?;
     // Preserve previously recorded workflows while removing external executable/plugin paths.
     let state = load(database)?
         .map(|previous| PathBuf::from(previous.state_directory))
@@ -135,6 +130,35 @@ pub fn initialize_bundled(
         .write_app_setting(BUNDLED_SETTING, "true")
         .map_err(|e| e.to_string())?;
     Ok(connection)
+}
+
+/// npm already runs under Node 24+. Its Windows payload can reuse that exact executable.
+/// Standalone installers always prefer their bundled runtime.
+pub fn node_runtime_path(resources: &std::path::Path) -> Result<PathBuf, String> {
+    let bundled =
+        resources
+            .join("one-ring/runtime")
+            .join(if cfg!(windows) { "node.exe" } else { "node" });
+    select_node_runtime(&bundled, std::env::var_os("TERMEXO_NPM_NODE"))
+}
+
+fn select_node_runtime(
+    bundled: &std::path::Path,
+    npm_node: Option<std::ffi::OsString>,
+) -> Result<PathBuf, String> {
+    if bundled.is_file() {
+        return Ok(bundled.to_owned());
+    }
+    if let Some(node) = npm_node
+        .map(PathBuf::from)
+        .filter(|path| path.is_absolute() && path.is_file())
+    {
+        return Ok(node);
+    }
+    Err(
+        "安装包缺少 One Ring 运行时，请通过 Node.js 24 或更高版本的 npm 启动，或重新安装 Termexo。"
+            .into(),
+    )
 }
 
 pub fn inspect(connection: &Connection, operation: &str, args: Value) -> Result<Value, String> {
@@ -417,6 +441,30 @@ mod tests {
         );
         assert!(PathBuf::from(connection.node_command).is_file());
         assert!(load(&database).unwrap().is_some());
+    }
+
+    #[test]
+    fn npm_runtime_requires_an_existing_absolute_path_and_never_overrides_a_bundle() {
+        let fixture = Fixture::new();
+        let bundled = fixture.root.join("bundled-node");
+        let npm_node = fixture.root.join("npm-node");
+        fs::write(&npm_node, "synthetic runtime").unwrap();
+        assert_eq!(
+            select_node_runtime(&bundled, Some(npm_node.clone().into_os_string())).unwrap(),
+            npm_node
+        );
+        assert!(select_node_runtime(&bundled, None).is_err());
+        assert!(select_node_runtime(&bundled, Some("node".into())).is_err());
+        assert!(select_node_runtime(
+            &bundled,
+            Some(fixture.root.join("missing").into_os_string())
+        )
+        .is_err());
+        fs::write(&bundled, "bundled runtime").unwrap();
+        assert_eq!(
+            select_node_runtime(&bundled, Some(npm_node.into_os_string())).unwrap(),
+            bundled
+        );
     }
 
     #[test]

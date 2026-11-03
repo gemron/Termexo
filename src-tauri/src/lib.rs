@@ -141,12 +141,9 @@ pub fn run() {
             }
 
             let database = WorkspaceDatabase::open(app_data_dir.join("agentdock.db"))?;
-            process::configure_bundled_node(
-                &app.path()
-                    .resource_dir()?
-                    .join("one-ring/runtime")
-                    .join(if cfg!(windows) { "node.exe" } else { "node" }),
-            );
+            if let Ok(node) = one_ring::node_runtime_path(&app.path().resource_dir()?) {
+                process::configure_bundled_node(&node);
+            }
             if let Err(error) =
                 one_ring::initialize_bundled(&database, &app.path().resource_dir()?, &app_data_dir)
             {

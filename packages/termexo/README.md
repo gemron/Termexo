@@ -8,6 +8,10 @@ run in a local workbench you can view and take over.
 
 ## Install
 
+The npm launcher requires Node.js 24 or later. On Windows it reuses that exact
+Node executable for the built-in One Ring engine, keeping the combined package
+within npm's upload size limit. EXE/MSI installers still include their own runtime.
+
 Supports Windows x64, macOS 12 or later on Apple Silicon and Intel, and Linux x64
 with glibc, GTK 3 and WebKitGTK 4.1. Linux needs a graphical desktop session.
 

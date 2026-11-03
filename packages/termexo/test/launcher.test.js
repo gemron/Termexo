@@ -94,7 +94,7 @@ test('launchExecutable starts a detached GUI process', () => {
         unrefCalled = true;
       },
     };
-  });
+  }, 'linux');
 
   assert.deepEqual(invocation, {
     command: 'C:\\Termexo\\termexo.exe',
@@ -106,6 +106,24 @@ test('launchExecutable starts a detached GUI process', () => {
     },
   });
   assert.equal(unrefCalled, true);
+});
+
+test('Windows npm launch forwards the exact host Node path without a shell', () => {
+  let invocation;
+  const node = 'C:\\Program Files\\nodejs\\node.exe';
+  launchExecutable('C:\\npm\\termexo.exe', (command, args, options) => {
+    invocation = { command, args, options };
+    return { unref() {} };
+  }, 'win32', node, '24.15.0');
+  assert.equal(invocation.command, 'C:\\npm\\termexo.exe');
+  assert.deepEqual(invocation.args, []);
+  assert.equal(invocation.options.env.TERMEXO_NPM_NODE, node);
+  assert.equal(invocation.options.env.PATH, process.env.PATH);
+  assert.equal(invocation.options.shell, undefined);
+});
+
+test('Windows npm launch rejects an old Node runtime before starting the application', () => {
+  assert.throws(() => launchExecutable('termexo.exe', () => assert.fail('Must not spawn'), 'win32', 'node.exe', '22.22.3'), /requires Node.js 24/);
 });
 
 test('openDownloadPage opens the official latest release URL', () => {

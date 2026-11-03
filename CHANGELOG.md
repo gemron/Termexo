@@ -12,6 +12,7 @@ Release notes for every Termexo version, newest first. The current release is su
 - **Stable mobile input and fewer redraws.** Use a separate touch input field, disable xterm's moving hidden input, retain failed drafts, batch output and replay history atomically.
 - **Preview, translation and quota improvements.** Refine preview navigation, Markdown rendering and controls, translate remaining German toolbar labels, and improve Antigravity credentials and quota-window labels. Document One Ring staging before direct Cargo commands.
 - **Updated dependencies.** Includes Angular and Rust updates from [#43](https://github.com/gemron/Termexo/pull/43).
+- **Keep npm publishing within its size budget.** The launcher requires Node.js 24+ and reuses its Node executable on Windows; standalone installers retain a bundled runtime. Validate the packed archive size before uploading.
 
 ## V0.11.0
 
