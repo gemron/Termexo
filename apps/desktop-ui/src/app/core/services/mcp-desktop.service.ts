@@ -195,6 +195,7 @@ export class McpDesktopService {
       case 'common_action_list': {
         const workspace = this.workspace(String(args['workspaceId']));
         return {
+          projectPath: workspace.projectPath,
           actions: workspace.commonActions ?? [],
           review: this.commonActions.reviews()[workspace.id] ?? null,
         };

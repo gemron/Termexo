@@ -111,6 +111,18 @@ describe('RemoteBridgeClient', () => {
     expect(client.state).toBe('connecting');
   });
 
+  it('takes permissions from the authenticated ready frame and updates them on reconnect', () => {
+    client.setToken('viewing-token');
+    const socket = newestSocket();
+    socket.open();
+    socket.receive({ type: 'challenge', protocol: 1, nonceS: '' });
+    socket.receive({ type: 'ready', serverVersion: '0.11.0', readOnly: true });
+    expect(client.readOnly).toBe(true);
+    client.setToken('control-token');
+    handshakeV1();
+    expect(client.readOnly).toBe(false);
+  });
+
   it('keeps the bridge beside the page when a relay serves it from a sub-path', () => {
     const base = document.createElement('base');
     base.setAttribute('href', '/d/abc/');

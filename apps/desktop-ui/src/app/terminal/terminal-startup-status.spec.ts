@@ -1,24 +1,27 @@
-import { terminalStatusAfterStart } from './terminal-startup-status';
+import { canSetTerminalIdle, terminalStatusAfterStart } from './terminal-startup-status';
 import { TerminalInputStatusTracker } from './terminal-input-status';
 import type { TerminalStatus } from '../core/models/workspace.models';
 
 describe('terminal startup status', () => {
-  it('restores Codex to idle and starts thinking only when the user submits a prompt', () => {
-    const status = terminalStatusAfterStart({
-      agentType: 'codex',
-      nativeSessionId: 'saved-session',
-      status: 'STARTING',
-    });
-    expect(status).toBe('IDLE');
-    const input = new TerminalInputStatusTracker();
-    expect(
-      input.statusAfterInput('\r', {
+  it.each([undefined, 'saved-session'])(
+    'opens new or resumed Codex idle (%s) until a prompt is submitted',
+    (nativeSessionId) => {
+      const status = terminalStatusAfterStart({
         agentType: 'codex',
-        status: status!,
-        readApprovalOptions: () => [],
-      }),
-    ).toBe('THINKING');
-  });
+        nativeSessionId,
+        status: 'STARTING',
+      });
+      expect(status).toBe('IDLE');
+      const input = new TerminalInputStatusTracker();
+      expect(
+        input.statusAfterInput('\r', {
+          agentType: 'codex',
+          status: status!,
+          readApprovalOptions: () => [],
+        }),
+      ).toBe('THINKING');
+    },
+  );
 
   it('preserves events received while the resumed process is starting', () => {
     const statuses: TerminalStatus[] = [
@@ -44,8 +47,8 @@ describe('terminal startup status', () => {
     }
   });
 
-  it('keeps other agents and a new Codex launch on their existing startup path', () => {
-    for (const agentType of ['shell', 'claude', 'grok', 'antigravity', 'opencode'] as const) {
+  it('keeps other agents on their existing startup path', () => {
+    for (const agentType of ['shell', 'claude', 'grok', 'pi', 'antigravity', 'opencode'] as const) {
       expect(
         terminalStatusAfterStart({
           agentType,
@@ -54,12 +57,24 @@ describe('terminal startup status', () => {
         }),
       ).toBe('RUNNING');
     }
-    expect(
-      terminalStatusAfterStart({
-        agentType: 'codex',
-        nativeSessionId: undefined,
-        status: 'STARTING',
-      }),
-    ).toBe('RUNNING');
+  });
+
+  it('offers a manual idle correction only for working terminals, excluding managed services', () => {
+    for (const status of ['RUNNING', 'THINKING'] as const) {
+      expect(canSetTerminalIdle({ status })).toBe(true);
+      expect(canSetTerminalIdle({ status, commonActionId: 'service' })).toBe(false);
+    }
+    for (const status of [
+      'STARTING',
+      'IDLE',
+      'COMPLETED',
+      'WAITING_APPROVAL',
+      'WAITING_INPUT',
+      'FAILED',
+      'RATE_LIMITED',
+      'STOPPED',
+      'DISCONNECTED',
+    ] as const)
+      expect(canSetTerminalIdle({ status })).toBe(false);
   });
 });

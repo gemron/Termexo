@@ -80,9 +80,19 @@ describe('ProjectPreviewService', () => {
   });
 
   it('retains independent files, positions and directories, and reuses only an explicitly targeted tab', async () => {
-    invoke.mockResolvedValueOnce({ path: 'D:/项目/one.ts', kind: 'text', content: 'one', mime: 'text/plain' });
+    invoke.mockResolvedValueOnce({
+      path: 'D:/项目/one.ts',
+      kind: 'text',
+      content: 'one',
+      mime: 'text/plain',
+    });
     const first = await service.openFile('w', 'one.ts', undefined, 3, 2);
-    invoke.mockResolvedValueOnce({ path: 'D:/项目/two.ts', kind: 'text', content: 'two', mime: 'text/plain' });
+    invoke.mockResolvedValueOnce({
+      path: 'D:/项目/two.ts',
+      kind: 'text',
+      content: 'two',
+      mime: 'text/plain',
+    });
     const second = await service.openFile('w', 'two.ts');
     expect(service.tabs()).toHaveLength(2);
     expect(first.file()?.content).toBe('one');
@@ -110,6 +120,36 @@ describe('ProjectPreviewService', () => {
     expect(service.activeTab()?.id).toBe(second.id);
     expect(service.activation()).toBe(activation);
     expect(second.url()).toBe('https://example.org/');
+  });
+
+  it('selects the adjacent preview when the active tab closes', () => {
+    const first = service.openUrl('https://example.com/1', 'w');
+    const second = service.openUrl('https://example.com/2', 'w');
+    const third = service.openUrl('https://example.com/3', 'w');
+    service.activate(first.id);
+    service.close(first.id);
+    expect(service.activeTab()?.id).toBe(second.id);
+    service.close(second.id);
+    expect(service.activeTab()?.id).toBe(third.id);
+  });
+
+  it('ignores a directory response and its errors after the same tab navigates to a webpage', async () => {
+    let reject!: (error: unknown) => void;
+    invoke.mockImplementationOnce(
+      () =>
+        new Promise((_, fail) => {
+          reject = fail;
+        }),
+    );
+    const tab = service.createTab('w');
+    const pending = tab.browse('w', 'src');
+    tab.openUrl('http://localhost:3000', 'w');
+    expect(tab.listing()).toBe(false);
+    reject(new Error('late error'));
+    await pending;
+    expect(tab.url()).toBe('http://localhost:3000/');
+    expect(tab.error()).toBe('');
+    expect(tab.directory()).toBeNull();
   });
 
   it('navigates directories from terminal links and surfaces read failures with an external-open path', async () => {

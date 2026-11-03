@@ -7,10 +7,10 @@
 
 .terminal-panel {
   position: relative;
-  display: grid;
+  display: flex;
+  flex-direction: column;
   height: 100%;
   min-height: 0;
-  grid-template-rows: 35px minmax(0, 1fr) 24px;
   overflow: hidden;
   border: 1px solid var(--border);
   border-radius: var(--radius-box);
@@ -96,6 +96,7 @@
 }
 
 header {
+  flex: 0 0 35px;
   display: flex;
   min-width: 0;
   align-items: center;
@@ -332,7 +333,19 @@ header {
  * of the height rather than outside it. Padding on the host was therefore counted as usable
  * space, proposing one row more than fits, and the last line was drawn behind the footer.
  */
+/* xterm moves its hidden textarea on every output frame. A focused mobile input must stay
+ * stationary or the browser continually pans/resizes the page to reveal that moving caret.
+ * Styles override xterm's inline positioning; desktop IME placement keeps its own caret anchor. */
+:host ::ng-deep .touch-terminal-input .xterm-helper-textarea {
+  left: 0 !important;
+  top: 0 !important;
+  width: 1px !important;
+  height: 1px !important;
+  line-height: 1px !important;
+}
+
 .terminal-frame {
+  flex: 1 1 0;
   /* Anchors the touch keypad, which floats over the output rather than taking rows from it. */
   position: relative;
   display: grid;
@@ -414,6 +427,7 @@ header {
 }
 
 footer {
+  flex: 0 0 24px;
   display: flex;
   min-width: 0;
   align-items: center;
@@ -468,7 +482,7 @@ footer {
 
 @container terminal-panel (max-height: 220px) {
   .terminal-panel {
-    grid-template-rows: 31px minmax(0, 1fr);
+    header { flex-basis: 31px; }
   }
 
   footer {

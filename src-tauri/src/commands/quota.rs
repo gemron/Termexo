@@ -468,10 +468,13 @@ async fn resolve_antigravity(now: i64, proxy: Option<String>) -> ProviderQuota {
 ///
 /// A group's name is what distinguishes the windows — "Gemini Models" and "Claude and GPT models"
 /// each have a window called "Weekly Limit Remaining", so the bucket's own name alone would give
-/// two identical rows.
+/// two identical rows. Within a group the shorter windows come first, so a five-hour cap sits
+/// above the weekly one.
 fn antigravity_entries(usage: &AntigravityUsage) -> Vec<quota::QuotaEntry> {
     let mut entries = Vec::new();
     for group in &usage.groups {
+        let group_name = group.name.trim();
+        let mut lines = Vec::new();
         for bucket in &group.buckets {
             let Some(remaining) = bucket.remaining_fraction else {
                 continue;
@@ -479,20 +482,57 @@ fn antigravity_entries(usage: &AntigravityUsage) -> Vec<quota::QuotaEntry> {
             if !(0.0..=1.0).contains(&remaining) {
                 continue;
             }
-            let label = match (group.name.trim(), bucket.name.trim()) {
+            let bucket_name = strip_group_prefix(bucket.name.trim(), group_name);
+            let label = match (group_name, bucket_name) {
                 ("", "") => continue,
                 ("", name) => name.to_owned(),
                 (group_name, "") => group_name.to_owned(),
                 (group_name, name) => format!("{group_name} · {name}"),
             };
-            entries.push(quota::remaining_share_entry(
-                label,
-                remaining,
-                bucket.reset_time.as_deref(),
+            lines.push((
+                antigravity_window_rank(bucket_name),
+                quota::remaining_share_entry(label, remaining, bucket.reset_time.as_deref()),
             ));
         }
+        // Stable, so windows of the same length keep the order the service sent.
+        lines.sort_by_key(|(rank, _)| *rank);
+        entries.extend(lines.into_iter().map(|(_, entry)| entry));
     }
     entries
+}
+
+/// "Gemini 4 Argon · Gemini 4 Argon Weekly Limit" says the model twice; keep only the window.
+fn strip_group_prefix<'a>(name: &'a str, group: &str) -> &'a str {
+    if group.is_empty() {
+        return name;
+    }
+    match name.get(..group.len()) {
+        Some(prefix) if prefix.eq_ignore_ascii_case(group) => {
+            let rest = &name[group.len()..];
+            if rest.starts_with(char::is_whitespace) && !rest.trim().is_empty() {
+                rest.trim_start()
+            } else {
+                name
+            }
+        }
+        _ => name,
+    }
+}
+
+/// Shorter windows sort first: hours, then days, weeks and months.
+fn antigravity_window_rank(name: &str) -> u8 {
+    let name = name.to_ascii_lowercase();
+    if name.contains("hour") {
+        0
+    } else if name.contains("daily") || name.contains("day") {
+        1
+    } else if name.contains("week") {
+        2
+    } else if name.contains("month") {
+        3
+    } else {
+        4
+    }
 }
 
 async fn execute(client: reqwest::Client, query: PendingQuery) -> ProviderQuota {
@@ -633,6 +673,36 @@ mod tests {
         let usage = usage(r#"{"groups":[{"name":"G","buckets":[{"name":"W"}]}]}"#);
 
         assert!(antigravity_entries(&usage).is_empty());
+    }
+
+    /// The five-hour cap is the one that runs out first, so it is listed above the weekly one.
+    #[test]
+    fn shorter_windows_lead_within_a_group() {
+        let usage = usage(
+            r#"{"groups":[
+                {"name":"","buckets":[
+                    {"name":"Five Hour Limit Remaining","remaining_fraction":0.98}]},
+                {"name":"Claude and GPT models","buckets":[
+                    {"name":"Weekly Limit Remaining","remaining_fraction":1},
+                    {"name":"Five Hour Limit Remaining","remaining_fraction":1}]},
+                {"name":"Gemini 4 Argon","buckets":[
+                    {"name":"Gemini 4 Argon Weekly Limit","remaining_fraction":0.8451}]}]}"#,
+        );
+
+        let labels: Vec<_> = antigravity_entries(&usage)
+            .into_iter()
+            .map(|entry| entry.label)
+            .collect();
+
+        assert_eq!(
+            labels,
+            [
+                "Five Hour Limit Remaining",
+                "Claude and GPT models · Five Hour Limit Remaining",
+                "Claude and GPT models · Weekly Limit Remaining",
+                "Gemini 4 Argon · Weekly Limit",
+            ]
+        );
     }
 
     #[test]

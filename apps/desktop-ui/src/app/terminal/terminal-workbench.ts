@@ -53,6 +53,7 @@ export class TerminalWorkbenchComponent {
   readonly linkOpenFailed = output<string>();
   readonly terminalModelSwitchRequested = output<string>();
   readonly terminalAccountSwitchRequested = output<string>();
+  readonly accountLoginRetryRequested = output<string>();
   readonly terminalInput = output<{ terminalId: string; data: string }>();
   readonly terminalOutput = output<{ terminalId: string; data: string }>();
 

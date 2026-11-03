@@ -62,6 +62,7 @@ pub struct RemoteAccessStatus {
     pub addresses: Vec<RemoteAccessAddress>,
     /// Empty until a token has been generated. This is the one credential the UI may show.
     pub token: String,
+    pub read_only_token: String,
     pub connected_clients: u32,
     /// The relay tunnel, which is independent of the LAN listener above.
     pub relay: RelayStatus,
@@ -480,6 +481,7 @@ impl RemoteAccessManager {
             error: state.last_error.clone(),
             addresses: local_addresses(),
             token: self.auth.token(),
+            read_only_token: self.auth.read_only_token(),
             connected_clients: self.hub.connected_clients(),
             relay: self.relay.status(),
         }
@@ -587,6 +589,7 @@ mod tests {
                 loopback: false,
             }],
             token: "token".into(),
+            read_only_token: "viewing-token".into(),
             connected_clients: 2,
             relay: RelayStatus::default(),
         };
@@ -597,6 +600,7 @@ mod tests {
             "\"bindAddress\"",
             "\"interfaceName\"",
             "\"connectedClients\"",
+            "\"readOnlyToken\"",
             "\"relay\":{",
             "\"certificateFingerprint\"",
             "\"deviceId\"",

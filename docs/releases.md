@@ -53,8 +53,8 @@ GitHub 仓库的 `npm` environment 应只允许 `v*` 标签部署。
 3. 提交并推送源码，再创建并推送同版本标签，例如：
 
 ```bash
-git tag -a v0.11.0 -m "Termexo v0.11.0"
-git push origin v0.11.0
+git tag -a v0.12.0 -m "Termexo v0.12.0"
+git push origin v0.12.0
 ```
 
 失败后可重跑失败任务。已发布的 npm 版本无法覆盖；重试只接受校验值完全相同的包。

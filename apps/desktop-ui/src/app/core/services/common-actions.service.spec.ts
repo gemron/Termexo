@@ -64,6 +64,22 @@ describe('CommonActionsService confirmation and execution boundaries', () => {
     repository.save.mockClear();
   });
 
+  it('saves separate environment variants and launches each from its own working directory', async () => {
+    (window as unknown as Record<string, unknown>)['__TAURI_INTERNALS__'] = {};
+    await service.save('w', { ...draft, id: 'dev', environment: { PORT: '4300', VALUE: '$HOME = literal' } });
+    await service.save('w', { ...draft, id: 'test', environment: { PORT: '4400' } });
+    expect(state.activeWorkspace()?.commonActions).toHaveLength(2);
+    const id = await service.run('w', 'dev');
+    const terminal = state.activeWorkspace()!.terminals.find((item) => item.id === id)!;
+    expect(terminal.workingDirectory).toBe(draft.workingDirectory);
+    expect(terminal.environment).toEqual({ PORT: '4300', VALUE: '$HOME = literal' });
+    expect(gateway.start).toHaveBeenCalledWith(expect.objectContaining({ id: terminal.id,
+      workingDirectory: terminal.workingDirectory, environment: terminal.environment }), expect.any(Number), expect.any(Number), 'w');
+    expect(repository.save).toHaveBeenCalledWith(expect.objectContaining({
+      terminals: expect.arrayContaining([expect.objectContaining({ environment: terminal.environment })]),
+    }));
+  });
+
   it('stages editable proposals without saving or starting, and persists only selected validated items after confirmation', async () => {
     const requestId = service.beginRecognition('w');
     const review = service.propose(
@@ -81,6 +97,24 @@ describe('CommonActionsService confirmation and execution boundaries', () => {
     expect(state.activeWorkspace()?.commonActions?.[0].command).toBe('pnpm dev');
     expect(service.reviews()['w']).toBeUndefined();
     expect(gateway.start).not.toHaveBeenCalled();
+  });
+
+  it('keeps automatically identified directories and environments from AI review through confirmation and launch', async () => {
+    const requestId = service.beginRecognition('w');
+    const review = service.propose('w', requestId, JSON.stringify([
+      { name: 'Web', command: 'pnpm dev', workingDirectory: './web', environment: { NODE_ENV: 'development', PORT: '4300' }, description: 'README and package.json' },
+      { name: 'Build', command: 'pnpm build' },
+    ]));
+    expect(review.suggestions[0]).toMatchObject({ workingDirectory: 'D:/项目 with spaces/web', environment: { NODE_ENV: 'development', PORT: '4300' } });
+    expect(review.suggestions[1]).toMatchObject({ workingDirectory: 'D:/项目 with spaces', environment: {} });
+    expect(repository.save).not.toHaveBeenCalled();
+    expect(gateway.start).not.toHaveBeenCalled();
+    await service.confirm('w');
+    const saved = state.activeWorkspace()!.commonActions![0];
+    expect(saved).toMatchObject({ workingDirectory: 'D:/项目 with spaces/web', environment: { NODE_ENV: 'development', PORT: '4300' } });
+    (window as unknown as Record<string, unknown>)['__TAURI_INTERNALS__'] = {};
+    await service.run('w', saved.id);
+    expect(gateway.start).toHaveBeenCalledWith(expect.objectContaining({ workingDirectory: saved.workingDirectory, environment: saved.environment }), 120, 30, 'w');
   });
 
   it('rejects cancelled or stale requests, invalid payloads and blank selections without side effects', async () => {
@@ -207,7 +241,11 @@ describe('CommonActionsService confirmation and execution boundaries', () => {
     const requestId = service.beginRecognition('w', 'agent', 'starting');
     expect(() => service.beginRecognition('w', 'agent')).toThrow('正在识别');
     service.updateRecognition('w', requestId, { phase: 'reading' });
-    expect(service.reviews()['w']).toMatchObject({ terminalId: 'agent', phase: 'reading', waiting: true });
+    expect(service.reviews()['w']).toMatchObject({
+      terminalId: 'agent',
+      phase: 'reading',
+      waiting: true,
+    });
     service.discard('w');
     service.updateRecognition('w', requestId, { waiting: false, error: 'late error' });
     expect(service.reviews()['w']).toBeUndefined();
@@ -224,5 +262,60 @@ describe('CommonActionsService confirmation and execution boundaries', () => {
     expect(review.terminalId).toBe('agent');
     expect(state.activeWorkspace()?.commonActions).toHaveLength(1);
     expect(gateway.start).not.toHaveBeenCalled();
+  });
+
+  it('rejects duplicate manual entries while allowing edits to the existing action', async () => {
+    await service.save('w', { ...draft, id: 'saved', category: 'develop' });
+    await expect(
+      service.save('w', { ...draft, id: 'copy', workingDirectory: 'd:\\项目 with spaces\\web\\' }),
+    ).rejects.toThrow('已存在');
+    await service.save('w', { ...draft, id: 'saved', name: '开发服务', category: 'develop' });
+    expect(state.activeWorkspace()?.commonActions).toMatchObject([
+      { id: 'saved', name: '开发服务', category: 'develop' },
+    ]);
+  });
+
+  it('reports the number actually added when suggestions are edited into duplicates', async () => {
+    const requestId = service.beginRecognition('w');
+    const review = service.propose(
+      'w',
+      requestId,
+      JSON.stringify([draft, { ...draft, command: 'npm test' }]),
+    );
+    service.editSuggestion('w', review.suggestions[1].id, { command: draft.command });
+    expect(await service.confirm('w')).toBe(1);
+    expect(state.activeWorkspace()?.commonActions).toHaveLength(1);
+  });
+
+  it('keeps editable suggestions and releases the lock when persistence fails', async () => {
+    const requestId = service.beginRecognition('w');
+    service.propose('w', requestId, JSON.stringify([{ ...draft, category: 'test' }]));
+    repository.save.mockRejectedValueOnce(new Error('disk full'));
+    await expect(service.confirm('w')).rejects.toThrow('disk full');
+    expect(service.reviews()['w'].suggestions).toHaveLength(1);
+    expect(service.busy().size).toBe(0);
+    expect(state.activeWorkspace()?.commonActions).toBeUndefined();
+    expect(await service.confirm('w')).toBe(1);
+    expect(state.activeWorkspace()?.commonActions?.[0].category).toBe('test');
+  });
+
+  it('marks background starts running without waiting for a mounted console and preserves fast exits', async () => {
+    (window as unknown as Record<string, unknown>)['__TAURI_INTERNALS__'] = {};
+    await service.save('w', { ...draft, id: 'dev' });
+    const id = await service.run('w', 'dev');
+    expect(state.activeWorkspace()?.terminals.find((item) => item.id === id)?.status).toBe(
+      'RUNNING',
+    );
+    gateway.start.mockImplementationOnce(async (terminal) => {
+      state.markTerminalExited(terminal.id, 'COMPLETED');
+      return { attached: false, runtimeRevision: 0, cols: 120, rows: 30 };
+    });
+    const completed = await service.run('w', 'dev', true);
+    expect(state.activeWorkspace()?.terminals.find((item) => item.id === completed)?.status).toBe(
+      'COMPLETED',
+    );
+    repository.list.mockResolvedValue(state.workspaces());
+    await state.initialize();
+    expect(state.activeWorkspace()?.terminals[0].status).toBe('COMPLETED');
   });
 });

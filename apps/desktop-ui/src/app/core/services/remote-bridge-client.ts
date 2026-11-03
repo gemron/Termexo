@@ -113,6 +113,7 @@ export class RemoteBridgeClient {
   private token: string | null = null;
   private stateValue: RemoteConnectionState = 'idle';
   private errorValue: string | null = null;
+  readOnly = false;
   private nextRequestId = 1;
   private reconnectAttempt = 0;
   private establishedOnce = false;
@@ -261,6 +262,7 @@ export class RemoteBridgeClient {
         this.handleChallenge(frame.protocol, frame.nonceS, frame.sealedRequired ?? false);
         return;
       case 'ready':
+        this.readOnly = frame.readOnly === true;
         this.handleReady();
         return;
       case 'auth-failed':

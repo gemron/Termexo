@@ -135,6 +135,21 @@ describe('RemoteAccessPanelComponent', () => {
     TestBed.resetTestingModule();
   });
 
+  it('generates a separate viewing URL and QR without replacing the control URL', async () => {
+    await mount(accessStatus({ readOnlyToken: 'viewing-token' }));
+    const render = vi.spyOn(service, 'renderQr');
+    const panel = fixture.componentInstance as unknown as { viewingLink: { set(value: boolean): void } };
+    expect(root.querySelector('.remote-link-row code')?.textContent).toContain('#token=token-value');
+    panel.viewingLink.set(true);
+    fixture.detectChanges();
+    await fixture.whenStable();
+    expect(root.querySelector('.remote-link-row code')?.textContent).toContain('#token=viewing-token');
+    expect(render).toHaveBeenCalledWith('https://192.168.1.10:7420/#token=viewing-token');
+    panel.viewingLink.set(false);
+    fixture.detectChanges();
+    expect(root.querySelector('.remote-link-row code')?.textContent).toContain('#token=token-value');
+  });
+
   it('explains the preview limitation without loading native controls', async () => {
     Reflect.deleteProperty(window, '__TAURI_INTERNALS__');
     await mount();

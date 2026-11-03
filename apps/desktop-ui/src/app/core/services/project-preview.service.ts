@@ -87,7 +87,9 @@ export class ProjectPreviewSession {
     return workspace.projectPath;
   }
 
-  close(): void { this.onClose(); }
+  close(): void {
+    this.onClose();
+  }
 
   dispose(): void {
     this.open.set(false);
@@ -120,7 +122,8 @@ export class ProjectPreviewSession {
       });
       if (generation === this.directoryGeneration) this.directory.set(directory);
     } catch (error) {
-      if (generation === this.directoryGeneration) this.error.set(String(error));
+      if (generation === this.directoryGeneration)
+        this.error.set(error instanceof Error ? error.message : String(error));
     } finally {
       if (generation === this.directoryGeneration) this.listing.set(false);
     }
@@ -163,7 +166,7 @@ export class ProjectPreviewSession {
       this.failedPath.set('');
     } catch (error) {
       if (generation === this.generation) {
-        this.error.set(String(error));
+        this.error.set(error instanceof Error ? error.message : String(error));
         throw error;
       }
     } finally {
@@ -175,6 +178,8 @@ export class ProjectPreviewSession {
     const url = previewUrl(value);
     this.root(workspaceId);
     ++this.generation;
+    ++this.directoryGeneration;
+    this.listing.set(false);
     if (this.workspaceId() !== workspaceId) {
       this.directory.set(null);
       ++this.directoryGeneration;
@@ -201,7 +206,6 @@ export class ProjectPreviewSession {
   }
 }
 
-
 /** Each tab owns its reads and view state. Only explicit opens/selections request focus. */
 @Injectable({ providedIn: 'root' })
 export class ProjectPreviewService {
@@ -218,8 +222,11 @@ export class ProjectPreviewService {
     const workspaceId = this.state.activeWorkspace()?.id;
     return this.liveTabs().filter((tab) => tab.workspaceId() === workspaceId);
   });
-  readonly activeTab = computed(() =>
-    this.workspaceTabs().find((tab) => tab.id === this.activeTabId()) ?? this.workspaceTabs().at(-1) ?? null,
+  readonly activeTab = computed(
+    () =>
+      this.workspaceTabs().find((tab) => tab.id === this.activeTabId()) ??
+      this.workspaceTabs().at(-1) ??
+      null,
   );
   readonly open = computed(() => this.workspaceTabs().length > 0);
   readonly workspaceId = computed(() => this.activeTab()?.workspaceId() ?? '');
@@ -249,7 +256,13 @@ export class ProjectPreviewService {
   createTab(workspaceId: string): ProjectPreviewSession {
     this.root(workspaceId);
     const id = createId();
-    const tab = new ProjectPreviewSession(this.state, id, workspaceId, `内容预览 ${this.nextNumber++}`, () => this.close(id));
+    const tab = new ProjectPreviewSession(
+      this.state,
+      id,
+      workspaceId,
+      `内容预览 ${this.nextNumber++}`,
+      () => this.close(id),
+    );
     this.tabs.update((tabs) => [...tabs, tab]);
     this.activate(id);
     return tab;
@@ -269,8 +282,10 @@ export class ProjectPreviewService {
     const remaining = tabs.filter((item) => item.id !== tab.id);
     this.tabs.set(remaining);
     if (this.activeTabId() === tab.id) {
+      const previousSiblings = tabs.filter((item) => item.workspaceId() === tab.workspaceId());
+      const index = previousSiblings.indexOf(tab);
       const siblings = remaining.filter((item) => item.workspaceId() === tab.workspaceId());
-      this.activeTabId.set(siblings.at(-1)?.id ?? null);
+      this.activeTabId.set(siblings[Math.min(index, siblings.length - 1)]?.id ?? null);
     }
   }
 
@@ -288,18 +303,31 @@ export class ProjectPreviewService {
     return tab;
   }
 
-  async openFile(workspaceId: string, path: string, workingDirectory?: string, line = 1, column = 1, tabId?: string): Promise<ProjectPreviewSession> {
+  async openFile(
+    workspaceId: string,
+    path: string,
+    workingDirectory?: string,
+    line = 1,
+    column = 1,
+    tabId?: string,
+  ): Promise<ProjectPreviewSession> {
     const tab = this.target(workspaceId, tabId);
     await tab.openFile(workspaceId, path, workingDirectory, line, column);
     return tab;
   }
 
-  openUrl(value: string, workspaceId = this.state.activeWorkspace()?.id ?? '', tabId?: string): ProjectPreviewSession {
+  openUrl(
+    value: string,
+    workspaceId = this.state.activeWorkspace()?.id ?? '',
+    tabId?: string,
+  ): ProjectPreviewSession {
     const url = previewUrl(value);
     const tab = this.target(workspaceId, tabId);
     tab.openUrl(url, workspaceId);
     return tab;
   }
 
-  async external(): Promise<void> { await this.activeTab()?.external(); }
+  async external(): Promise<void> {
+    await this.activeTab()?.external();
+  }
 }

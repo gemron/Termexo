@@ -11,6 +11,7 @@ import {
 } from '../core/models/agent.models';
 import { I18nService } from '../core/i18n/i18n.service';
 import { TranslatePipe } from '../core/i18n/translate.pipe';
+import { localizeQuotaLabel } from '../core/models/quota-label';
 import {
   RepositoryChange,
   RepositoryOverview,
@@ -95,16 +96,6 @@ const QUOTA_DIAGNOSTIC_KEYS: Readonly<Record<string, string>> = {
     'quota.diagnostic.ownStatusLine',
   'No allowance reported yet. It appears after Claude Code answers in a Termexo terminal (Pro and Max plans).':
     'quota.diagnostic.noAllowanceYet',
-};
-
-/** Allowance line names the backend writes, and the wording that replaces each. */
-const QUOTA_LABEL_KEYS: Readonly<Record<string, string>> = {
-  每周额度: 'quota.window.weekly',
-  周额度: 'quota.window.weekly',
-  'Opus 额度': 'quota.window.opus',
-  订阅额度: 'quota.window.subscription',
-  可用余额: 'quota.window.balance',
-  额外点数余额: 'quota.window.extraCredits',
 };
 
 @Component({
@@ -439,12 +430,7 @@ export class InspectorPanelComponent {
    * in the interface language. Anything else is a provider's own wording and passes through.
    */
   protected quotaLabel(label: string): string {
-    const hours = /^(\d+) 小时窗口$/.exec(label);
-    if (hours) return this.i18n.t('quota.window.hours', { count: hours[1] });
-    const days = /^(\d+) 天窗口$/.exec(label);
-    if (days) return this.i18n.t('quota.window.days', { count: days[1] });
-    const key = QUOTA_LABEL_KEYS[label];
-    return key ? this.i18n.t(key) : label;
+    return localizeQuotaLabel(label, (key, params) => this.i18n.t(key, params));
   }
 
   /** A diagnostic the backend is known to write is shown in the interface language. */

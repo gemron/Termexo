@@ -2,6 +2,7 @@ import { TestBed } from '@angular/core/testing';
 
 import { TerminalSession } from '../models/workspace.models';
 import { terminalEventMatchesSession, TerminalGatewayService } from './terminal-gateway.service';
+import { RemoteConnectionService } from './remote-connection.service';
 
 describe('terminal runtime event matching', () => {
   it('accepts events from the active PTY revision', () => {
@@ -199,7 +200,7 @@ describe('TerminalGatewayService attachment', () => {
     await expect(service.replayInitial('terminal-unknown')).resolves.toBeUndefined();
   });
 
-  it('clears the screen before replaying a reconnected terminal', async () => {
+  it('writes a reconnected terminal replacement in one chunk without an intermediate blank screen', async () => {
     const output: string[] = [];
     await service.connect('terminal-1', 3, (data) => output.push(data));
     const replaying = service.replayInitial('terminal-1');
@@ -211,7 +212,7 @@ describe('TerminalGatewayService attachment', () => {
 
     await service.replayAll();
 
-    expect(output).toEqual([CLEAR_SCREEN, 'redrawn']);
+    expect(output).toEqual([CLEAR_SCREEN + 'redrawn']);
   });
 
   it('releases the terminal when a redraw never comes back', async () => {
@@ -253,7 +254,7 @@ describe('TerminalGatewayService attachment', () => {
 
     await service.redraw('terminal-1');
 
-    expect(output).toEqual([CLEAR_SCREEN, 'drawn for 80 columns']);
+    expect(output).toEqual([CLEAR_SCREEN + 'drawn for 80 columns']);
   });
 
   it('ignores a redraw for a terminal that never attached', async () => {
@@ -337,6 +338,37 @@ describe('TerminalGatewayService attachment', () => {
       accountProfileId: 'isolated-claude',
       workspaceId: 'workspace-1',
     });
+  });
+
+  it('uses a passive attachment for viewers and sends no input, viewport, palette or close commands', async () => {
+    TestBed.inject(RemoteConnectionService).readOnly.set(true);
+    const commands: string[] = [];
+    commandHandler = async (command) => {
+      commands.push(command);
+      return { attached: true, runtimeRevision: 0, cols: 100, rows: 30 };
+    };
+    const session: TerminalSession = { id: 'viewer-terminal', name: 'Shared', agentType: 'shell',
+      shell: 'powershell.exe', status: 'RUNNING', model: '', branch: '', workingDirectory: 'C:/project' };
+    expect(await service.start(session, 80, 24)).toMatchObject({ attached: true, cols: 100, rows: 30 });
+    await service.write(session, 'command\r');
+    await service.resize(session.id, 80, 24, true);
+    await service.setPalette(session.id, { foreground: '#ffffff', background: '#000000' });
+    await service.close(session.id);
+    expect(commands).toEqual(['attach_terminal']);
+  });
+
+  it('forwards scoped environment and working directory when starting or restoring a command', async () => {
+    let request: Record<string, unknown> | undefined;
+    commandHandler = async (command, args) => {
+      if (command === 'create_terminal') request = args['request'] as Record<string, unknown>;
+      return { attached: false, runtimeRevision: 0, cols: 80, rows: 24 };
+    };
+    const session: TerminalSession = { id: 'env-terminal', name: 'Dev', agentType: 'shell',
+      shell: '', status: 'STARTING', model: '', branch: '', command: 'npm run dev',
+      workingDirectory: 'D:/项目 with spaces/web', environment: { PORT: '4300', VALUE: " $HOME='literal' " } };
+    await service.start(session, 80, 24, 'w');
+    expect(request).toMatchObject({ environment: session.environment, workingDirectory: session.workingDirectory,
+      command: session.command, workspaceId: 'w' });
   });
 
   const startableSession = () =>

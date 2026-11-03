@@ -1,3 +1,5 @@
+import './core/i18n/workspace-tools.i18n';
+import { RemoteReadOnlyViewComponent } from './remote/remote-read-only-view';
 import { ProjectPreviewPanelComponent } from './preview/project-preview-panel';
 import { ProjectPreviewService } from './core/services/project-preview.service';
 import { CommonActionsDialogComponent } from './dialogs/common-actions-dialog';
@@ -70,6 +72,7 @@ import {
   todoWorkingDirectory,
 } from './core/models/todo.models';
 import { I18nService } from './core/i18n/i18n.service';
+import { localizeQuotaLabel } from './core/models/quota-label';
 import { TranslatePipe } from './core/i18n/translate.pipe';
 import {
   clearedNoticeStatus,
@@ -84,6 +87,7 @@ import {
 } from './core/models/terminal-notifications';
 import { createAppThemePalette } from './core/models/theme-palette';
 import { AgentService } from './core/services/agent.service';
+import { AccountLoginFeedbackService } from './core/services/account-login-feedback.service';
 import { AppStateService } from './core/services/app-state.service';
 import { DirectoryPickerService } from './core/services/directory-picker.service';
 import { DesktopNotificationService } from './core/services/desktop-notification.service';
@@ -270,6 +274,7 @@ function readStoredString(key: string, fallback: string): string {
 @Component({
   selector: 'app-root',
   imports: [
+    RemoteReadOnlyViewComponent,
     ProjectPreviewPanelComponent,
     CommonActionsDialogComponent,
     AgentLaunchOptionsComponent,
@@ -338,6 +343,7 @@ export class App {
   private pendingCommonActionLaunch: string | null = null;
   private readonly returnToCommonActionReview = signal<{ workspaceId: string; requestId: string } | null>(null);
   protected readonly agents = inject(AgentService);
+  private readonly loginFeedback = inject(AccountLoginFeedbackService);
   protected readonly modelCatalog = inject(ModelCatalogService);
   protected readonly i18n = inject(I18nService);
   protected readonly updates = inject(UpdateService);
@@ -797,7 +803,7 @@ export class App {
           this.showToast(
             this.i18n.t('quota.thresholdAlert', {
               name: quota.profileName,
-              label: entry.label,
+              label: localizeQuotaLabel(entry.label, (key, params) => this.i18n.t(key, params)),
               percent: Math.round(entry.percent),
             }),
             'attention',
@@ -851,17 +857,7 @@ export class App {
    * exit raises the terminal's attention notice, which is what tells the user about it.
    */
   private handleTerminalExit(event: TerminalExitEvent): void {
-    // The login CLI writes its credentials before exiting, so its exit is a reliable moment for
-    // the final read — and ends the poll early instead of letting it run to the timeout when the
-    // user abandoned the flow. Checked before the terminal lookup because the login terminal may
-    // already have been closed. The poll is what actually catches a success, since the CLI often
-    // keeps running after the browser returns.
-    const loggingInProfileId = this.pendingAccountLogins.get(event.terminalId);
-    if (loggingInProfileId !== undefined) {
-      this.pendingAccountLogins.delete(event.terminalId);
-      void this.refreshAccountAfterLogin(loggingInProfileId);
-    }
-
+    if (this.remoteConnection.readOnly()) return;
     const terminal = this.state
       .workspaces()
       .flatMap((workspace) => workspace.terminals)
@@ -872,7 +868,14 @@ export class App {
     if (!terminalEventMatchesSession(event, terminal)) {
       return;
     }
-    const status = event.intentional || event.success ? 'STOPPED' : 'FAILED';
+    const loggingInProfileId = this.pendingAccountLogins.get(event.terminalId);
+    if (loggingInProfileId !== undefined) {
+      this.pendingAccountLogins.delete(event.terminalId);
+      void this.refreshAccountAfterLogin(loggingInProfileId, event.terminalId, event.success && !event.intentional);
+    }
+    const status = event.intentional
+      ? 'STOPPED'
+      : event.success ? (terminal.commonActionId ? 'COMPLETED' : 'STOPPED') : 'FAILED';
     this.state.markTerminalExited(event.terminalId, status);
     this.todos.handleTerminalStatus(event.terminalId, status);
     this.agentStartup.cancel(event.terminalId);
@@ -1669,6 +1672,8 @@ export class App {
   }
 
   private removeClosedTerminal(terminalId: string): void {
+    this.pendingAccountLogins.delete(terminalId);
+    this.loginFeedback.forget(terminalId);
     const workspace = this.state.activeWorkspace();
     if (
       this.terminalMaximized() &&
@@ -2434,6 +2439,7 @@ export class App {
    */
   @HostListener('window:keydown', ['$event'])
   protected handleWindowKeydown(event: KeyboardEvent): void {
+    if (this.remoteConnection.readOnly()) return;
     if (event.key === 'Escape') {
       this.restoreMaximizedView(event);
       return;
@@ -3219,30 +3225,7 @@ export class App {
       this.profileSaveCompleted.set({ kind: 'accounts', id: profileId });
       const profile = this.agents.accountProfiles().find((item) => item.id === profileId);
       if (!profile) throw new Error(this.i18n.t('account.notFound'));
-      const launch = await this.agents.prepareAccountLogin({
-        terminalId,
-        workspaceId: workspace.id,
-        accountProfileId: profileId,
-      });
-      const terminal = this.state.createTerminal(
-        {
-          id: terminalId,
-          agentType: profile.agentType,
-          name: this.i18n.t('account.loginName', { name: profile.name }),
-          command: launch.command,
-          accountLogin: true,
-          accountProfileId: profileId,
-          model: this.i18n.t('account.loginModel'),
-          workingDirectory: workspace.projectPath,
-        },
-        workspace.id,
-      );
-      this.settingsOpen.set(false);
-      if (terminal) {
-        this.revealCreatedTerminal(terminal.id);
-        this.showToast(this.i18n.t('account.loginOpened', { name: profile.name }));
-        void this.watchAccountLogin(profileId, terminalId);
-      }
+      await this.openAccountLogin(profile, workspace, terminalId);
     } catch (error) {
       this.showToast(this.errorMessage(error), 'error');
     } finally {
@@ -3250,30 +3233,70 @@ export class App {
     }
   }
 
-  /**
-   * Polls the account until the CLI reports it signed in, so the new state appears on its own.
-   *
-   * Waiting for the login process to exit is not enough: `claude auth login` keeps running after
-   * the browser flow returns, so the credentials land while the terminal is still open. Polling
-   * stops early once the account reads as authenticated, when the login terminal is gone (the
-   * user gave up), or at the timeout.
-   */
-  /** One last read after the login CLI exits, reporting whichever state it left behind. */
-  private async refreshAccountAfterLogin(profileId: string): Promise<void> {
-    await this.agents.refreshAccountProfile(profileId).catch(() => undefined);
-    const profile = this.agents.accountProfiles().find((item) => item.id === profileId);
-    if (!profile) {
-      return;
+  protected async retryAccountLogin(terminalId: string): Promise<void> {
+    if (this.profileSaving() || this.remoteConnection.readOnly()) return;
+    const workspace = this.state.workspaces().find((item) => item.terminals.some((terminal) => terminal.id === terminalId));
+    const terminal = workspace?.terminals.find((item) => item.id === terminalId);
+    if (!workspace || !terminal?.accountLogin || !terminal.accountProfileId) return;
+    const profile = this.agents.accountProfiles().find((item) => item.id === terminal.accountProfileId);
+    if (!profile) { this.showToast(this.i18n.t('account.notFound'), 'error'); return; }
+    this.profileSaving.set(true);
+    this.loginFeedback.setPhase(terminalId, 'restarting');
+    try {
+      await this.openAccountLogin(profile, workspace, createId(), terminalId);
+    } catch (error) {
+      this.loginFeedback.setPhase(terminalId, 'closed');
+      this.showToast(this.errorMessage(error), 'error');
+    } finally {
+      this.profileSaving.set(false);
     }
-    this.showToast(
-      profile.authenticated
-        ? this.i18n.t('account.loginSucceeded', { name: profile.name })
-        : this.i18n.t('account.loginIncomplete', {
-            name: profile.name,
-            detail: profile.diagnostic,
-          }),
-      profile.authenticated ? 'success' : 'attention',
-    );
+  }
+
+  private async openAccountLogin(profile: AccountProfile, workspace: Workspace, terminalId: string, previousId?: string): Promise<void> {
+    const launch = await this.agents.prepareAccountLogin({ terminalId, workspaceId: workspace.id, accountProfileId: profile.id });
+    // Only one live attempt per profile. Other accounts retain their own terminal and feedback.
+    const replaced = new Set(this.state.workspaces().flatMap((item) => item.terminals)
+      .filter((item) => item.accountLogin && item.accountProfileId === profile.id).map((item) => item.id));
+    if (previousId) replaced.add(previousId);
+    for (const id of replaced) {
+      this.pendingAccountLogins.delete(id);
+      try {
+        await this.terminalGateway.close(id);
+      } catch (error) {
+        // A restored login tab may outlive its PTY. It can still start a fresh attempt.
+        if (this.errorMessage(error) !== `terminal ${id} was not found`) throw error;
+      }
+      this.loginFeedback.setPhase(id, 'closed');
+    }
+    const terminal = this.state.createTerminal({
+      id: terminalId, agentType: profile.agentType,
+      name: this.i18n.t('account.loginName', { name: profile.name }),
+      command: launch.command, accountLogin: true, accountProfileId: profile.id,
+      model: this.i18n.t('account.loginModel'), workingDirectory: workspace.projectPath,
+    }, workspace.id);
+    if (!terminal) throw new Error(this.i18n.t('account.loginWorkspaceRequired'));
+    this.loginFeedback.begin(terminalId, this.agents.accountProfiles().find((item) => item.id === profile.id) ?? profile);
+    this.settingsOpen.set(false);
+    for (const id of replaced) this.removeClosedTerminal(id);
+    this.revealCreatedTerminal(terminal.id);
+    this.showToast(this.i18n.t('account.loginOpened', { name: profile.name }));
+    void this.watchAccountLogin(profile.id, terminalId);
+  }
+
+  private async refreshAccountAfterLogin(profileId: string, terminalId: string, successfulExit: boolean): Promise<void> {
+    try {
+      await this.agents.refreshAccountProfile(profileId);
+      // A replaced/closed terminal must never update its successor's feedback.
+      if (!this.loginFeedback.get(terminalId)) return;
+      const profile = this.agents.accountProfiles().find((item) => item.id === profileId);
+      if (successfulExit && this.loginFeedback.confirm(terminalId, !!profile?.authenticated, true)) {
+        this.showToast(this.i18n.t('account.loginSucceeded', { name: profile!.name }), 'success');
+      } else if (this.loginFeedback.get(terminalId)?.phase !== 'rejected') {
+        this.loginFeedback.setPhase(terminalId, 'closed');
+      }
+    } catch {
+      if (this.loginFeedback.get(terminalId)?.phase !== 'rejected') this.loginFeedback.setPhase(terminalId, 'closed');
+    }
   }
 
   private async watchAccountLogin(profileId: string, terminalId: string): Promise<void> {
@@ -3282,31 +3305,20 @@ export class App {
     try {
       while (Date.now() < deadline) {
         await new Promise((resolve) => window.setTimeout(resolve, ACCOUNT_LOGIN_POLL_INTERVAL_MS));
-        // A watch is abandoned when its terminal is closed, or when a later login replaced it.
-        if (this.pendingAccountLogins.get(terminalId) !== profileId) {
-          return;
-        }
-        await this.agents.refreshAccountProfile(profileId).catch(() => undefined);
+        if (this.pendingAccountLogins.get(terminalId) !== profileId) return;
+        try { await this.agents.refreshAccountProfile(profileId); } catch { continue; }
+        if (this.pendingAccountLogins.get(terminalId) !== profileId) return;
         const profile = this.agents.accountProfiles().find((item) => item.id === profileId);
-        if (profile?.authenticated) {
-          this.showToast(this.i18n.t('account.loginSucceeded', { name: profile.name }));
+        if (this.loginFeedback.confirm(terminalId, !!profile?.authenticated)) {
+          this.showToast(this.i18n.t('account.loginSucceeded', { name: profile!.name }), 'success');
           return;
         }
       }
-      const profile = this.agents.accountProfiles().find((item) => item.id === profileId);
-      if (profile) {
-        this.showToast(
-          this.i18n.t('account.loginIncomplete', {
-            name: profile.name,
-            detail: profile.diagnostic,
-          }),
-          'attention',
-        );
+      if (this.pendingAccountLogins.get(terminalId) === profileId && this.loginFeedback.get(terminalId)?.phase !== 'rejected') {
+        this.loginFeedback.setPhase(terminalId, 'timeout');
       }
     } finally {
-      if (this.pendingAccountLogins.get(terminalId) === profileId) {
-        this.pendingAccountLogins.delete(terminalId);
-      }
+      if (this.pendingAccountLogins.get(terminalId) === profileId) this.pendingAccountLogins.delete(terminalId);
     }
   }
 
@@ -4081,6 +4093,10 @@ export class App {
     // actions still await it, because a prompt must never reach an agent as raw keys.
     void this.loadTodoTranslations();
     await this.state.initialize();
+    if (this.remoteConnection.readOnly()) {
+      this.workspacesLoaded.set(true);
+      return;
+    }
     await this.todos.initialize(this.state.workspaces());
     this.workspacesLoaded.set(true);
     this.todos.reconcileTerminals(this.state.workspaces());

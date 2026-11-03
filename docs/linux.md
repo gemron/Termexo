@@ -21,6 +21,11 @@ npm --prefix apps/desktop-ui ci
 npm run tauri:dev
 ```
 
+On a fresh checkout, run `npm --prefix apps/desktop-ui ci` followed by
+`npm run one-ring:stage` before invoking Cargo directly (including `cargo test`),
+because Tauri requires the generated `src-tauri/vendor/one-ring/` resources;
+the npm Tauri commands stage them automatically.
+
 Run in a graphical desktop session. Saving API keys requires an unlocked Secret Service
 provider on the session D-Bus, such as GNOME Keyring or a KWallet installation exposing
 Secret Service. Credentials are never stored in SQLite or plaintext as a fallback.

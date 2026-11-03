@@ -21,10 +21,12 @@ export class RemoteConnectionService {
   private readonly storedTokenValue = signal(false);
   private readonly reconnectedHandlers = new Set<() => void>();
   private clientPromise: Promise<RemoteBridgeClient> | null = null;
+  private establishedReadOnly: boolean | undefined;
 
   readonly state = this.stateValue.asReadonly();
   readonly error = this.errorValue.asReadonly();
   readonly hasStoredToken = this.storedTokenValue.asReadonly();
+  readonly readOnly = signal(false);
 
   constructor() {
     if (this.mode !== 'remote') {
@@ -67,12 +69,26 @@ export class RemoteConnectionService {
 
   private async attach(): Promise<RemoteBridgeClient> {
     const client = await getRemoteClient();
-    client.onStateChange((state, error) => this.applyState(state, error));
+    client.onStateChange((state, error) => {
+      if (state === 'ready') {
+        const changedRole = this.establishedReadOnly !== undefined && this.establishedReadOnly !== client.readOnly;
+        this.establishedReadOnly = client.readOnly;
+        if (changedRole) {
+          // Controllers and viewers initialize different services. A credential switch starts
+          // a fresh page so a viewer never inherits controller automation or editing state.
+          window.location.reload();
+          return;
+        }
+      }
+      this.readOnly.set(client.readOnly);
+      this.applyState(state, error);
+    });
     client.onReconnected(() => {
       for (const handler of [...this.reconnectedHandlers]) {
         handler();
       }
     });
+    this.readOnly.set(client.readOnly);
     this.applyState(client.state, client.error);
     return client;
   }

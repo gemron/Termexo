@@ -542,6 +542,8 @@ enum ServerFrame {
     Ready {
         #[serde(rename = "serverVersion")]
         server_version: String,
+        #[serde(rename = "readOnly")]
+        read_only: bool,
     },
     AuthFailed {
         reason: String,
@@ -595,6 +597,7 @@ impl Drop for ViewportGuard {
 /// every later frame passes through.
 struct Session {
     client_id: String,
+    read_only: bool,
     sealer: Option<FrameSealer>,
     opener: Option<FrameOpener>,
 }
@@ -612,6 +615,7 @@ async fn handle_connection(
     };
     let Session {
         client_id,
+        read_only,
         mut sealer,
         mut opener,
     } = session;
@@ -623,7 +627,7 @@ async fn handle_connection(
     // was holding at its own width can grow back for whoever is still watching.
     let _viewports = ViewportGuard {
         app: context.app.clone(),
-        client_id,
+        client_id: if read_only { String::new() } else { client_id },
     };
     let (outbound, mut outbound_rx) = mpsc::channel::<Message>(OUTBOUND_CAPACITY);
     // Command results arrive from spawned tasks, so exactly one task owns the sink — which is also
@@ -690,7 +694,7 @@ async fn handle_connection(
                         break;
                     }
                     Incoming::Frame(frame) => {
-                        if !handle_client_frame(frame, &context, &outbound, peer).await {
+                        if !handle_client_frame(frame, &context, &outbound, peer, read_only).await {
                             break;
                         }
                     }
@@ -787,6 +791,7 @@ async fn handle_client_frame(
     context: &Arc<ServerContext>,
     outbound: &mpsc::Sender<Message>,
     peer: IpAddr,
+    read_only: bool,
 ) -> bool {
     match frame {
         ClientFrame::Ping => outbound
@@ -804,6 +809,7 @@ async fn handle_client_frame(
                 id,
                 command,
                 args,
+                read_only,
             );
             true
         }
@@ -818,11 +824,12 @@ fn spawn_invoke(
     id: i64,
     command: String,
     args: Option<Value>,
+    read_only: bool,
 ) {
     tauri::async_runtime::spawn(async move {
         let started = std::time::Instant::now();
         let args = args.unwrap_or_else(|| Value::Object(Default::default()));
-        let outcome = bridge::dispatch(&app, command.clone(), args).await;
+        let outcome = bridge::dispatch(&app, command.clone(), args, read_only).await;
         tracing::debug!(
             %peer,
             %command,
@@ -892,10 +899,18 @@ async fn authenticate(
             Err(())
         }
         HandshakeChoice::Plain => {
-            accept_or_reject(sink, peer, context.auth.authorize(peer, &auth.token)).await?;
-            send_ready(sink, context, None).await?;
+            let (_, read_only) = accept_or_reject(
+                sink,
+                peer,
+                context.auth.authorize_access_with(peer, |expected| {
+                    crate::remote::token::tokens_match(expected, &auth.token).then_some(())
+                }),
+            )
+            .await?;
+            send_ready(sink, context, None, read_only).await?;
             Ok(Session {
                 client_id: auth.client_id,
+                read_only,
                 sealer: None,
                 opener: None,
             })
@@ -942,21 +957,22 @@ async fn seal_session(
 
     // The proof is checked against the live token inside the lockout gate, exactly where a
     // plaintext token comparison used to happen, so failed guesses still lock the source address.
-    let outcome = context.auth.authorize_with(peer, |token| {
+    let outcome = context.auth.authorize_access_with(peer, |token| {
         let secrets = SessionSecrets::derive(token, &challenge.bytes, &client_nonce);
         secrets
             .proof_matches(&challenge.bytes, &client_nonce, &proof)
             .then_some(secrets)
     });
-    let secrets = accept_or_reject(sink, peer, outcome).await?;
+    let (secrets, read_only) = accept_or_reject(sink, peer, outcome).await?;
 
     let mut sealer = secrets.sealer(Direction::ServerToClient);
     let opener = secrets.opener(Direction::ClientToServer);
     // The ready frame is the first sealed one, so opening it is how the client learns the keys
     // really do match.
-    send_ready(sink, context, Some(&mut sealer)).await?;
+    send_ready(sink, context, Some(&mut sealer), read_only).await?;
     Ok(Session {
         client_id: auth.client_id,
+        read_only,
         sealer: Some(sealer),
         opener: Some(opener),
     })
@@ -983,9 +999,11 @@ async fn send_ready(
     sink: &mut SocketSink,
     context: &Arc<ServerContext>,
     sealer: Option<&mut FrameSealer>,
+    read_only: bool,
 ) -> Result<(), ()> {
     let ready = ServerFrame::Ready {
         server_version: context.version.clone(),
+        read_only,
     }
     .into_message();
     let ready = match sealer {
@@ -1371,9 +1389,13 @@ mod tests {
     fn server_frames_use_the_documented_wire_shape() {
         let ready = serde_json::to_string(&ServerFrame::Ready {
             server_version: "0.7.0".into(),
+            read_only: false,
         })
         .expect("the frame should serialize");
-        assert_eq!(ready, "{\"type\":\"ready\",\"serverVersion\":\"0.7.0\"}");
+        assert_eq!(
+            ready,
+            "{\"type\":\"ready\",\"serverVersion\":\"0.7.0\",\"readOnly\":false}"
+        );
 
         let failed = serde_json::to_string(&ServerFrame::AuthFailed {
             reason: "no".into(),

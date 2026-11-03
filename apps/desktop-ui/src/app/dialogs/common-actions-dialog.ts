@@ -12,9 +12,29 @@ import {
 import { FormsModule } from '@angular/forms';
 
 import { createId } from '../core/models/identifiers';
-import type { CommonAction, Workspace } from '../core/models/workspace.models';
-import { CommonActionsService, validateCommonAction } from '../core/services/common-actions.service';
-import { hasBackend } from '../core/services/tauri-runtime';
+import {
+  COMMON_ACTION_CATEGORIES,
+  COMMON_ACTION_STATUS_LABELS,
+  MAX_ACTION_ENVIRONMENT_VARIABLES,
+  MAX_ACTION_ENVIRONMENT_VALUE_LENGTH,
+  commonActionCategory,
+  commonActionState,
+  commonActionTerminal,
+  relativeActionDirectory,
+  type CommonActionState,
+} from '../core/models/common-action';
+import type {
+  CommonAction,
+  CommonActionCategory,
+  Workspace,
+} from '../core/models/workspace.models';
+import {
+  CommonActionsService,
+  validateCommonAction,
+} from '../core/services/common-actions.service';
+import { writeClipboardText } from '../core/services/clipboard-text';
+import { hasBackend, isTauriRuntime } from '../core/services/tauri-runtime';
+import { DirectoryPickerService } from '../core/services/directory-picker.service';
 import { ModalFocusDirective } from '../shared/modal-focus.directive';
 import { IconComponent } from '../shared/icon/icon';
 
@@ -33,7 +53,22 @@ export class CommonActionsDialogComponent {
   readonly recognitionAgentRequested = output<string>();
   protected readonly actions = inject(CommonActionsService);
   protected readonly available = hasBackend();
-  protected readonly running = new Set(['STARTING', 'RUNNING']);
+  protected readonly canPickDirectory = isTauriRuntime();
+  private readonly directoryPicker = inject(DirectoryPickerService);
+  protected readonly selectingDirectory = signal(false);
+  protected readonly environmentRows = signal<{ name: string; value: string }[]>([]);
+  protected readonly maxEnvironmentVariables = MAX_ACTION_ENVIRONMENT_VARIABLES;
+  protected readonly maxEnvironmentValueLength = MAX_ACTION_ENVIRONMENT_VALUE_LENGTH;
+  protected readonly categories = COMMON_ACTION_CATEGORIES;
+  protected readonly statusLabels = COMMON_ACTION_STATUS_LABELS;
+  protected readonly statusOptions = Object.entries(COMMON_ACTION_STATUS_LABELS) as [
+    CommonActionState,
+    string,
+  ][];
+  protected readonly search = signal('');
+  protected readonly category = signal<CommonActionCategory | 'all'>('all');
+  protected readonly status = signal<CommonActionState | 'all'>('all');
+  protected readonly pending = signal<{ id: string; label: string } | null>(null);
   protected readonly error = signal('');
   protected readonly editor = signal<CommonAction | null>(null);
   protected readonly editingSuggestionId = signal<string | null>(null);
@@ -42,6 +77,53 @@ export class CommonActionsDialogComponent {
   protected readonly importJson = signal('');
   protected readonly agentId = signal('');
   protected readonly review = computed(() => this.actions.reviews()[this.workspace().id]);
+  protected readonly savedRows = computed(() =>
+    (this.workspace().commonActions ?? []).map((action) => {
+      const terminal = commonActionTerminal(action, this.workspace().terminals);
+      const state = commonActionState(terminal);
+      return {
+        action,
+        state,
+        hasConsole: !!terminal,
+        active: state === 'starting' || state === 'running',
+      };
+    }),
+  );
+  protected readonly runningCount = computed(
+    () => this.savedRows().filter((row) => row.active).length,
+  );
+  protected readonly failedCount = computed(
+    () => this.savedRows().filter((row) => row.state === 'failed').length,
+  );
+  protected readonly filteredRows = computed(() => {
+    const words = this.search().trim().toLocaleLowerCase().split(/\s+/).filter(Boolean);
+    return this.savedRows().filter(({ action, state }) => {
+      const category = commonActionCategory(action);
+      const text = [
+        action.name,
+        action.command,
+        action.workingDirectory,
+        action.description,
+        this.categoryLabel(action),
+      ]
+        .join(' ')
+        .toLocaleLowerCase();
+      return (
+        (this.category() === 'all' || this.category() === category) &&
+        (this.status() === 'all' || this.status() === state) &&
+        words.every((word) => text.includes(word))
+      );
+    });
+  });
+  protected readonly editorError = computed(() => {
+    if (!this.editor()) return '';
+    try {
+      validateCommonAction({ ...this.editor(), environment: this.editorEnvironment() });
+      return '';
+    } catch (error) {
+      return error instanceof Error ? error.message : String(error);
+    }
+  });
   private readonly editorName = viewChild<ElementRef<HTMLInputElement>>('editorName');
   protected readonly selectedCount = computed(
     () => this.review()?.suggestions.filter((item) => item.selected).length ?? 0,
@@ -83,16 +165,21 @@ export class CommonActionsDialogComponent {
       this.editingSuggestionId.set(null);
       this.activeTab.set(this.review() ? 'suggestions' : 'saved');
       this.message.set('');
+      this.clearFilters();
+      this.pending.set(null);
     });
   }
 
   protected async perform(operation: () => Promise<unknown>): Promise<boolean> {
+    const workspaceId = this.workspace().id;
     this.error.set('');
+    this.message.set('');
     try {
       await operation();
-      return true;
+      return this.workspace().id === workspaceId;
     } catch (error) {
-      this.error.set(error instanceof Error ? error.message : String(error));
+      if (this.workspace().id === workspaceId)
+        this.error.set(error instanceof Error ? error.message : String(error));
       return false;
     }
   }
@@ -101,7 +188,8 @@ export class CommonActionsDialogComponent {
     if (this.review()?.waiting || this.busy()) return;
     this.error.set('');
     this.message.set('');
-    const terminalId = this.agents().find((agent) => agent.id === this.agentId())?.id || this.agents()[0]?.id;
+    const terminalId =
+      this.agents().find((agent) => agent.id === this.agentId())?.id || this.agents()[0]?.id;
     if (!terminalId) return;
     this.importJson.set('');
     this.activeTab.set('suggestions');
@@ -109,8 +197,9 @@ export class CommonActionsDialogComponent {
   }
 
   protected add(ide = false): void {
+    this.error.set('');
     this.editingSuggestionId.set(null);
-    this.editor.set({
+    this.showEditor({
       id: createId(),
       name: ide ? '打开 IDE' : '',
       command: ide ? 'code .' : '',
@@ -118,6 +207,7 @@ export class CommonActionsDialogComponent {
       description: ide
         ? '使用 VS Code 打开项目；可将 code 替换为 cursor、idea 等已安装的 IDE 命令。'
         : '',
+      category: ide ? 'tools' : 'custom',
     });
   }
 
@@ -125,24 +215,91 @@ export class CommonActionsDialogComponent {
     this.editor.update((item) => (item ? { ...item, ...patch } : null));
   }
 
-  protected async save(): Promise<void> {
+  private showEditor(action: CommonAction): void {
+    this.environmentRows.set(Object.entries(action.environment ?? {}).map(([name, value]) => ({ name, value })));
+    this.editor.set({ ...action });
+  }
+
+  protected addEnvironment(): void {
+    if (this.environmentRows().length < MAX_ACTION_ENVIRONMENT_VARIABLES)
+      this.environmentRows.update((rows) => [...rows, { name: '', value: '' }]);
+  }
+
+  protected patchEnvironment(index: number, patch: { name?: string; value?: string }): void {
+    this.environmentRows.update((rows) => rows.map((row, i) => i === index ? { ...row, ...patch } : row));
+  }
+
+  protected removeEnvironment(index: number): void {
+    this.environmentRows.update((rows) => rows.filter((_, i) => i !== index));
+  }
+
+  protected environmentNames(action: CommonAction): string[] {
+    return Object.keys(action.environment ?? {});
+  }
+
+  protected environmentEntries(action: CommonAction): { name: string; value: string }[] {
+    return Object.entries(action.environment ?? {}).map(([name, value]) => ({ name, value }));
+  }
+
+  private editorEnvironment(): Record<string, string> {
+    const entries = this.environmentRows().filter((row) => row.name || row.value)
+      .map((row) => [row.name.trim(), row.value] as const);
+    if (new Set(entries.map(([name]) => name)).size !== entries.length)
+      throw new Error('环境变量名不能重复。');
+    return Object.fromEntries(entries);
+  }
+
+  protected async selectWorkingDirectory(): Promise<void> {
     const draft = this.editor();
+    if (!draft || this.selectingDirectory()) return;
+    const workspaceId = this.workspace().id;
+    this.selectingDirectory.set(true);
+    this.error.set('');
+    try {
+      const path = await this.directoryPicker.select(draft.workingDirectory, '选择命令工作目录');
+      if (path && this.workspace().id === workspaceId && this.editor()?.id === draft.id)
+        this.patchEditor({ workingDirectory: path });
+    } catch (error) {
+      this.error.set(error instanceof Error ? error.message : String(error));
+    } finally {
+      this.selectingDirectory.set(false);
+    }
+  }
+
+  protected async save(): Promise<void> {
+    const current = this.editor();
+    if (!current || this.selectingDirectory() || this.editorError()) return;
+    const draft = { ...current, environment: this.editorEnvironment() };
     if (draft && this.editingSuggestionId()) {
-      if (await this.perform(async () => {
-        const value = validateCommonAction(draft);
-        this.actions.editSuggestion(this.workspace().id, this.editingSuggestionId()!, value);
-      })) this.editor.set(null);
+      if (
+        await this.perform(async () => {
+          const value = validateCommonAction(draft);
+          this.actions.editSuggestion(this.workspace().id, this.editingSuggestionId()!, value);
+        })
+      )
+        this.editor.set(null);
       return;
     }
-    if (draft && (await this.perform(() => this.actions.save(this.workspace().id, draft))))
+    if (draft && (await this.perform(() => this.actions.save(this.workspace().id, draft)))) {
       this.editor.set(null);
+      this.activeTab.set('saved');
+      this.clearFilters();
+      this.message.set(`已保存“${draft.name.trim()}”。`);
+    }
   }
 
   protected async confirm(): Promise<void> {
-    const count = this.selectedCount();
-    if (await this.perform(() => this.actions.confirm(this.workspace().id))) {
+    let count = 0;
+    if (
+      await this.perform(async () => {
+        count = await this.actions.confirm(this.workspace().id);
+      })
+    ) {
       this.activeTab.set('saved');
-      this.message.set(`已添加 ${count} 项操作，可在列表中启动。`);
+      this.clearFilters();
+      this.message.set(
+        count ? `已添加 ${count} 项操作，可在列表中启动。` : '所选操作已存在，未重复添加。',
+      );
     }
   }
 
@@ -157,31 +314,39 @@ export class CommonActionsDialogComponent {
   }
 
   protected async run(id: string, restart = false): Promise<void> {
-    if (
-      await this.perform(async () => {
-        await this.actions.run(this.workspace().id, id, restart);
-      })
-    ) {
-      this.message.set(restart ? '操作已重启。' : '操作已启动，可继续启动其他操作，或打开控制台。');
-    }
+    const name = this.actionName(id);
+    await this.execute(
+      id,
+      restart ? '重启中…' : '启动中…',
+      () => this.actions.run(this.workspace().id, id, restart),
+      `“${name}”${restart ? '已重启' : '已启动'}，可打开控制台查看输出。`,
+    );
   }
 
   protected async stop(id: string): Promise<void> {
-    await this.perform(() => this.actions.stop(this.workspace().id, id));
+    await this.execute(
+      id,
+      '停止中…',
+      () => this.actions.stop(this.workspace().id, id),
+      `“${this.actionName(id)}”已停止。`,
+    );
   }
 
   protected async remove(id: string): Promise<void> {
-    await this.perform(() => this.actions.remove(this.workspace().id, id));
+    const name = this.actionName(id);
+    if (await this.perform(() => this.actions.remove(this.workspace().id, id)))
+      this.message.set(`已移除“${name}”的入口，已有终端仍保留。`);
   }
 
   protected edit(action: CommonAction): void {
+    this.error.set('');
     this.editingSuggestionId.set(null);
-    this.editor.set({ ...action });
+    this.showEditor(action);
   }
 
   protected editSuggestion(action: CommonAction): void {
     this.editingSuggestionId.set(action.id);
-    this.editor.set({ ...action });
+    this.showEditor(action);
   }
 
   protected selectAll(selected: boolean): void {
@@ -191,34 +356,63 @@ export class CommonActionsDialogComponent {
   }
 
   protected relativeDirectory(path: string): string {
-    const root = this.workspace().projectPath.replaceAll('\\', '/').replace(/\/$/, '');
-    const normalized = path.replaceAll('\\', '/').replace(/\/$/, '');
-    return normalized.toLowerCase() === root.toLowerCase()
-      ? '项目根目录'
-      : normalized.toLowerCase().startsWith(root.toLowerCase() + '/') ? './' + normalized.slice(root.length + 1) : path;
+    return relativeActionDirectory(path, this.workspace().projectPath);
   }
 
-  protected actionStatus(action: CommonAction): string {
-    const terminal = this.workspace().terminals.find((item) => item.id === action.terminalId);
-    if (!terminal) return '尚未启动';
-    return this.running.has(terminal.status)
-      ? '运行中'
-      : terminal.status === 'FAILED'
-        ? '启动失败'
-        : '已停止';
+  protected categoryLabel(action: CommonAction): string {
+    return this.categories.find((item) => item.value === commonActionCategory(action))!.label;
+  }
+
+  protected clearFilters(): void {
+    this.search.set('');
+    this.category.set('all');
+    this.status.set('all');
+  }
+
+  protected duplicate(action: CommonAction): void {
+    this.error.set('');
+    this.editingSuggestionId.set(null);
+    this.showEditor({
+      ...action,
+      id: createId(),
+      name: `${action.name.slice(0, 95)} 副本`,
+      terminalId: undefined,
+    });
+  }
+
+  protected async copyCommand(action: CommonAction): Promise<void> {
+    if (await this.perform(() => writeClipboardText(action.command)))
+      this.message.set(`已复制“${action.name}”的命令。`);
+  }
+
+  private actionName(id: string): string {
+    return this.workspace().commonActions?.find((item) => item.id === id)?.name ?? '操作';
+  }
+
+  private async execute(
+    id: string,
+    label: string,
+    operation: () => Promise<unknown>,
+    message: string,
+  ): Promise<void> {
+    if (this.pending() || this.busy()) return;
+    const pending = { id, label };
+    this.pending.set(pending);
+    try {
+      if (await this.perform(operation)) this.message.set(message);
+    } finally {
+      if (this.pending() === pending) this.pending.set(null);
+    }
   }
 
   protected isEditing(): boolean {
     return !!this.workspace().commonActions?.some((item) => item.id === this.editor()?.id);
   }
 
-  protected hasConsole(action: CommonAction): boolean {
-    return this.workspace().terminals.some((item) => item.id === action.terminalId);
-  }
-
   protected console(action: CommonAction): void {
-    if (action.terminalId) {
-      this.terminalRequested.emit(action.terminalId);
+    const terminal = commonActionTerminal(action, this.workspace().terminals);
+    if (terminal) {
+      this.terminalRequested.emit(terminal.id);
       this.closed.emit();
     }
   }

@@ -211,6 +211,7 @@ describe('McpDesktopService', () => {
   it('lets AI propose actions for review, but exposes no confirmation or save tool', async () => {
     const common = TestBed.inject(CommonActionsService);
     const requestId = common.beginRecognition('w1');
+    expect(await service.execute('common_action_list', { workspaceId: 'w1' })).toMatchObject({ projectPath: 'D:/project' });
     const proposal = (await service.execute('common_action_propose', {
       workspaceId: 'w1',
       requestId,
@@ -218,12 +219,14 @@ describe('McpDesktopService', () => {
         {
           name: 'Web',
           command: 'npm run dev',
-          workingDirectory: 'D:/project',
+          workingDirectory: './web',
+          environment: { NODE_ENV: 'development', PORT: '4300' },
           description: 'scripts.dev',
         },
       ]),
     })) as { suggestions: { id: string }[] };
     expect(proposal.suggestions).toHaveLength(1);
+    expect(proposal.suggestions[0]).toMatchObject({ workingDirectory: 'D:/project/web', environment: { NODE_ENV: 'development', PORT: '4300' } });
     expect(state.workspaces()[0].commonActions).toBeUndefined();
     expect(gateway.start).not.toHaveBeenCalled();
     await expect(service.execute('common_action_confirm', { workspaceId: 'w1' })).rejects.toThrow(

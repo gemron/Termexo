@@ -17,6 +17,7 @@ import { RemoteAccessService } from '../core/services/remote-access.service';
 import { runtimeMode } from '../core/services/tauri-runtime';
 import { IconComponent } from '../shared/icon/icon';
 import { RemoteAccessGuideComponent } from './remote-access-guide';
+import '../core/i18n/remote-read-only.i18n';
 
 registerRemoteTranslations();
 
@@ -451,6 +452,16 @@ interface AddressOption {
             -->
             <div class="remote-link">
               <div class="remote-link-value">
+                @if (!readOnly && status()?.readOnlyToken) {
+                  <label class="remote-address-pick">
+                    <span>{{ 'remote.linkPermission' | t }}</span>
+                    <select [ngModel]="viewingLink()" (ngModelChange)="viewingLink.set($event)">
+                      <option [ngValue]="false">{{ 'remote.controlLink' | t }}</option>
+                      <option [ngValue]="true">{{ 'remote.viewingLink' | t }}</option>
+                    </select>
+                  </label>
+                  <p class="field-hint">{{ 'remote.viewingLinkHint' | t }}</p>
+                }
                 @if (linkOptions().length > 1) {
                   <label class="remote-address-pick">
                     <span>{{ 'remote.addressPick' | t }}</span>
@@ -598,6 +609,7 @@ export class RemoteAccessPanelComponent implements OnDestroy {
   protected readonly tls = signal(true);
   /** Address the shown link and QR code point at; only offered when bound to every interface. */
   protected readonly linkAddress = signal('');
+  protected readonly viewingLink = signal(false);
   protected readonly qrCode = signal<QrCodeImage | null>(null);
 
   /** Draft of the relay enrolment form; the password lives here for one request and no longer. */
@@ -686,16 +698,18 @@ export class RemoteAccessPanelComponent implements OnDestroy {
   protected readonly accessUrl = computed(() => {
     const status = this.status();
     if (!status?.token) return '';
+    const token = this.viewingLink() ? status.readOnlyToken : status.token;
+    if (!token) return '';
     const options = this.linkOptions();
     if (options.length === 0) return '';
     const selected = options.find((option) => option.value === this.linkAddress()) ?? options[0];
     return selected.relay
-      ? this.remoteAccess.buildRelayUrl(selected.relay, status.token)
+      ? this.remoteAccess.buildRelayUrl(selected.relay, token)
       : this.remoteAccess.buildUrl(
           selected.value,
           status.settings.port,
           status.settings.tls,
-          status.token,
+          token,
         );
   });
 

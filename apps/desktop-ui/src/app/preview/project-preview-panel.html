@@ -1,201 +1,500 @@
 <header>
-  <strong>内容预览 · 只读</strong
-  ><button
-    type="button"
-    class="btn btn-ghost btn-xs"
-    (click)="preview.close()"
-    aria-label="关闭预览"
-  >
-    关闭
-  </button>
+  <div class="preview-title">
+    <span class="title-icon"><app-icon name="layout" [size]="16" /></span><strong>内容预览</strong
+    ><span class="readonly-badge">只读</span>
+  </div>
+  <div class="header-actions">
+    <button
+      type="button"
+      class="icon-button"
+      aria-label="刷新预览"
+      title="刷新当前文件或网页"
+      [disabled]="preview.loading() || preview.listing()"
+      (click)="refresh()"
+    >
+      <app-icon name="refresh" [size]="15" />
+    </button>
+    <button
+      type="button"
+      class="icon-button"
+      [attr.aria-label]="expanded() ? '还原预览宽度' : '展开预览'"
+      [title]="expanded() ? '还原预览宽度' : '展开至可用宽度'"
+      [attr.aria-pressed]="expanded()"
+      (click)="expanded.set(!expanded())"
+    >
+      <app-icon [name]="expanded() ? 'minimize' : 'maximize'" [size]="15" />
+    </button>
+    <button
+      type="button"
+      class="icon-button"
+      aria-label="关闭预览"
+      title="关闭此预览标签"
+      (click)="preview.close()"
+    >
+      <app-icon name="x" [size]="15" />
+    </button>
+  </div>
 </header>
-<div class="panel-tools preview-actions" role="group" aria-label="预览操作">
+<div class="navigation-bar">
   <button
     type="button"
-    class="btn btn-outline btn-xs file-browser-toggle"
+    class="browser-toggle"
     [class.expanded]="browserOpen()"
     [attr.aria-expanded]="browserOpen()"
     [attr.aria-controls]="browserId()"
     data-testid="preview-file-browser-toggle"
     [title]="preview.root()"
-    (click)="browserOpen() ? browserOpen.set(false) : browse(preview.directory()?.path)"
+    (click)="toggleBrowser()"
   >
-    {{ browserOpen() ? '收起文件' : '项目文件' }}
+    <app-icon name="folder" [size]="15" /><span>{{ browserOpen() ? '收起文件' : '项目文件' }}</span>
   </button>
-  @if (preview.file() || preview.url() || preview.failedPath()) {
-    <button type="button" class="btn btn-outline btn-xs" (click)="external()">外部打开</button>
-  }
+  <form class="address" (ngSubmit)="navigate()">
+    <input
+      class="input input-sm"
+      aria-label="项目文件路径或网页地址"
+      placeholder="文件路径、path:行号 或 https://…"
+      spellcheck="false"
+      [ngModel]="address()"
+      (ngModelChange)="address.set($event)"
+      name="address"
+    />
+    <button
+      type="submit"
+      class="address-submit"
+      [disabled]="!address().trim()"
+      title="打开输入的文件或网页"
+      aria-label="打开地址"
+    >
+      <app-icon name="arrow-right" [size]="15" />
+    </button>
+  </form>
 </div>
-<form class="address" (ngSubmit)="navigate()">
-  <input
-    class="input input-bordered input-sm"
-    aria-label="项目文件路径或网页地址"
-    placeholder="项目内文件路径或 http(s)://…"
-    [ngModel]="address()"
-    (ngModelChange)="address.set($event)"
-    name="address"
-  /><button type="submit" class="btn btn-primary btn-sm">打开</button>
-</form>
 @if (preview.error()) {
-  <p class="notice error" role="alert">{{ preview.error() }}</p>
+  <div class="notice error" role="alert">
+    <app-icon name="triangle-alert" [size]="15" /><span>{{ preview.error() }}</span>
+    @if (preview.failedPath()) {
+      <button type="button" (click)="refresh()">重试</button
+      ><button type="button" (click)="external()">外部打开</button>
+    }
+  </div>
 }
 @if (message()) {
   <p class="notice" role="status">{{ message() }}</p>
 }
-@if (browserOpen()) {
-  <nav [id]="browserId()" class="file-browser" aria-label="项目文件">
-    <div class="panel-tools">
-      <button type="button" class="btn btn-xs btn-ghost" (click)="browse()">项目根目录</button
-      ><button
-        type="button"
-        class="btn btn-xs btn-ghost"
-        [disabled]="atRoot()"
-        (click)="browse(parent())"
-      >
-        上一级</button
-      ><button
-        type="button"
-        class="btn btn-xs btn-ghost"
-        (click)="browse(preview.directory()?.path)"
-      >
-        刷新
-      </button>
-    </div>
-    <small>{{ preview.directory()?.path }}</small>
-    @if (preview.listing()) {
-      <p role="status">读取目录中…</p>
-    }
-    @for (entry of preview.directory()?.entries; track entry.path) {
-      <button
-        type="button"
-        class="file-entry"
-        [title]="entry.path"
-        (click)="open(entry.path, entry.directory)"
-      >
-        <span aria-hidden="true">{{ entry.directory ? '▸' : '·' }}</span
-        >{{ entry.name }}
-      </button>
-    } @empty {
-      @if (!preview.listing()) {
-        <p>此目录暂无可查看的文件。</p>
+<div class="preview-layout">
+  @if (browserOpen()) {
+    <aside [id]="browserId()" class="file-browser" aria-label="项目文件">
+      <div class="browser-heading">
+        <strong>项目文件</strong>
+        <div class="browser-actions">
+          <button
+            type="button"
+            class="icon-button"
+            aria-label="项目根目录"
+            title="项目根目录"
+            (click)="browse()"
+          >
+            <app-icon name="folder" [size]="14" /></button
+          ><button
+            type="button"
+            class="icon-button"
+            aria-label="上一级"
+            title="上一级目录"
+            [disabled]="atRoot()"
+            (click)="browse(parent())"
+          >
+            <app-icon name="arrow-up" [size]="14" /></button
+          ><button
+            type="button"
+            class="icon-button"
+            aria-label="刷新目录"
+            title="刷新目录"
+            [disabled]="preview.listing()"
+            (click)="browse(preview.directory()?.path)"
+          >
+            <app-icon name="refresh" [size]="14" />
+          </button>
+        </div>
+      </div>
+      <nav class="breadcrumbs" aria-label="当前目录">
+        @for (crumb of breadcrumbs(); track crumb.path; let last = $last) {
+          <button
+            type="button"
+            [title]="crumb.path"
+            [attr.aria-current]="last ? 'location' : null"
+            (click)="browse(crumb.path)"
+          >
+            {{ crumb.name }}
+          </button>
+          @if (!last) {
+            <span aria-hidden="true">/</span>
+          }
+        }
+      </nav>
+      <label class="file-filter"
+        ><app-icon name="search" [size]="13" /><input
+          type="search"
+          aria-label="筛选当前目录文件"
+          placeholder="筛选当前目录…"
+          [ngModel]="fileFilter()"
+          (ngModelChange)="fileFilter.set($event)"
+      /></label>
+      <div class="directory-entries" [attr.aria-busy]="preview.listing()">
+        @if (preview.listing()) {
+          <p class="browser-notice" role="status">
+            <span class="loading loading-spinner loading-xs"></span>读取目录中…
+          </p>
+        }
+        @for (entry of filteredEntries(); track entry.path) {
+          <div class="entry-row" [class.active]="entry.path === preview.file()?.path">
+            <button
+              type="button"
+              class="file-entry"
+              [title]="entry.path"
+              [disabled]="preview.listing()"
+              [attr.aria-current]="entry.path === preview.file()?.path ? 'page' : null"
+              (click)="open(entry.path, entry.directory)"
+            >
+              <app-icon [name]="entry.directory ? 'folder' : 'terminal'" [size]="14" /><span>{{
+                entry.name
+              }}</span>
+              @if (entry.directory) {
+                <app-icon name="arrow-right" [size]="11" />
+              }
+            </button>
+            @if (!entry.directory) {
+              <button
+                type="button"
+                class="entry-new-tab icon-button"
+                [attr.aria-label]="'新标签页打开 ' + entry.name"
+                title="在新标签页打开"
+                [disabled]="preview.listing()"
+                (click)="openInNewTab(entry.path)"
+              >
+                <app-icon name="plus" [size]="12" />
+              </button>
+            }
+          </div>
+        } @empty {
+          @if (!preview.listing()) {
+            <div class="browser-empty">
+              <p>{{ fileFilter() ? '没有匹配的文件' : '此目录暂无文件' }}</p>
+              @if (fileFilter()) {
+                <button type="button" (click)="fileFilter.set('')">清除筛选</button>
+              } @else if (!preview.directory()) {
+                <button type="button" (click)="browse()">读取项目目录</button>
+              }
+            </div>
+          }
+        }
+      </div>
+      <div class="directory-summary">
+        <span
+          >{{ filteredEntries().length }} / {{ preview.directory()?.entries?.length ?? 0 }} 项</span
+        ><small>当前目录</small>
+      </div>
+      @if (preview.directory()?.truncated) {
+        <p class="browser-notice">仅展示前 500 项，可在地址栏输入具体路径。</p>
       }
+    </aside>
+  }
+  <main class="preview-content" [attr.aria-busy]="preview.loading()">
+    @if (preview.loading()) {
+      <div class="loading-state" role="status">
+        <span class="loading loading-spinner loading-sm"></span><span>正在读取文件…</span>
+      </div>
     }
-    @if (preview.directory()?.truncated) {
-      <p>目录条目超过 500 项，仅展示部分。可输入具体文件路径。</p>
-    }
-  </nav>
-}
-@if (preview.loading()) {
-  <p class="notice" role="status">读取文件中…</p>
-}
-@if (preview.file(); as file) {
-  <div class="file-heading">
-    <strong [title]="file.path">{{ file.path }}</strong
-    ><button type="button" class="btn btn-ghost btn-xs" (click)="copy('path')">复制路径</button>
-  </div>
-  @if (file.kind === 'text' || file.kind === 'markdown') {
-    <div class="copy-tools">
-      <button
-        type="button"
-        class="btn btn-ghost btn-xs"
-        (mousedown)="$event.preventDefault()"
-        (click)="copy('all')"
-      >
-        {{ file.kind === 'markdown' ? '复制全部源文' : '复制全部代码' }}
-      </button>
-      @if (file.kind !== 'markdown' || sourceMode()) {
-        <button
+    @if (preview.file(); as file) {
+      <div class="file-heading">
+        <div class="file-identity">
+          <strong [title]="file.path">{{ filename() }}</strong
+          ><small [title]="file.path">{{ displayPath() }}</small>
+        </div>
+        <div class="file-tools">
+          <button
+            type="button"
+            class="text-button"
+            (click)="copy('path')"
+            title="复制文件的完整路径"
+          >
+            复制路径</button
+          ><button
+            type="button"
+            class="icon-button"
+            aria-label="新标签页打开当前文件"
+            title="在新标签页打开"
+            (click)="openInNewTab()"
+          >
+            <app-icon name="plus" [size]="14" /></button
+          ><button
+            type="button"
+            class="icon-button"
+            aria-label="外部打开"
+            title="使用外部应用打开"
+            (click)="external()"
+          >
+            <app-icon name="external" [size]="14" />
+          </button>
+        </div>
+      </div>
+      @if (file.kind === 'text' || file.kind === 'markdown') {
+        <div class="content-tools">
+          @if (file.kind === 'markdown') {
+            <button
+              type="button"
+              class="mode-button"
+              [class.active]="!sourceMode()"
+              (click)="sourceMode.set(!sourceMode())"
+            >
+              {{ sourceMode() ? '阅读文档' : '查看源文' }}
+            </button>
+          }
+          <div class="copy-tools">
+            <button
+              type="button"
+              class="text-button"
+              (mousedown)="$event.preventDefault()"
+              (click)="copy('all')"
+            >
+              {{ file.kind === 'markdown' ? '复制全部源文' : '复制全部代码' }}
+            </button>
+            @if (file.kind !== 'markdown' || sourceMode()) {
+              <button
+                type="button"
+                class="text-button"
+                (mousedown)="$event.preventDefault()"
+                (click)="copy('location')"
+              >
+                复制位置</button
+              ><button
+                type="button"
+                class="text-button"
+                (mousedown)="$event.preventDefault()"
+                (click)="copy('quote')"
+              >
+                复制代码及位置
+              </button>
+            }
+          </div>
+          <div class="source-tools">
+            <button
+              type="button"
+              class="icon-button"
+              aria-label="查找内容"
+              title="查找内容（Ctrl+F）"
+              [attr.aria-pressed]="findOpen()"
+              (click)="toggleFind()"
+            >
+              <app-icon name="search" [size]="14" /></button
+            ><button
+              type="button"
+              class="text-button"
+              title="跳转到行（Ctrl+G）"
+              [attr.aria-expanded]="lineOpen()"
+              (click)="sourceMode.set(true); lineOpen.set(!lineOpen())"
+            >
+              跳转行
+            </button>
+          </div>
+        </div>
+        @if (findOpen()) {
+          <div class="find-bar" role="search" aria-label="在文件中查找">
+            <input
+              #searchInput
+              type="search"
+              aria-label="查找文本"
+              placeholder="查找文本…"
+              [ngModel]="findQuery()"
+              (ngModelChange)="findQuery.set($event)"
+              (keydown)="handleFindKey($event)"
+            /><button
+              type="button"
+              class="case-button"
+              aria-label="区分大小写"
+              [class.active]="matchCase()"
+              [attr.aria-pressed]="matchCase()"
+              (click)="matchCase.set(!matchCase())"
+            >
+              Aa</button
+            ><span class="match-count" role="status"
+              >{{ matchIndex() + 1 }} / {{ searchResults().matches.length
+              }}{{ searchResults().truncated ? '+' : '' }}</span
+            ><button
+              type="button"
+              class="icon-button"
+              aria-label="上一个匹配"
+              [disabled]="!searchResults().matches.length"
+              (click)="findNext(-1)"
+            >
+              <app-icon name="arrow-up" [size]="14" /></button
+            ><button
+              type="button"
+              class="icon-button"
+              aria-label="下一个匹配"
+              [disabled]="!searchResults().matches.length"
+              (click)="findNext()"
+            >
+              <app-icon name="arrow-down" [size]="14" /></button
+            ><button
+              type="button"
+              class="icon-button"
+              aria-label="关闭查找"
+              (click)="findOpen.set(false)"
+            >
+              <app-icon name="x" [size]="14" />
+            </button>
+          </div>
+        }
+        @if (lineOpen()) {
+          <form class="line-bar" (ngSubmit)="goToLine()">
+            <label
+              >跳转到行<input
+                #lineInput
+                type="number"
+                name="line"
+                aria-label="目标行号"
+                min="1"
+                [max]="lineCount()"
+                [placeholder]="'1–' + lineCount()"
+                [ngModel]="lineValue()"
+                (ngModelChange)="lineValue.set($event)" /></label
+            ><button type="submit" class="text-button">跳转</button
+            ><button
+              type="button"
+              class="icon-button"
+              aria-label="关闭行号跳转"
+              (click)="lineOpen.set(false)"
+            >
+              <app-icon name="x" [size]="14" />
+            </button>
+          </form>
+        }
+        @if (file.kind === 'markdown' && !sourceMode()) {
+          <article
+            #markdownDocument
+            class="markdown document"
+            [innerHTML]="markdown()"
+            (click)="markdownLink($event)"
+          ></article>
+        } @else {
+          <div class="code-body">
+            <pre class="gutter" aria-hidden="true" #gutter>{{ lineNumbers() }}</pre>
+            <div class="code-editor">
+              <pre
+                #highlightedCode
+                class="syntax-layer"
+                aria-hidden="true"
+              ><code [innerHTML]="highlighted()"></code></pre>
+              @if (findOpen() && matchIndex() >= 0) {
+                <pre
+                  #searchHighlights
+                  class="search-layer"
+                  aria-hidden="true"
+                ><code [innerHTML]="searchMarkup()"></code></pre>
+              }
+              <textarea
+                #codeText
+                class="code"
+                readonly
+                wrap="off"
+                spellcheck="false"
+                aria-label="只读代码，可选择复制"
+                [value]="file.content"
+                (select)="updateSelection(codeText)"
+                (click)="updateSelection(codeText)"
+                (keyup)="updateSelection(codeText)"
+                (scroll)="scrollCode(codeText)"
+              ></textarea>
+            </div>
+          </div>
+        }
+        <div class="content-status">
+          <span [title]="reference()">行 {{ cursor().line }}，列 {{ cursor().column }}</span
+          ><span>{{ language() || '文本' }} · {{ lineCount() }} 行</span>
+        </div>
+      } @else if (file.kind === 'image') {
+        <div class="media-tools">
+          <button
+            type="button"
+            class="mode-button"
+            [class.active]="!imageActualSize()"
+            (click)="imageActualSize.set(false)"
+          >
+            适应窗口</button
+          ><button
+            type="button"
+            class="mode-button"
+            [class.active]="imageActualSize()"
+            (click)="imageActualSize.set(true)"
+          >
+            原始尺寸
+          </button>
+        </div>
+        <div class="image-body" [class.actual-size]="imageActualSize()">
+          <img
+            [src]="media()"
+            [alt]="filename()"
+            (error)="message.set('图片无法解码，请使用外部应用打开。')"
+          />
+        </div>
+      } @else if (file.kind === 'pdf') {
+        <p class="notice muted">PDF 使用内置查看器；如显示空白，可使用外部打开。</p>
+        @if (mediaFrame(); as source) {
+          <iframe
+            class="document"
+            [src]="source"
+            title="PDF 只读预览"
+            (error)="message.set('PDF 无法载入，请外部打开。')"
+          ></iframe>
+        }
+      } @else {
+        <div class="empty-state">
+          <app-icon name="package" [size]="32" />
+          <h3>此格式需要外部应用</h3>
+          <p>{{ file.message }}</p>
+          <button type="button" class="btn btn-outline btn-sm" (click)="external()">
+            外部打开
+          </button>
+        </div>
+      }
+    } @else if (frame(); as source) {
+      <div class="web-heading">
+        <span class="web-address" [title]="preview.url()">{{ preview.url() }}</span
+        ><button
           type="button"
-          class="btn btn-ghost btn-xs"
-          (mousedown)="$event.preventDefault()"
-          (click)="copy('location')"
+          class="icon-button"
+          aria-label="新标签页打开网页"
+          title="在新标签页打开"
+          (click)="openInNewTab()"
         >
-          复制位置
-        </button>
-        <button
-          type="button"
-          class="btn btn-ghost btn-xs"
-          (mousedown)="$event.preventDefault()"
-          (click)="copy('quote')"
-        >
-          复制代码及位置
-        </button>
-      }
-      @if (file.kind === 'markdown') {
-        <button type="button" class="btn btn-ghost btn-xs" (click)="sourceMode.set(!sourceMode())">
-          {{ sourceMode() ? '阅读文档' : '查看源文' }}
-        </button>
-      }
-    </div>
-    @if (file.kind !== 'markdown' || sourceMode()) {
-      <small class="location" [title]="reference()">{{ reference() }} · 无选区时引用当前行</small>
-      @if (language(); as name) {
-        <small class="code-language">{{ name }} · 保留原始排版</small>
-      }
-    } @else {
-      <small class="location">需要带行号引用？查看源文后选择内容。</small>
-    }
-    @if (file.kind === 'markdown' && !sourceMode()) {
-      <article
-        class="markdown document"
-        [innerHTML]="markdown()"
-        (click)="markdownLink($event)"
-      ></article>
-    } @else {
-      <div class="code-body">
-        <pre class="gutter" aria-hidden="true" #gutter>{{ lineNumbers() }}</pre>
-        <div class="code-editor">
-          <pre #highlightedCode class="syntax-layer" aria-hidden="true"><code [innerHTML]="highlighted()"></code></pre>
-          <textarea
-            #codeText
-            class="code"
-            readonly
-            wrap="off"
-            spellcheck="false"
-            aria-label="只读代码，可选择复制"
-            [value]="file.content"
-            (select)="updateSelection(codeText)"
-            (click)="updateSelection(codeText)"
-            (keyup)="updateSelection(codeText)"
-            (scroll)="scrollCode(codeText)"
-          ></textarea>
+          <app-icon name="plus" [size]="14" /></button
+        ><button type="button" class="text-button" (click)="external()">外部打开</button>
+      </div>
+      <p class="notice muted" role="status">{{ frameState() }}</p>
+      <iframe
+        #webFrame
+        class="document webpage"
+        [src]="source"
+        title="网页预览"
+        sandbox="allow-scripts allow-forms allow-popups"
+        referrerpolicy="no-referrer"
+        (load)="frameState.set('若网页空白、拒绝连接或需要登录，请使用外部打开。')"
+        (error)="frameState.set('网页载入失败，请外部打开。')"
+      ></iframe>
+    } @else if (!preview.loading()) {
+      <div class="empty-state">
+        <span class="empty-icon"><app-icon name="layout" [size]="30" /></span>
+        <h3>{{ preview.error() ? '暂时无法预览内容' : '选择文件，开始预览' }}</h3>
+        <p>浏览项目文件，或粘贴文件路径、代码位置和网页地址。</p>
+        <div class="empty-actions">
+          <button type="button" class="btn btn-outline btn-sm" (click)="browse()">
+            浏览项目文件
+          </button>
+        </div>
+        <div class="preview-capabilities">
+          <span>代码与行号引用</span><span>Markdown 文档</span><span>图片 · PDF · 网页</span>
         </div>
       </div>
     }
-  } @else if (file.kind === 'image') {
-    <div class="image-body">
-      <img
-        [src]="media()"
-        [alt]="file.path"
-        (error)="message.set('图片无法解码，请使用外部应用打开。')"
-      />
-    </div>
-  } @else if (file.kind === 'pdf') {
-    <p class="notice">PDF 由浏览器内置查看器显示；若当前环境不支持或显示空白，请外部打开。</p>
-    <!-- Only fixed-MIME application/pdf blobs reach this viewer; web pages below stay sandboxed. -->
-    @if (mediaFrame(); as source) {
-      <iframe
-        class="document"
-        [src]="source"
-        title="PDF 只读预览"
-        (error)="message.set('PDF 无法载入，请外部打开。')"
-      ></iframe>
-    }
-  } @else {
-    <p class="notice">{{ file.message }}</p>
-  }
-} @else if (frame(); as source) {
-  <p class="notice" role="status">{{ frameState() }}</p>
-  <small class="location">{{ preview.url() }}</small>
-  <iframe
-    class="document webpage"
-    [src]="source"
-    title="网页预览"
-    sandbox="allow-scripts allow-forms allow-popups"
-    referrerpolicy="no-referrer"
-    (load)="frameState.set('若网页空白、拒绝连接或需要登录，请使用外部打开。')"
-    (error)="frameState.set('网页载入失败，请外部打开。')"
-  ></iframe>
-} @else if (!preview.loading() && !preview.error()) {
-  <p class="notice">从项目文件中选择文件，或输入网页地址。代码支持选中复制及带行号的位置引用。</p>
-}
+  </main>
+</div>

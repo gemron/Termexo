@@ -5,6 +5,9 @@
   [attr.data-tone]="statusTone()"
   (mousedown)="focus()"
 >
+  @if (readOnly()) {
+    <header><strong>{{ session().name }}</strong><span>{{ statusLabel(session().status) }}</span></header>
+  } @else {
   <header>
     <div class="terminal-identity">
       <span class="agent-icon" [attr.data-agent]="session().agentType">
@@ -44,6 +47,17 @@
       <span class="status-label" aria-live="polite" [attr.data-status]="session().status">
         {{ statusLabel(session().status) }}
       </span>
+      @if (canSetIdle()) {
+        <button
+          type="button"
+          class="btn btn-ghost btn-xs"
+          [title]="'terminal.setIdleHint' | t"
+          (mousedown)="$event.stopPropagation()"
+          (click)="$event.stopPropagation(); setIdle()"
+        >
+          {{ 'terminal.setIdle' | t }}
+        </button>
+      }
       @if (session().status === 'COMPLETED') {
         <button
           type="button"
@@ -97,12 +111,18 @@
         class="btn btn-square btn-ghost btn-xs"
         [title]="'terminal.close' | t"
         [attr.aria-label]="'terminal.close' | t"
-        (click)="$event.stopPropagation(); closeRequested.emit({ terminalId: session().id, event: $event })"
+        (click)="
+          $event.stopPropagation(); closeRequested.emit({ terminalId: session().id, event: $event })
+        "
       >
         <app-icon name="x" [size]="13" />
       </button>
     </div>
   </header>
+  }
+  @if (!readOnly() && session().accountLogin) {
+    <app-account-login-code [session]="session()" (retryRequested)="accountLoginRetryRequested.emit($event)" />
+  }
   @if (connectionNotice() || runtimeNotice(); as notice) {
     <div class="runtime-alert" role="alert">
       <app-icon name="activity" [size]="13" />
@@ -134,7 +154,7 @@
     would count the inset as usable rows.
   -->
   <div class="terminal-frame">
-    <div #terminal class="terminal-host" [attr.aria-label]="'terminal.aria' | t"></div>
+    <div #terminal class="terminal-host" [class.touch-terminal-input]="touchInput" [attr.aria-label]="'terminal.aria' | t"></div>
     @if (startupVisible() && (session().status === 'STARTING' || session().status === 'RUNNING')) {
       <div class="terminal-startup" role="status" aria-live="polite">
         <span class="terminal-startup-spinner" aria-hidden="true"></span>
@@ -146,7 +166,7 @@
       touch handlers that turn a drag into scrolling. Only the active terminal gets one: that is
       the one a press is meant for.
     -->
-    @if (quickKeysEnabled && active()) {
+    @if (!readOnly() && quickKeysEnabled && active()) {
       @defer (on immediate) {
         <app-terminal-quick-keys
           [agentType]="session().agentType"
@@ -155,6 +175,9 @@
       }
     }
   </div>
+  @if (touchInput && !readOnly() && !session().accountLogin) {
+    <app-terminal-mobile-input [disabled]="mobileInputDisabled()" [sendText]="sendMobileText" />
+  }
   <footer>
     <button
       type="button"
@@ -163,7 +186,9 @@
       [title]="('common.openInExplorer' | t) + ': ' + session().workingDirectory"
       [attr.aria-label]="('common.openInExplorer' | t) + ': ' + session().workingDirectory"
       (click)="openWorkingDirectory($event)"
-    >{{ session().workingDirectory }}</button>
+    >
+      {{ session().workingDirectory }}
+    </button>
     @if (gitBranch(); as branch) {
       <span>{{ branch }}</span>
     }

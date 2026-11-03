@@ -1,4 +1,5 @@
 import { computed, inject, Injectable, signal } from '@angular/core';
+import { isFinishedCommonAction } from '../models/common-action';
 
 import { AgentEvent, EVENT_STATUS, TOOL_STARTED_EVENT_TYPE } from '../models/agent.models';
 import { createId } from '../models/identifiers';
@@ -669,13 +670,13 @@ export class AppStateService {
 
   updateTerminalStatus(terminalId: string, status: TerminalStatus): void {
     const current = this.findTerminal(terminalId);
-    // Killing a common operation produces a late unsuccessful PTY exit on Windows.
+    // Killing a common operation can produce a late successful or unsuccessful PTY exit.
     // Preserve the user's explicit stop after that runtime has already been marked exited.
     if (
       current?.commonActionId &&
       current.status === 'STOPPED' &&
       this.isExitedLaunch(current) &&
-      status === 'FAILED'
+      (status === 'FAILED' || status === 'COMPLETED')
     )
       return;
     this.recordStatusChange(terminalId, Date.now());
@@ -689,7 +690,7 @@ export class AppStateService {
    * Stop can land late — and none of them may bring a terminal that is gone back to life. They are
    * ignored until the terminal is relaunched, which moves it to a new runtime revision.
    */
-  markTerminalExited(terminalId: string, status: 'STOPPED' | 'FAILED'): void {
+  markTerminalExited(terminalId: string, status: 'STOPPED' | 'FAILED' | 'COMPLETED'): void {
     const terminal = this.findTerminal(terminalId);
     if (!terminal) {
       return;
@@ -1049,6 +1050,7 @@ export class AppStateService {
       commonActionId: input.commonActionId,
       name: input.name?.trim() || `${agentLabel} ${workspace.terminals.length + 1}`,
       workingDirectory: input.workingDirectory ?? workspace.projectPath,
+      environment: input.environment ? { ...input.environment } : undefined,
       shell: DEFAULT_SHELL,
       agentType,
       status: 'STARTING',
@@ -1116,7 +1118,7 @@ export class AppStateService {
           const runningRevision = live.get(terminal.id);
           return runningRevision === undefined
             ? terminal.commonActionId
-              ? { ...terminal, status: 'STOPPED' as const }
+              ? { ...terminal, status: isFinishedCommonAction(terminal) ? terminal.status : 'STOPPED' as const }
               : {
                   ...terminal,
                   status: 'STARTING' as const,
@@ -1143,7 +1145,7 @@ export class AppStateService {
         const runningRevision = live.get(terminal.id);
         return runningRevision === undefined
           ? terminal.commonActionId
-            ? { ...terminal, status: 'STOPPED' as const }
+            ? { ...terminal, status: isFinishedCommonAction(terminal) ? terminal.status : 'STOPPED' as const }
             : terminal
           : {
               ...terminal,

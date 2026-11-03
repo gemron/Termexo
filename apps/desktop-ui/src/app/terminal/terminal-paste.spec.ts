@@ -122,6 +122,14 @@ describe('terminal clipboard interactions', () => {
     expect(status).not.toHaveBeenCalled();
   });
 
+  it('keeps a completed operation console read-only for paste and special keys', async () => {
+    fixture.componentRef.setInput('session', { ...session, commonActionId: 'test', status: 'COMPLETED' });
+    await handlers.pasteFromClipboard();
+    handlers.handleCustomKey(new KeyboardEvent('keydown', { key: 'Tab', shiftKey: true, cancelable: true }));
+    expect(readText).not.toHaveBeenCalled();
+    expect(write).not.toHaveBeenCalled();
+  });
+
   it('preserves a right-click selection when copying fails instead of pasting', async () => {
     const notice = vi.fn();
     fixture.componentInstance.interactionFailed.subscribe(notice);

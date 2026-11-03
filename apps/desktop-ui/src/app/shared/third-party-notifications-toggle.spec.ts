@@ -2,6 +2,7 @@ import { type ComponentFixture, TestBed } from '@angular/core/testing';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { ThirdPartyNotificationsService } from '../core/services/third-party-notifications.service';
 import { ThirdPartyNotificationsToggleComponent } from './third-party-notifications-toggle';
+import { I18nService } from '../core/i18n/i18n.service';
 
 const backend = vi.hoisted(() => ({ invoke: vi.fn() }));
 
@@ -12,6 +13,7 @@ describe('topbar third party notification switch', () => {
       enabled: command === 'read_third_party_notifications' ? true : args.enabled,
     }));
     TestBed.configureTestingModule({});
+    TestBed.inject(I18nService).setPreference('zh-CN');
   });
   afterEach(() => { Reflect.deleteProperty(window, '__TAURI_INTERNALS__'); });
   async function settle(fixture: ComponentFixture<ThirdPartyNotificationsToggleComponent>) {

@@ -70,6 +70,8 @@ export interface RemoteAccessStatus {
   addresses: RemoteAccessAddress[];
   /** Empty until a token has been generated. */
   token: string;
+  /** A separate credential that cannot invoke mutating commands. */
+  readOnlyToken?: string;
   connectedClients: number;
   relay: RelayStatus;
 }
@@ -111,7 +113,7 @@ export type RemoteServerFrame =
       /** Absent from a desktop older than the flag, which never refused the older handshake. */
       sealedRequired?: boolean;
     }
-  | { type: 'ready'; serverVersion: string }
+  | { type: 'ready'; serverVersion: string; readOnly?: boolean }
   | { type: 'auth-failed'; reason: string }
   | { type: 'result'; id: number; ok: true; value: unknown }
   | { type: 'result'; id: number; ok: false; error: unknown }

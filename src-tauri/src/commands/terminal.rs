@@ -1,4 +1,5 @@
 use serde::{Deserialize, Serialize};
+use std::collections::{HashMap, HashSet};
 use tauri::{AppHandle, Manager, State};
 
 use crate::agent::OpenCodeAdapter;
@@ -14,6 +15,9 @@ use crate::pty::{LiveTerminal, PtyManager, TerminalScrollback};
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct TerminalStartRequest {
+    /// Literal overrides for this process only; never applied to the Termexo process.
+    #[serde(default)]
+    pub environment: HashMap<String, String>,
     pub terminal_id: String,
     #[serde(default)]
     pub runtime_revision: u64,
@@ -82,6 +86,8 @@ pub fn create_terminal(
         return Ok(attached);
     }
 
+    validate_terminal_environment(&request.environment)?;
+
     let mut environment = launch_environment
         .take(&request.terminal_id)
         .map_err(|error| error.to_string())?;
@@ -126,6 +132,7 @@ pub fn create_terminal(
     }
     app.state::<std::sync::Arc<crate::mcp::McpManager>>()
         .prepare_agent_launch(&mut request, &mut environment)?;
+    apply_terminal_environment(&mut environment, &request.environment);
     if let Err(error) = repositories.capture_baseline(
         request.workspace_id.as_deref(),
         &request.terminal_id,
@@ -154,6 +161,66 @@ pub fn create_terminal(
         cols,
         rows,
     })
+}
+
+const MAX_TERMINAL_ENVIRONMENT_VARIABLES: usize = 100;
+const MAX_TERMINAL_ENVIRONMENT_VALUE_LENGTH: usize = 16_384;
+
+fn validate_terminal_environment(environment: &HashMap<String, String>) -> Result<(), String> {
+    if environment.len() > MAX_TERMINAL_ENVIRONMENT_VARIABLES {
+        return Err(format!(
+            "环境变量最多 {MAX_TERMINAL_ENVIRONMENT_VARIABLES} 项。"
+        ));
+    }
+    let mut names = HashSet::new();
+    for (name, value) in environment {
+        let mut chars = name.chars();
+        if !chars
+            .next()
+            .is_some_and(|c| c.is_ascii_alphabetic() || c == '_')
+            || !chars.all(|c| c.is_ascii_alphanumeric() || c == '_')
+        {
+            return Err("环境变量名须以字母或下划线开头，只能包含字母、数字和下划线。".into());
+        }
+        if value.contains('\0')
+            || value.encode_utf16().count() > MAX_TERMINAL_ENVIRONMENT_VALUE_LENGTH
+        {
+            return Err("环境变量值包含空字符或超过长度限制。".into());
+        }
+        let key = if cfg!(windows) {
+            name.to_ascii_lowercase()
+        } else {
+            name.clone()
+        };
+        if !names.insert(key) {
+            return Err("当前主机不允许重复的环境变量名。".into());
+        }
+    }
+    Ok(())
+}
+
+fn apply_terminal_environment(
+    base: &mut HashMap<String, String>,
+    overrides: &HashMap<String, String>,
+) {
+    for (name, value) in overrides {
+        #[cfg(windows)]
+        base.retain(|key, _| !key.eq_ignore_ascii_case(name));
+        base.insert(name.clone(), value.clone());
+    }
+}
+
+/// Returns everything a client needs to catch up with a terminal it was not connected to.
+/// Viewing does not start a process or change its size, palette or ownership.
+#[tauri::command]
+pub fn attach_terminal(
+    terminal_id: String,
+    manager: State<'_, PtyManager>,
+) -> Result<TerminalStartResult, String> {
+    manager
+        .attachment(&terminal_id)
+        .map_err(|error| error.to_string())?
+        .ok_or_else(|| "该终端当前未运行。".to_owned())
 }
 
 /// Returns everything a client needs to catch up with a terminal it was not connected to.
@@ -245,4 +312,66 @@ pub fn close_terminal(
         manager.forget_palette(&terminal_id);
     }
     result
+}
+
+#[cfg(test)]
+mod environment_tests {
+    use super::*;
+
+    #[test]
+    fn overrides_are_literal_scoped_and_can_set_empty_values() {
+        let parent = std::env::var("TERMEXO_COMMAND_TEST_VARIABLE").ok();
+        let mut base = HashMap::from([
+            ("PORT".into(), "3000".into()),
+            ("UNCHANGED".into(), "keep".into()),
+        ]);
+        let overrides = HashMap::from([
+            ("PORT".into(), "4300".into()),
+            ("EMPTY".into(), String::new()),
+            (
+                "TERMEXO_COMMAND_TEST_VARIABLE".into(),
+                "  literal $HOME = 'value'\nnext  ".into(),
+            ),
+        ]);
+        validate_terminal_environment(&overrides).unwrap();
+        apply_terminal_environment(&mut base, &overrides);
+        assert_eq!(base.get("PORT"), overrides.get("PORT"));
+        assert_eq!(base.get("EMPTY").unwrap(), "");
+        assert_eq!(base.get("UNCHANGED").unwrap(), "keep");
+        assert_eq!(
+            base.get("TERMEXO_COMMAND_TEST_VARIABLE"),
+            overrides.get("TERMEXO_COMMAND_TEST_VARIABLE")
+        );
+        assert_eq!(std::env::var("TERMEXO_COMMAND_TEST_VARIABLE").ok(), parent);
+    }
+
+    #[test]
+    fn malformed_overrides_are_rejected_and_legacy_requests_need_no_environment() {
+        for overrides in [
+            HashMap::from([("BAD=NAME".into(), "x".into())]),
+            HashMap::from([("PORT".into(), "a\0b".into())]),
+        ] {
+            assert!(validate_terminal_environment(&overrides).is_err());
+        }
+        let request: TerminalStartRequest = serde_json::from_value(serde_json::json!({
+            "terminalId": "t", "shell": "", "workingDirectory": "/project", "cols": 80, "rows": 24
+        }))
+        .unwrap();
+        assert!(request.environment.is_empty());
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn windows_replaces_environment_names_without_case_ambiguity() {
+        let mut base = HashMap::from([("Path".into(), "old".into())]);
+        let overrides = HashMap::from([("PATH".into(), "custom".into())]);
+        apply_terminal_environment(&mut base, &overrides);
+        assert_eq!(base.len(), 1);
+        assert_eq!(base.get("PATH").unwrap(), "custom");
+        assert!(validate_terminal_environment(&HashMap::from([
+            ("Port".into(), "1".into()),
+            ("PORT".into(), "2".into())
+        ]))
+        .is_err());
+    }
 }

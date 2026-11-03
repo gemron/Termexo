@@ -2,6 +2,17 @@
 
 Release notes for every Termexo version, newest first. The current release is summarised in [README.md](README.md).
 
+## V0.12.0
+
+- **Linux desktop and npm distribution.** Ship a Debian package and complete application archive, with native desktop, PTY and npm installation checks, alongside Windows and both macOS architectures. Thanks to [wuyh410](https://github.com/wuyh410) for [#45](https://github.com/gemron/Termexo/pull/45).
+- **Built-in One Ring workflows.** Integrate workflow launch and review into the workbench, bundle the MCP runtime, and improve native worker routing, Codex hook identity and Windows paths. Includes [#41](https://github.com/gemron/Termexo/pull/41).
+- **Saved actions with execution context.** Search and organize commands, choose working directories and set per-command environment variables. AI discovery supplies directory and environment settings for review and reuse.
+- **Independent read-only remote links.** Keep a control connection while sharing a viewer link with backend-enforced permissions.
+- **Clear account authorization feedback.** Show account-specific steps and verification status, invalid-code errors, a 30-second response timeout and a fresh-login retry. Prevent existing credentials and stale terminal events from falsely confirming a new attempt.
+- **Stable mobile input and fewer redraws.** Use a separate touch input field, disable xterm's moving hidden input, retain failed drafts, batch output and replay history atomically.
+- **Preview, translation and quota improvements.** Refine preview navigation, Markdown rendering and controls, translate remaining German toolbar labels, and improve Antigravity credentials and quota-window labels. Document One Ring staging before direct Cargo commands.
+- **Updated dependencies.** Includes Angular and Rust updates from [#43](https://github.com/gemron/Termexo/pull/43).
+
 ## V0.11.0
 
 - **Preview content in its own tabs.** Open multiple file or website previews alongside terminals, switch files without losing the browser, resize the panel, and highlight code without changing whitespace. MCP can open project and web previews without unrelated terminal activity stealing focus.

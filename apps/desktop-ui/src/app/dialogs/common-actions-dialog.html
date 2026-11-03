@@ -9,19 +9,29 @@
         <button type="button" role="tab" [attr.aria-selected]="activeTab() === 'saved'" [class.active]="activeTab() === 'saved'" (click)="activeTab.set('saved')">已保存 <b>{{ workspace().commonActions?.length ?? 0 }}</b></button>
         <button type="button" role="tab" [attr.aria-selected]="activeTab() === 'suggestions'" [class.active]="activeTab() === 'suggestions'" (click)="activeTab.set('suggestions')">识别建议 <b>{{ review()?.waiting ? '…' : (review()?.suggestions?.length ?? 0) }}</b></button>
       </div>
-      <div class="action-buttons">
-        <button type="button" class="btn btn-outline btn-sm" [disabled]="busy()" (click)="add()"><app-icon name="plus" [size]="13" />手动添加</button>
-        <button type="button" class="btn btn-outline btn-sm" [disabled]="busy()" (click)="add(true)">添加 IDE 操作</button>
-        @if (agents().length > 1 && !review()?.waiting) {
-          <select class="select select-bordered select-sm" aria-label="识别使用的 Agent" [ngModel]="agentId() || agents()[0].id" (ngModelChange)="agentId.set($event)">
-            @for (agent of agents(); track agent.id) { <option [value]="agent.id">{{ agent.name }}</option> }
-          </select>
-        }
-        @if (agents().length || review()?.waiting) {
-          <button type="button" class="btn btn-primary btn-sm" [disabled]="!available || busy() || review()?.waiting" (click)="recognize()"><app-icon name="sparkles" [size]="13" />{{ review()?.waiting ? '正在识别…' : '识别常用操作' }}</button>
-        } @else {
-          <button type="button" class="btn btn-primary btn-sm" [disabled]="!available || busy()" (click)="agentRequested.emit()"><app-icon name="sparkles" [size]="13" />启动 Agent 并识别</button>
-        }
+      <div class="toolbar-controls">
+        <div class="manual-actions">
+          <button type="button" class="btn btn-outline btn-sm toolbar-secondary" [disabled]="busy()" (click)="add()"><app-icon name="plus" [size]="14" />手动添加</button>
+          <button type="button" class="btn btn-outline btn-sm toolbar-secondary" [disabled]="busy()" (click)="add(true)"><app-icon name="external" [size]="14" />添加 IDE 操作</button>
+        </div>
+        <div class="recognition-tools">
+          @if (agents().length && !review()?.waiting) {
+            <label class="agent-picker" title="选择用于分析项目的空闲 Agent">
+              <app-icon name="bot" [size]="15" />
+              <select class="select select-sm" aria-label="识别使用的 Agent" [disabled]="busy()" [ngModel]="agentId() || agents()[0].id" (ngModelChange)="agentId.set($event)">
+                @for (agent of agents(); track agent.id) { <option [value]="agent.id">{{ agent.name }}</option> }
+              </select>
+            </label>
+          }
+          @if (agents().length || review()?.waiting) {
+            <button type="button" class="btn btn-primary btn-sm recognize-button" [disabled]="!available || busy() || review()?.waiting" title="读取项目配置，生成可审核的操作建议" (click)="recognize()">
+              @if (review()?.waiting) { <span class="loading loading-spinner loading-xs" aria-hidden="true"></span> } @else { <app-icon name="sparkles" [size]="14" /> }
+              {{ review()?.waiting ? '正在识别…' : '识别常用操作' }}
+            </button>
+          } @else {
+            <button type="button" class="btn btn-primary btn-sm recognize-button" [disabled]="!available || busy()" (click)="agentRequested.emit()"><app-icon name="sparkles" [size]="14" />启动 Agent 并识别</button>
+          }
+        </div>
       </div>
     </div>
     @if (error()) { <p class="notice error" role="alert">{{ error() }}</p> }
@@ -31,34 +41,68 @@
       @if (editor(); as draft) {
         <form class="editor" aria-label="操作编辑" (ngSubmit)="save()">
           <div class="editor-heading"><h3>{{ editingSuggestionId() ? '编辑建议' : (isEditing() ? '编辑操作' : '添加操作') }}</h3><button type="button" class="btn btn-ghost btn-xs" aria-label="关闭编辑" (click)="editor.set(null)"><app-icon name="x" [size]="13" /></button></div>
-          <label>名称<input #editorName name="name" class="input input-bordered input-sm" required [ngModel]="draft.name" (ngModelChange)="patchEditor({ name: $event })" /></label>
-          <label>命令<input name="command" class="input input-bordered input-sm command" required placeholder="npm run dev" [ngModel]="draft.command" (ngModelChange)="patchEditor({ command: $event })" /></label>
-          <label>工作目录<input name="directory" class="input input-bordered input-sm" required [ngModel]="draft.workingDirectory" (ngModelChange)="patchEditor({ workingDirectory: $event })" /></label>
-          <label>说明<input name="description" class="input input-bordered input-sm" [ngModel]="draft.description" (ngModelChange)="patchEditor({ description: $event })" /></label>
-          <div class="action-buttons"><button type="submit" class="btn btn-primary btn-sm" [disabled]="busy()">{{ editingSuggestionId() ? '更新建议' : '确认保存' }}</button><button type="button" class="btn btn-outline btn-sm" (click)="editor.set(null)">取消</button></div>
+          <label>名称<input #editorName name="name" class="input input-bordered input-sm" required maxlength="100" placeholder="例如：前端 · 开发服务" [ngModel]="draft.name" (ngModelChange)="patchEditor({ name: $event })" /></label>
+          <label>分类<select name="category" class="select select-bordered select-sm" [ngModel]="draft.category || 'custom'" (ngModelChange)="patchEditor({ category: $event })">@for (item of categories; track item.value) { <option [value]="item.value">{{ item.label }}</option> }</select></label>
+          <label>命令<input name="command" class="input input-bordered input-sm command" required maxlength="4000" placeholder="npm run dev" spellcheck="false" [ngModel]="draft.command" (ngModelChange)="patchEditor({ command: $event })" /><small class="field-hint">在指定目录中执行单行命令；保存后可手动启动。</small></label>
+          <label>工作目录<input name="directory" class="input input-bordered input-sm" required maxlength="2000" spellcheck="false" placeholder="D:/project/web 或 /home/project/web" [ngModel]="draft.workingDirectory" (ngModelChange)="patchEditor({ workingDirectory: $event })" /><small class="field-hint">命令从此目录启动，请填写主机上的绝对路径。</small><span class="directory-actions">@if (canPickDirectory) { <button type="button" class="directory-reset" [disabled]="selectingDirectory()" (click)="selectWorkingDirectory()">{{ selectingDirectory() ? '选择中…' : '选择文件夹' }}</button> }<button type="button" class="directory-reset" (click)="patchEditor({ workingDirectory: workspace().projectPath })">使用项目根目录</button></span></label>
+          <fieldset class="environment-editor">
+            <legend>环境变量 <small>{{ environmentRows().length }} / {{ maxEnvironmentVariables }}</small></legend>
+            <p class="field-hint">随操作保存，仅对该命令的终端生效；值按原文传入，无需添加引号。修改后需重新启动命令。</p>
+            @for (row of environmentRows(); track $index; let index = $index) {
+              <div class="environment-row">
+                <input [name]="'envName' + index" class="input input-bordered input-sm" [attr.aria-label]="'环境变量名 ' + (index + 1)" placeholder="NODE_ENV" spellcheck="false" [ngModel]="row.name" (ngModelChange)="patchEnvironment(index, { name: $event })" />
+                <textarea [name]="'envValue' + index" class="textarea textarea-bordered" [attr.aria-label]="'环境变量值 ' + (index + 1)" placeholder="development（可留空）" rows="1" [maxlength]="maxEnvironmentValueLength" spellcheck="false" [ngModel]="row.value" (ngModelChange)="patchEnvironment(index, { value: $event })"></textarea>
+                <button type="button" class="btn btn-ghost btn-xs" [attr.aria-label]="'移除环境变量 ' + (index + 1)" (click)="removeEnvironment(index)"><app-icon name="x" [size]="13" /></button>
+              </div>
+            }
+            <button type="button" class="btn btn-outline btn-xs" [disabled]="environmentRows().length >= maxEnvironmentVariables" (click)="addEnvironment()">添加环境变量</button>
+          </fieldset>
+          <label>说明<textarea name="description" class="textarea textarea-bordered" rows="3" maxlength="2000" placeholder="用途、前置条件、服务地址或命令来源" [ngModel]="draft.description" (ngModelChange)="patchEditor({ description: $event })"></textarea></label>
+          @if (editorError()) { <p class="field-error" role="status">{{ editorError() }}</p> }
+          <div class="action-buttons"><button type="submit" class="btn btn-primary btn-sm" [disabled]="busy() || selectingDirectory() || !!editorError()">{{ editingSuggestionId() ? '更新建议' : '确认保存' }}</button><button type="button" class="btn btn-outline btn-sm" (click)="editor.set(null)">取消</button></div>
         </form>
       }
       <div class="list-area">
         @if (activeTab() === 'saved') {
+          <div class="library-overview">
+            <div class="library-heading"><strong>项目操作</strong><div class="operation-stats"><span>{{ savedRows().length }} 项操作</span><span class="running-stat" [class.has-running]="runningCount() > 0"><i aria-hidden="true"></i>{{ runningCount() }} 项运行中</span>@if (failedCount()) { <span class="failed-stat">{{ failedCount() }} 项失败</span> }</div></div>
+            @if (filteredRows().length !== savedRows().length) { <small>显示 {{ filteredRows().length }} / {{ savedRows().length }} 项</small> }
+          </div>
+          <div class="library-filters" aria-label="筛选常用操作">
+            <label class="search-field"><app-icon name="search" [size]="14" /><input type="search" aria-label="搜索常用操作" placeholder="搜索名称、命令、说明或目录" [ngModel]="search()" (ngModelChange)="search.set($event)" /></label>
+            <select class="select select-bordered select-sm" aria-label="按分类筛选" [ngModel]="category()" (ngModelChange)="category.set($event)"><option value="all">全部分类</option>@for (item of categories; track item.value) { <option [value]="item.value">{{ item.label }}</option> }</select>
+            <select class="select select-bordered select-sm" aria-label="按状态筛选" [ngModel]="status()" (ngModelChange)="status.set($event)"><option value="all">全部状态</option>@for (item of statusOptions; track item[0]) { <option [value]="item[0]">{{ item[1] }}</option> }</select>
+          </div>
           <div class="actions-grid">
-            @for (action of workspace().commonActions ?? []; track action.id) {
-              <article class="saved-action action-card">
-                <div class="action-summary" [title]="action.description || action.name">
-                  <div class="action-name"><strong>{{ action.name }}</strong><small class="action-status" [class.running]="actionStatus(action) === '运行中'">{{ actionStatus(action) }}</small></div>
-                  <code [title]="action.command">{{ action.command }}</code>
-                  <small class="directory" [title]="action.workingDirectory">{{ relativeDirectory(action.workingDirectory) }}</small>
+            @for (row of filteredRows(); track row.action.id) {
+              @let action = row.action;
+              <article class="saved-action action-card" [class.active-action]="row.active" [class.failed-action]="row.state === 'failed'" [attr.aria-busy]="pending()?.id === action.id">
+                <div class="action-summary">
+                  <div class="action-name"><strong [title]="action.name">{{ action.name }}</strong><small class="action-status" [class.running]="row.active" [class.failed]="row.state === 'failed'" [class.completed]="row.state === 'completed'">{{ pending()?.id === action.id ? pending()!.label : statusLabels[row.state] }}</small></div>
+                  <span class="category-tag">{{ categoryLabel(action) }}</span>
+                  <div class="command-line"><code [title]="action.command">{{ action.command }}</code><button type="button" class="copy-command" [attr.aria-label]="'复制 ' + action.name + ' 的命令'" title="复制命令" (click)="copyCommand(action)"><app-icon name="copy" [size]="13" /></button></div>
+                  @if (action.description) { <p class="action-description" [title]="action.description">{{ action.description }}</p> }
+                  <small class="directory" [title]="action.workingDirectory">工作目录：{{ relativeDirectory(action.workingDirectory) }}</small>
+                  @if (environmentNames(action).length) { <small class="environment-summary" [title]="environmentNames(action).join(', ')">{{ environmentNames(action).length }} 个环境变量 · {{ environmentNames(action).join(', ') }}</small> }
+                  @if (row.state === 'failed') { <p class="failure-hint">查看控制台中的错误输出，检查命令、依赖和工作目录后重试。</p> }
                 </div>
                 <div class="card-buttons">
-                  <button type="button" class="btn btn-primary btn-xs" [disabled]="!available || busy()" (click)="actionStatus(action) === '运行中' ? console(action) : run(action.id)">{{ actionStatus(action) === '运行中' ? '查看' : '启动' }}</button>
-                  <button type="button" class="btn btn-outline btn-xs" [disabled]="!available || busy() || actionStatus(action) !== '运行中'" (click)="stop(action.id)">停止</button>
-                  <button type="button" class="btn btn-outline btn-xs" [disabled]="!available || busy()" (click)="run(action.id, true)">重启</button>
-                  <button type="button" class="btn btn-ghost btn-xs" [disabled]="!hasConsole(action)" (click)="console(action)">控制台</button>
+                  <button type="button" class="btn btn-primary btn-xs" [disabled]="!available || busy()" (click)="row.active ? console(action) : run(action.id)">{{ row.active ? '查看' : (row.state === 'failed' ? '重试' : '启动') }}</button>
+                  <button type="button" class="btn btn-outline btn-xs" [disabled]="!available || busy() || !row.active" (click)="stop(action.id)">停止</button>
+                  <button type="button" class="btn btn-outline btn-xs" [disabled]="!available || busy() || !row.hasConsole" (click)="run(action.id, true)">重启</button>
+                  <button type="button" class="btn btn-ghost btn-xs" [disabled]="!row.hasConsole" (click)="console(action)">控制台</button>
+                  <span class="button-spacer"></span>
                   <button type="button" class="btn btn-ghost btn-xs" [disabled]="busy()" (click)="edit(action)">编辑</button>
+                  <button type="button" class="btn btn-ghost btn-xs" [disabled]="busy()" title="以此操作为基础编辑新命令" (click)="duplicate(action)">复用</button>
                   <button type="button" class="btn btn-ghost btn-xs remove" [disabled]="busy()" title="仅移除入口，已启动的终端会保留" (click)="remove(action.id)">移除</button>
                 </div>
               </article>
             } @empty {
-              <div class="empty-state"><app-icon name="command" [size]="28" /><h3>把项目常用命令放在这里</h3><p>点击“识别常用操作”，或手动添加启动、测试、构建等命令。</p></div>
+              @if (savedRows().length) {
+                <div class="empty-state"><app-icon name="search" [size]="28" /><h3>没有匹配的操作</h3><p>试试其他关键词，或清除分类和状态筛选。</p><button type="button" class="btn btn-outline btn-sm" (click)="clearFilters()">清除筛选</button></div>
+              } @else {
+                <div class="empty-state"><app-icon name="command" [size]="28" /><h3>把项目常用命令放在这里</h3><p>识别项目中的开发、测试、构建与质量检查命令，或手动添加。</p><div class="empty-features"><span>独立终端运行</span><span>运行状态跟踪</span><span>命令随项目保存</span></div></div>
+              }
             }
           </div>
         } @else {
@@ -78,7 +122,22 @@
                 @for (item of result.suggestions; track item.id) {
                   <article class="suggestion action-card" [class.selected]="item.selected">
                     <input type="checkbox" class="checkbox checkbox-sm" [attr.aria-label]="'添加 ' + item.name" [ngModel]="item.selected" (ngModelChange)="actions.editSuggestion(workspace().id, item.id, { selected: $event })" />
-                    <div class="action-summary"><strong>{{ item.name }}</strong><code [title]="item.command">{{ item.command }}</code><small class="directory" [title]="item.workingDirectory + ' · ' + item.description">{{ relativeDirectory(item.workingDirectory) }}</small></div>
+                    <div class="action-summary">
+                      <div class="action-name"><strong>{{ item.name }}</strong><span class="category-tag">{{ categoryLabel(item) }}</span></div>
+                      <code [title]="item.command">{{ item.command }}</code>
+                      @if (item.description) { <p class="action-description" [title]="item.description">{{ item.description }}</p> }
+                      <small class="directory suggestion-directory">工作目录：{{ item.workingDirectory }}</small>
+                      @if (environmentNames(item).length) {
+                        <details class="suggestion-environment">
+                          <summary>{{ environmentNames(item).length }} 个环境变量 · {{ environmentNames(item).join(', ') }}</summary>
+                          <dl>
+                            @for (variable of environmentEntries(item); track variable.name) {
+                              <dt>{{ variable.name }}</dt><dd>{{ variable.value === '' ? '(空值)' : variable.value }}</dd>
+                            }
+                          </dl>
+                        </details>
+                      } @else { <small class="environment-summary">未识别到额外环境变量，继承主机环境</small> }
+                    </div>
                     <button type="button" class="btn btn-outline btn-xs" (click)="editSuggestion(item)">编辑</button>
                   </article>
                 }

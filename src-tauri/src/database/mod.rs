@@ -108,6 +108,8 @@ pub struct Workspace {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct TerminalSession {
+    #[serde(default, skip_serializing_if = "std::collections::HashMap::is_empty")]
+    pub environment: std::collections::HashMap<String, String>,
     #[serde(default)]
     pub common_action_id: Option<String>,
     pub id: String,
@@ -130,12 +132,16 @@ pub struct TerminalSession {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct CommonAction {
+    #[serde(default, skip_serializing_if = "std::collections::HashMap::is_empty")]
+    pub environment: std::collections::HashMap<String, String>,
     pub id: String,
     pub name: String,
     pub command: String,
     pub working_directory: String,
     #[serde(default)]
     pub description: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub category: Option<String>,
     pub terminal_id: Option<String>,
 }
 
@@ -1772,11 +1778,13 @@ mod tests {
             grid_columns: 2,
             grid_rows: 2,
             common_actions: vec![CommonAction {
+                environment: std::collections::HashMap::from([("NODE_ENV".into(), "development".into())]),
                 id: "frontend".into(),
                 name: "Frontend".into(),
                 command: "npm run dev".into(),
                 working_directory: "D:/dev/termexo".into(),
                 description: "package.json".into(),
+                category: Some("develop".into()),
                 terminal_id: None,
             }],
             terminals: vec![],
@@ -1804,12 +1812,25 @@ mod tests {
         assert_eq!(stored[1].name, workspace.name);
         assert_eq!(stored[1].layout, workspace.layout);
         assert_eq!(stored[1].common_actions[0].command, "npm run dev");
+        assert_eq!(stored[1].common_actions[0].category.as_deref(), Some("develop"));
+        assert_eq!(stored[1].common_actions[0].environment.get("NODE_ENV").map(String::as_str), Some("development"));
 
         database.delete_workspace(&workspace.id).unwrap();
         assert!(database.list_todo_snapshots().unwrap().is_empty());
         let stored_after_delete = database.list().unwrap();
         assert_eq!(stored_after_delete.len(), 1);
         assert_eq!(stored_after_delete[0].id, first_workspace.id);
+    }
+
+    #[test]
+    fn common_action_category_is_optional_for_legacy_snapshots() {
+        let action: CommonAction = serde_json::from_value(serde_json::json!({
+            "id": "dev", "name": "Dev", "command": "npm run dev",
+            "workingDirectory": "D:/project"
+        })).unwrap();
+        assert!(action.category.is_none());
+        assert!(action.environment.is_empty());
+        assert!(serde_json::to_value(action).unwrap().get("category").is_none());
     }
 
     #[test]
@@ -1841,6 +1862,7 @@ mod tests {
             grid_rows: 2,
             common_actions: vec![],
             terminals: vec![TerminalSession {
+                environment: std::collections::HashMap::from([("CUSTOM_VALUE".into(), "literal value = '$HOME'".into())]),
                 common_action_id: None,
                 id: "terminal-1".into(),
                 name: "Claude 1".into(),
@@ -1863,6 +1885,7 @@ mod tests {
         let stored = database.list().unwrap();
 
         assert!(stored[0].terminals[0].account_login);
+        assert_eq!(stored[0].terminals[0].environment.get("CUSTOM_VALUE").map(String::as_str), Some("literal value = '$HOME'"));
         assert_eq!(
             stored[0].terminals[0].profile_id.as_deref(),
             Some("glm-4-6")

@@ -1,3 +1,6 @@
+@if (remoteConnection.readOnly()) {
+  @defer (on immediate) { <app-remote-read-only-view /> }
+} @else {
 <main
   class="app-shell bg-base-100 text-base-content"
   [class.workspace-sidebar-collapsed]="!workspaceSidebarOpen()"
@@ -75,16 +78,16 @@
           type="button"
           class="tool-button btn btn-ghost btn-sm join-item"
           data-testid="common-actions-open"
-          title="常用操作"
-          aria-label="常用操作"
+          [title]="'commonActions.title' | t"
+          [attr.aria-label]="'commonActions.title' | t"
           aria-haspopup="dialog"
           [attr.aria-expanded]="commonActionsOpen()"
           [disabled]="!state.activeWorkspace()"
           (click)="commonActionsOpen.set(true)"
         >
-          <app-icon name="command" [size]="14" /><span>常用操作</span>
+          <app-icon name="command" [size]="14" /><span>{{ 'commonActions.title' | t }}</span>
           @if (commonActions.reviews()[state.activeWorkspace()?.id ?? '']) {
-            <b>待审核</b>
+            <b>{{ 'commonActions.reviewPending' | t }}</b>
           }
         </button>
       </div>
@@ -728,6 +731,7 @@
             (linkOpenFailed)="reportFailure($event)"
             (terminalModelSwitchRequested)="openSingleModelSwitch($event)"
             (terminalAccountSwitchRequested)="openAccountSwitch($event)"
+            (accountLoginRetryRequested)="retryAccountLogin($event)"
             (terminalInput)="handleTerminalInput($event)"
             (terminalOutput)="handleTerminalOutput($event)"
           />
@@ -1154,10 +1158,6 @@
   </div>
 }
 
-<!-- Covers everything until the remote socket is authenticated; renders nothing on the desktop. -->
-@defer (when remoteMode) {
-  <app-remote-access-gate />
-}
 
 @defer (when commonActionsOpen()) {
   @if (commonActionsOpen()) {
@@ -1172,4 +1172,11 @@
       />
     }
   }
+}
+
+}
+
+<!-- Covers everything until the remote socket is authenticated; renders nothing on the desktop. -->
+@defer (when remoteMode) {
+  <app-remote-access-gate />
 }

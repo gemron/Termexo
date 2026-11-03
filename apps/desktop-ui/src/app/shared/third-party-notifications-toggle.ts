@@ -1,13 +1,16 @@
 import { Component, computed, inject, output, signal } from '@angular/core';
+import '../core/i18n/workspace-tools.i18n';
+import { I18nService } from '../core/i18n/i18n.service';
+import { TranslatePipe } from '../core/i18n/translate.pipe';
 import { ThirdPartyNotificationsService } from '../core/services/third-party-notifications.service';
 import { runtimeMode } from '../core/services/tauri-runtime';
 import { IconComponent } from './icon/icon';
 
 @Component({
   selector: 'app-third-party-notifications-toggle',
-  imports: [IconComponent],
+  imports: [IconComponent, TranslatePipe],
   template: `
-    <button type="button" role="switch" aria-label="第三方通知"
+    <button type="button" role="switch" [attr.aria-label]="'thirdParty.label' | t"
       data-testid="third-party-notifications-toggle"
       [attr.aria-checked]="flow.initialized() && flow.enabled()"
       [attr.aria-busy]="loading() || flow.saving()"
@@ -15,7 +18,7 @@ import { IconComponent } from './icon/icon';
       [disabled]="!available || loading() || flow.saving()"
       [title]="hint()" (click)="toggle()">
       <app-icon name="bell" [size]="15" />
-      <span>第三方通知</span>
+      <span>{{ 'thirdParty.label' | t }}</span>
       <span class="switch-track" aria-hidden="true"><i></i></span>
     </button>
   `,
@@ -36,19 +39,18 @@ import { IconComponent } from './icon/icon';
   `,
 })
 export class ThirdPartyNotificationsToggleComponent {
+  private readonly i18n = inject(I18nService);
   protected readonly flow = inject(ThirdPartyNotificationsService);
   protected readonly available = runtimeMode() === 'desktop';
   protected readonly loading = signal(false);
   private readonly error = signal('');
   readonly failed = output<string>();
   protected readonly hint = computed(() => {
-    if (!this.available) return '请在桌面端切换第三方通知';
-    if (this.loading()) return '正在读取第三方通知总开关…';
-    if (this.flow.saving()) return '正在保存第三方通知总开关…';
-    if (this.error()) return this.error() + '；点击重试';
-    return this.flow.enabled()
-      ? '第三方通知已开启，点击暂停所有渠道；各渠道配置会保留'
-      : '第三方通知已暂停，点击按各渠道原有配置恢复';
+    if (!this.available) return this.i18n.t('thirdParty.desktopOnly');
+    if (this.loading()) return this.i18n.t('thirdParty.loading');
+    if (this.flow.saving()) return this.i18n.t('thirdParty.saving');
+    if (this.error()) return this.i18n.t('thirdParty.retry', { error: this.error() });
+    return this.i18n.t(this.flow.enabled() ? 'thirdParty.enabled' : 'thirdParty.paused');
   });
 
   constructor() {
@@ -79,7 +81,7 @@ export class ThirdPartyNotificationsToggleComponent {
   }
 
   private report(error: unknown): void {
-    const message = '第三方通知开关操作失败：' + String(error);
+    const message = this.i18n.t('thirdParty.failed', { error: String(error) });
     this.error.set(message);
     this.failed.emit(message);
   }

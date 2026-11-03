@@ -7,9 +7,15 @@ import type { AccountProfileInput } from './core/models/agent.models';
 import { AgentService } from './core/services/agent.service';
 import { AppStateService } from './core/services/app-state.service';
 import { WorkspaceRepository } from './core/services/workspace.repository';
+import { TerminalExitEvent, TerminalGatewayService } from './core/services/terminal-gateway.service';
+import { AccountLoginFeedbackService } from './core/services/account-login-feedback.service';
 
 interface AccountLoginFlow {
   loginAccount(input: AccountProfileInput): Promise<void>;
+  retryAccountLogin(terminalId: string): Promise<void>;
+  pendingAccountLogins: Map<string, string>;
+  handleTerminalExit(event: TerminalExitEvent): void;
+  refreshAccountAfterLogin(profileId: string, terminalId: string, success: boolean): Promise<void>;
   profileSaving: Signal<boolean>;
   settingsOpen: WritableSignal<boolean>;
   toastMessage: Signal<string | null>;
@@ -99,5 +105,78 @@ describe('App account login', () => {
     expect(saving).not.toHaveBeenCalled();
     expect(flow.toastMessage()).toBeTruthy();
     expect(flow.settingsOpen()).toBe(true);
+  });
+
+  it('retries only the selected account in a fresh terminal and preserves the other account', async () => {
+    await state.createWorkspace('Project', 'D:\\projects\\current');
+    await flow.loginAccount(input);
+    const original = state.activeWorkspace()!.terminals[0];
+    await flow.loginAccount({ ...input, id: 'other-account', name: 'Other account' });
+    const other = state.activeWorkspace()!.terminals.find((item) => item.accountProfileId === 'other-account')!;
+    const feedback = TestBed.inject(AccountLoginFeedbackService);
+    feedback.setPhase(original.id, 'rejected');
+    const close = vi.spyOn(TestBed.inject(TerminalGatewayService), 'close').mockResolvedValue(undefined);
+    await flow.retryAccountLogin(original.id);
+    expect(close).toHaveBeenCalledExactlyOnceWith(original.id);
+    const terminals = state.activeWorkspace()!.terminals;
+    expect(terminals).toHaveLength(2);
+    expect(terminals).toContainEqual(other);
+    const next = terminals.find((item) => item.accountProfileId === input.id)!;
+    expect(next.id).not.toBe(original.id);
+    expect(next.workingDirectory).toBe(original.workingDirectory);
+    expect(next.command).toBe('codex login --device-auth');
+    expect(feedback.get(original.id)).toBeUndefined();
+    expect(feedback.get(next.id)?.phase).toBe('waiting');
+    expect(feedback.get(other.id)?.phase).toBe('waiting');
+  });
+
+  it('keeps the failure page available when preparing a retry fails', async () => {
+    await state.createWorkspace('Project', 'D:\\projects\\current');
+    await flow.loginAccount(input);
+    const original = state.activeWorkspace()!.terminals[0];
+    const close = vi.spyOn(TestBed.inject(TerminalGatewayService), 'close').mockResolvedValue(undefined);
+    vi.spyOn(agents, 'prepareAccountLogin').mockRejectedValueOnce(new Error('Cannot prepare login'));
+    await flow.retryAccountLogin(original.id);
+    expect(close).not.toHaveBeenCalled();
+    expect(state.activeWorkspace()!.terminals).toContainEqual(original);
+    expect(TestBed.inject(AccountLoginFeedbackService).get(original.id)?.phase).toBe('closed');
+    expect(flow.toastMessage()).toContain('Cannot prepare login');
+    expect(flow.profileSaving()).toBe(false);
+  });
+
+  it('ignores an exit from an older runtime before touching login state', async () => {
+    await state.createWorkspace('Project', 'D:\\projects\\current');
+    await flow.loginAccount(input);
+    const terminal = state.activeWorkspace()!.terminals[0];
+    flow.pendingAccountLogins.set(terminal.id, input.id);
+    const refresh = vi.spyOn(agents, 'refreshAccountProfile').mockResolvedValue(undefined);
+    flow.handleTerminalExit({ terminalId: terminal.id, runtimeRevision: (terminal.runtimeRevision ?? 0) + 1,
+      exitCode: 1, success: false });
+    expect(refresh).not.toHaveBeenCalled();
+    expect(flow.pendingAccountLogins.get(terminal.id)).toBe(input.id);
+    expect(TestBed.inject(AccountLoginFeedbackService).get(terminal.id)?.phase).toBe('waiting');
+  });
+
+  it('can retry a restored login whose old PTY no longer exists', async () => {
+    await state.createWorkspace('Project', 'D:\\projects\\current');
+    await flow.loginAccount(input);
+    const original = state.activeWorkspace()!.terminals[0];
+    vi.spyOn(TestBed.inject(TerminalGatewayService), 'close').mockRejectedValueOnce(`terminal ${original.id} was not found`);
+    await flow.retryAccountLogin(original.id);
+    const next = state.activeWorkspace()!.terminals[0];
+    expect(next.id).not.toBe(original.id);
+    expect(next.accountProfileId).toBe(input.id);
+    expect(TestBed.inject(AccountLoginFeedbackService).get(next.id)?.phase).toBe('waiting');
+  });
+
+  it('does not report a failed login as successful because old credentials still exist', async () => {
+    await state.createWorkspace('Project', 'D:\\projects\\current');
+    await flow.loginAccount(input);
+    const terminal = state.activeWorkspace()!.terminals[0];
+    const profiles = agents.accountProfiles().map((profile) => ({ ...profile, authenticated: true }));
+    vi.spyOn(agents, 'accountProfiles').mockReturnValue(profiles);
+    vi.spyOn(agents, 'refreshAccountProfile').mockResolvedValue(undefined);
+    await flow.refreshAccountAfterLogin(input.id, terminal.id, false);
+    expect(TestBed.inject(AccountLoginFeedbackService).get(terminal.id)?.phase).toBe('closed');
   });
 });

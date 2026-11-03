@@ -105,6 +105,7 @@ export interface TerminalPalette {
 }
 
 interface TerminalStartRequest {
+  environment?: Record<string, string>;
   terminalId: string;
   runtimeRevision: number;
   shell: string;
@@ -326,6 +327,7 @@ export class TerminalGatewayService {
     workspaceId?: string,
   ): Promise<TerminalStartResult> {
     const request: TerminalStartRequest = {
+      environment: session.environment,
       terminalId: session.id,
       runtimeRevision: session.runtimeRevision ?? 0,
       shell: session.shell,
@@ -347,7 +349,9 @@ export class TerminalGatewayService {
 
     if (hasBackend()) {
       const connection = this.connections.get(session.id);
-      const result = await invoke<TerminalStartResult>('create_terminal', { request });
+      const result = this.remoteConnection.readOnly()
+        ? await invoke<TerminalStartResult>('attach_terminal', { terminalId: session.id })
+        : await invoke<TerminalStartResult>('create_terminal', { request });
       const runtimeRevision = result?.runtimeRevision ?? request.runtimeRevision;
       if (
         connection &&
@@ -384,6 +388,7 @@ export class TerminalGatewayService {
   }
 
   async write(session: TerminalSession, data: string): Promise<void> {
+    if (this.remoteConnection.readOnly()) return;
     if (hasBackend()) {
       await invoke('write_terminal', { terminalId: session.id, data });
       return;
@@ -401,6 +406,7 @@ export class TerminalGatewayService {
    * itself leaves the one in use alone.
    */
   async resize(terminalId: string, cols: number, rows: number, claim = false): Promise<void> {
+    if (this.remoteConnection.readOnly()) return;
     if (hasBackend()) {
       await invoke('resize_terminal', {
         terminalId,
@@ -420,6 +426,7 @@ export class TerminalGatewayService {
    * `]11;rgb:…`. The browser preview has no program to ask.
    */
   async setPalette(terminalId: string, palette: TerminalPalette): Promise<void> {
+    if (this.remoteConnection.readOnly()) return;
     if (hasBackend()) {
       await invoke('set_terminal_palette', {
         terminalId,
@@ -472,6 +479,7 @@ export class TerminalGatewayService {
   }
 
   async close(terminalId: string, preserveRepositoryBaseline = false): Promise<void> {
+    if (this.remoteConnection.readOnly()) return;
     if (hasBackend()) {
       await invoke('close_terminal', { terminalId, preserveRepositoryBaseline });
     }
@@ -571,10 +579,9 @@ export class TerminalGatewayService {
       if (this.connections.get(connection.id) !== connection) return;
       // A snapshot from a PTY this view has already replaced would draw someone else's output.
       if (scrollback.runtimeRevision === connection.runtimeRevision && scrollback.data) {
-        if (clearScreen) {
-          connection.onOutput(CLEAR_SCREEN, true);
-        }
-        connection.onOutput(scrollback.data, true);
+        // xterm yields between writes. Clearing separately can paint an empty frame while
+        // the replacement screen waits to be parsed, especially on a remote browser.
+        connection.onOutput((clearScreen ? CLEAR_SCREEN : '') + scrollback.data, true);
         connection.lastSequence = scrollback.sequence;
       }
     } catch (error) {

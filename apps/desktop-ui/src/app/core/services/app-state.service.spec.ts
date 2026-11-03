@@ -180,6 +180,7 @@ describe('AppStateService', () => {
     service.markTerminalExited(terminal.id, 'STOPPED');
     service.markTerminalExited(terminal.id, 'FAILED');
     service.updateTerminalStatus(terminal.id, 'FAILED');
+    service.markTerminalExited(terminal.id, 'COMPLETED');
     expect(service.activeTerminal()?.status).toBe('STOPPED');
     const failed = service.createTerminal({ agentType: 'shell', commonActionId: 'bad' })!;
     service.markTerminalExited(failed.id, 'FAILED');

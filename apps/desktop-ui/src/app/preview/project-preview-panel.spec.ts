@@ -41,6 +41,8 @@ describe('read-only project preview and code references', () => {
     preview.failedPath.set('');
     preview.directory.set(null);
     preview.url.set('');
+    preview.loading.set(false);
+    preview.listing.set(false);
     preview.browse.mockReset();
     preview.openFile.mockReset();
     vi.stubGlobal('navigator', {
@@ -168,7 +170,9 @@ describe('read-only project preview and code references', () => {
     expect(preview.file().path).toBe(second);
     expect(entries()).toHaveLength(2);
 
-    const toggle = fixture.nativeElement.querySelector('[data-testid="preview-file-browser-toggle"]') as HTMLButtonElement;
+    const toggle = fixture.nativeElement.querySelector(
+      '[data-testid="preview-file-browser-toggle"]',
+    ) as HTMLButtonElement;
     toggle.click();
     fixture.detectChanges();
     expect(entries()).toHaveLength(0);
@@ -188,7 +192,8 @@ describe('read-only project preview and code references', () => {
   });
 
   it('highlights code while keeping indentation, blank lines, trailing spaces and copy text unchanged', async () => {
-    const original = 'const message = "<img src=x onerror=alert(1)>";  \n\n\tif (true) {\n    console.log(message);\n}\n';
+    const original =
+      'const message = "<img src=x onerror=alert(1)>";  \n\n\tif (true) {\n    console.log(message);\n}\n';
     preview.file.set({ path, content: original, kind: 'text', mime: 'text/plain' });
     const fixture = TestBed.createComponent(ProjectPreviewPanelComponent);
     fixture.detectChanges();
@@ -234,5 +239,136 @@ describe('read-only project preview and code references', () => {
     expect(html).not.toContain('<script>');
     expect(html).not.toContain('href="javascript:');
     expect(html).toContain('&lt;tag&gt;');
+  });
+
+  it('filters directory entries while keeping the currently open source and highlights its row', async () => {
+    preview.directory.set({
+      path: 'D:/代码 project/src',
+      entries: [
+        { name: 'main.ts', path, directory: false },
+        { name: 'other.ts', path: 'D:/代码 project/src/other.ts', directory: false },
+      ],
+      truncated: false,
+    });
+    const fixture = TestBed.createComponent(ProjectPreviewPanelComponent);
+    fixture.detectChanges();
+    const input = fixture.nativeElement.querySelector(
+      '[aria-label="筛选当前目录文件"]',
+    ) as HTMLInputElement;
+    input.value = 'MAIN';
+    input.dispatchEvent(new Event('input'));
+    await fixture.whenStable();
+    fixture.detectChanges();
+    expect(fixture.nativeElement.querySelectorAll('.file-entry')).toHaveLength(1);
+    expect(
+      fixture.nativeElement
+        .querySelector('.entry-row.active .file-entry')
+        ?.getAttribute('aria-current'),
+    ).toBe('page');
+    expect((fixture.nativeElement.querySelector('textarea') as HTMLTextAreaElement).value).toBe(
+      content,
+    );
+    expect(preview.openFile).not.toHaveBeenCalled();
+  });
+
+  it('opens pasted code references and keeps the address synchronized with the displayed file', async () => {
+    const fixture = TestBed.createComponent(ProjectPreviewPanelComponent);
+    fixture.detectChanges();
+    await fixture.whenStable();
+    const input = fixture.nativeElement.querySelector('.address input') as HTMLInputElement;
+    expect(input.value).toBe(path);
+    input.value = 'src/main.ts:3:2';
+    input.dispatchEvent(new Event('input'));
+    await fixture.whenStable();
+    fixture.nativeElement.querySelector('.address').dispatchEvent(new Event('submit'));
+    await fixture.whenStable();
+    expect(preview.openFile).toHaveBeenLastCalledWith('w', 'src/main.ts', undefined, 3, 2);
+  });
+
+  it('finds literal text using keyboard shortcuts, wraps matches and copies the matched location', async () => {
+    preview.file.set({ path, content: 'a.b\nA.B\naXb', kind: 'text', mime: 'text/plain' });
+    const fixture = TestBed.createComponent(ProjectPreviewPanelComponent);
+    fixture.detectChanges();
+    const code = fixture.nativeElement.querySelector('textarea') as HTMLTextAreaElement;
+    const shortcut = new KeyboardEvent('keydown', {
+      key: 'f',
+      ctrlKey: true,
+      bubbles: true,
+      cancelable: true,
+    });
+    code.dispatchEvent(shortcut);
+    fixture.detectChanges();
+    await fixture.whenStable();
+    expect(shortcut.defaultPrevented).toBe(true);
+    const find = fixture.nativeElement.querySelector('[aria-label="查找文本"]') as HTMLInputElement;
+    find.value = 'a.b';
+    find.dispatchEvent(new Event('input'));
+    await fixture.whenStable();
+    fixture.detectChanges();
+    const next = fixture.nativeElement.querySelector(
+      '[aria-label="下一个匹配"]',
+    ) as HTMLButtonElement;
+    next.click();
+    fixture.detectChanges();
+    expect(code.selectionStart).toBe(0);
+    expect(code.selectionEnd).toBe(3);
+    expect(fixture.nativeElement.querySelector('.search-layer mark')?.textContent).toBe('a.b');
+    next.click();
+    fixture.detectChanges();
+    expect(code.selectionStart).toBe(4);
+    expect(code.selectionEnd).toBe(7);
+    const copy = [...fixture.nativeElement.querySelectorAll('button')].find(
+      (button: HTMLButtonElement) => button.textContent?.trim() === '复制位置',
+    ) as HTMLButtonElement;
+    copy.click();
+    await fixture.whenStable();
+    expect(clipboardWrite).toHaveBeenLastCalledWith(`${path}:2:1-2:4`);
+    next.click();
+    fixture.detectChanges();
+    expect(code.selectionStart).toBe(0);
+  });
+
+  it('jumps to a valid line without modifying text and validates out-of-range input', async () => {
+    const fixture = TestBed.createComponent(ProjectPreviewPanelComponent);
+    fixture.detectChanges();
+    const code = fixture.nativeElement.querySelector('textarea') as HTMLTextAreaElement;
+    code.dispatchEvent(
+      new KeyboardEvent('keydown', { key: 'g', ctrlKey: true, bubbles: true, cancelable: true }),
+    );
+    fixture.detectChanges();
+    await fixture.whenStable();
+    const line = fixture.nativeElement.querySelector('[aria-label="目标行号"]') as HTMLInputElement;
+    line.value = '99';
+    line.dispatchEvent(new Event('input'));
+    await fixture.whenStable();
+    fixture.nativeElement.querySelector('.line-bar').dispatchEvent(new Event('submit'));
+    await fixture.whenStable();
+    fixture.detectChanges();
+    expect(fixture.nativeElement.textContent).toContain('1 至 3');
+    line.value = '3';
+    line.dispatchEvent(new Event('input'));
+    await fixture.whenStable();
+    fixture.nativeElement.querySelector('.line-bar').dispatchEvent(new Event('submit'));
+    await fixture.whenStable();
+    fixture.detectChanges();
+    expect(code.selectionStart).toBe(content.lastIndexOf('\n') + 1);
+    expect(code.value).toBe(content);
+    expect(code.readOnly).toBe(true);
+  });
+
+  it('navigates a Markdown heading anchor within the document without reading another file', () => {
+    preview.file.set({
+      path: 'D:/代码 project/README.md',
+      content: '# 使用说明\n# 使用说明\n[跳转](#使用说明-1)',
+      kind: 'markdown',
+      mime: 'text/markdown',
+    });
+    const fixture = TestBed.createComponent(ProjectPreviewPanelComponent);
+    fixture.detectChanges();
+    const heading = fixture.nativeElement.querySelectorAll('.markdown h1')[1] as HTMLElement;
+    heading.scrollIntoView = vi.fn();
+    (fixture.nativeElement.querySelector('.markdown a') as HTMLAnchorElement).click();
+    expect(heading.scrollIntoView).toHaveBeenCalledOnce();
+    expect(preview.openFile).not.toHaveBeenCalled();
   });
 });

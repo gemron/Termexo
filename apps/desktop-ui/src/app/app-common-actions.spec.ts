@@ -7,6 +7,7 @@ import { AppStateService } from './core/services/app-state.service';
 import { CommonActionsService } from './core/services/common-actions.service';
 import { AgentStartupService, type AgentStartupRequest } from './core/services/agent-startup.service';
 import { WorkspaceRepository } from './core/services/workspace.repository';
+import type { TerminalExitEvent } from './core/services/terminal-gateway.service';
 
 interface RecognitionFlow {
   commonActionsOpen: WritableSignal<boolean>;
@@ -17,13 +18,14 @@ interface RecognitionFlow {
   armStartupDialogs(terminalId: string): void;
   deliverTerminalPrompt(terminalId: string, content: string, submit: boolean): Promise<void>;
   viewCommonActionAgent(terminalId: string): void;
+  handleTerminalExit(event: TerminalExitEvent): void;
 }
 
 describe('continuous common action recognition', () => {
   let flow: RecognitionFlow;
   let state: AppStateService;
   let actions: CommonActionsService;
-  const startup = { arm: vi.fn(), markRuntimeStarted: vi.fn(), awaitingTerminalIds: signal<readonly string[]>([]) };
+  const startup = { arm: vi.fn(), cancel: vi.fn(), markRuntimeStarted: vi.fn(), awaitingTerminalIds: signal<readonly string[]>([]) };
   beforeEach(async () => {
     vi.clearAllMocks();
     vi.spyOn(App.prototype as unknown as { initialize(): Promise<void> }, 'initialize').mockResolvedValue(undefined);
@@ -98,5 +100,14 @@ describe('continuous common action recognition', () => {
     flow.closeCodexLaunch();
     expect(flow.commonActionsOpen()).toBe(true);
     expect(actions.reviews()[state.activeWorkspace()!.id]).toBeUndefined();
+  });
+
+  it('records successful common commands as completed while ordinary shell exits stay stopped', () => {
+    const command = state.createTerminal({ agentType: 'shell', commonActionId: 'test' })!;
+    flow.handleTerminalExit({ terminalId: command.id, runtimeRevision: command.runtimeRevision ?? 0, exitCode: 0, success: true });
+    expect(state.activeTerminal()?.status).toBe('COMPLETED');
+    const shell = state.createTerminal({ agentType: 'shell' })!;
+    flow.handleTerminalExit({ terminalId: shell.id, runtimeRevision: shell.runtimeRevision ?? 0, exitCode: 0, success: true });
+    expect(state.activeTerminal()?.status).toBe('STOPPED');
   });
 });

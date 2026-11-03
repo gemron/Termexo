@@ -28,11 +28,12 @@ import {
   TerminalStatus,
   TERMINAL_STATUS_META,
 } from '../core/models/workspace.models';
-import { primaryPointerIsTouch } from '../core/services/input-device';
+import { hasTouchInput } from '../core/services/input-device';
 import { readClipboardText, writeClipboardText } from '../core/services/clipboard-text';
 import { PtyBackendService } from '../core/services/pty-backend.service';
 import { runtimeMode } from '../core/services/tauri-runtime';
 import { TerminalGatewayService } from '../core/services/terminal-gateway.service';
+import { AccountLoginFeedbackService } from '../core/services/account-login-feedback.service';
 import { IconComponent } from '../shared/icon/icon';
 import { TerminalCompositionAnchor } from './terminal-composition-anchor';
 import type { TerminalCloseRequest } from './terminal-close-request';
@@ -52,7 +53,12 @@ import {
   TerminalRow,
 } from './terminal-links';
 import { TerminalReplayGate } from './terminal-replay-gate';
-import { terminalStatusAfterStart } from './terminal-startup-status';
+import { canSetTerminalIdle, terminalStatusAfterStart } from './terminal-startup-status';
+import { isFinishedCommonAction } from '../core/models/common-action';
+import { TerminalOutputBuffer } from './terminal-output-buffer';
+import { RemoteConnectionService } from '../core/services/remote-connection.service';
+import { AccountLoginCodeComponent } from './account-login-code';
+import { TerminalMobileInputComponent } from './terminal-mobile-input';
 import {
   type ApprovalOption,
   isSubmission,
@@ -89,7 +95,7 @@ const RIGHT_MOUSE_BUTTON = 2;
  * preview that stands in for it during development — on a touch device qualifies.
  */
 function offersQuickKeys(): boolean {
-  return runtimeMode() !== 'desktop' && primaryPointerIsTouch();
+  return runtimeMode() !== 'desktop' && hasTouchInput();
 }
 
 /**
@@ -115,12 +121,14 @@ const RUNTIME_ISSUE_NOTICE_KEYS: Readonly<
 
 @Component({
   selector: 'app-terminal-panel',
-  imports: [IconComponent, TerminalQuickKeysComponent, TranslatePipe],
+  imports: [IconComponent, TerminalQuickKeysComponent, TranslatePipe, AccountLoginCodeComponent, TerminalMobileInputComponent],
   templateUrl: './terminal-panel.html',
   styleUrl: './terminal-panel.scss',
 })
 export class TerminalPanelComponent implements AfterViewInit {
+  protected readonly readOnly = inject(RemoteConnectionService).readOnly;
   private readonly gateway = inject(TerminalGatewayService);
+  private readonly loginFeedback = inject(AccountLoginFeedbackService);
   private readonly ptyBackend = inject(PtyBackendService);
   private readonly i18n = inject(I18nService);
   private readonly destroyRef = inject(DestroyRef);
@@ -171,6 +179,8 @@ export class TerminalPanelComponent implements AfterViewInit {
   private outputTail = '';
   private lastRuntimeIssue: TerminalRuntimeIssue = null;
   private readonly replayGate = new TerminalReplayGate();
+  private readonly remoteOutput = runtimeMode() === 'remote';
+  private readonly outputBuffer = new TerminalOutputBuffer((data, replayed) => this.writeOutput(data, replayed));
   private readonly inputStatus = new TerminalInputStatusTracker();
 
   /** The mark of the agent this terminal runs, drawn in its title. */
@@ -201,6 +211,11 @@ export class TerminalPanelComponent implements AfterViewInit {
   private touchPoint = { x: 0, y: 0 };
 
   readonly session = input.required<TerminalSession>();
+  protected readonly canSetIdle = computed(() => canSetTerminalIdle(this.session()));
+
+  protected setIdle(): void {
+    if (this.canSetIdle()) this.statusChanged.emit({ terminalId: this.session().id, status: 'IDLE' });
+  }
   /** The active terminal's current Git branch, supplied by the repository overview. */
   readonly gitBranch = input('');
   /** Needed when reconnecting, to rebuild the workspace's proxy settings. */
@@ -223,13 +238,23 @@ export class TerminalPanelComponent implements AfterViewInit {
   readonly renameRequested = output<{ terminalId: string; name: string }>();
   readonly modelSwitchRequested = output<string>();
   readonly accountSwitchRequested = output<string>();
+  readonly accountLoginRetryRequested = output<string>();
   readonly inputCaptured = output<{ terminalId: string; data: string }>();
   readonly outputCaptured = output<{ terminalId: string; data: string }>();
   /** User actions that failed, reported by the shell without touching the terminal buffer. */
   readonly interactionFailed = output<string>();
 
   protected readonly renaming = signal(false);
-  protected readonly quickKeysEnabled = offersQuickKeys();
+  protected readonly touchInput = offersQuickKeys();
+  protected readonly quickKeysEnabled = this.touchInput;
+  protected readonly mobileInputDisabled = computed(() => this.readOnly() || this.connectingRuntime() || !this.runtimeReady
+    || isFinishedCommonAction(this.session()) || ['FAILED', 'STOPPED', 'DISCONNECTED'].includes(this.session().status));
+  protected readonly sendMobileText = async (text: string): Promise<void> => {
+    if (this.mobileInputDisabled() || this.replayGate.replaying) throw new Error('Terminal input is unavailable');
+    const normalized = text.replace(/\r?\n/g, '\r');
+    const paste = this.terminal.modes.bracketedPasteMode ? '\x1b[200~' + normalized + '\x1b[201~' : normalized;
+    await this.handleUserInput(paste + '\r');
+  };
 
   /**
    * Types a keypad key as if it came from a keyboard.
@@ -277,6 +302,7 @@ export class TerminalPanelComponent implements AfterViewInit {
   });
 
   constructor() {
+    this.destroyRef.onDestroy(() => this.outputBuffer.dispose());
     const stopReconnect = this.gateway.onReconnected(() => {
       if (!this.viewReady || this.destroyRef.destroyed || this.runtimeReady) return;
       if (this.connectingRuntime()) {
@@ -365,7 +391,8 @@ export class TerminalPanelComponent implements AfterViewInit {
       this.terminal.open(terminalContainer);
       void this.enableGpuRenderer();
     });
-    this.compositionAnchor = new TerminalCompositionAnchor(terminalContainer, () => {
+    this.disableMobileTerminalInput();
+    if (!this.touchInput) this.compositionAnchor = new TerminalCompositionAnchor(terminalContainer, () => {
       const buffer = this.terminal.buffer.active;
       return {
         cols: this.terminal.cols,
@@ -409,38 +436,9 @@ export class TerminalPanelComponent implements AfterViewInit {
 
     void this.initializeRuntime();
     const inputDisposable = this.terminal.onData((data) => {
-      // History being redrawn, not the user typing: xterm is answering a query the replayed
-      // scrollback still carried, and sending that answer would type it into the program.
-      if (this.replayGate.replaying) {
-        return;
-      }
-      const session = this.session();
-      this.inputCaptured.emit({ terminalId: session.id, data });
-      // Read before the key reaches the agent, while the screen still shows what it answers.
-      const status = this.inputStatus.statusAfterInput(data, {
-        agentType: session.agentType,
-        status: session.status,
-        readApprovalOptions: this.readScreenApprovalOptions,
-      });
-      const submitted = isSubmission(data);
-      if (submitted) {
-        this.terminal.scrollToBottom();
-        this.lastRuntimeIssue = null;
-        this.outputTail = '';
-      }
-      if (submitted || status) {
-        // Submitting clears the runtime notice and a key can move the terminal's status, both of
-        // which the workbench draws, so this part re-enters the zone.
-        this.zone.run(() => {
-          if (submitted) {
-            this.runtimeIssue.set(null);
-          }
-          if (status) {
-            this.statusChanged.emit({ terminalId: session.id, status });
-          }
-        });
-      }
-      void this.gateway.write(session, data);
+      void this.handleUserInput(data).catch(() => this.zone.run(() => {
+        this.connectionNotice.set(this.i18n.t('terminal.mobileSendFailed'));
+      }));
     });
     // xterm repositions its IME elements on every render. Registering after open means this runs
     // after xterm's own render listener, so it wins for both the caret captured at
@@ -494,6 +492,42 @@ export class TerminalPanelComponent implements AfterViewInit {
       this.webglAddon = undefined;
       this.terminal.dispose();
     });
+  }
+
+  private async handleUserInput(data: string): Promise<void> {
+    // History being redrawn, not the user typing: xterm is answering a query the replayed
+    // scrollback still carried, and sending that answer would type it into the program.
+    if (this.replayGate.replaying || this.readOnly()) {
+      return;
+    }
+    const session = this.session();
+    if (isFinishedCommonAction(session)) return;
+    this.inputCaptured.emit({ terminalId: session.id, data });
+    // Read before the key reaches the agent, while the screen still shows what it answers.
+    const status = this.inputStatus.statusAfterInput(data, {
+      agentType: session.agentType,
+      status: session.status,
+      readApprovalOptions: this.readScreenApprovalOptions,
+    });
+    const submitted = isSubmission(data);
+    if (submitted) {
+      this.terminal.scrollToBottom();
+      this.lastRuntimeIssue = null;
+      this.outputTail = '';
+    }
+    if (submitted || status) {
+      // Submitting clears the runtime notice and a key can move the terminal's status, both of
+      // which the workbench draws, so this part re-enters the zone.
+      this.zone.run(() => {
+        if (submitted) {
+          this.runtimeIssue.set(null);
+        }
+        if (status) {
+          this.statusChanged.emit({ terminalId: session.id, status });
+        }
+      });
+    }
+    await this.gateway.write(session, data);
   }
 
   /**
@@ -554,14 +588,6 @@ export class TerminalPanelComponent implements AfterViewInit {
     let startingProcess = false;
     try {
       const session = this.session();
-      // Saved project commands only start through an explicit Run/Restart action.
-      if (
-        session.commonActionId &&
-        ['STOPPED', 'FAILED', 'DISCONNECTED'].includes(session.status)
-      ) {
-        this.terminal.writeln('此常用操作已停止。请在“常用操作”中启动。');
-        return;
-      }
       unlisten = await this.gateway.connect(
         session.id,
         session.runtimeRevision ?? 0,
@@ -577,6 +603,14 @@ export class TerminalPanelComponent implements AfterViewInit {
         unlisten = undefined;
         if (this.startupTimer !== undefined) window.clearTimeout(this.startupTimer);
       });
+
+      // A finished operation is a read-only console. Replay its output without spawning its command again.
+      if (isFinishedCommonAction(this.session())) {
+        await this.gateway.replayInitial(session.id);
+        if (!this.destroyRef.destroyed)
+          this.terminal.writeln('\r\n此常用操作已结束。可在“常用操作”中重新启动。');
+        return;
+      }
 
       // The PTY is shared, so its size is negotiated across every attached client; the emulator
       // follows that rather than its own fit, or it would keep drawing columns the agent has
@@ -948,6 +982,7 @@ export class TerminalPanelComponent implements AfterViewInit {
    * which would move focus out of the terminal entirely.
    */
   private readonly handleCustomKey = (event: KeyboardEvent): boolean => {
+    if (this.readOnly()) return false;
     // Tab shortcuts belong to the workbench. Declining them here keeps xterm from writing an
     // escape sequence to the PTY; the event still bubbles to the shell, which acts on it.
     if (workbenchShortcut(event)) {
@@ -965,6 +1000,7 @@ export class TerminalPanelComponent implements AfterViewInit {
       return true;
     }
     event.preventDefault();
+    if (isFinishedCommonAction(this.session())) return false;
     void this.gateway.write(this.session(), sequence);
     return false;
   };
@@ -1214,6 +1250,7 @@ export class TerminalPanelComponent implements AfterViewInit {
    * The handlers suppress the WebView's default paste before calling this method.
    */
   private async pasteFromClipboard(): Promise<void> {
+    if (this.readOnly() || isFinishedCommonAction(this.session())) return;
     try {
       const text = await readClipboardText();
       if (text) {
@@ -1225,6 +1262,8 @@ export class TerminalPanelComponent implements AfterViewInit {
   }
 
   private scheduleActivation(): void {
+    // A phone opens its keyboard only from a deliberate tap, never from a render/status change.
+    if (this.touchInput) return;
     if (this.activationFrame !== undefined) {
       window.cancelAnimationFrame(this.activationFrame);
     }
@@ -1305,14 +1344,25 @@ export class TerminalPanelComponent implements AfterViewInit {
   }
 
   private activateTerminal(): void {
-    if (this.destroyRef.destroyed || !this.visible()) {
+    if (this.destroyRef.destroyed || !this.visible() || this.readOnly()) {
       return;
     }
     if (!this.active()) {
       this.selected.emit(this.session().id);
     }
-    this.terminal.focus();
+    if (!this.touchInput) this.terminal.focus();
     void this.claimTerminalSize();
+  }
+
+  private disableMobileTerminalInput(): void {
+    if (!this.touchInput || !this.terminal.textarea) return;
+    // CSS positioning alone cannot stop Chrome from following xterm's native input element.
+    // A disabled element cannot gain focus, even through xterm's internal mouse/IME handlers.
+    this.terminal.textarea.blur();
+    this.terminal.textarea.disabled = true;
+    this.terminal.textarea.readOnly = true;
+    this.terminal.textarea.inputMode = 'none';
+    this.terminal.textarea.tabIndex = -1;
   }
 
   private handleOutput(data: string, replayed = false): void {
@@ -1328,22 +1378,27 @@ export class TerminalPanelComponent implements AfterViewInit {
       // drawn again once the view is on screen with a grid of its own.
       this.wroteWhileHidden = true;
     }
-    if (replayed) {
-      // The callback runs once xterm has parsed this chunk, which is the whole window in which
-      // the history could make it answer something.
-      this.replayGate.begin();
-      this.terminal.write(data, () => this.replayGate.end());
-    } else {
-      this.terminal.write(data);
-    }
+    if (this.remoteOutput) this.outputBuffer.enqueue(data, replayed);
+    else this.writeOutput(data, replayed);
     // Replayed scrollback was already analysed when it first arrived. Feeding a whole terminal's
     // history back through the task, handoff and startup readers on every reconnect is what made
     // restoring terminals stall, and it would count the same output twice.
     if (replayed) {
       return;
     }
+    if (this.session().accountLogin) this.loginFeedback.observeOutput(this.session().id, data);
     this.outputCaptured.emit({ terminalId: this.session().id, data });
     this.diagnoseOutput(data);
+  }
+
+  private writeOutput(data: string, replayed: boolean): void {
+    if (replayed) {
+      // The callback runs after this complete history update has been parsed.
+      this.replayGate.begin();
+      this.terminal.write(data, () => this.replayGate.end());
+    } else {
+      this.terminal.write(data);
+    }
   }
 
   /**

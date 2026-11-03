@@ -15,3 +15,11 @@ export function primaryPointerIsTouch(): boolean {
     window.matchMedia(TOUCH_PRIMARY_POINTER_QUERY).matches
   );
 }
+
+/** Android desktop-site mode may advertise a fine pointer while retaining a touch keyboard. */
+export function hasTouchInput(): boolean {
+  if (primaryPointerIsTouch()) return true;
+  if (typeof navigator === 'undefined') return false;
+  return /Android|iPhone|iPad|iPod/i.test(navigator.userAgent)
+    || (navigator.maxTouchPoints > 1 && /Mac/i.test(navigator.platform));
+}

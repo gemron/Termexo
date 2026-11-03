@@ -297,6 +297,7 @@ pub fn run() {
             commands::webview::get_webview_status,
             commands::webview::open_webview_download,
             commands::terminal::create_terminal,
+            commands::terminal::attach_terminal,
             commands::terminal::write_terminal,
             commands::terminal::resize_terminal,
             commands::terminal::set_terminal_palette,

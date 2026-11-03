@@ -129,6 +129,7 @@ pub const REMOTE_ALLOWED: &[&str] = &[
     "get_pty_backend",
     "list_live_terminals",
     "create_terminal",
+    "attach_terminal",
     "write_terminal",
     "resize_terminal",
     "set_terminal_palette",
@@ -212,7 +213,46 @@ pub fn is_remote_command_allowed(command: &str) -> bool {
 ///
 /// Reusing `on_message` is what keeps a single implementation of every command, its argument
 /// deserialization and its validation, instead of a second dispatcher that would drift.
-pub async fn dispatch(app: &AppHandle, command: String, args: Value) -> Result<Value, Value> {
+/// Explicit allowlist: new commands are denied to viewing credentials until reviewed.
+pub fn is_read_only_command_allowed(command: &str) -> bool {
+    matches!(
+        command,
+        "list_workspaces"
+            | "list_live_terminals"
+            | "attach_terminal"
+            | "read_terminal_scrollback"
+            | "get_pty_backend"
+            | "list_system_fonts"
+            | "get_repository_overview"
+            | "get_repository_diff"
+            | "list_project_directory"
+            | "read_project_preview"
+            | "list_todo_snapshots"
+            | "list_agent_events"
+            | "read_model_catalog"
+            | "list_agent_sessions"
+            | "list_prompt_assets"
+            | "list_handoff_packages"
+            | "list_model_profiles"
+            | "list_account_profiles"
+            | "list_mcp_profiles"
+            | "list_network_profiles"
+            | "get_provider_quotas"
+            | "read_storage_overview"
+    )
+}
+
+pub async fn dispatch(
+    app: &AppHandle,
+    command: String,
+    args: Value,
+    read_only: bool,
+) -> Result<Value, Value> {
+    if read_only && !is_read_only_command_allowed(&command) {
+        return Err(Value::String(
+            "当前链接为只读模式，不允许执行此操作。".into(),
+        ));
+    }
     if !is_remote_command_allowed(&command) {
         return Err(Value::String("该命令不支持远程调用。".into()));
     }
@@ -371,6 +411,40 @@ pub fn broadcast_event<T: Serialize + Clone>(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn viewing_links_deny_mutations_and_control_credentials() {
+        for command in [
+            "create_terminal",
+            "write_terminal",
+            "resize_terminal",
+            "set_terminal_palette",
+            "close_terminal",
+            "prepare_account_login",
+            "save_workspace",
+            "execute_cli_operation",
+            "get_remote_access_status",
+            "regenerate_remote_access_token",
+            "save_account_profile",
+            "refresh_account_profile",
+            "plugin:clipboard-manager|read_text",
+            "future_command",
+        ] {
+            assert!(
+                !is_read_only_command_allowed(command),
+                "{command} must require control access"
+            );
+        }
+        for command in [
+            "attach_terminal",
+            "read_terminal_scrollback",
+            "list_workspaces",
+            "get_repository_diff",
+        ] {
+            assert!(is_read_only_command_allowed(command));
+            assert!(is_remote_command_allowed(command));
+        }
+    }
 
     /// Every command registered in `generate_handler!`, extracted from the source so a newly added
     /// command cannot silently default to either side of the boundary.

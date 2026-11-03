@@ -2,6 +2,9 @@ use std::net::IpAddr;
 use std::sync::RwLock;
 use std::time::Instant;
 
+use data_encoding::BASE64URL_NOPAD;
+use hmac::{Hmac, Mac};
+use sha2::Sha256;
 use termexo_relay_protocol::throttle::FailureThrottle;
 
 pub use termexo_relay_protocol::secret::{generate_token, tokens_match};
@@ -50,6 +53,21 @@ impl RemoteAuth {
             .unwrap_or_default()
     }
 
+    /// A domain-separated viewing credential. Knowing it cannot recover the control token.
+    /// Rotating the control token also revokes every existing viewing link.
+    pub fn read_only_token(&self) -> String {
+        viewing_token(&self.token())
+    }
+
+    /// Returns the verified value and the permission bound to the credential, never a client flag.
+    pub fn authorize_access_with<T>(
+        &self,
+        source: IpAddr,
+        verify: impl FnMut(&str) -> Option<T>,
+    ) -> Result<(T, bool), AuthRejection> {
+        self.authorize_scoped_at(source, verify, Instant::now(), true)
+    }
+
     /// Installs a new token and clears the lockout table, so regenerating also unblocks a source
     /// address that was locked out while guessing the previous token.
     pub fn replace_token(&self, token: String) {
@@ -59,32 +77,13 @@ impl RemoteAuth {
         self.failures.reset();
     }
 
-    pub fn authorize(&self, source: IpAddr, provided: &str) -> Result<(), AuthRejection> {
-        self.authorize_with(source, |expected| {
-            tokens_match(expected, provided).then_some(())
-        })
-    }
-
-    /// Checks a client against the live token under the same lockout a plain comparison passes
-    /// through, and hands back whatever `verify` produced from it.
-    ///
-    /// The sealed handshake never receives the token itself — it verifies an HMAC derived from it
-    /// and derives the session keys in the same step — so that work has to happen inside this gate
-    /// rather than on a copy of the token handed back out.
-    pub fn authorize_with<T>(
+    fn authorize_scoped_at<T>(
         &self,
         source: IpAddr,
-        verify: impl FnOnce(&str) -> Option<T>,
-    ) -> Result<T, AuthRejection> {
-        self.authorize_at(source, verify, Instant::now())
-    }
-
-    fn authorize_at<T>(
-        &self,
-        source: IpAddr,
-        verify: impl FnOnce(&str) -> Option<T>,
+        mut verify: impl FnMut(&str) -> Option<T>,
         now: Instant,
-    ) -> Result<T, AuthRejection> {
+        allow_viewing: bool,
+    ) -> Result<(T, bool), AuthRejection> {
         // A locked source is turned away before the token is even looked at, so a lockout also
         // covers the window in which no token exists yet.
         if self.failures.is_locked(&source, now) {
@@ -97,12 +96,28 @@ impl RemoteAuth {
         }
         if let Some(accepted) = verify(&expected) {
             self.failures.clear(&source);
-            return Ok(accepted);
+            return Ok((accepted, false));
+        }
+        if allow_viewing {
+            if let Some(accepted) = verify(&viewing_token(&expected)) {
+                self.failures.clear(&source);
+                return Ok((accepted, true));
+            }
         }
 
         self.failures.record_failure(source, now);
         Err(AuthRejection::InvalidToken)
     }
+}
+
+fn viewing_token(control_token: &str) -> String {
+    if control_token.is_empty() {
+        return String::new();
+    }
+    let mut mac = Hmac::<Sha256>::new_from_slice(control_token.as_bytes())
+        .expect("HMAC accepts keys of any length");
+    mac.update(b"termexo-remote-read-only-v1");
+    BASE64URL_NOPAD.encode(&mac.finalize().into_bytes())
 }
 
 #[cfg(test)]
@@ -112,6 +127,55 @@ mod tests {
     use termexo_relay_protocol::throttle::{LOCKOUT_DURATION, MAX_FAILURES_PER_WINDOW};
 
     use super::*;
+
+    #[test]
+    fn viewing_credentials_are_scoped_and_rotate_with_control_credentials() {
+        let auth = RemoteAuth::new("control-secret".into());
+        let view = auth.read_only_token();
+        assert_ne!(view, auth.token());
+        let verify = |provided: &str| {
+            auth.authorize_access_with(source(), |expected| {
+                tokens_match(expected, provided).then_some(())
+            })
+        };
+        assert_eq!(verify("control-secret"), Ok(((), false)));
+        assert_eq!(verify(&view), Ok(((), true)));
+        assert_eq!(
+            auth.authorize_scoped_at(
+                source(),
+                |expected| tokens_match(expected, &view).then_some(()),
+                Instant::now(),
+                false
+            ),
+            Err(AuthRejection::InvalidToken)
+        );
+        auth.replace_token("new-control-secret".into());
+        assert_ne!(auth.read_only_token(), view);
+        assert_eq!(verify(&view), Err(AuthRejection::InvalidToken));
+        assert_eq!(verify("control-secret"), Err(AuthRejection::InvalidToken));
+    }
+
+    #[test]
+    fn a_viewing_handshake_counts_as_one_failure_not_two() {
+        let auth = RemoteAuth::new("control-secret".into());
+        let now = Instant::now();
+        for _ in 0..MAX_FAILURES_PER_WINDOW - 1 {
+            assert_eq!(
+                auth.authorize_scoped_at(source(), |_| None::<()>, now, true),
+                Err(AuthRejection::InvalidToken)
+            );
+        }
+        let view = auth.read_only_token();
+        assert_eq!(
+            auth.authorize_scoped_at(
+                source(),
+                |expected| { tokens_match(expected, &view).then_some(()) },
+                now,
+                true
+            ),
+            Ok(((), true))
+        );
+    }
 
     fn source() -> IpAddr {
         IpAddr::V4(Ipv4Addr::new(192, 168, 1, 42))
@@ -124,11 +188,13 @@ mod tests {
         provided: &str,
         now: Instant,
     ) -> Result<(), AuthRejection> {
-        auth.authorize_at(
+        auth.authorize_scoped_at(
             source,
             |expected| tokens_match(expected, provided).then_some(()),
             now,
+            true,
         )
+        .map(|(accepted, _)| accepted)
     }
 
     #[test]
@@ -196,7 +262,7 @@ mod tests {
         let auth = RemoteAuth::new(String::new());
 
         assert_eq!(
-            auth.authorize(source(), ""),
+            auth.authorize_access_with(source(), |_| Some(())),
             Err(AuthRejection::NotConfigured)
         );
     }

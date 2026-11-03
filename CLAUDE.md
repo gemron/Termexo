@@ -15,7 +15,11 @@ refactoring code here.
 ## Commands
 
 Run from the repository root. `apps/desktop-ui` is the only npm workspace with dependencies —
-install with `npm --prefix apps/desktop-ui install`.
+install with `npm --prefix apps/desktop-ui ci`.
+
+On a fresh checkout, run `npm --prefix apps/desktop-ui ci` and `npm run one-ring:stage`
+before invoking Cargo directly; Tauri's build script requires the generated `src-tauri/vendor/one-ring/`
+resources even for `cargo test` (the npm Tauri commands stage them automatically).
 
 ```sh
 npm run dev                 # Browser preview on http://127.0.0.1:4200 (no Rust required)

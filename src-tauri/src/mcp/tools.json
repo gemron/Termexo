@@ -663,7 +663,7 @@
   {
     "name": "common_action_list",
     "group": "terminal",
-    "description": "List saved project actions and the pending recognition request. Only the user can confirm proposals in the desktop UI.",
+    "description": "List the absolute projectPath, saved project actions (including workingDirectory and environment), and pending recognition request. Only the user can confirm proposals in the desktop UI.",
     "inputSchema": {
       "type": "object",
       "properties": {
@@ -686,7 +686,7 @@
   {
     "name": "common_action_propose",
     "group": "terminal",
-    "description": "Submit suggestions for an active recognition request for USER REVIEW ONLY. Never saves or runs commands. Use the requestId returned by common_action_list or the recognition prompt.",
+    "description": "Submit suggestions with automatically identified working directories and environment variables for USER REVIEW ONLY. Never saves or runs commands. Use the projectPath and requestId from common_action_list or the recognition prompt.",
     "inputSchema": {
       "type": "object",
       "properties": {
@@ -703,7 +703,7 @@
         "actionsJson": {
           "type": "string",
           "maxLength": 100000,
-          "description": "JSON array of objects with name, command, absolute workingDirectory, description. Empty array if no reliable suggestions."
+          "description": "JSON array of objects with name, command, absolute workingDirectory, environment, description, and optional category. Automatically determine each directory from the actual project/subproject config. environment is an object of literal string values (e.g. PORT must be a string); explicitly use {} if no extra variables are identified. Extract only evidenced non-sensitive values from public README/scripts/config/examples; never guess defaults, read real .env secrets, or insert unresolved placeholders. Move outer cd/env assignments into workingDirectory/environment, keep the normal project script invocation, and cite sources or missing required values in description. Empty array if no reliable suggestions."
         }
       },
       "required": ["workspaceId", "requestId", "actionsJson"],

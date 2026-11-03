@@ -1,6 +1,12 @@
 import { inject, Injectable, signal } from '@angular/core';
 
 import { createId } from '../models/identifiers';
+import {
+  commonActionSignature as signature,
+  commonActionTerminal,
+  parseActionSuggestions,
+  validateCommonAction,
+} from '../models/common-action';
 import type { CommonAction, Workspace } from '../models/workspace.models';
 import { AppStateService } from './app-state.service';
 import { TerminalGatewayService } from './terminal-gateway.service';
@@ -20,34 +26,10 @@ export interface ActionReview {
   duplicateCount?: number;
 }
 
-const MAX_ACTIONS = 20;
 const DEFAULT_TERMINAL_COLS = 120;
 const DEFAULT_TERMINAL_ROWS = 30;
 
-export function validateCommonAction(value: unknown): Omit<CommonAction, 'id'> {
-  if (!value || typeof value !== 'object') throw new Error('操作必须是 JSON 对象。');
-  const action = value as Record<string, unknown>;
-  const field = (key: string, max: number, required = true): string => {
-    const value = action[key] ?? '';
-    if (typeof value !== 'string' || value.length > max || (required && !value.trim()))
-      throw new Error(`操作的 ${key} 为空或超出长度限制。`);
-    if (/[\x00-\x1f\x7f]/.test(value)) throw new Error('操作字段不能包含换行或控制字符。');
-    return value.trim();
-  };
-  const workingDirectory = field('workingDirectory', 2000);
-  if (!/^(?:[a-z]:[\\/]|\\\\|\/)/i.test(workingDirectory))
-    throw new Error('工作目录必须是绝对路径。');
-  return {
-    name: field('name', 100),
-    command: field('command', 4000),
-    workingDirectory,
-    description: field('description', 2000, false),
-  };
-}
-
-function signature(action: CommonAction): string {
-  return `${action.workingDirectory.replaceAll('\\', '/').replace(/\/$/, '').toLowerCase()}\n${action.command}`;
-}
+export { validateCommonAction } from '../models/common-action';
 
 @Injectable({ providedIn: 'root' })
 export class CommonActionsService {
@@ -63,9 +45,14 @@ export class CommonActionsService {
     return workspace;
   }
 
-  beginRecognition(workspaceId: string, terminalId?: string, phase: 'starting' | 'reading' = 'reading'): string {
+  beginRecognition(
+    workspaceId: string,
+    terminalId?: string,
+    phase: 'starting' | 'reading' = 'reading',
+  ): string {
     this.workspace(workspaceId);
-    if (this.reviews()[workspaceId]?.waiting) throw new Error('正在识别，请等待结果或取消本次识别。');
+    if (this.reviews()[workspaceId]?.waiting)
+      throw new Error('正在识别，请等待结果或取消本次识别。');
     const requestId = createId();
     this.reviews.update((items) => ({
       ...items,
@@ -74,7 +61,11 @@ export class CommonActionsService {
     return requestId;
   }
 
-  updateRecognition(workspaceId: string, requestId: string, patch: Pick<Partial<ActionReview>, 'phase' | 'error' | 'waiting'>): void {
+  updateRecognition(
+    workspaceId: string,
+    requestId: string,
+    patch: Pick<Partial<ActionReview>, 'phase' | 'error' | 'waiting'>,
+  ): void {
     this.reviews.update((items) => {
       const review = items[workspaceId];
       return review?.requestId === requestId && review.waiting
@@ -93,32 +84,29 @@ export class CommonActionsService {
 
   /** AI can stage proposals; it has no API for confirming or persisting them. */
   propose(workspaceId: string, requestId: string, actionsJson: string): ActionReview {
-    this.workspace(workspaceId);
+    const workspace = this.workspace(workspaceId);
     const current = this.reviews()[workspaceId];
     if (!current || current.requestId !== requestId || !current.waiting)
       throw new Error('识别请求已取消或过期，请重新开始识别。');
-    if (actionsJson.length > 100_000) throw new Error('建议内容过长。');
-    let values: unknown;
-    try {
-      values = JSON.parse(actionsJson);
-    } catch {
-      throw new Error('无法解析建议，请粘贴完整的 JSON 数组。');
-    }
-    if (!Array.isArray(values) || values.length > MAX_ACTIONS)
-      throw new Error(`建议必须是最多 ${MAX_ACTIONS} 项的 JSON 数组。`);
-    const candidates = values.map((value) => ({
-      ...validateCommonAction(value),
+    const candidates = parseActionSuggestions(actionsJson, workspace.projectPath).map((value) => ({
+      ...value,
+      environment: value.environment ?? {},
       id: createId(),
       selected: true,
     }));
-    const signatures = new Set((this.workspace(workspaceId).commonActions ?? []).map(signature));
+    const signatures = new Set((workspace.commonActions ?? []).map(signature));
     const suggestions = candidates.filter((item) => {
       const key = signature(item);
       if (signatures.has(key)) return false;
       signatures.add(key);
       return true;
     });
-    const review = { ...current, waiting: false, suggestions, duplicateCount: candidates.length - suggestions.length };
+    const review = {
+      ...current,
+      waiting: false,
+      suggestions,
+      duplicateCount: candidates.length - suggestions.length,
+    };
     this.reviews.update((items) => ({ ...items, [workspaceId]: review }));
     return review;
   }
@@ -139,19 +127,21 @@ export class CommonActionsService {
     });
   }
 
-  async confirm(workspaceId: string): Promise<void> {
-    await this.exclusive(workspaceId, async () => {
+  async confirm(workspaceId: string): Promise<number> {
+    return this.exclusive(workspaceId, async () => {
       const review = this.reviews()[workspaceId];
       if (!review || review.waiting) throw new Error('请先等待识别完成。');
       const selected = review.suggestions.filter((item) => item.selected);
       if (!selected.length) throw new Error('请选择要添加的操作。');
       const actions = [...(this.workspace(workspaceId).commonActions ?? [])];
+      const initialCount = actions.length;
       for (const item of selected) {
         const action = { ...validateCommonAction(item), id: item.id };
         if (!actions.some((saved) => signature(saved) === signature(action))) actions.push(action);
       }
       await this.state.saveCommonActions(workspaceId, actions);
       this.discard(workspaceId);
+      return actions.length - initialCount;
     });
   }
 
@@ -164,6 +154,10 @@ export class CommonActionsService {
         id: draft.id,
         terminalId: actions[index]?.terminalId,
       };
+      const duplicate = actions.find(
+        (item) => item.id !== draft.id && signature(item) === signature(action),
+      );
+      if (duplicate) throw new Error(`相同目录、命令和环境变量已存在于“${duplicate.name}”，请编辑已有操作。`);
       if (index < 0) actions.push(action);
       else actions[index] = action;
       await this.state.saveCommonActions(workspaceId, actions);
@@ -184,10 +178,8 @@ export class CommonActionsService {
       if (!hasBackend()) throw new Error('请在桌面应用中运行常用操作。');
       const workspace = this.workspace(workspaceId);
       const action = this.action(workspaceId, id);
-      validateCommonAction(action);
-      const previous = workspace.terminals.find(
-        (item) => item.id === action.terminalId && item.commonActionId === id,
-      );
+      const validated = validateCommonAction(action);
+      const previous = commonActionTerminal(action, workspace.terminals);
       const live = await this.gateway.liveTerminals();
       if (previous && live.has(previous.id) && !restart) return previous.id;
       if (previous) {
@@ -199,8 +191,9 @@ export class CommonActionsService {
           agentType: 'shell',
           commonActionId: id,
           name: action.name,
-          command: action.command,
-          workingDirectory: action.workingDirectory,
+          command: validated.command,
+          workingDirectory: validated.workingDirectory,
+          environment: validated.environment,
         },
         workspaceId,
       );
@@ -212,6 +205,12 @@ export class CommonActionsService {
           DEFAULT_TERMINAL_ROWS,
           workspaceId,
         );
+        // A background operation may have no mounted console to report startup. Keep a fast exit's newer result.
+        const started = this.workspace(workspaceId).terminals.find(
+          (item) => item.id === terminal.id,
+        );
+        if (started?.status === 'STARTING' && !this.state.hasTerminalExited(terminal.id))
+          this.state.updateTerminalStatus(terminal.id, 'RUNNING');
         await this.state.saveCommonActions(
           workspaceId,
           (this.workspace(workspaceId).commonActions ?? []).map((item) =>
@@ -239,9 +238,7 @@ export class CommonActionsService {
   async stop(workspaceId: string, id: string): Promise<void> {
     await this.exclusive(workspaceId, async () => {
       const action = this.action(workspaceId, id);
-      const terminal = this.workspace(workspaceId).terminals.find(
-        (item) => item.id === action.terminalId && item.commonActionId === id,
-      );
+      const terminal = commonActionTerminal(action, this.workspace(workspaceId).terminals);
       if (!terminal) throw new Error('操作尚未启动。');
       const live = await this.gateway.liveTerminals();
       if (live.has(terminal.id)) await this.gateway.close(terminal.id);

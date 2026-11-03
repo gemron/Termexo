@@ -15,6 +15,7 @@ packages/one-ring/plugins/codex/server/
 src-tauri/vendor/one-ring/
 .tooling/
 /validation-results/
+/artifacts/
 
 # Local data
 *.db
