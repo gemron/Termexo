@@ -300,7 +300,7 @@ export class TerminalPanelComponent implements AfterViewInit {
     });
     effect(() => {
       const backend = this.ptyBackend.backend();
-      if (backend) {
+      if (backend?.backend === 'conpty') {
         // Without this xterm assumes it owns reflow. An old system ConPTY rewrites wrapped lines
         // itself, and a second reflow on top of that corrupts them; xterm suppresses its own once
         // it knows the build it is talking to.

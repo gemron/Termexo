@@ -55,6 +55,7 @@ import { registerMcpServerTranslations } from '../core/i18n/mcp-server.i18n';
 import { AGENT_ICONS } from '../core/models/workspace.models';
 import { ProjectLinksComponent } from './project-links';
 import { AgentInstallPanelComponent } from './agent-install-panel';
+import { isTauriRuntime } from '../core/services/tauri-runtime';
 
 export type SettingsTab =
   | 'diagnostics'
@@ -70,8 +71,14 @@ export type SettingsTab =
 
 registerMcpServerTranslations();
 registerTranslations({
-  en: { 'wechat.tab': 'WeChat notifications' },
-  'zh-CN': { 'wechat.tab': '微信通知' },
+  en: {
+    'wechat.tab': 'WeChat notifications',
+    'settings.hostCredentialStorage': 'Host operating system credential store',
+  },
+  'zh-CN': {
+    'wechat.tab': '微信通知',
+    'settings.hostCredentialStorage': '宿主操作系统凭据存储',
+  },
 });
 
 interface ModelEditorDraft {
@@ -315,7 +322,7 @@ const DEFAULT_ALERT_THRESHOLD = 80;
                     </div>
                     <div>
                       <dt>{{ 'settings.credentialStorage' | t }}</dt>
-                      <dd>Windows Credential Manager</dd>
+                      <dd>{{ credentialStorage() }}</dd>
                     </div>
                     <div>
                       <dt>{{ 'settings.sessionPolicy' | t }}</dt>
@@ -1140,7 +1147,7 @@ const DEFAULT_ALERT_THRESHOLD = 80;
                       </div>
                       <label>
                         <span>{{ 'settings.enterpriseCa' | t }}</span>
-                        <input placeholder="C:\\certs\\internal-ca.pem" [(ngModel)]="npmCaPath" />
+                        <input placeholder="/path/to/internal-ca.pem" [(ngModel)]="npmCaPath" />
                       </label>
                     </div>
 
@@ -1331,6 +1338,15 @@ const DEFAULT_ALERT_THRESHOLD = 80;
 })
 export class AgentSettingsDialogComponent {
   private readonly i18n = inject(I18nService);
+  protected readonly credentialStorage = computed(() => {
+    // A remote browser's OS does not identify the desktop that stores the credentials.
+    if (!isTauriRuntime()) return this.i18n.t('settings.hostCredentialStorage');
+    return /Mac/i.test(navigator.userAgent)
+      ? 'macOS Keychain'
+      : /Linux/i.test(navigator.userAgent)
+        ? 'Secret Service (GNOME Keyring / KWallet)'
+        : 'Windows Credential Manager';
+  });
   protected readonly catalog = inject(ModelCatalogService);
   readonly installation = input<AgentInstallation | null>(null);
   readonly codexInstallation = input<AgentInstallation | null>(null);

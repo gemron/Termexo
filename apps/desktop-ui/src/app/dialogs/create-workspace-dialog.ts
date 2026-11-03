@@ -56,7 +56,7 @@ import { IconComponent } from '../shared/icon/icon';
             <input
               type="text"
               class="input input-bordered input-sm"
-              placeholder="D:\\dev\\project"
+              placeholder="/path/to/project"
               [attr.aria-label]="'dialog.workspaceProjectDirectory' | t"
               [ngModel]="projectPath()"
               [disabled]="busy()"

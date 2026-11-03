@@ -153,7 +153,20 @@ pub fn show_toast(app: &tauri::AppHandle, title: &str, body: &str) -> Result<(),
         .map_err(|error| format!("系统通知发送失败：{error}"))
 }
 
-#[cfg(not(any(windows, target_os = "macos")))]
+/// Linux uses the session notification daemon and preserves its delivery result.
+#[cfg(target_os = "linux")]
+pub fn show_toast(_app: &tauri::AppHandle, title: &str, body: &str) -> Result<(), String> {
+    notify_rust::Notification::new()
+        .appname("Termexo")
+        .summary(title)
+        .body(body)
+        .icon("termexo")
+        .show()
+        .map(|_| ())
+        .map_err(|error| format!("Linux 系统通知发送失败：{error}"))
+}
+
+#[cfg(not(any(windows, target_os = "macos", target_os = "linux")))]
 pub fn show_toast(_app: &tauri::AppHandle, _title: &str, _body: &str) -> Result<(), String> {
     Err("当前平台不支持系统通知。".into())
 }

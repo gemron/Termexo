@@ -438,8 +438,7 @@ impl HookEventStore {
     ) -> Result<HashMap<String, String>, HookError> {
         let home = env::var_os("GROK_HOME")
             .map(PathBuf::from)
-            .or_else(|| env::var_os("USERPROFILE").map(|value| PathBuf::from(value).join(".grok")))
-            .or_else(|| env::var_os("HOME").map(|value| PathBuf::from(value).join(".grok")))
+            .or_else(|| crate::platform::home_dir().map(|home| home.join(".grok")))
             .ok_or(HookError::InvalidArguments)?;
         let directory = home.join("hooks");
         let executable = env::current_exe()?;

@@ -24,7 +24,10 @@ describe('AgentService CLI detection', () => {
     service = TestBed.inject(AgentService);
   });
 
-  afterEach(() => Reflect.deleteProperty(window, '__TAURI_INTERNALS__'));
+  afterEach(() => {
+    Reflect.deleteProperty(window, '__TAURI_INTERNALS__');
+    vi.restoreAllMocks();
+  });
 
   it('keeps each result when another CLI probe fails, then recovers on retry', async () => {
     vi.mocked(invoke).mockImplementation(async (command) => {
@@ -86,6 +89,7 @@ describe('AgentService CLI detection', () => {
   });
 
   it('previews the official updater for an installed Antigravity and the script for a new install', async () => {
+    vi.spyOn(navigator, 'userAgent', 'get').mockReturnValue('Windows NT 10.0');
     invoke.mockResolvedValueOnce({
       ...installed('antigravity'),
       executablePath: "C:\\ag y's\\agy.exe",
@@ -111,5 +115,18 @@ describe('AgentService CLI detection', () => {
     expect(install.commandPreview).toContain(
       'irm https://antigravity.google/cli/install.ps1 | iex',
     );
+  });
+
+  it('previews Bash installers on Linux and preserves quoted native update paths', async () => {
+    vi.spyOn(navigator, 'userAgent', 'get').mockReturnValue('X11; Linux x86_64');
+    invoke.mockResolvedValueOnce({ ...installed('antigravity'), executablePath: "/home/me/agy's tools/agy" });
+    await service.detectAntigravity();
+    Reflect.deleteProperty(window, '__TAURI_INTERNALS__');
+    const upgrade = await service.previewCliOperation({ agentType: 'antigravity', installer: 'script' });
+    expect(upgrade.commandPreview).toBe("'/home/me/agy'\\''s tools/agy' update");
+    const install = await service.previewCliOperation({ agentType: 'claude', installer: 'script' });
+    expect(install.packageSpec).toBe('https://claude.ai/install.sh');
+    expect(install.commandPreview).toContain('bash -o pipefail');
+    expect(install.commandPreview).not.toMatch(/powershell|\.ps1/);
   });
 });

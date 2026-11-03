@@ -259,7 +259,7 @@ a local control plane that is observable, recoverable, and extensible.
 
 Termexo supports detecting, installing and launching [Pi Coding Agent](https://github.com/earendil-works/pi), status tracking, native session resume, task-board execution and remote terminal operation.
 
-```powershell
+```sh
 npm install -g --ignore-scripts @earendil-works/pi-coding-agent
 pi
 ```
@@ -340,6 +340,12 @@ These requirements are for contributors building Termexo, not for installing the
 
 macOS source builds require macOS 12+ and Xcode command-line tools. The Windows-specific runtime requirements below do not apply to Mac builds.
 
+Linux source builds are also available; see [Linux build and desktop testing](docs/linux.md) for dependencies, `.deb` packaging, and real WebKit/PTY smoke tests.
+
+This source branch also adds Linux x64 npm packaging and real installation tests.
+Build a local npm archive with `npm run npm:stage:linux` followed by `npm run npm:pack:linux`
+after building the `.deb`; see the Linux guide. Earlier published npm packages remain unchanged.
+
 - Windows 10 build 17763 (October 2018) or newer, the first to carry the pseudo console the
   terminals run on;
 - the WebView2 runtime at Chromium 111 or newer — the interface states its colours through
@@ -351,7 +357,7 @@ macOS source builds require macOS 12+ and Xcode command-line tools. The Windows-
 
 ### 1. Clone and install frontend dependencies
 
-```powershell
+```sh
 git clone https://github.com/gemron/Termexo.git
 cd Termexo
 npm --prefix apps/desktop-ui install
@@ -359,7 +365,7 @@ npm --prefix apps/desktop-ui install
 
 ### 2. Run the browser preview
 
-```powershell
+```sh
 npm run dev
 ```
 
@@ -368,13 +374,21 @@ Open <http://127.0.0.1:4200>. Browser mode uses a simulated terminal with `help`
 
 ### 3. Run the desktop application
 
-```powershell
+```sh
 npm run tauri:dev
 ```
 
 On macOS, use `npm run tauri:dev:mac` for development and `npm run tauri:build:mac` for packaging. [GitHub Actions](docs/releases.md) also builds both Mac architectures and publishes the npm package.
 
 Desktop mode uses real PTYs. If Claude Code is not available on PATH, specify it:
+
+Linux/macOS (Bash):
+
+```sh
+TERMEXO_CLAUDE_PATH="$HOME/.local/bin/claude" npm run tauri:dev
+```
+
+Windows (PowerShell):
 
 ```powershell
 $env:TERMEXO_CLAUDE_PATH = "C:\path\to\claude.exe"
@@ -476,7 +490,7 @@ Termexo/
 
 ## Development and Verification
 
-```powershell
+```sh
 npm run build
 npm test
 cargo test --manifest-path src-tauri/Cargo.toml
@@ -486,7 +500,7 @@ npm run tauri:build
 
 With the local development server running, regenerate the README screenshots with:
 
-```powershell
+```sh
 npm run capture:readme
 ```
 

@@ -50,7 +50,7 @@ import { IconComponent } from '../shared/icon/icon';
             autocapitalize="off"
             autocorrect="off"
             spellcheck="false"
-            placeholder="D:\\dev\\project"
+            placeholder="/path/to/project"
             [attr.aria-label]="'dialog.projectDirectory' | t"
             [ngModel]="directory()"
             (ngModelChange)="directory.set($event)"

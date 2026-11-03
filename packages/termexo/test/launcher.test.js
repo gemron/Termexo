@@ -156,3 +156,12 @@ test('macOS opens downloads with its system URL handler', () => {
     args: [RELEASES_URL],
   });
 });
+
+test('Linux opens downloads through xdg-open instead of rundll32', () => {
+  let invocation;
+  openDownloadPage((command, args) => {
+    invocation = { command, args };
+    return { unref() {} };
+  }, 'linux');
+  assert.deepEqual(invocation, { command: 'xdg-open', args: [RELEASES_URL] });
+});

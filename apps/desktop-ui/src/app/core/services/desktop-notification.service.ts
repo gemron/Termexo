@@ -12,10 +12,15 @@ export const DESKTOP_NOTIFICATION_WINDOW = new InjectionToken<ReturnType<typeof 
   providedIn: 'root', factory: () => isTauriRuntime() ? getCurrentWindow() : null,
 });
 
+export const DESKTOP_NOTIFICATION_DIALOG_FALLBACK = new InjectionToken<boolean>('Desktop notification dialog fallback', {
+  providedIn: 'root', factory: () => /Windows/i.test(navigator.userAgent),
+});
+
 @Injectable({ providedIn: 'root' })
 export class DesktopNotificationService {
   private readonly i18n = inject(I18nService);
   private readonly appWindow = inject(DESKTOP_NOTIFICATION_WINDOW);
+  private readonly dialogFallback = inject(DESKTOP_NOTIFICATION_DIALOG_FALLBACK);
   private permissionPromise?: Promise<boolean>;
   private taskbarAttention: boolean | null = null;
   private attentionQueue: Promise<void> = Promise.resolve();
@@ -108,17 +113,17 @@ export class DesktopNotificationService {
 
   private async send(title: string, body: string): Promise<void> {
     if (!(await this.ensurePermission())) {
-      // 无通知权限时降级为系统对话框
-      void this.showDialogFallback(title, body);
+      if (this.dialogFallback) void this.showDialogFallback(title, body);
       return;
     }
 
     try {
       // 走自有命令而非通知插件：插件会丢弃投递结果，失败时无法降级
       await invoke('show_desktop_notification', { title, body });
-    } catch {
-      // Toast 投递失败（例如 AUMID 未注册），降级为系统对话框
-      void this.showDialogFallback(title, body);
+    } catch (error) {
+      // Unix sessions without a notification daemon retain in-app notices without modal dialogs.
+      if (this.dialogFallback) void this.showDialogFallback(title, body);
+      else console.warn('Unable to deliver a desktop notification', error);
     }
   }
 

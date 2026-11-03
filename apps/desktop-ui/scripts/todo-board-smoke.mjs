@@ -1,13 +1,14 @@
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 import { chromium } from 'playwright-core';
+import { resolveBrowserExecutable } from './lib/browser-executable.mjs';
 
 const APP_URL = process.env.TERMEXO_URL ?? 'http://127.0.0.1:4200';
-const EDGE_PATH =
-  process.env.EDGE_PATH ?? 'C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe';
+const BROWSER_PATH = resolveBrowserExecutable();
 
-const browser = await chromium.launch({ executablePath: EDGE_PATH, headless: true });
+const browser = await chromium.launch({ executablePath: BROWSER_PATH, headless: true });
 
 /** Execution settings start folded away, so the fields inside need the section opened first. */
 const openExecutionSettings = async (page) => {
@@ -26,8 +27,16 @@ const waitForPromptDelivery = (page, title) =>
   }, title);
 
 try {
-  const page = await browser.newPage({ viewport: { width: 1440, height: 900 } });
+  const page = await browser.newPage({ locale: 'zh-CN', viewport: { width: 1440, height: 900 } });
   const errors = [];
+  const openTaskEditor = async (card) => {
+    await card.locator('h3 button').click();
+    await page.getByTestId('task-detail-edit').click();
+  };
+  const requestCardDeletion = async (card) => {
+    await card.getByTestId('task-more-button').click();
+    await page.getByTestId('task-card-delete').click();
+  };
   page.on('console', (message) => {
     if (message.type() === 'error') errors.push(message.text());
   });
@@ -56,7 +65,7 @@ try {
   // Closing a dirty editor must offer a deliberate choice and preserve the draft while continuing.
   await page.getByTestId('task-create-button').click();
   await page.getByTestId('task-title-input').fill('尚未保存的任务');
-  await page.getByRole('button', { name: '关闭', exact: true }).click();
+  await page.locator('.task-dialog').getByRole('button', { name: '关闭', exact: true }).click();
   await page.getByText('要放弃未保存的修改吗？', { exact: true }).waitFor();
   await page.getByRole('button', { name: '继续编辑', exact: true }).click();
   if ((await page.getByTestId('task-title-input').inputValue()) !== '尚未保存的任务') {
@@ -188,7 +197,7 @@ try {
     app.handleTerminalStatus({ terminalId, status: 'RUNNING' });
   }, reusedTerminalId);
   await reusedCard.locator('.run-rail[data-rail="active"]').waitFor();
-  await reusedCard.getByRole('button', { name: '编辑待办', exact: true }).click();
+  await openTaskEditor(reusedCard);
   await openExecutionSettings(page);
   if (!(await page.getByTestId('task-terminal-select').isDisabled())) {
     throw new Error('an executing task allowed its terminal binding to be changed');
@@ -196,7 +205,7 @@ try {
   if ((await page.getByRole('button', { name: '删除任务', exact: true }).count()) !== 0) {
     throw new Error('an executing task exposed deletion while its terminal was still active');
   }
-  await page.getByRole('button', { name: '关闭', exact: true }).click();
+  await page.locator('.task-dialog').getByRole('button', { name: '关闭', exact: true }).click();
   await page.evaluate((title) => {
     const app = globalThis.ng.getComponent(document.querySelector('app-root'));
     const workspace = app.state.activeWorkspace();
@@ -206,7 +215,7 @@ try {
   reusedCard = page
     .locator('.kanban-column[data-stage="completed"] .task-card')
     .filter({ hasText: reusedTaskTitle });
-  await reusedCard.getByRole('button', { name: '编辑待办', exact: true }).click();
+  await openTaskEditor(reusedCard);
   await page.getByRole('button', { name: '删除任务', exact: true }).click();
   await page.getByRole('button', { name: '再次点击确认删除', exact: true }).click();
   await reusedCard.waitFor({ state: 'detached' });
@@ -255,10 +264,12 @@ try {
   ) {
     throw new Error(`failed task was not redelivered to its terminal: ${JSON.stringify(retried)}`);
   }
-  // A run can be called off from the card: the agent is interrupted and the task waits in 待办
-  // instead of being stranded in an execution nobody is watching.
+  // Stop preserves the run for resuming; returning it to To do is a separate explicit action.
   const writesBeforeStop = await page.evaluate(() => globalThis.__termexoWrites.length);
   await retriedCard.getByTestId('task-stop-button').click();
+  await retriedCard.getByTestId('task-resume-button').waitFor();
+  await retriedCard.getByTestId('task-more-button').click();
+  await page.getByRole('menuitem', { name: '放回待办', exact: true }).click();
   retriedCard = page
     .locator('.kanban-column[data-stage="todo"] .task-card')
     .filter({ hasText: retriedTaskTitle });
@@ -291,17 +302,17 @@ try {
   }
 
   // Deleting from the card asks once on the card itself, so no dialog has to be opened for it.
-  await retriedCard.getByTestId('task-card-delete').click();
+  await requestCardDeletion(retriedCard);
   await retriedCard.getByText('删除这个任务？', { exact: true }).waitFor();
   await retriedCard.getByRole('button', { name: '取消', exact: true }).click();
   await retriedCard.getByText('删除这个任务？', { exact: true }).waitFor({ state: 'detached' });
-  await retriedCard.getByTestId('task-card-delete').click();
+  await requestCardDeletion(retriedCard);
   await retriedCard.getByTestId('task-card-delete-confirm').click();
   await retriedCard.waitFor({ state: 'detached' });
 
-  const projectDirectory = 'D:\\devlop\\Termexo\\apps\\desktop-ui';
-  const movedProjectDirectory = 'D:\\devlop\\Termexo\\apps';
-  const taskDirectory = 'D:\\devlop\\Termexo\\src-tauri';
+  const projectDirectory = fileURLToPath(new URL('../', import.meta.url)).replace(/[\\/]$/, '');
+  const movedProjectDirectory = dirname(projectDirectory);
+  const taskDirectory = join(dirname(movedProjectDirectory), 'src-tauri');
 
   await page.getByRole('button', { name: '添加项目', exact: true }).click();
   await page.getByTestId('project-name-input').fill('桌面端');
@@ -346,13 +357,20 @@ try {
     throw new Error('new task was not created in the todo column');
   }
 
-  if ((await card.locator('.task-directory').innerText()).trim() !== taskDirectory) {
-    throw new Error('task card did not show the directory chosen for the task');
-  }
+  await card.locator('h3 button').click();
+  const detail = page.locator('.task-detail');
+  if (
+    (
+      await detail.locator('dl div').filter({ hasText: '工作目录' }).locator('dd').innerText()
+    ).trim() !== taskDirectory
+  )
+    throw new Error('task details did not show the directory chosen for the task');
+  await detail.locator('header').getByRole('button', { name: '关闭', exact: true }).click();
 
   await card.dragTo(executingColumn);
   card = executingColumn.locator('.task-card').filter({ hasText: title });
   await card.waitFor();
+  await waitForPromptDelivery(page, title);
   await card.getByRole('button', { name: '查看关联终端', exact: true }).click();
   await page.locator('.terminal-panel.active').filter({ hasText: title }).waitFor();
 
@@ -384,10 +402,17 @@ try {
     );
   }
   // The emulated PTY replays the writes the desktop app sends, so the prompt has to be readable.
-  await page
-    .locator('.terminal-panel.active .xterm-rows')
-    .filter({ hasText: 'Termexo 任务看板' })
-    .waitFor();
+  await page.waitForFunction(() => {
+    const panel = document.querySelector('.terminal-panel.active');
+    const host = panel?.closest('app-terminal-panel');
+    const buffer = host && globalThis.ng?.getComponent(host)?.terminal?.buffer.active;
+    if (!buffer) return false;
+    const lines = Array.from(
+      { length: buffer.length },
+      (_, index) => buffer.getLine(index)?.translateToString(true) ?? '',
+    );
+    return lines.join('\n').includes('Termexo 任务看板');
+  });
   if (
     launched.submitted !== 1 ||
     !launched.clearedBeforePaste ||
@@ -453,7 +478,8 @@ try {
   card = completedColumn.locator('.task-card').filter({ hasText: title });
   await card.waitFor();
 
-  await card.getByRole('button', { name: '不通过 / 继续修改', exact: true }).click();
+  await card.getByTestId('task-more-button').click();
+  await page.getByRole('menuitem', { name: '不通过 / 继续修改', exact: true }).click();
   await page.getByTestId('validation-feedback-input').fill('窄屏下最后一列被截断，请修复布局。');
   await page.getByTestId('validation-continue-button').click();
   card = executingColumn.locator('.task-card').filter({ hasText: title });
@@ -517,8 +543,8 @@ try {
     return { projectPath: project?.path, taskDirectory: task?.workingDirectory };
   });
   if (
-    directories.projectPath !== 'D:\\devlop\\Termexo\\apps' ||
-    directories.taskDirectory !== 'D:\\devlop\\Termexo\\src-tauri'
+    directories.projectPath !== movedProjectDirectory ||
+    directories.taskDirectory !== taskDirectory
   ) {
     throw new Error(`editing the project directory went wrong: ${JSON.stringify(directories)}`);
   }
@@ -694,7 +720,7 @@ try {
   const routineCompletedCard = completedColumn
     .locator('.task-card')
     .filter({ hasText: routineTitle });
-  await routineCompletedCard.getByTestId('task-rerun-button').waitFor();
+  await routineCompletedCard.getByTestId('task-verify-button').waitFor();
 
   // 验收时可以顺手关掉跑完的终端，否则常用任务反复执行会在标签栏留下一排空闲终端。
   const routineTerminalId = await page.evaluate((title) => {
@@ -702,7 +728,8 @@ try {
     const workspace = app.state.activeWorkspace();
     return app.todos.tasksFor(workspace.id).find((item) => item.title === title)?.terminalId;
   }, routineTitle);
-  await routineCompletedCard.getByTestId('task-verify-close-terminal').click();
+  await routineCompletedCard.getByTestId('task-more-button').click();
+  await page.getByRole('menuitem', { name: '验收并关闭终端', exact: true }).click();
   await verifiedColumn.locator('.task-card').filter({ hasText: routineTitle }).waitFor();
   const releasedRun = await page.evaluate(
     ({ title, terminalId }) => {

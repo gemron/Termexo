@@ -538,9 +538,7 @@ fn opencode_auth_path() -> PathBuf {
     let data_home = std::env::var_os("XDG_DATA_HOME")
         .map(PathBuf::from)
         .or_else(|| {
-            std::env::var_os("USERPROFILE")
-                .or_else(|| std::env::var_os("HOME"))
-                .map(PathBuf::from)
+            crate::platform::home_dir()
                 .map(|home| home.join(".local").join("share"))
         });
     data_home
@@ -637,9 +635,7 @@ fn agent_home(agent_type: &str, config_dir: Option<&str>) -> PathBuf {
     if let Some(configured) = std::env::var_os(variable) {
         return PathBuf::from(configured);
     }
-    std::env::var_os("USERPROFILE")
-        .or_else(|| std::env::var_os("HOME"))
-        .map(PathBuf::from)
+    crate::platform::home_dir()
         .unwrap_or_default()
         .join(default_directory)
 }
@@ -685,9 +681,7 @@ fn grok_home() -> Option<PathBuf> {
     std::env::var_os("GROK_HOME")
         .map(PathBuf::from)
         .or_else(|| {
-            std::env::var_os("USERPROFILE")
-                .or_else(|| std::env::var_os("HOME"))
-                .map(|home| PathBuf::from(home).join(".grok"))
+            crate::platform::home_dir().map(|home| home.join(".grok"))
         })
 }
 

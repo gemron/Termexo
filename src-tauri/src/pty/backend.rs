@@ -20,18 +20,20 @@ use serde::Serialize;
 /// xterm gates its own reflow on this number: below it ConPTY rewrites the wrapped lines and a
 /// second reflow in the terminal corrupts them. The bundled ConPTY behaves as this build or newer
 /// whatever Windows it runs on, so that is what a bundled backend reports.
+#[cfg(windows)]
 const CONPTY_REFLOW_BUILD: u32 = 21376;
 
 /// Build reported when Windows will not say which one it is running.
 ///
 /// ConPTY exists at all only from build 17763, so a process that got this far is at least there.
+#[cfg(windows)]
 const MINIMUM_CONPTY_BUILD: u32 = 17763;
 
 /// The pseudo console backing every terminal, as the frontend needs to see it.
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct PtyBackendInfo {
-    /// Always `conpty` on Windows; `portable-pty` offers no other backend there.
+    /// `conpty` on Windows and `unix` on Linux/macOS.
     pub backend: &'static str,
     /// Windows build number, which decides how much of the terminal's own behaviour is safe.
     pub build_number: u32,
@@ -40,6 +42,7 @@ pub struct PtyBackendInfo {
 }
 
 /// Describes the pseudo console this process will open terminals with.
+#[cfg(windows)]
 pub fn describe() -> PtyBackendInfo {
     let bundled = bundled_conpty_present();
     let system_build = windows_build_number().unwrap_or(MINIMUM_CONPTY_BUILD);
@@ -56,7 +59,17 @@ pub fn describe() -> PtyBackendInfo {
     }
 }
 
+#[cfg(not(windows))]
+pub fn describe() -> PtyBackendInfo {
+    PtyBackendInfo {
+        backend: "unix",
+        build_number: 0,
+        bundled: false,
+    }
+}
+
 /// Whether a `conpty.dll` sits beside the executable, which is where `portable-pty` looks first.
+#[cfg(windows)]
 fn bundled_conpty_present() -> bool {
     std::env::current_exe()
         .ok()
@@ -113,15 +126,11 @@ fn windows_build_number() -> Option<u32> {
         .ok()
 }
 
-#[cfg(not(windows))]
-fn windows_build_number() -> Option<u32> {
-    None
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
 
+    #[cfg(windows)]
     #[test]
     fn a_bundled_backend_never_reports_a_build_that_reflows() {
         let info = describe();
@@ -135,5 +144,14 @@ mod tests {
     fn windows_reports_a_build_that_supports_conpty() {
         let build = windows_build_number().expect("Windows records its own build number");
         assert!(build >= MINIMUM_CONPTY_BUILD);
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn unix_terminals_do_not_enable_windows_reflow_workarounds() {
+        let info = describe();
+        assert_eq!(info.backend, "unix");
+        assert_eq!(info.build_number, 0);
+        assert!(!info.bundled);
     }
 }

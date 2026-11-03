@@ -74,6 +74,15 @@ pub fn hide_window(command: &mut Command) {
 /// Killing only the `cmd.exe` of a Windows `.cmd` shim leaves the real program alive holding the
 /// inherited pipes, so a reader waiting on those pipes never returns even though the child is gone.
 pub fn terminate_process_tree(child: &mut Child) {
+    #[cfg(unix)]
+    {
+        // Both callers create a fresh group before spawning. The group can still exist after
+        // its leader exits, while a descendant holds the stdout/stderr pipes open.
+        // SAFETY: a negative PID addresses only this child's owned process group.
+        unsafe {
+            libc::kill(-(child.id() as libc::pid_t), libc::SIGKILL);
+        }
+    }
     #[cfg(windows)]
     {
         let pid = child.id().to_string();
@@ -91,6 +100,17 @@ pub fn terminate_process_tree(child: &mut Child) {
     let _ = child.wait();
 }
 
+/// Gives timed probes/installers a group whose descendants can be terminated together.
+pub fn isolate_process_tree(command: &mut Command) {
+    #[cfg(unix)]
+    {
+        use std::os::unix::process::CommandExt;
+        command.process_group(0);
+    }
+    #[cfg(not(unix))]
+    let _ = command;
+}
+
 /// Runs a command to completion, terminating its whole process tree once `timeout` elapses.
 ///
 /// Output is drained on separate threads: a child that fills a pipe blocks until someone reads it,
@@ -101,6 +121,7 @@ pub fn run_with_timeout(command: &mut Command, timeout: Duration) -> io::Result<
         .stdout(Stdio::piped())
         .stderr(Stdio::piped());
     hide_window(command);
+    isolate_process_tree(command);
 
     let mut child = command.spawn()?;
     let stdout = child.stdout.take();
@@ -123,6 +144,11 @@ pub fn run_with_timeout(command: &mut Command, timeout: Duration) -> io::Result<
         thread::sleep(POLL_INTERVAL);
     };
 
+    // Waiting on the reader threads is unbounded if an otherwise finished probe left a
+    // background child holding its pipes. That child belongs to this invocation as well.
+    #[cfg(unix)]
+    terminate_process_tree(&mut child);
+
     Ok(Output {
         status,
         stdout: stdout_reader.join().unwrap_or_default(),
@@ -141,6 +167,39 @@ fn read_stream(reader: Option<impl Read>) -> Vec<u8> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[cfg(unix)]
+    #[test]
+    fn a_finished_probe_does_not_wait_for_background_children_holding_its_pipes() {
+        let mut command = Command::new("/bin/sh");
+        command.args(["-c", "sleep 3 & printf termexo"]);
+        let started = Instant::now();
+        let output = run_with_timeout(&mut command, Duration::from_millis(100)).unwrap();
+        assert!(output.status.success());
+        assert_eq!(output.stdout, b"termexo");
+        assert!(started.elapsed() < Duration::from_secs(1));
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn timing_out_a_probe_stops_its_background_work() {
+        let marker =
+            std::env::temp_dir().join(format!("termexo-timeout-child-{}", std::process::id()));
+        let _ = std::fs::remove_file(&marker);
+        let mut command = Command::new("/bin/sh");
+        command
+            .args(["-c", "(sleep 1; printf alive > \"$1\") & wait", "sh"])
+            .arg(&marker);
+        let error = run_with_timeout(&mut command, Duration::from_millis(100)).unwrap_err();
+        thread::sleep(Duration::from_millis(1200));
+        let child_wrote_marker = marker.exists();
+        let _ = std::fs::remove_file(&marker);
+        assert_eq!(error.kind(), io::ErrorKind::TimedOut);
+        assert!(
+            !child_wrote_marker,
+            "a descendant survived the probe timeout"
+        );
+    }
     #[cfg(windows)]
     use std::{
         env, fs,

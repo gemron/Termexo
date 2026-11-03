@@ -22,6 +22,7 @@ const CLI_PREFLIGHT_TIMEOUT: Duration = Duration::from_secs(45);
 const VERSION_TIMEOUT: Duration = Duration::from_secs(10);
 const MAX_CAPTURED_OUTPUT_BYTES: usize = 32 * 1024;
 const NPM_OVERRIDE_ENV: &str = "TERMEXO_NPM_PATH";
+const SCRIPT_SHELL_LABEL: &str = if cfg!(windows) { "PowerShell" } else { "Bash" };
 
 /// A script install always fetches the current release; there is no version to ask for.
 const SCRIPT_TARGET_VERSION: &str = "latest";
@@ -289,8 +290,9 @@ fn build_script_plan_for_installation(
     script: ScriptInstaller,
     installation: AgentInstallation,
 ) -> CliOperationPlan {
-    let ready = find_script_shell().is_some();
+    let shell_ready = find_script_shell().is_some();
     let native_update = installation.installed && script.update_command.is_some();
+    let download_ready = cfg!(windows) || native_update || command_on_path("curl").is_some();
     let action = if native_update {
         "upgrade"
     } else if installation.installed {
@@ -309,11 +311,13 @@ fn build_script_plan_for_installation(
     } else {
         script.url
     };
-    let ready = ready && !source.is_empty();
+    let ready = shell_ready && download_ready && !source.is_empty();
     let diagnostic = if native_update && source.is_empty() {
         "未找到已安装 CLI 的执行路径，无法运行官方升级命令。".into()
-    } else if !ready {
-        "未找到 PowerShell，无法运行官方安装脚本。".into()
+    } else if !shell_ready {
+        format!("未找到 {SCRIPT_SHELL_LABEL}，无法运行官方安装脚本。")
+    } else if !download_ready {
+        "未找到 curl，无法下载官方安装脚本。".into()
     } else if native_update {
         format!("将运行 {} 的官方升级命令 agy update，检查并更新到最新版本。完成后请重启正在运行的 CLI。", definition.display_name)
     } else {
@@ -468,13 +472,19 @@ fn execute_vendor_operation(
     environment: HashMap<String, String>,
 ) -> Result<CliOperationResult, String> {
     let Some(shell) = find_script_shell() else {
-        return Err("未找到 PowerShell，无法运行官方安装脚本。".to_owned());
+        return Err(format!(
+            "未找到 {SCRIPT_SHELL_LABEL}，无法运行官方安装脚本。"
+        ));
     };
     let script = definition(&plan.agent_type)?
         .script
         .ok_or_else(|| format!("{} 没有官方安装脚本。", plan.display_name))?;
     let started = Instant::now();
     let native_update = plan.action == "upgrade" && script.update_command.is_some();
+    #[cfg(unix)]
+    if !native_update && command_on_path("curl").is_none() {
+        return Err("未找到 curl，无法下载官方安装脚本。".into());
+    }
 
     let expression = vendor_expression(script, &plan.package_spec, &plan.action);
     let mut command = Command::new(shell);
@@ -488,13 +498,13 @@ fn execute_vendor_operation(
         &expression,
     ]);
     #[cfg(unix)]
-    command.args(["-c", &expression]);
+    command.args(["-o", "pipefail", "-c", &expression]);
     command
         .envs(&environment)
         // Last, so a script that must not stop to ask cannot be overridden by the proxy
         // environment carrying the same name.
         .envs(script.environment.iter().copied());
-    let install = run_command(command, "PowerShell", CLI_OPERATION_TIMEOUT)?;
+    let install = run_command(command, SCRIPT_SHELL_LABEL, CLI_OPERATION_TIMEOUT)?;
     if !install.success {
         return Ok(failed_result(
             plan,
@@ -572,7 +582,10 @@ fn script_command_preview(url: &str) -> String {
         script_expression(url)
     );
     #[cfg(unix)]
-    return script_expression(url);
+    return format!(
+        "bash -o pipefail -c {}",
+        shell_quote(&script_expression(url))
+    );
 }
 
 /// The existing Antigravity binary owns upgrades; its install script skips existing files.
@@ -604,7 +617,7 @@ fn vendor_command_preview(script: ScriptInstaller, source: &str, action: &str) -
     vendor_expression(script, source, action)
 }
 
-/// The shell that runs vendor installers: Windows PowerShell, or `/bin/sh` on Unix.
+/// Bash preserves download failures through the vendor's curl-to-bash pipeline.
 fn find_script_shell() -> Option<PathBuf> {
     #[cfg(windows)]
     {
@@ -622,8 +635,10 @@ fn find_script_shell() -> Option<PathBuf> {
     }
     #[cfg(unix)]
     {
-        // `sh` runs the vendors' one-liners (`curl … | bash`) and is on every Unix.
-        Some(PathBuf::from("/bin/sh")).filter(|path| path.is_file())
+        command_on_path("bash").or_else(|| {
+            let path = PathBuf::from("/bin/bash");
+            crate::platform::is_executable_file(&path).then_some(path)
+        })
     }
 }
 
@@ -631,7 +646,7 @@ fn command_on_path(name: &str) -> Option<PathBuf> {
     let search_path = env::var_os("PATH")?;
     env::split_paths(&search_path)
         .map(|directory| directory.join(name))
-        .find(|path| path.is_file())
+        .find(|path| crate::platform::is_executable_file(path))
 }
 
 fn failed_result_with_rollback(
@@ -813,7 +828,9 @@ fn find_npm_executable() -> Option<PathBuf> {
         }
     }
 
-    candidates.into_iter().find(|path| path.is_file())
+    candidates
+        .into_iter()
+        .find(|path| crate::platform::is_executable_file(path))
 }
 
 /// Asks the registry which version `package_spec` resolves to.
@@ -923,6 +940,7 @@ fn run_command(
         .stdout(Stdio::piped())
         .stderr(Stdio::piped());
     hide_window(&mut command);
+    crate::process::isolate_process_tree(&mut command);
 
     let mut child = command
         .spawn()
@@ -958,6 +976,8 @@ fn run_command(
         thread::sleep(Duration::from_millis(100));
     };
 
+    #[cfg(unix)]
+    terminate_process_tree(&mut child);
     Ok(CommandResult {
         success: status.success(),
         stdout: stdout_reader.join().unwrap_or_default(),
@@ -1061,7 +1081,11 @@ impl ScriptInstaller {
 /// prompt, and this says so outright rather than relying on that.
 /// Where the vendors' installers put a user-level binary, per platform.
 const HOME_VARIABLE: &str = if cfg!(windows) { "USERPROFILE" } else { "HOME" };
-const LOCAL_BIN_SUFFIX: &str = if cfg!(windows) { ".local\\bin" } else { ".local/bin" };
+const LOCAL_BIN_SUFFIX: &str = if cfg!(windows) {
+    ".local\\bin"
+} else {
+    ".local/bin"
+};
 const LOCAL_BIN_LABEL: &str = if cfg!(windows) {
     "%USERPROFILE%\\.local\\bin"
 } else {
@@ -1101,7 +1125,11 @@ fn definition(agent_type: &str) -> Result<CliDefinition, String> {
                 },
                 update_command: None,
                 // The Unix script installs next to Claude's, in `~/.local/bin`.
-                directory_root: if cfg!(windows) { "LOCALAPPDATA" } else { HOME_VARIABLE },
+                directory_root: if cfg!(windows) {
+                    "LOCALAPPDATA"
+                } else {
+                    HOME_VARIABLE
+                },
                 directory_suffix: if cfg!(windows) {
                     "Programs\\OpenAI\\Codex\\bin"
                 } else {
@@ -1146,8 +1174,16 @@ fn definition(agent_type: &str) -> Result<CliDefinition, String> {
                     "https://antigravity.google/cli/install.sh"
                 },
                 update_command: Some("update"),
-                directory_root: if cfg!(windows) { "LOCALAPPDATA" } else { HOME_VARIABLE },
-                directory_suffix: if cfg!(windows) { "agy\\bin" } else { LOCAL_BIN_SUFFIX },
+                directory_root: if cfg!(windows) {
+                    "LOCALAPPDATA"
+                } else {
+                    HOME_VARIABLE
+                },
+                directory_suffix: if cfg!(windows) {
+                    "agy\\bin"
+                } else {
+                    LOCAL_BIN_SUFFIX
+                },
                 directory_label: if cfg!(windows) {
                     "%LOCALAPPDATA%\\agy\\bin"
                 } else {
@@ -1163,6 +1199,33 @@ fn definition(agent_type: &str) -> Result<CliDefinition, String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[cfg(unix)]
+    #[test]
+    fn bash_installer_preview_propagates_download_failure() {
+        use std::os::unix::fs::PermissionsExt;
+        let root = env::temp_dir().join(format!("termexo-curl-failure-{}", std::process::id()));
+        std::fs::create_dir_all(&root).unwrap();
+        let curl = root.join("curl");
+        std::fs::write(&curl, "#!/bin/sh\nprintf 'download failed' >&2\nexit 22\n").unwrap();
+        std::fs::set_permissions(&curl, std::fs::Permissions::from_mode(0o755)).unwrap();
+        let search =
+            env::join_paths([root.as_path(), Path::new("/usr/bin"), Path::new("/bin")]).unwrap();
+        let mut command = Command::new("/bin/bash");
+        command
+            .args([
+                "-c",
+                &script_command_preview("https://example.invalid/install.sh"),
+            ])
+            .env("PATH", search);
+        let result = run_command(command, "Bash", VERSION_TIMEOUT).unwrap();
+        std::fs::remove_dir_all(root).unwrap();
+        assert!(
+            !result.success,
+            "an empty bash pipe must not hide curl's failure"
+        );
+        assert!(result.stderr.contains("download failed"));
+    }
 
     #[test]
     fn opencode_install_and_rollback_allow_only_the_required_package_script() {
@@ -1271,10 +1334,8 @@ mod tests {
         for (agent_type, url) in expected {
             let script = definition(agent_type).unwrap().script.unwrap();
             assert_eq!(script.url, url);
-            assert_eq!(
-                script_command_preview(url),
-                format!("curl -fsSL '{url}' | bash")
-            );
+            assert!(script_command_preview(url).starts_with("bash -o pipefail -c "));
+            assert!(script_command_preview(url).contains(url));
             assert_eq!(script.directory().unwrap().file_name().unwrap(), "bin");
         }
     }

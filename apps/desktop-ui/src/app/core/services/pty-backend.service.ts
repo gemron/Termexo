@@ -6,11 +6,11 @@ import { hasBackend } from './tauri-runtime';
 /**
  * The pseudo console the backend opens terminals with.
  *
- * Only ConPTY exists on Windows, but which one — the copy shipped beside the executable or the
- * one the user's Windows build carries — changes what the terminal may safely do for itself.
+ * Unix uses the platform PTY. On Windows, the bundled or system ConPTY version determines
+ * which reflow workarounds the terminal needs.
  */
 export interface PtyBackend {
-  readonly backend: 'conpty';
+  readonly backend: 'conpty' | 'unix';
   readonly buildNumber: number;
   readonly bundled: boolean;
 }

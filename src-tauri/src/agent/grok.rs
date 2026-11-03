@@ -1,16 +1,16 @@
-use crate::platform::{shell_invoke, shell_quote};
+use super::cli::{command_paths, query_command};
+use crate::platform::{paths_equal, shell_invoke, shell_quote};
 use std::cmp::Reverse;
 use std::env;
 use std::fs;
 use std::path::{Path, PathBuf};
-use std::process::Command;
 use std::time::{Duration, UNIX_EPOCH};
 
 use serde_json::Value;
 use thiserror::Error;
 
 use super::{AgentAdapter, AgentInstallation, AgentLaunchSpec, AgentSession, GrokLaunchOptions};
-use crate::process::{hidden_command, run_with_timeout};
+use crate::process::run_with_timeout;
 
 const VERSION_TIMEOUT: Duration = Duration::from_secs(10);
 const GROK_PATH_ENV: &str = "TERMEXO_GROK_PATH";
@@ -44,7 +44,7 @@ impl GrokBuildAdapter {
 
     fn find_executable(&self) -> Option<PathBuf> {
         if let Some(executable) = &self.executable_override {
-            return executable.is_file().then(|| executable.clone());
+            return crate::platform::is_executable_file(executable).then(|| executable.clone());
         }
         let mut candidates = Vec::new();
         if let Some(configured) = env::var_os(GROK_PATH_ENV) {
@@ -61,15 +61,16 @@ impl GrokBuildAdapter {
         }
         #[cfg(not(windows))]
         candidates.extend(command_paths("grok"));
-        candidates.into_iter().find(|path| path.is_file())
+        candidates
+            .into_iter()
+            .find(|path| crate::platform::is_executable_file(path))
     }
 
     fn home(&self) -> Option<PathBuf> {
         self.home_override.clone().or_else(|| {
-            env::var_os("GROK_HOME").map(PathBuf::from).or_else(|| {
-                env::var_os(if cfg!(windows) { "USERPROFILE" } else { "HOME" })
-                    .map(|path| PathBuf::from(path).join(".grok"))
-            })
+            env::var_os("GROK_HOME")
+                .map(PathBuf::from)
+                .or_else(|| crate::platform::home_dir().map(|path| path.join(".grok")))
         })
     }
 
@@ -252,39 +253,6 @@ impl AgentAdapter for GrokBuildAdapter {
             executable_path: executable.to_string_lossy().into_owned(),
         })
     }
-}
-
-fn command_paths(command: &str) -> Vec<PathBuf> {
-    env::var_os("PATH")
-        .map(|value| {
-            env::split_paths(&value)
-                .map(|dir| dir.join(command))
-                .collect()
-        })
-        .unwrap_or_default()
-}
-
-fn query_command(executable: &Path) -> Command {
-    #[cfg(windows)]
-    if executable
-        .extension()
-        .is_some_and(|extension| extension.eq_ignore_ascii_case("cmd"))
-    {
-        let mut command = hidden_command("cmd.exe");
-        command.args(["/d", "/c", "call"]).arg(executable);
-        return command;
-    }
-    hidden_command(executable)
-}
-
-fn paths_equal(left: &str, right: &str) -> bool {
-    let normalize = |value: &str| {
-        value
-            .trim_end_matches(['\\', '/'])
-            .replace('/', "\\")
-            .to_lowercase()
-    };
-    normalize(left) == normalize(right)
 }
 
 #[cfg(test)]

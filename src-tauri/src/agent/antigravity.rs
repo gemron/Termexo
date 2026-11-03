@@ -1,4 +1,5 @@
-use crate::platform::{shell_invoke, shell_quote};
+use super::cli::command_paths;
+use crate::platform::{paths_equal, shell_invoke, shell_quote};
 use std::env;
 use std::path::{Path, PathBuf};
 use std::process::Output;
@@ -107,7 +108,7 @@ impl AntigravityAdapter {
 
     fn find_executable(&self) -> Option<PathBuf> {
         if let Some(executable) = self.executable_override.as_ref() {
-            return executable.is_file().then(|| executable.clone());
+            return crate::platform::is_executable_file(executable).then(|| executable.clone());
         }
 
         let mut candidates = Vec::new();
@@ -136,7 +137,9 @@ impl AntigravityAdapter {
             candidates.extend(command_paths("agy"));
         }
 
-        candidates.into_iter().find(|path| path.is_file())
+        candidates
+            .into_iter()
+            .find(|path| crate::platform::is_executable_file(path))
     }
 
     /// The directory holding the CLI's own state, which is where conversations are summarised.
@@ -144,7 +147,7 @@ impl AntigravityAdapter {
         if let Some(directory) = self.data_directory_override.as_ref() {
             return Some(directory.clone());
         }
-        let home = env::var_os("USERPROFILE").or_else(|| env::var_os("HOME"))?;
+        let home = crate::platform::home_dir()?;
         Some(PathBuf::from(home).join(".gemini").join("antigravity-cli"))
     }
 
@@ -356,25 +359,18 @@ fn transcript_path(data_directory: &Path, conversation_id: &str) -> String {
 
 /// The first workspace a conversation was opened against, as a native path.
 ///
-/// The column holds a JSON array of file URIs (`["file:///C:/Users/x"]`), which has to become a
-/// Windows path before it can be compared with the one a workspace records.
+/// The column holds file URIs, which must be decoded into native paths before comparison.
 fn first_workspace_path(workspace_uris: &str) -> Option<String> {
     let uris: Vec<String> = serde_json::from_str(workspace_uris).ok()?;
     uris.into_iter().find_map(|uri| file_uri_to_path(&uri))
 }
 
 fn file_uri_to_path(uri: &str) -> Option<String> {
-    let remainder = uri.strip_prefix("file://")?;
-    let trimmed = remainder.strip_prefix('/').unwrap_or(remainder);
-    if trimmed.is_empty() {
-        return None;
-    }
-    let decoded = trimmed.replace("%20", " ");
-    Some(if cfg!(windows) {
-        decoded.replace('/', "\\")
-    } else {
-        format!("/{decoded}")
-    })
+    url::Url::parse(uri)
+        .ok()?
+        .to_file_path()
+        .ok()
+        .map(|path| path.to_string_lossy().into_owned())
 }
 
 fn parse_models(output: &str) -> Vec<AntigravityModel> {
@@ -390,24 +386,6 @@ fn parse_models(output: &str) -> Vec<AntigravityModel> {
             })
         })
         .collect()
-}
-
-fn paths_equal(left: &str, right: &str) -> bool {
-    let normalize = |value: &str| {
-        value
-            .trim_end_matches(['\\', '/'])
-            .replace('/', "\\")
-            .to_lowercase()
-    };
-    normalize(left) == normalize(right)
-}
-
-fn command_paths(command: &str) -> Vec<PathBuf> {
-    let mut paths = Vec::new();
-    if let Some(search_path) = env::var_os("PATH") {
-        paths.extend(env::split_paths(&search_path).map(|directory| directory.join(command)));
-    }
-    paths
 }
 
 fn append_option(command: &mut String, flag: &str, value: Option<&str>) {
@@ -531,6 +509,19 @@ mod tests {
         }
     }
 
+    #[cfg(unix)]
+    #[test]
+    fn unix_workspace_uris_decode_unicode_and_preserve_filename_characters() {
+        let expected = "/tmp/Project's 中文 # %/";
+        let uri = url::Url::from_directory_path(expected).unwrap();
+        assert!(paths_equal(
+            &file_uri_to_path(uri.as_str()).unwrap(),
+            expected
+        ));
+        assert_eq!(file_uri_to_path("file:///"), Some("/".into()));
+        assert_eq!(file_uri_to_path("https://example.com/tmp/project"), None);
+    }
+
     #[test]
     fn models_are_read_as_slug_and_display_name() {
         let models = parse_models(
@@ -548,6 +539,11 @@ mod tests {
     fn a_resumed_conversation_is_launched_by_id() {
         let executable = temporary_directory("launch").join("agy.exe");
         std::fs::write(&executable, b"").unwrap();
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            std::fs::set_permissions(&executable, std::fs::Permissions::from_mode(0o755)).unwrap();
+        }
         let adapter = AntigravityAdapter {
             executable_override: Some(executable),
             data_directory_override: None,
@@ -573,6 +569,11 @@ mod tests {
     fn continuing_without_an_id_asks_for_the_most_recent_conversation() {
         let executable = temporary_directory("continue").join("agy.exe");
         std::fs::write(&executable, b"").unwrap();
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            std::fs::set_permissions(&executable, std::fs::Permissions::from_mode(0o755)).unwrap();
+        }
         let adapter = AntigravityAdapter {
             executable_override: Some(executable),
             data_directory_override: None,

@@ -42,9 +42,7 @@ pub async fn read_model_catalog() -> ModelCatalog {
     let home = std::env::var_os("CODEX_HOME")
         .map(std::path::PathBuf::from)
         .or_else(|| {
-            std::env::var_os("USERPROFILE")
-                .or_else(|| std::env::var_os("HOME"))
-                .map(|home| std::path::PathBuf::from(home).join(".codex"))
+            crate::platform::home_dir().map(|home| home.join(".codex"))
         });
     if let Some(home) = home {
         let path = home.join("models_cache.json");

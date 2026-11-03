@@ -248,7 +248,7 @@ Termexo 以 **Workspace** 为组织单位，把这些信息集中到一个可观
 
 Termexo 可检测、安装及启动 [Pi Coding Agent](https://github.com/earendil-works/pi)，并支持状态追踪、历史会话恢复、任务看板与远程终端操作。
 
-```powershell
+```sh
 npm install -g --ignore-scripts @earendil-works/pi-coding-agent
 pi
 ```
@@ -323,6 +323,12 @@ Termexo 将扩展写入自己的运行时目录，以 `--extension` 注入每个
 
 macOS 源码构建需要 macOS 12+ 与 Xcode 命令行工具。下方 Windows 专属运行时要求不适用于 Mac 构建。
 
+Linux 现支持从源码构建；依赖安装、`.deb` 打包和真实 WebKit/PTY 冒烟测试见 [Linux 构建与运行验证](docs/linux.md)。
+
+当前源码还加入 Linux x64 npm 打包和真实安装测试。构建 `.deb` 后运行
+`npm run npm:stage:linux`、`npm run npm:pack:linux` 即可生成本地 npm 包，具体步骤见 Linux 说明。
+已发布的旧 npm 版本不会自动包含这些修改。
+
 - Windows 10 build 17763（2018 年 10 月）或更高——终端所依赖的伪控制台从这个版本开始才有；
 - WebView2 运行时需 Chromium 111 或更高——界面的配色用 `color-mix()` 和 `oklch()` 表达，更旧的
   运行时会直接丢弃这些声明。遇到旧版本时 Termexo 会提示并提供下载入口；Windows 11 自带，安装包
@@ -333,7 +339,7 @@ macOS 源码构建需要 macOS 12+ 与 Xcode 命令行工具。下方 Windows �
 
 ### 1. 获取代码与安装前端依赖
 
-```powershell
+```sh
 git clone https://github.com/gemron/Termexo.git
 cd Termexo
 npm --prefix apps/desktop-ui install
@@ -341,7 +347,7 @@ npm --prefix apps/desktop-ui install
 
 ### 2. 运行浏览器预览
 
-```powershell
+```sh
 npm run dev
 ```
 
@@ -350,13 +356,21 @@ npm run dev
 
 ### 3. 运行桌面应用
 
-```powershell
+```sh
 npm run tauri:dev
 ```
 
 macOS 开发使用 `npm run tauri:dev:mac`，打包使用 `npm run tauri:build:mac`。[GitHub Actions](docs/releases.md) 也会自动构建两种 Mac 架构并发布 npm 包。
 
 桌面模式使用真实 PTY。若 Claude Code 不在 PATH 中，可以显式指定：
+
+Linux/macOS（Bash）：
+
+```sh
+TERMEXO_CLAUDE_PATH="$HOME/.local/bin/claude" npm run tauri:dev
+```
+
+Windows（PowerShell）：
 
 ```powershell
 $env:TERMEXO_CLAUDE_PATH = "C:\path\to\claude.exe"
@@ -457,7 +471,7 @@ Termexo/
 
 ## 开发与验证
 
-```powershell
+```sh
 npm run build
 npm test
 cargo test --manifest-path src-tauri/Cargo.toml
@@ -467,7 +481,7 @@ npm run tauri:build
 
 本地开发服务运行后，可重新生成 README 截图：
 
-```powershell
+```sh
 npm run capture:readme
 ```
 

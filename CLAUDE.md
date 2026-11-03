@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What this is
 
-Termexo is a Windows-only, local-first desktop control plane for AI coding terminals: an
+Termexo is a Windows, macOS and Linux local-first desktop control plane for AI coding terminals: an
 Angular 22 frontend inside a Tauri 2 / Rust shell that launches real PTYs running Claude Code
 and Codex CLI, tracks their state through hooks, and persists workspaces in SQLite.
 
@@ -17,47 +17,53 @@ refactoring code here.
 Run from the repository root. `apps/desktop-ui` is the only npm workspace with dependencies —
 install with `npm --prefix apps/desktop-ui install`.
 
-```powershell
+```sh
 npm run dev                 # Browser preview on http://127.0.0.1:4200 (no Rust required)
 npm run build               # Angular production build -> apps/desktop-ui/dist/
 npm test                    # Frontend unit tests (Vitest), single run
 npm run tauri:dev           # Full desktop app with real PTYs
 npm run tauri:build         # Release bundle
 cargo test --manifest-path src-tauri/Cargo.toml   # Rust tests
-scripts\cargo-msvc.cmd test --manifest-path crates/termexo-relay-protocol/Cargo.toml  # Shared relay protocol crate
+cargo test --manifest-path crates/termexo-relay-protocol/Cargo.toml  # Shared relay protocol crate
 ```
 
 Run a single frontend test file or filter by test name:
 
-```powershell
+```sh
 npm --prefix apps/desktop-ui test -- --watch=false --include src/app/core/services/app-state.service.spec.ts
 npm --prefix apps/desktop-ui test -- --watch=false --filter "restores"
 ```
 
-Browser smoke tests need `npm run dev` already running and Microsoft Edge (override with
-`EDGE_PATH`); the desktop smoke test needs a release build of `termexo.exe`:
+Browser smoke tests need `npm run dev` already running and Chromium/Chrome/Edge (override with
+`BROWSER_PATH`; legacy `EDGE_PATH` is also supported). The WebView2/CDP desktop smoke tests and
+demo recorder require Windows. Linux native testing uses `npm run test:desktop:linux` against
+a built native executable; see `docs/linux.md` for Bash argv and authenticated Codex checks.
 
-```powershell
+```sh
 npm --prefix apps/desktop-ui run e2e:smoke        # Main UI flows
 npm --prefix apps/desktop-ui run e2e:responsive   # Layout across viewports
-npm --prefix apps/desktop-ui run e2e:desktop      # Drives the real app over CDP
+npm --prefix apps/desktop-ui run e2e:desktop      # Windows only: real app over CDP
 npm run capture:readme                            # Regenerate docs/images screenshots
 ```
 
 ### Toolchain notes
 
-- `scripts/run-angular.mjs` and `scripts/run-tauri.mjs` spawn the **pinned Node binary** from
-  `apps/desktop-ui/node_modules/node/bin/node.exe`, not system Node. Invoke the npm scripts
+- The frontend's `scripts/run-angular.mjs` and `scripts/run-tauri.mjs` spawn the **pinned Node binary** from
+  `apps/desktop-ui/node_modules/node/bin/node` (`node.exe` on Windows). Invoke the npm scripts
   rather than calling `ng` or `tauri` directly.
-- `npm run tauri:dev|build` goes through `scripts/tauri-msvc.cmd`, which sources
+- On Windows, `npm run tauri:dev|build` goes through `scripts/tauri-msvc.cmd`, which sources
   `VsDevCmd.bat` (Visual Studio 2022 Build Tools, Desktop C++ workload) and prefers the
   vendored toolchain in `.tooling/cargo` + `.tooling/rustup` when present. A bare `cargo build`
   in a shell without the MSVC environment will fail to link. `scripts/cargo-msvc.cmd <args>`
   runs any cargo command inside that same environment — use it for `crates/`, which is a
   separate crate (no root Cargo workspace, so `src-tauri/target` stays where the npm packaging
   scripts expect it).
-- One Rust test is `#[ignore]`d because it writes to the real Windows Credential Manager; run
-  it explicitly with `cargo test -- --ignored` when touching `CredentialStore`.
+- On Linux/macOS the root dispatcher starts the Tauri CLI directly. Install Linux GTK/WebKitGTK
+  development libraries before building. Linux vendor installers require Bash and curl; generated
+  command arguments use POSIX quoting, while Windows continues to use PowerShell quoting.
+- The credential round-trip Rust test is ignored by default because it touches the session's
+  real credential store. Run that exact test explicitly when touching `CredentialStore`;
+  Linux requires an unlocked Secret Service provider (see `docs/linux.md`).
 
 ## Architecture
 
@@ -103,8 +109,8 @@ in `core/models/agent.models.ts` — a new event type must be handled in both th
 
 ### Secrets boundary
 
-`CredentialStore` (`src-tauri/src/config/mod.rs`) wraps `keyring` with the `windows-native`
-feature under service name `dev.agentdock.desktop`. `set()` reads the secret back and returns
+`CredentialStore` (`src-tauri/src/config/mod.rs`) wraps `keyring` with Windows Credential Manager,
+macOS Keychain, or Linux Secret Service under service name `dev.agentdock.desktop`. `set()` reads the secret back and returns
 `CredentialNotPersisted` if storage silently dropped it (the V0.3.8 fix). SQLite stores only a
 `credential_target` string; profile structs serialized to the frontend expose `hasCredential`,
 never the value. Do not add a field that would return a key to the UI, and keep keys out of hook
@@ -164,5 +170,10 @@ compatibility with early installations — do not rename them.
 The version string is duplicated across `package.json`, `apps/desktop-ui/package.json`,
 `packages/termexo/package.json`, `src-tauri/Cargo.toml`, `src-tauri/tauri.conf.json`,
 and `crates/termexo-relay-protocol/Cargo.toml`, and is referenced in
-both READMEs. `packages/termexo` is the npm distribution wrapper; its `prepack`
-stages the built Windows executable into `vendor/win32-x64/`.
+both READMEs. `packages/termexo` is the npm distribution wrapper; `prepack` verifies
+all declared platform payloads. The release workflow assembles Windows x64, both macOS
+architectures and Linux x64 from the same commit. Linux keeps the complete `usr/bin` +
+`usr/lib/Termexo` resource tree and checks its native payload after an actual npm installation.
+Use `npm run npm:stage:linux`, `npm run npm:pack:linux` and `npm run test:npm:linux`
+after building a Linux `.deb` for local validation. Never replace published packages
+with the Linux-only local test archive. See `docs/releases.md` and `docs/linux.md`.

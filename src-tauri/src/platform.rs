@@ -1,9 +1,7 @@
 //! Facts about the host OS that the rest of the crate would otherwise have to guess at.
 //!
-//! Windows keeps working exactly as before; the Unix branches exist so the same code can run in a
-//! macOS app bundle, which differs in three ways that matter here: the user's shell is zsh or
-//! bash rather than PowerShell, a GUI app does not inherit the shell's `PATH`, and application
-//! data lives under `~/Library/Application Support`.
+//! Unix desktops need a native shell and the login environment even when launched outside a
+//! terminal. Data follows the platform convention: Application Support on macOS and XDG on Linux.
 
 use std::path::PathBuf;
 
@@ -13,8 +11,10 @@ use std::env;
 /// The shell Termexo opens when nothing more specific was asked for.
 #[cfg(windows)]
 pub const FALLBACK_SHELL: &str = "powershell.exe";
-#[cfg(unix)]
+#[cfg(target_os = "macos")]
 pub const FALLBACK_SHELL: &str = "/bin/zsh";
+#[cfg(all(unix, not(target_os = "macos")))]
+pub const FALLBACK_SHELL: &str = "/bin/sh";
 
 /// Directory name for application data on macOS, deliberately not the bundle identifier.
 #[cfg(target_os = "macos")]
@@ -25,13 +25,46 @@ pub fn home_dir() -> Option<PathBuf> {
     std::env::home_dir()
 }
 
+/// Compare saved native paths without applying Windows case/separator rules to Unix filenames.
+pub fn paths_equal(left: &str, right: &str) -> bool {
+    #[cfg(windows)]
+    {
+        let normalize = |value: &str| {
+            value
+                .trim_end_matches(['\\', '/'])
+                .replace('/', "\\")
+                .to_lowercase()
+        };
+        normalize(left) == normalize(right)
+    }
+    #[cfg(not(windows))]
+    {
+        std::path::Path::new(left) == std::path::Path::new(right)
+    }
+}
+
 /// The user's own shell: `$SHELL` when it points at something runnable, otherwise the fallback.
 #[cfg(unix)]
 pub fn default_shell() -> String {
     env::var("SHELL")
         .ok()
-        .filter(|shell| std::path::Path::new(shell).is_file())
+        .filter(|shell| {
+            std::path::Path::new(shell).is_absolute()
+                && is_executable_file(std::path::Path::new(shell))
+        })
         .unwrap_or_else(|| FALLBACK_SHELL.into())
+}
+
+#[cfg(unix)]
+pub fn is_executable_file(path: &std::path::Path) -> bool {
+    use std::os::unix::fs::PermissionsExt;
+    path.metadata()
+        .is_ok_and(|metadata| metadata.is_file() && metadata.permissions().mode() & 0o111 != 0)
+}
+
+#[cfg(not(unix))]
+pub fn is_executable_file(path: &std::path::Path) -> bool {
+    path.is_file()
 }
 
 #[cfg(windows)]
@@ -44,6 +77,9 @@ pub fn default_shell() -> String {
 /// Workspaces store `powershell.exe` as the shell, and a workspace written on Windows (or by the
 /// frontend's default) must still open here, so Windows-only shells map to the user's own shell.
 pub fn resolve_shell(requested: &str) -> String {
+    if requested.trim().is_empty() {
+        return default_shell();
+    }
     #[cfg(unix)]
     {
         let name = requested
@@ -52,7 +88,7 @@ pub fn resolve_shell(requested: &str) -> String {
             .unwrap_or(requested)
             .to_ascii_lowercase();
         let windows_only = name.starts_with("powershell") || name == "cmd" || name == "cmd.exe";
-        if requested.trim().is_empty() || windows_only {
+        if windows_only {
             return default_shell();
         }
     }
@@ -88,6 +124,16 @@ pub fn macos_data_dir() -> Option<PathBuf> {
     })
 }
 
+/// Matches Tauri's Linux data path, including the XDG absolute-path requirement.
+#[cfg(target_os = "linux")]
+pub fn linux_data_dir() -> Option<PathBuf> {
+    env::var_os("XDG_DATA_HOME")
+        .map(PathBuf::from)
+        .filter(|directory| directory.is_absolute())
+        .or_else(|| home_dir().map(|home| home.join(".local/share")))
+        .map(|base| base.join("dev.agentdock.desktop"))
+}
+
 /// Application data directory under the macOS convention, or the one Tauri chose elsewhere.
 pub fn app_data_dir(app: &tauri::AppHandle) -> Result<PathBuf, String> {
     use tauri::Manager;
@@ -100,12 +146,11 @@ pub fn app_data_dir(app: &tauri::AppHandle) -> Result<PathBuf, String> {
 }
 
 /// Directories agents are usually installed into, searched in addition to `PATH`.
-#[cfg(target_os = "macos")]
+#[cfg(unix)]
 fn well_known_bin_directories() -> Vec<PathBuf> {
-    let mut directories = vec![
-        PathBuf::from("/opt/homebrew/bin"),
-        PathBuf::from("/usr/local/bin"),
-    ];
+    let mut directories = vec![PathBuf::from("/usr/local/bin")];
+    #[cfg(target_os = "macos")]
+    directories.insert(0, PathBuf::from("/opt/homebrew/bin"));
     if let Some(home) = home_dir() {
         directories.extend([
             home.join(".local").join("bin"),
@@ -118,14 +163,14 @@ fn well_known_bin_directories() -> Vec<PathBuf> {
 }
 
 /// Markers around the printed `PATH`, because a login shell may print anything else it likes.
-#[cfg(target_os = "macos")]
+#[cfg(unix)]
 const PATH_MARKER: &str = "__TERMEXO_LOGIN_PATH__";
 
-#[cfg(target_os = "macos")]
+#[cfg(unix)]
 const LOGIN_SHELL_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(5);
 
 /// The `PATH` an interactive login shell would have, as the user's dotfiles build it.
-#[cfg(target_os = "macos")]
+#[cfg(unix)]
 fn login_shell_path() -> Option<String> {
     let mut command = std::process::Command::new(default_shell());
     command.args([
@@ -141,7 +186,7 @@ fn login_shell_path() -> Option<String> {
 
 /// Puts `login`'s entries first, then whatever `current` adds, then the existing well-known
 /// directories that are still missing. Duplicates keep their first position.
-#[cfg(target_os = "macos")]
+#[cfg(unix)]
 fn merge_paths(login: Option<&str>, current: &str, extra: &[PathBuf]) -> String {
     let mut merged: Vec<PathBuf> = Vec::new();
     let mut push = |directory: PathBuf| {
@@ -165,14 +210,13 @@ fn merge_paths(login: Option<&str>, current: &str, extra: &[PathBuf]) -> String 
 
 /// Gives this process the `PATH` the user sees in a terminal.
 ///
-/// An app launched from Finder or the Dock inherits launchd's minimal `PATH`, so `claude`,
-/// `codex` and `node` installed through Homebrew or npm would not be found, neither by detection
-/// nor by the terminals that inherit this environment. Must run before other threads start.
+/// Desktop launchers often inherit a minimal `PATH`, so agents installed through npm or a shell
+/// version manager would not be found by detection or PTYs. Run before other threads start.
 ///
 /// The probe waits for the user's shell dotfiles, so a slow `.zshrc` delays the window by up to
 /// `LOGIN_SHELL_TIMEOUT`; after that the current `PATH` is kept and the well-known directories are
 /// added anyway.
-#[cfg(target_os = "macos")]
+#[cfg(unix)]
 pub fn inherit_login_environment() {
     let current = env::var("PATH").unwrap_or_default();
     let merged = merge_paths(
@@ -183,7 +227,7 @@ pub fn inherit_login_environment() {
     env::set_var("PATH", merged);
 }
 
-#[cfg(not(target_os = "macos"))]
+#[cfg(not(unix))]
 pub fn inherit_login_environment() {}
 
 #[cfg(test)]
@@ -192,8 +236,44 @@ mod tests {
 
     #[cfg(unix)]
     #[test]
+    fn unix_project_paths_preserve_case_and_literal_backslashes() {
+        assert!(!paths_equal("/tmp/Project", "/tmp/project"));
+        assert!(!paths_equal("/tmp/project\\name", "/tmp/project/name"));
+        assert!(paths_equal("/tmp/project/", "/tmp/project"));
+        assert!(!paths_equal("/", ""));
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn windows_project_paths_ignore_case_and_separator_style() {
+        assert!(paths_equal("C:\\Project\\", "c:/project"));
+    }
+
+    #[test]
+    fn empty_shell_requests_use_the_host_default_on_every_platform() {
+        assert_eq!(resolve_shell(""), default_shell());
+        assert_eq!(resolve_shell("  "), default_shell());
+    }
+
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn fallback_shell_exists_and_is_executable_without_zsh() {
+        assert_eq!(FALLBACK_SHELL, "/bin/sh");
+        assert!(is_executable_file(std::path::Path::new(FALLBACK_SHELL)));
+        assert!(!is_executable_file(std::path::Path::new("/etc/passwd")));
+        assert!(!is_executable_file(std::path::Path::new("/bin")));
+    }
+
+    #[cfg(unix)]
+    #[test]
     fn windows_shells_resolve_to_the_users_shell() {
-        for shell in ["powershell.exe", "powershell", "PowerShell.EXE", "cmd.exe", ""] {
+        for shell in [
+            "powershell.exe",
+            "powershell",
+            "PowerShell.EXE",
+            "cmd.exe",
+            "",
+        ] {
             assert_eq!(resolve_shell(shell), default_shell(), "{shell}");
         }
     }
@@ -209,17 +289,20 @@ mod tests {
     #[test]
     fn other_shells_are_left_alone() {
         assert_eq!(resolve_shell("/bin/bash"), "/bin/bash");
-        assert_eq!(resolve_shell("/opt/homebrew/bin/pwsh"), "/opt/homebrew/bin/pwsh");
+        assert_eq!(
+            resolve_shell("/opt/homebrew/bin/pwsh"),
+            "/opt/homebrew/bin/pwsh"
+        );
     }
 
-    #[cfg(target_os = "macos")]
+    #[cfg(unix)]
     #[test]
     fn login_entries_lead_and_duplicates_collapse() {
         let merged = merge_paths(Some("/a:/b"), "/usr/bin:/b", &[]);
         assert_eq!(merged, "/a:/b:/usr/bin");
     }
 
-    #[cfg(target_os = "macos")]
+    #[cfg(unix)]
     #[test]
     fn a_failed_login_shell_keeps_the_current_path() {
         assert_eq!(merge_paths(None, "/usr/bin:/bin", &[]), "/usr/bin:/bin");

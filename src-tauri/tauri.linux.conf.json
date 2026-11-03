@@ -1,0 +1,14 @@
+{
+  "bundle": {
+    "targets": ["deb"],
+    "resources": {
+      "vendor/conpty/conpty.dll": null,
+      "vendor/conpty/OpenConsole.exe": null
+    },
+    "linux": {
+      "deb": {
+        "depends": ["libsecret-1-0", "gnome-keyring", "fontconfig", "xdg-utils"]
+      }
+    }
+  }
+}

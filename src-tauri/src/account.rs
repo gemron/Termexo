@@ -487,7 +487,10 @@ fn run_cli(
     #[cfg(not(windows))]
     let mut command = Command::new(executable);
 
-    command.args(args).envs(environment).output()
+    crate::process::run_with_timeout(
+        command.args(args).envs(environment),
+        std::time::Duration::from_secs(20),
+    )
 }
 
 fn output_text(output: &Output) -> String {
@@ -551,13 +554,21 @@ mod tests {
     #[test]
     fn login_commands_are_plain_posix_words() {
         assert_eq!(
-            login_command("claude", AccountLoginMethod::Browser, "/Users/me/my tools/claude")
-                .unwrap(),
+            login_command(
+                "claude",
+                AccountLoginMethod::Browser,
+                "/Users/me/my tools/claude"
+            )
+            .unwrap(),
             "'/Users/me/my tools/claude' auth login"
         );
         assert_eq!(
-            login_command("codex", AccountLoginMethod::DeviceCode, "/opt/codex's/bin/codex")
-                .unwrap(),
+            login_command(
+                "codex",
+                AccountLoginMethod::DeviceCode,
+                "/opt/codex's/bin/codex"
+            )
+            .unwrap(),
             r"'/opt/codex'\''s/bin/codex' login --device-auth"
         );
         assert!(login_command("unknown-agent", AccountLoginMethod::Browser, "agent").is_err());

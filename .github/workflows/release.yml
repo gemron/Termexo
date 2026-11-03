@@ -71,9 +71,14 @@ jobs:
     needs: validate
     uses: ./.github/workflows/macos-build.yml
 
+  linux:
+    name: Build Linux and test npm installation
+    needs: validate
+    uses: ./.github/workflows/linux-build.yml
+
   publish:
     name: Publish GitHub Release and npm
-    needs: [validate, windows, macos]
+    needs: [validate, windows, macos, linux]
     runs-on: ubuntu-latest
     timeout-minutes: 20
     environment: npm
@@ -113,6 +118,7 @@ jobs:
             ['Windows', 'x86_64-pc-windows-msvc'],
             ['macOS', 'aarch64-apple-darwin'],
             ['macOS', 'x86_64-apple-darwin'],
+            ['Linux', 'x86_64-unknown-linux-gnu'],
           ];
           for (const [platform, target] of targets) {
             const suffix = platform === 'Windows' && process.env.SIGN_WINDOWS === 'true' ? '-signed' : '';
@@ -121,6 +127,7 @@ jobs:
             assert.equal(info.version, version, `${target}: wrong version`);
             assert.equal(info.commit, commit, `${target}: wrong source commit`);
             assert.equal(info.target, target, `${target}: wrong architecture`);
+            if (platform === 'Linux') assert.equal(info.dirty, false, 'Linux release must come from its CI source commit');
             if (platform === 'Windows') {
               assert.equal(info.signingRequested, process.env.SIGN_WINDOWS === 'true');
               if (info.signingRequested) assert.ok(info.signatures.length === 3 && info.signatures.every(s => s.status === 'Valid' && s.timestamped));
@@ -132,7 +139,7 @@ jobs:
               assert.ok(match, 'Invalid checksum entry');
               const [, hash, name] = match;
               assert.ok(name.includes(`_${version}_`), `${name}: wrong version`);
-              assert.match(name, platform === 'Windows' ? /\.(exe|msi)$/ : /\.(dmg|app\.tar\.gz)$/);
+              assert.match(name, platform === 'Windows' ? /\.(exe|msi)$/ : platform === 'Linux' ? /\.(deb|tar\.gz)$/ : /\.(dmg|app\.tar\.gz)$/);
               assert.equal(sha256(readFileSync(`${dir}/${name}`)), hash, `${name}: checksum mismatch`);
               copyFileSync(`${dir}/${name}`, `release-assets/${name}`);
             }
@@ -155,6 +162,8 @@ jobs:
             mkdirSync(`packages/termexo/vendor/darwin-${arch}`, { recursive: true });
             copyFileSync(`release-assets/Termexo_${version}_${archiveArch}.app.tar.gz`, `packages/termexo/vendor/darwin-${arch}/Termexo.app.tar.gz`);
           }
+          mkdirSync('packages/termexo/vendor/linux-x64', { recursive: true });
+          copyFileSync(`release-assets/Termexo_${version}_linux_x64.tar.gz`, 'packages/termexo/vendor/linux-x64/Termexo.tar.gz');
           NODE
       - name: Test and pack the complete multiplatform npm distribution
         run: |
@@ -176,7 +185,7 @@ jobs:
           const pkg = JSON.parse(unpack('package.json'));
           assert.equal(pkg.name, 'termexo');
           assert.equal(pkg.version, version);
-          assert.deepEqual(pkg.os, ['win32', 'darwin']);
+          assert.deepEqual(pkg.os, ['win32', 'darwin', 'linux']);
           const info = JSON.parse(readFileSync('downloaded/Termexo-npm-windows/build-info.json', 'utf8'));
           assert.equal(sha256(unpack('vendor/win32-x64/termexo.exe')), info.executableSha256, 'npm must contain the executable from this Windows build');
           validateWindowsPayloadInventory(info.files);
@@ -184,9 +193,10 @@ jobs:
           for (const [arch, archiveArch] of [['arm64', 'arm64'], ['x64', 'x86_64']]) {
             assert.equal(sha256(unpack(`vendor/darwin-${arch}/Termexo.app.tar.gz`)), sha256(readFileSync(`release-assets/Termexo_${version}_${archiveArch}.app.tar.gz`)));
           }
-          writeFileSync('release-assets/build-info-npm.json', JSON.stringify({ version, commit, platforms: ['win32-x64', 'darwin-arm64', 'darwin-x64'], packageSha256: sha256(readFileSync(archive)) }, null, 2) + '\n');
+          assert.equal(sha256(unpack('vendor/linux-x64/Termexo.tar.gz')), sha256(readFileSync(`release-assets/Termexo_${version}_linux_x64.tar.gz`)));
+          writeFileSync('release-assets/build-info-npm.json', JSON.stringify({ version, commit, platforms: ['win32-x64', 'darwin-arm64', 'darwin-x64', 'linux-x64'], packageSha256: sha256(readFileSync(archive)) }, null, 2) + '\n');
           const files = readdirSync('release-assets').sort();
-          assert.equal(files.length, 11, 'Expected seven packages and four build records');
+          assert.equal(files.length, 14, 'Expected nine packages and five build records');
           writeFileSync('release-assets/SHA256SUMS.txt', files.map(name => `${sha256(readFileSync(`release-assets/${name}`))}  ${name}\n`).join(''));
           NODE
       - name: Prepare draft release

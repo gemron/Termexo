@@ -24,7 +24,8 @@ import { hasBackend, runtimeMode } from './tauri-runtime';
 import { WorkspaceRepository } from './workspace.repository';
 import { WorkspaceOrganizationService } from './workspace-organization.service';
 
-const DEFAULT_SHELL = 'powershell.exe';
+// The host resolves its own default, including when this page is a remote browser.
+const DEFAULT_SHELL = '';
 const SELECTED_TERMINALS_STORAGE_KEY = 'termexo.selectedTerminals.v1';
 
 /**

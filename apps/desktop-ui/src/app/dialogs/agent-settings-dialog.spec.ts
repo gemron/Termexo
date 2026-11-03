@@ -56,6 +56,20 @@ describe('AgentSettingsDialogComponent', () => {
     root = fixture.nativeElement as HTMLElement;
   });
 
+  it('does not infer the host credential store from a browser user agent', async () => {
+    const userAgent = vi
+      .spyOn(navigator, 'userAgent', 'get')
+      .mockReturnValue('Mozilla/5.0 (X11; Linux x86_64)');
+    try {
+      fixture.detectChanges();
+      await fixture.whenStable();
+      expect(component['credentialStorage']()).toBe('宿主操作系统凭据存储');
+      expect(root.textContent).not.toContain('Secret Service (GNOME Keyring / KWallet)');
+    } finally {
+      userAgent.mockRestore();
+    }
+  });
+
   it('offers newly discovered models when adding a profile and saves the selected id', async () => {
     const catalog = TestBed.inject(ModelCatalogService);
     catalog['items'].set([
