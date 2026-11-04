@@ -8,7 +8,6 @@ on:
       - ".github/workflows/linux-build.yml"
       - "apps/desktop-ui/**"
       - "crates/**"
-      - "packages/one-ring/**"
       - "packages/termexo/**"
       - "scripts/**"
       - "src-tauri/**"
@@ -53,11 +52,11 @@ jobs:
             libayatana-appindicator3-dev librsvg2-dev libxdo-dev libssl-dev libdbus-1-dev \
             gnome-keyring fontconfig fonts-dejavu-core xdg-utils webkit2gtk-driver xvfb
       - run: npm --prefix apps/desktop-ui ci
-      - run: npm run one-ring:stage
       - run: npm test
-      - run: npm run one-ring:test
       - run: npm run npm:test
-      - run: node --test scripts/one-ring-bridge.test.mjs scripts/linux-real-agent-smoke.test.mjs scripts/bash-command-quoting.test.mjs scripts/browser-executable.test.mjs
+      - run: node --test scripts/linux-real-agent-smoke.test.mjs scripts/bash-command-quoting.test.mjs scripts/browser-executable.test.mjs
+      - name: Clean cached desktop bundles
+        run: node scripts/clean-desktop-bundles.mjs
       - name: Run native tests
         run: cargo test --manifest-path src-tauri/Cargo.toml --lib --locked
       - name: Test the Secret Service credential backend

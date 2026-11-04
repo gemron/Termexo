@@ -60,11 +60,7 @@ export function launchExecutable(
   spawnProcess = spawn,
   platform = process.platform,
   nodeExecutable = process.execPath,
-  nodeVersion = process.versions.node,
 ) {
-  if (platform === 'win32' && Number(nodeVersion.split('.')[0]) < 24) {
-    throw new Error('The Windows npm application requires Node.js 24 or later. Upgrade Node.js or use the EXE/MSI installer.');
-  }
   const macApplication = platform === 'darwin' && executable.endsWith('.app');
   const child = spawnProcess(
     macApplication ? '/usr/bin/open' : executable,
@@ -73,7 +69,7 @@ export function launchExecutable(
       detached: true,
       stdio: 'ignore',
       windowsHide: false,
-      ...(platform === 'win32' ? { env: { ...process.env, TERMEXO_NPM_NODE: nodeExecutable } } : {}),
+      ...(platform === 'win32' ? { env: { ...process.env, TERMEXO_NODE_PATH: nodeExecutable } } : {}),
     },
   );
   child.unref();

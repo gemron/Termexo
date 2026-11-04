@@ -63,17 +63,11 @@ jobs:
       - name: Install frontend dependencies
         run: npm --prefix apps/desktop-ui ci
 
-      - name: Prepare built-in One Ring resources
-        run: npm run one-ring:stage
-
-      - name: Test built-in One Ring engine
-        run: npm run one-ring:test
-
-      - name: Test One Ring desktop bridge
-        run: node --test scripts/one-ring-bridge.test.mjs
-
       - name: Run native Rust tests
         run: cargo test --manifest-path src-tauri/Cargo.toml --lib --locked --target "$TARGET" -- --quiet
+
+      - name: Clean cached desktop bundles
+        run: node scripts/clean-desktop-bundles.mjs
 
       - name: Build app and DMG
         run: npm run tauri:build:mac -- --target "$TARGET" --bundles app,dmg
@@ -87,6 +81,8 @@ jobs:
           output="artifacts/$TARGET"
           version=$(node -p "require('./package.json').version")
           mkdir -p "$output"
+
+          test ! -e "$app/Contents/Resources/one-ring"
 
           lipo "$app/Contents/MacOS/termexo" -verify_arch "$ARCH"
           codesign --verify --deep --strict --verbose=2 "$app"

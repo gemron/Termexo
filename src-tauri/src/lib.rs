@@ -11,7 +11,6 @@ mod hooks;
 mod mcp;
 mod network;
 mod notification;
-mod one_ring;
 mod platform;
 mod process;
 mod pty;
@@ -141,22 +140,9 @@ pub fn run() {
             }
 
             let database = WorkspaceDatabase::open(app_data_dir.join("agentdock.db"))?;
-            if let Ok(node) = one_ring::node_runtime_path(&app.path().resource_dir()?) {
-                process::configure_bundled_node(&node);
+            if let Some(node) = std::env::var_os("TERMEXO_NODE_PATH") {
+                process::configure_node_runtime(std::path::Path::new(&node));
             }
-            if let Err(error) =
-                one_ring::initialize_bundled(&database, &app.path().resource_dir()?, &app_data_dir)
-            {
-                tracing::warn!(%error, "内置 One Ring 初始化失败");
-            }
-            database.write_app_setting(
-                "one_ring.desktop_bridge.v1",
-                &serde_json::json!({
-                    "executable": std::env::current_exe()?.to_string_lossy(),
-                    "database": app_data_dir.join("agentdock.db").to_string_lossy(),
-                })
-                .to_string(),
-            )?;
             let hooks = HookEventStore::new(&app_data_dir)?;
             app.manage(database);
             app.manage(CredentialStore);
@@ -212,14 +198,7 @@ pub fn run() {
             commands::agent::inspect_claude_background_session,
             commands::agent::stop_claude_background_session,
             commands::agent::prepare_codex_launch,
-            commands::agent::prepare_interactive_worker_launch,
-            commands::agent::get_worker_transcript_path,
-            commands::agent::get_opencode_worker_evidence,
-            commands::agent::list_opencode_worker_models,
             commands::agent::list_codex_models,
-            commands::one_ring::get_one_ring_connection,
-            commands::one_ring::inspect_one_ring,
-            commands::one_ring::find_one_ring_coordinator,
             commands::agent::prepare_opencode_launch,
             commands::agent::prepare_grok_launch,
             commands::agent::prepare_pi_launch,

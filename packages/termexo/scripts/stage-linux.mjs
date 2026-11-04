@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
-import { copyFileSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { copyFileSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -26,11 +26,12 @@ assert.equal(field('Architecture'), 'amd64', 'Debian package architecture mismat
 const temporary = mkdtempSync(join(tmpdir(), 'termexo-linux-stage-'));
 try {
   execFileSync('dpkg-deb', ['-x', deb, temporary]);
+  assert(!existsSync(join(temporary, 'usr/lib/Termexo/one-ring')), 'Removed runtime remains in Debian staging');
   assert(
     linuxPayloadComplete(temporary),
     'The Debian package is missing the complete executable/runtime payload',
   );
-  for (const name of ['usr/bin/termexo', 'usr/lib/Termexo/one-ring/runtime/node']) {
+  for (const name of ['usr/bin/termexo']) {
     const header = readFileSync(join(temporary, name)).subarray(0, 20);
     assert.equal(header.subarray(0, 4).toString(), '\x7fELF', `${name}: invalid ELF`);
     assert.equal(header[4], 2, `${name}: expected ELF64`);
@@ -66,7 +67,7 @@ try {
   const vendor = fileURLToPath(new URL('../vendor/linux-x64/Termexo.tar.gz', import.meta.url));
   mkdirSync(dirname(vendor), { recursive: true });
   copyFileSync(join(output, archiveName), vendor);
-  console.log(`Staged Linux x64 application, resources and One Ring runtime: ${output}`);
+  console.log(`Staged Linux x64 application and resources: ${output}`);
 } finally {
   rmSync(temporary, { recursive: true, force: true });
 }

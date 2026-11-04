@@ -18,7 +18,7 @@ npm 使用 OIDC 和来源证明，不需要保存长期 npm 令牌。
 发布后会等待 npm 完成处理，并校验公开版本的包完整性，再公开 GitHub Release。
 
 新的联合发布包含 Windows、Mac 和 Linux x64，可使用 `npx termexo` 或 `npm install --global termexo`；已发布的旧版本不会自动新增 Linux 载荷。
-npm 启动器要求 Node.js 24 或更高版本。Windows npm 分发复用启动器所用的 Node 可执行文件，避免重复打包运行时；EXE/MSI 仍内置运行时。发布前将 npm 归档限制在 180 MB 内，为上传请求中的编码开销留出空间。
+The npm launcher requires Node.js 18.18 or later. Desktop packages carry no bundled Node.js runtime. The combined npm archive is limited to 180 MB before publication.
 Mac 首次启动时按 Node.js 架构选择应用，将其解压到
 `~/Library/Caches/Termexo/npm/` 后通过系统 `open` 命令启动。
 解压保留权限、符号链接、应用资源和签名，无需运行时下载。
@@ -54,8 +54,8 @@ GitHub 仓库的 `npm` environment 应只允许 `v*` 标签部署。
 3. 提交并推送源码，再创建并推送同版本标签，例如：
 
 ```bash
-git tag -a v0.12.0 -m "Termexo v0.12.0"
-git push origin v0.12.0
+git tag -a v0.12.1 -m "Termexo v0.12.1"
+git push origin v0.12.1
 ```
 
 失败后可重跑失败任务。已发布的 npm 版本无法覆盖；重试只接受校验值完全相同的包。

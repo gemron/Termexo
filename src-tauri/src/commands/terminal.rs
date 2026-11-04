@@ -87,6 +87,50 @@ pub fn create_terminal(
     }
 
     validate_terminal_environment(&request.environment)?;
+    // Rebuild only launches recorded by the removed built-in workflow engine. Existing PTYs
+    // were attached above; ordinary user commands and saved workflow files are left alone.
+    if !request.account_login && legacy_workflow_launch(&database, &request.terminal_id)? {
+        use crate::commands::agent::{
+            prepare_codex_launch, prepare_opencode_launch, PrepareCodexLaunchRequest,
+            PrepareOpenCodeLaunchRequest,
+        };
+        let launch = match request.agent_type.as_deref() {
+            Some("codex") => Some(prepare_codex_launch(
+                PrepareCodexLaunchRequest {
+                    terminal_id: request.terminal_id.clone(),
+                    workspace_id: request.workspace_id.clone(),
+                    session_id: request.native_session_id.clone(),
+                    profile_id: request.profile_id.clone(),
+                    account_profile_id: request.account_profile_id.clone(),
+                    model: None,
+                    auto_confirm: false,
+                    reasoning_effort: None,
+                },
+                app.state(),
+                app.state(),
+                app.state(),
+                app.state(),
+            )?),
+            Some("opencode") => Some(prepare_opencode_launch(
+                PrepareOpenCodeLaunchRequest {
+                    terminal_id: request.terminal_id.clone(),
+                    workspace_id: request.workspace_id.clone(),
+                    session_id: request.native_session_id.clone(),
+                    model: None,
+                    auto_confirm: false,
+                    continue_last: false,
+                },
+                app.state(),
+                app.state(),
+                app.state(),
+                app.state(),
+            )?),
+            _ => None,
+        };
+        if let Some(launch) = launch {
+            request.command = Some(launch.command);
+        }
+    }
 
     let mut environment = launch_environment
         .take(&request.terminal_id)
@@ -124,7 +168,7 @@ pub fn create_terminal(
             tracing::warn!(terminal_id = %request.terminal_id, "无法应用默认网络配置：{error}");
         }
     }
-    crate::process::apply_bundled_runtime(&mut environment);
+    crate::process::apply_node_runtime(&mut environment);
     if request.agent_type.as_deref() == Some("opencode") {
         OpenCodeAdapter::new()
             .ensure_private_server(&mut request.command)
@@ -161,6 +205,19 @@ pub fn create_terminal(
         cols,
         rows,
     })
+}
+
+fn legacy_workflow_launch(database: &WorkspaceDatabase, terminal_id: &str) -> Result<bool, String> {
+    for prefix in ["one_ring.coordinator.v1.", "one_ring.worker.v1."] {
+        if database
+            .read_app_setting(&format!("{prefix}{terminal_id}"))
+            .map_err(|error| error.to_string())?
+            .is_some()
+        {
+            return Ok(true);
+        }
+    }
+    Ok(false)
 }
 
 const MAX_TERMINAL_ENVIRONMENT_VARIABLES: usize = 100;
@@ -317,6 +374,25 @@ pub fn close_terminal(
 #[cfg(test)]
 mod environment_tests {
     use super::*;
+
+    #[test]
+    fn legacy_workflow_migration_requires_a_record_for_the_exact_terminal() {
+        let database = WorkspaceDatabase::open(std::path::PathBuf::from(":memory:")).unwrap();
+        database
+            .write_app_setting("one_ring.worker.v1.worker-1", "implementer")
+            .unwrap();
+        database
+            .write_app_setting("one_ring.coordinator.v1.coordinator-1", "{}")
+            .unwrap();
+        assert!(legacy_workflow_launch(&database, "worker-1").unwrap());
+        assert!(legacy_workflow_launch(&database, "coordinator-1").unwrap());
+        assert!(!legacy_workflow_launch(&database, "worker").unwrap());
+        assert!(!legacy_workflow_launch(&database, "custom-one-ring-command").unwrap());
+        assert!(database
+            .read_app_setting("one_ring.worker.v1.worker-1")
+            .unwrap()
+            .is_some());
+    }
 
     #[test]
     fn overrides_are_literal_scoped_and_can_set_empty_values() {

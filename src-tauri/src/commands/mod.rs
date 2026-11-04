@@ -9,7 +9,6 @@ pub mod mcp;
 pub mod model_catalog;
 pub mod network_export;
 pub mod notification;
-pub mod one_ring;
 pub mod open;
 pub mod preview;
 pub mod quota;

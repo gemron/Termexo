@@ -8,9 +8,7 @@ run in a local workbench you can view and take over.
 
 ## Install
 
-The npm launcher requires Node.js 24 or later. On Windows it reuses that exact
-Node executable for the built-in One Ring engine, keeping the combined package
-within npm's upload size limit. EXE/MSI installers still include their own runtime.
+The npm launcher requires Node.js 18.18 or later.
 
 Supports Windows x64, macOS 12 or later on Apple Silicon and Intel, and Linux x64
 with glibc, GTK 3 and WebKitGTK 4.1. Linux needs a graphical desktop session.
@@ -58,7 +56,7 @@ Privacy & Security.
 
 On Linux, the complete `usr/bin` + `usr/lib/Termexo` application is extracted into
 `${XDG_CACHE_HOME:-~/.cache}/Termexo/npm/`, preserving executable permissions and
-the bundled One Ring runtime. Cache entries include the version, architecture and
+application resources. Cache entries include the version, architecture and
 archive hash. Missing shared libraries, unsupported architectures and headless
 launches produce a diagnostic. Application data remains in its separate XDG data
 directory. `--help` and `--version` work without a display.
@@ -69,7 +67,7 @@ contain it. To build a Linux-only npm archive locally after building the `.deb`:
 ```sh
 npm run npm:stage:linux
 npm run npm:pack:linux
-npm install --global ./validation-results/linux-npm/termexo-0.11.0.tgz
+npm install --global ./validation-results/linux-npm/termexo-0.12.1.tgz
 ```
 
 Run these build commands from the repository root. The local Linux-only package has

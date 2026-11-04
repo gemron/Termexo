@@ -175,15 +175,12 @@ import { TerminalWorkbenchComponent } from './terminal/terminal-workbench';
 import { TerminalCloseConfirmComponent } from './terminal/terminal-close-confirm';
 import type { CloseConfirmAnchor } from './terminal/terminal-close-request';
 import { TodoBoardComponent } from './todo/todo-board';
-import { OneRingPanelComponent } from './one-ring/one-ring-panel';
-import { sameOneRingRoot, type OneRingCoordinatorRequest } from './core/models/one-ring.models';
-import { OneRingService } from './core/services/one-ring.service';
 import { CLI_NATIVE_PROFILE_ID, explicitCliModel } from './core/models/launch-model-choice';
 import { WorkspaceSidebarComponent } from './workspace/workspace-sidebar';
 import { GitWorkbenchComponent } from './git/git-workbench';
 
 type SidebarResizeTarget = 'workspace' | 'inspector' | 'preview';
-type WorkspaceView = 'terminal' | 'tasks' | 'git' | 'preview' | 'one-ring';
+type WorkspaceView = 'terminal' | 'tasks' | 'git' | 'preview';
 
 /** How a resume should proceed once the CLI's hold on the session has been dealt with. */
 interface BackgroundReclaim {
@@ -310,7 +307,6 @@ function readStoredString(key: string, fallback: string): string {
     TerminalWorkbenchComponent,
     TerminalCloseConfirmComponent,
     TodoBoardComponent,
-    OneRingPanelComponent,
     TranslatePipe,
     WebviewUpgradeDialogComponent,
     WorkspaceSidebarComponent,
@@ -392,7 +388,6 @@ export class App {
   protected readonly createWorkspaceError = signal<string | null>(null);
   private readonly pendingOnboardingAgent = signal<AgentType | null>(null);
   protected readonly workspaceView = signal<WorkspaceView>('terminal');
-  protected readonly pendingOneRing = signal<OneRingCoordinatorRequest | null>(null);
   protected readonly busyTodoTaskId = signal<string | null>(null);
   protected readonly editingWorkspaceId = signal<string | null>(null);
   protected readonly claudeLaunchOpen = signal(false);
@@ -1049,7 +1044,6 @@ export class App {
   }
 
   protected async openCodexLaunch(): Promise<void> {
-    this.pendingOneRing.set(null);
     this.agentMenuOpen.set(false);
     const workingDirectory = this.state.activeWorkspace()?.projectPath;
     if (!workingDirectory) {
@@ -1311,15 +1305,11 @@ export class App {
 
   protected async launchCodex(value: CodexLaunchDialogValue): Promise<void> {
     const workspace = this.state.activeWorkspace();
-    const oneRing = this.pendingOneRing();
-    const workingDirectory = oneRing?.root ?? this.selectedTerminalDirectory();
+    const workingDirectory = this.selectedTerminalDirectory();
     if (!workspace || !workingDirectory || this.launchingCodex()) {
       return;
     }
-    if (oneRing && !sameOneRingRoot(oneRing.root, workspace.projectPath)) {
-      this.showToast('当前项目已切换，请关闭对话框后重新发起 One Ring 任务。', 'attention');
-      return;
-    }
+
 
     if (!this.agents.codexInstallation()) {
       await this.agents.detectCodex();
@@ -1337,19 +1327,18 @@ export class App {
         ? this.agents.modelProfiles().find((item) => item.id === value.profileId)
         : undefined;
       const launch = await this.agents.prepareCodexLaunch({
-        oneRing: oneRing ?? undefined,
         terminalId,
         workspaceId: workspace.id,
         model: value.model,
         profileId: value.profileId,
         accountProfileId: value.accountProfileId,
-        autoConfirm: oneRing ? false : value.autoConfirm,
+        autoConfirm: value.autoConfirm,
         reasoningEffort: value.reasoningEffort,
       });
       const terminal = this.state.createTerminal({
         id: terminalId,
         agentType: 'codex',
-        name: oneRing ? `One Ring · ${value.name || 'Coordinator'}` : value.name || undefined,
+        name: value.name || undefined,
         command: launch.command,
         model:
           value.model ||
@@ -1358,10 +1347,9 @@ export class App {
         workingDirectory,
         profileId: value.profileId,
         accountProfileId: value.accountProfileId,
-        autoConfirm: oneRing ? false : value.autoConfirm,
+        autoConfirm: value.autoConfirm,
       });
       this.codexLaunchOpen.set(false);
-      this.pendingOneRing.set(null);
       this.selectedTerminalDirectory.set(null);
       if (terminal) {
         this.armStartupDialogs(terminal.id);
@@ -1376,39 +1364,11 @@ export class App {
   }
 
   protected closeCodexLaunch(): void {
-    this.pendingOneRing.set(null);
     this.codexLaunchOpen.set(false);
     this.selectedTerminalDirectory.set(null);
     if (this.pendingCommonActionLaunch) {
       this.pendingCommonActionLaunch = null;
       this.commonActionsOpen.set(true);
-    }
-  }
-
-  private readonly oneRingService = inject(OneRingService);
-  private openingOneRingCoordinator = false;
-  protected async openOneRingCoordinator(request: OneRingCoordinatorRequest): Promise<void> {
-    if (this.launchingCodex() || this.codexLaunchOpen() || this.openingOneRingCoordinator) return;
-    this.openingOneRingCoordinator = true;
-    try {
-      const workspace = this.state.activeWorkspace();
-      if (!workspace || !sameOneRingRoot(workspace.projectPath, request.root)) return;
-      if (request.workflowId) {
-        const id = await this.oneRingService.findCoordinator(request, workspace.terminals.map(t => t.id));
-        if (this.state.activeWorkspace()?.id !== workspace.id) return;
-        if (id && this.state.activeWorkspace()?.terminals.some(t => t.id === id && t.agentType === 'codex')) {
-          this.revealCreatedTerminal(id);
-          return;
-        }
-      }
-      await this.openCodexLaunch();
-      if (this.codexLaunchOpen()) {
-        this.pendingOneRing.set(request);
-      }
-    } catch (error) {
-      this.showToast(this.errorMessage(error), 'error');
-    } finally {
-      this.openingOneRingCoordinator = false;
     }
   }
 
@@ -1694,10 +1654,6 @@ export class App {
    * board or the Git view, where no terminal is drawn at all — the new one opened behind whichever
    * view was in front, and nothing said so.
    */
-  protected openOneRingWorkerTerminal(terminalId: string): void {
-    this.revealCreatedTerminal(terminalId);
-  }
-
   private revealCreatedTerminal(terminalId: string): void {
     this.workspaceView.set('terminal');
     this.selectTerminal(terminalId);

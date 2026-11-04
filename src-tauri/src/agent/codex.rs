@@ -784,7 +784,7 @@ mod tests {
 
         let fresh = adapter
             .build_launch_command(&CodexLaunchOptions {
-                initial_prompt: Some("Use One Ring; read C:\\task's notes.md; keep $() literal".into()),
+                initial_prompt: Some("Read project instructions; open C:\\task's notes.md; keep $() literal".into()),
                 session_id: None,
                 model: Some("gpt-5.6-sol".into()),
                 notify_config: Some(
@@ -815,9 +815,11 @@ mod tests {
         assert!(fresh.command.contains("https://api.deepseek.com/v1"));
         assert!(!fresh.command.contains(" resume "));
         #[cfg(windows)]
-        let prompt_suffix = " -- 'Use One Ring; read C:\\task''s notes.md; keep $() literal'";
+        let prompt_suffix =
+            " -- 'Read project instructions; open C:\\task''s notes.md; keep $() literal'";
         #[cfg(unix)]
-        let prompt_suffix = " -- 'Use One Ring; read C:\\task'\\''s notes.md; keep $() literal'";
+        let prompt_suffix =
+            " -- 'Read project instructions; open C:\\task'\\''s notes.md; keep $() literal'";
         assert!(fresh.command.ends_with(prompt_suffix));
 
         let resumed = adapter

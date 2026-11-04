@@ -2,6 +2,14 @@
 
 Release notes for every Termexo version, newest first. The current release is summarised in [README.md](README.md).
 
+## V0.12.1
+
+- Remove the built-in One Ring panel, workflow engine, internal Worker bridge and related agent launch integration.
+- Remove its bundled Node.js runtime, engine, plugins and resources from Windows, macOS, Linux and npm packages.
+- Restore the npm launcher's Node.js minimum to 18.18. Cargo no longer requires generated workflow resources on a fresh checkout.
+- Reopen previously managed workflow terminals as ordinary agent sessions while preserving saved workflow data.
+- Preserve Linux support, public MCP tools, remote read-only links, common command environments, account authorization and mobile input fixes.
+
 ## V0.12.0
 
 - **Linux desktop and npm distribution.** Ship a Debian package and complete application archive, with native desktop, PTY and npm installation checks, alongside Windows and both macOS architectures. Thanks to [wuyh410](https://github.com/wuyh410) for [#45](https://github.com/gemron/Termexo/pull/45).

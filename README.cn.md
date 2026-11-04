@@ -11,7 +11,7 @@
 </p>
 
 <p align="center">
-  <img alt="Version 0.12.0" src="https://img.shields.io/badge/version-0.12.0-58c7a0">
+  <img alt="Version 0.12.1" src="https://img.shields.io/badge/version-0.12.1-58c7a0">
   <img alt="Windows" src="https://img.shields.io/badge/platform-Windows-0078D4?logo=windows">
   <img alt="macOS" src="https://img.shields.io/badge/platform-macOS-222222?logo=apple">
   <img alt="Tauri 2" src="https://img.shields.io/badge/Tauri-2-24C8DB?logo=tauri&logoColor=white">
@@ -73,7 +73,7 @@
 
 ## 在 Windows 或 macOS 上开始使用
 
-1. **[下载 v0.12.0](https://github.com/gemron/Termexo/releases/tag/v0.12.0)**：Windows 选择 EXE/MSI；Mac 按芯片选择 Apple Silicon（`aarch64`）或 Intel（`x64`）的 DMG；Linux x64 可选择 Debian 安装包，无需 Rust 或编译工具。
+1. **[下载 v0.12.1](https://github.com/gemron/Termexo/releases/tag/v0.12.1)**：Windows 选择 EXE/MSI；Mac 按芯片选择 Apple Silicon（`aarch64`）或 Intel（`x64`）的 DMG；Linux x64 可选择 Debian 安装包，无需 Rust 或编译工具。
 2. 打开 Termexo，为本机项目目录创建工作区。
 3. 在工作区中新建终端，选择已安装的 Agent；若尚未安装，可在设置中查看检测结果并安装 CLI。
 4. 运行一个任务，查看终端标签和右侧面板的状态；手机访问可在本地流程跑通后按需启用。
@@ -136,7 +136,7 @@ MCP 是 AI 与 Termexo 之间的连接。**你用日常语言提出要求，不�
 
 ## 最新版本
 
-**[v0.12.0](https://github.com/gemron/Termexo/releases/tag/v0.12.0)** 加入 Linux 桌面与 npm 支持、内置 One Ring 工作流、独立远程只读链接，以及带工作目录和环境变量的常用操作，并完善多账号授权、手机终端输入与内容预览。Windows、macOS 和 Linux 安装包与通用 npm 包统一由 [GitHub Actions 自动编译发布](docs/releases.md)。
+**[v0.12.1](https://github.com/gemron/Termexo/releases/tag/v0.12.1)** 移除内置 One Ring 及其 Node.js 运行时，减小安装包体积。保留 Linux、远程只读、常用命令环境和多账号等功能。
 [完整更新记录](CHANGELOG.cn.md)。
 
 如果 Termexo 帮到了你，欢迎 **给仓库点一个 Star**，帮助更多开发者发现它。
@@ -147,7 +147,6 @@ MCP 是 AI 与 Termexo 之间的连接。**你用日常语言提出要求，不�
 <details>
 <summary><strong>更多功能与截图</strong></summary>
 
-One Ring 已内置于 Termexo：无需安装独立插件、配置 Node 或填写目录。使用方式见 [One Ring 内置编排](docs/one-ring.md)。
 
 ## 现在已经能做什么
 
@@ -453,7 +452,7 @@ flowchart LR
 | V0.10.14 | 简化安装与更新、Pi Agent、官方 Antigravity 升级、持续闪动提醒 | 已发布 |
 | V0.10.15 | 工作区整理、登录方式、模型目录、活动终端关闭确认 | 已发布 |
 | V0.11.0 | 内容预览标签、常用操作、第三方通知、macOS 构建和自动发布 | 已发布 |
-| V0.12.0 | Linux、One Ring 工作流、远程只读、命令环境、多账号与手机输入优化 | 当前版本 |
+| V0.12.1 | 移除内置工作流引擎与运行时，减小包体积 | 当前版本 |
 | V1.0 | 稳定性、安全加固与恢复体验 | 规划中 |
 
 进行中的工作见 [Issues](https://github.com/gemron/Termexo/issues)，实际交付内容见
@@ -476,7 +475,6 @@ Termexo/
 npm run build
 npm test
 npm --prefix apps/desktop-ui ci
-npm run one-ring:stage  # 首次直接运行 Cargo 前准备 Tauri 必需的 vendor/one-ring 资源
 cargo test --manifest-path src-tauri/Cargo.toml
 npm --prefix apps/desktop-ui run e2e:smoke
 npm run tauri:build

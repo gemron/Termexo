@@ -125,17 +125,7 @@
             <b>{{ activeTodoCount() }}</b>
           }
         </button>
-        <button
-          type="button"
-          role="tab"
-          class="tool-button"
-          data-testid="one-ring-toggle"
-          [class.active]="workspaceView() === 'one-ring'"
-          [attr.aria-selected]="workspaceView() === 'one-ring'"
-          (click)="workspaceView.set('one-ring')"
-        >
-          <span>One Ring</span>
-        </button>
+
         <button
           type="button"
           role="tab"
@@ -623,17 +613,6 @@
 
     <section class="workbench-area" [class.board-active]="workspaceView() !== 'terminal'">
       @if (state.activeWorkspace(); as activeWorkspace) {
-        @defer (when workspaceView() === 'one-ring') {
-          @if (workspaceView() === 'one-ring') {
-            <app-one-ring-panel
-              [root]="activeWorkspace.projectPath"
-              [terminals]="activeWorkspace.terminals"
-              (coordinatorRequested)="openOneRingCoordinator($event)"
-              (terminalRequested)="workspaceView.set('terminal')"
-              (workerTerminalRequested)="openOneRingWorkerTerminal($event)"
-            />
-          }
-        }
         @defer (when preview.open()) {
           @for (tab of preview.liveTabs(); track tab.id) {
             <div
@@ -898,7 +877,6 @@
 
 @if (codexLaunchOpen()) {
   <app-codex-launch-dialog
-    [oneRing]="pendingOneRing() !== null"
     [installation]="agents.codexInstallation()"
     [profiles]="agents.modelProfiles()"
     [accountProfiles]="agents.accountProfiles()"

@@ -21,10 +21,7 @@ npm --prefix apps/desktop-ui ci
 npm run tauri:dev
 ```
 
-On a fresh checkout, run `npm --prefix apps/desktop-ui ci` followed by
-`npm run one-ring:stage` before invoking Cargo directly (including `cargo test`),
-because Tauri requires the generated `src-tauri/vendor/one-ring/` resources;
-the npm Tauri commands stage them automatically.
+Cargo can run directly on a fresh checkout; no generated workflow runtime is required.
 
 Run in a graphical desktop session. Saving API keys requires an unlocked Secret Service
 provider on the session D-Bus, such as GNOME Keyring or a KWallet installation exposing
@@ -45,8 +42,7 @@ npm run tauri:build                 # Release .deb in src-tauri/target/release/b
 npm run tauri:build -- --debug      # Faster debug .deb in src-tauri/target/debug/bundle/deb/
 ```
 
-Linux packaging excludes Windows ConPTY resources and bundles the Linux Node runtime
-and One Ring engine. The `.deb` declares GTK/WebKitGTK, font and desktop utility
+Linux packaging excludes Windows ConPTY resources. The `.deb` declares GTK/WebKitGTK, font and desktop utility
 dependencies. Windows-only features such as WeChat window automation remain unavailable.
 
 ### Linux npm distribution
@@ -57,12 +53,12 @@ After building the `.deb`, prepare a Linux-only npm archive and test a real inst
 npm run npm:stage:linux
 npm run npm:pack:linux
 npm run test:npm:linux
-npm install --global ./validation-results/linux-npm/termexo-0.11.0.tgz
+npm install --global ./validation-results/linux-npm/termexo-0.12.1.tgz
 termexo
 ```
 
 The stage command validates the `.deb` version/architecture, executable permissions,
-complete One Ring resources, and the x86_64 ELF headers of both binaries. It produces
+and the x86_64 ELF header of the native binary. It produces
 the Linux app archive, `.deb`, build record and SHA256 checksums. The npm launcher
 extracts the entire `usr/` tree to `$XDG_CACHE_HOME/Termexo/npm/` (or `~/.cache`),
 preserving executable modes and Tauri's resource layout; no root access or runtime
@@ -121,7 +117,7 @@ and `TAURI_DRIVER` override their executable paths.
 
 The smoke test creates a separate temporary home and XDG data directories, starts
 the native desktop, and checks WebKit compatibility, Unix PTY reporting, system
-fonts, bundled One Ring, seeded accounts, a saved Windows shell with `$SHELL` unset,
+fonts, seeded accounts, a saved Windows shell with `$SHELL` unset,
 a project path containing spaces and Chinese characters, rendered terminals, real
 PTY input/output and resize, SQLite workspace restore, PTY reattachment, and closure.
 It writes a screenshot, terminal output, driver log, and JSON report to
@@ -189,7 +185,7 @@ Codex checks separately; the two modes cannot be combined.
 Local audit validation on 2026-11-02 used Ubuntu 26.04, Bash 5.3.9, Node 24.21.0,
 and Codex CLI 0.166.0. Rust passed 465 tests (5 ignored), the frontend passed 819
 tests across 99 files, command/bridge Node checks passed 10 tests, the npm launcher
-passed 16 tests, and One Ring passed 51 tests (8 skipped). Frontend production and
+passed 16 tests. Frontend production and
 Linux `.deb` builds also passed. Both native suites ran the extracted `.deb` executable
 and passed all 14 desktop checks; the Bash suite additionally passed all 8 argv cases,
 and the authenticated Codex suite verified the exact final reply after Bash tool execution.
@@ -238,8 +234,6 @@ The following remain explicitly platform-specific:
 
 ```sh
 npm test
-npm run one-ring:test
-node --test scripts/one-ring-bridge.test.mjs
 cargo test --manifest-path src-tauri/Cargo.toml --lib --locked
 # Uses the session's actual keyring; the temporary probe entry is deleted afterwards.
 cargo test --manifest-path src-tauri/Cargo.toml --lib --locked \

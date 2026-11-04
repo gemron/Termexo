@@ -110,7 +110,7 @@ jobs:
           import { createHash } from 'node:crypto';
           import { copyFileSync, mkdirSync, readFileSync } from 'node:fs';
           import { dirname } from 'node:path';
-          import { validateWindowsPayloadInventory, WINDOWS_NPM_PAYLOAD_FILES } from './packages/termexo/lib/windows-payload.js';
+          import { validateWindowsPayloadInventory, WINDOWS_PAYLOAD_FILES } from './packages/termexo/lib/windows-payload.js';
           const { VERSION: version, GITHUB_SHA: commit } = process.env;
           const sha256 = (bytes) => createHash('sha256').update(bytes).digest('hex');
           mkdirSync('release-assets');
@@ -154,7 +154,7 @@ jobs:
           validateWindowsPayloadInventory(info.files);
           for (const { name, sha256: expectedHash } of info.files) {
             assert.equal(sha256(readFileSync(`${npmDir}/${name}`)), expectedHash, `${name}: checksum mismatch`);
-            if (!WINDOWS_NPM_PAYLOAD_FILES.includes(name)) continue;
+            if (!WINDOWS_PAYLOAD_FILES.includes(name)) continue;
             const destination = `packages/termexo/vendor/win32-x64/${name}`;
             mkdirSync(dirname(destination), { recursive: true });
             copyFileSync(`${npmDir}/${name}`, destination);
@@ -178,7 +178,7 @@ jobs:
           import { createHash } from 'node:crypto';
           import { execFileSync } from 'node:child_process';
           import { readFileSync, readdirSync, writeFileSync } from 'node:fs';
-          import { validateWindowsPayloadInventory, WINDOWS_NPM_PAYLOAD_FILES } from './packages/termexo/lib/windows-payload.js';
+          import { validateWindowsPayloadInventory, WINDOWS_PAYLOAD_FILES } from './packages/termexo/lib/windows-payload.js';
           const { VERSION: version, GITHUB_SHA: commit } = process.env;
           const archive = `release-assets/termexo-${version}.tgz`;
           assert.ok(readFileSync(archive).length <= 180_000_000, 'npm archive exceeds the 180 MB upload budget; reduce duplicate payloads before publishing');
@@ -188,13 +188,13 @@ jobs:
           assert.equal(pkg.name, 'termexo');
           assert.equal(pkg.version, version);
           assert.deepEqual(pkg.os, ['win32', 'darwin', 'linux']);
-          assert.equal(pkg.engines.node, '>=24.0.0');
+          assert.equal(pkg.engines.node, '>=18.18.0');
           const packedPaths = execFileSync('tar', ['-tzf', archive], { encoding: 'utf8' }).trim().split(/\r?\n/);
-          assert.ok(!packedPaths.includes('package/vendor/win32-x64/one-ring/runtime/node.exe'), 'npm must reuse its host Node runtime on Windows');
+          assert.ok(!packedPaths.some((name) => /one-ring|node\.exe$/.test(name)), 'Removed runtime must not be published');
           const info = JSON.parse(readFileSync('downloaded/Termexo-npm-windows/build-info.json', 'utf8'));
           assert.equal(sha256(unpack('vendor/win32-x64/termexo.exe')), info.executableSha256, 'npm must contain the executable from this Windows build');
           validateWindowsPayloadInventory(info.files);
-          for (const { name, sha256: expectedHash } of info.files.filter(({ name }) => WINDOWS_NPM_PAYLOAD_FILES.includes(name))) assert.equal(sha256(unpack(`vendor/win32-x64/${name}`)), expectedHash, `${name}: packaged checksum mismatch`);
+          for (const { name, sha256: expectedHash } of info.files.filter(({ name }) => WINDOWS_PAYLOAD_FILES.includes(name))) assert.equal(sha256(unpack(`vendor/win32-x64/${name}`)), expectedHash, `${name}: packaged checksum mismatch`);
           for (const [arch, archiveArch] of [['arm64', 'arm64'], ['x64', 'x86_64']]) {
             assert.equal(sha256(unpack(`vendor/darwin-${arch}/Termexo.app.tar.gz`)), sha256(readFileSync(`release-assets/Termexo_${version}_${archiveArch}.app.tar.gz`)));
           }

@@ -12,8 +12,7 @@ $files = @(
     (Join-Path $releaseRoot "bundle/nsis/Termexo_${version}_x64-setup.exe"),
     (Join-Path $releaseRoot "bundle/msi/Termexo_${version}_x64_en-US.msi"),
     (Join-Path $repositoryRoot 'src-tauri/vendor/conpty/conpty.dll'),
-    (Join-Path $repositoryRoot 'src-tauri/vendor/conpty/OpenConsole.exe'),
-    (Join-Path $repositoryRoot 'src-tauri/vendor/one-ring/runtime/node.exe')
+    (Join-Path $repositoryRoot 'src-tauri/vendor/conpty/OpenConsole.exe')
 )
 $inventory = @($files | ForEach-Object {
     $filePath = $_

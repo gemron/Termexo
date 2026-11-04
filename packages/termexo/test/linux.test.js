@@ -15,7 +15,6 @@ import { dirname, join } from 'node:path';
 import { setTimeout as delay } from 'node:timers/promises';
 import test from 'node:test';
 import {
-  LINUX_RESOURCE_FILES,
   checkLinuxRuntime,
   linuxCacheRoot,
   prepareLinuxApplication,
@@ -30,13 +29,6 @@ function fixture(t) {
   const binary = join(source, 'usr/bin/termexo');
   mkdirSync(dirname(binary), { recursive: true });
   writeFileSync(binary, '#!/bin/sh\nexit 0\n', { mode: 0o755 });
-  for (const file of LINUX_RESOURCE_FILES) {
-    const path = join(source, 'usr/lib/Termexo/one-ring', file);
-    mkdirSync(dirname(path), { recursive: true });
-    writeFileSync(path, file === 'runtime/node' ? '#!/bin/sh\nexit 0\n' : '{}', {
-      mode: file === 'runtime/node' ? 0o755 : 0o644,
-    });
-  }
   const archivePath = join(root, 'Termexo.tar.gz');
   execFileSync('tar', ['-czf', archivePath, '-C', source, 'usr']);
   return { version: '0.11.0', arch: 'x64', archivePath, cacheRoot: join(root, "cache's ! 中文") };
@@ -59,8 +51,8 @@ test(
       binary,
     );
     assert.equal(readdirSync(options.cacheRoot).length, 1);
-    rmSync(join(dirname(binary), '../lib/Termexo/one-ring/runtime/node'));
-    assert.equal(prepareLinuxApplication(options), binary, 'Repair a damaged resource cache');
+    rmSync(binary);
+    assert.equal(prepareLinuxApplication(options), binary, 'Repair a damaged executable cache');
     assert(!readdirSync(options.cacheRoot).some((name) => name.startsWith('.extract-')));
   },
 );

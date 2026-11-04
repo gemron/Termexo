@@ -8,11 +8,6 @@ apps/desktop-ui/coverage/
 src-tauri/target/
 crates/*/target/
 packages/termexo/vendor/
-packages/one-ring/node_modules/
-packages/one-ring/dist/
-packages/one-ring/.one-ring/
-packages/one-ring/plugins/codex/server/
-src-tauri/vendor/one-ring/
 .tooling/
 /validation-results/
 /artifacts/
@@ -34,3 +29,7 @@ src-tauri/vendor/one-ring/
 .vscode/
 .DS_Store
 Thumbs.db
+
+# Obsolete local workflow build caches
+/packages/one-ring/
+/src-tauri/vendor/one-ring/

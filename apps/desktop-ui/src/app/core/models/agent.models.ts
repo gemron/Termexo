@@ -241,7 +241,6 @@ export interface ClaudeBackgroundSession {
 }
 
 export interface CodexLaunchRequest {
-  oneRing?: import('./one-ring.models').OneRingCoordinatorRequest;
   terminalId: string;
   workspaceId?: string;
   sessionId?: string;

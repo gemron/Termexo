@@ -21,12 +21,11 @@ repository root in PowerShell:
 
 The report at `artifacts/windows-security/report.json` includes SHA-256 hashes,
 file sizes, Authenticode status, publishers and timestamps for the local program,
-installers and bundled Windows runtimes. It does not execute those files, upload
+installers and bundled Windows console components. It does not execute those files, upload
 samples or change security settings. Its source commit identifies the current
 checkout; only CI build records establish which commit produced a binary.
 
-For v0.11.0 the local ConPTY DLL and OpenConsole executable carry valid Microsoft
-signatures, and the bundled Node executable carries a valid OpenJS Foundation
-signature. These checks cover those component files; they do not establish why
+The bundled ConPTY DLL and OpenConsole executable carry Microsoft signatures.
+These checks cover those component files; they do not establish why
 Termexo was blocked. A detection without a threat name or affected path remains
 unresolved until the endpoint event or company IT report is available.

@@ -17,17 +17,6 @@ import { fileURLToPath } from 'node:url';
 
 const vendorRoot = fileURLToPath(new URL('../vendor/', import.meta.url));
 export const LINUX_ARCHITECTURES = ['x64'];
-export const LINUX_RESOURCE_FILES = [
-  'plugin.json',
-  'bundle.json',
-  'server/index.mjs',
-  'runtime/node',
-  'runtime/LICENSE.txt',
-  'THIRD_PARTY_NOTICES.txt',
-  'skills/one-ring/SKILL.md',
-  'skills/setup/SKILL.md',
-  'skills/status/SKILL.md',
-];
 
 export function linuxCacheRoot(environment = process.env, home = homedir()) {
   const configured = environment.XDG_CACHE_HOME;
@@ -47,14 +36,9 @@ function executable(file) {
   }
 }
 
-/** Keep the Debian usr/bin + usr/lib layout so Tauri finds the complete bundled runtime. */
+/** Keep the Debian usr/bin + usr/lib layout so Tauri finds the application resources. */
 export function linuxPayloadComplete(root) {
-  const resources = join(root, 'usr/lib/Termexo/one-ring');
-  return (
-    executable(join(root, 'usr/bin/termexo')) &&
-    executable(join(resources, 'runtime/node')) &&
-    LINUX_RESOURCE_FILES.every((name) => existsSync(join(resources, name)))
-  );
+  return executable(join(root, 'usr/bin/termexo'));
 }
 
 export function prepareLinuxApplication({
@@ -81,7 +65,7 @@ export function prepareLinuxApplication({
     extract(archive, temporary);
     if (!linuxPayloadComplete(temporary))
       throw new Error(
-        'The npm archive does not contain a complete executable Linux application and One Ring runtime.',
+        'The npm archive does not contain a complete executable Linux application.',
       );
     // A broken cache can be repaired from the verified archive without touching application data.
     if (existsSync(destination) && !linuxPayloadComplete(destination))

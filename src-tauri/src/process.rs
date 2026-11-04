@@ -12,18 +12,18 @@ use std::sync::OnceLock;
 use std::thread;
 use std::time::{Duration, Instant};
 
-static BUNDLED_NODE_DIRECTORY: OnceLock<PathBuf> = OnceLock::new();
+static NODE_RUNTIME_DIRECTORY: OnceLock<PathBuf> = OnceLock::new();
 
-pub fn configure_bundled_node(executable: &Path) {
+pub fn configure_node_runtime(executable: &Path) {
     if executable.is_file() {
         if let Some(directory) = executable.parent() {
-            let _ = BUNDLED_NODE_DIRECTORY.set(directory.to_path_buf());
+            let _ = NODE_RUNTIME_DIRECTORY.set(directory.to_path_buf());
         }
     }
 }
 
 fn runtime_path(existing: Option<&OsStr>) -> Option<std::ffi::OsString> {
-    let directory = BUNDLED_NODE_DIRECTORY.get()?;
+    let directory = NODE_RUNTIME_DIRECTORY.get()?;
     let mut entries = vec![directory.clone()];
     if let Some(existing) = existing {
         entries.extend(std::env::split_paths(existing).filter(|entry| entry != directory));
@@ -31,7 +31,7 @@ fn runtime_path(existing: Option<&OsStr>) -> Option<std::ffi::OsString> {
     std::env::join_paths(entries).ok()
 }
 
-pub fn apply_bundled_runtime(environment: &mut std::collections::HashMap<String, String>) {
+pub fn apply_node_runtime(environment: &mut std::collections::HashMap<String, String>) {
     let existing = environment
         .iter()
         .find(|(key, _)| key.eq_ignore_ascii_case("PATH"))

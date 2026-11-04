@@ -11,7 +11,7 @@
 </p>
 
 <p align="center">
-  <img alt="Version 0.12.0" src="https://img.shields.io/badge/version-0.12.0-58c7a0">
+  <img alt="Version 0.12.1" src="https://img.shields.io/badge/version-0.12.1-58c7a0">
   <img alt="Windows" src="https://img.shields.io/badge/platform-Windows-0078D4?logo=windows">
   <img alt="macOS" src="https://img.shields.io/badge/platform-macOS-222222?logo=apple">
   <img alt="Tauri 2" src="https://img.shields.io/badge/Tauri-2-24C8DB?logo=tauri&logoColor=white">
@@ -73,7 +73,7 @@ With several AI coding tools running, you spend time sending requests, checking 
 
 ## Get started on Windows or macOS
 
-1. **[Download v0.12.0](https://github.com/gemron/Termexo/releases/tag/v0.12.0)** — choose Windows EXE/MSI, the Mac DMG for Apple Silicon (`aarch64`) or Intel (`x64`), or the Linux x64 Debian package. No Rust or build tools needed.
+1. **[Download v0.12.1](https://github.com/gemron/Termexo/releases/tag/v0.12.1)** — choose Windows EXE/MSI, the Mac DMG for Apple Silicon (`aarch64`) or Intel (`x64`), or the Linux x64 Debian package. No Rust or build tools needed.
 2. Open Termexo and create a workspace for a project folder on your PC.
 3. Start a terminal with an installed agent. If none is installed, check detection and install a CLI from Settings.
 4. Run a task and watch its status in the terminal tab and right panel. Enable phone access later if you need it.
@@ -137,7 +137,7 @@ Keep the token private. Closing Termexo or stopping the PC ends the running proc
 
 ## Latest release
 
-**[v0.12.0](https://github.com/gemron/Termexo/releases/tag/v0.12.0)** adds Linux desktop and npm support, built-in One Ring workflows, independent read-only remote links, and saved actions with working directories and environment variables. Account authorization, mobile terminal input and content previews have also been improved. Windows, macOS and Linux packages are built and published together by [GitHub Actions](docs/releases.md).
+**[v0.12.1](https://github.com/gemron/Termexo/releases/tag/v0.12.1)** removes the built-in One Ring workflow engine and its bundled Node.js runtime, reducing package size. Linux desktop and npm support, read-only remote links, command environments, account authorization and mobile input improvements remain available. Packages are built and published together by [GitHub Actions](docs/releases.md).
 [Full changelog](CHANGELOG.md).
 
 If Termexo helps your workflow, a **Star on this repository** helps other developers discover it.
@@ -148,7 +148,6 @@ Trying it for the first time? [Tell us what worked or where you got stuck](https
 <details>
 <summary><strong>More features and screenshots</strong></summary>
 
-One Ring is built into Termexo, including its engine and runtime. No separate plugin, Node setup, or directory configuration is required. See the [built-in orchestration guide](docs/one-ring.md) (Chinese).
 
 ## What Works Today
 
@@ -472,7 +471,8 @@ identifiers still use a legacy name. This does not affect the Termexo product na
 | V0.10.14 | Easier setup, Pi Agent, official Antigravity updates, persistent reminders | Released |
 | V0.10.15 | Workspace organization, login choices, model discovery, active terminal close confirmation | Released |
 | V0.11.0 | Content preview tabs, saved actions, notifications, macOS builds, automated releases | Released |
-| V0.12.0 | Linux, One Ring workflows, read-only links, command environments, account and mobile input improvements | Current |
+| V0.12.1 | Remove built-in workflow engine and runtime; smaller desktop and npm packages | Current |
+| V0.12.0 | Linux, read-only links, command environments, account and mobile input improvements | Released |
 | V1.0 | Stability, security hardening, and recovery experience | Planned |
 
 See [open issues](https://github.com/gemron/Termexo/issues) for ongoing work and
@@ -491,7 +491,7 @@ Termexo/
 
 ## Development and Verification
 
-On a fresh checkout, run `npm --prefix apps/desktop-ui ci` and `npm run one-ring:stage` before invoking Cargo directly (including `cargo test`); Tauri requires the generated `src-tauri/vendor/one-ring/` resources.
+Cargo can run directly on a fresh checkout. Install frontend dependencies with `npm --prefix apps/desktop-ui ci` before building the desktop UI.
 
 ```sh
 npm run build

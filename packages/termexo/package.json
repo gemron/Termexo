@@ -1,6 +1,6 @@
 {
   "name": "termexo",
-  "version": "0.12.0",
+  "version": "0.12.1",
   "description": "Run the Termexo AI development workspace directly from npm on Windows, macOS and Linux",
   "type": "module",
   "bin": {
@@ -14,8 +14,6 @@
     "vendor/win32-x64/OpenConsole.exe",
     "vendor/darwin-arm64/Termexo.app.tar.gz",
     "vendor/darwin-x64/Termexo.app.tar.gz",
-    "vendor/win32-x64/one-ring/",
-    "!vendor/win32-x64/one-ring/runtime/node.exe",
     "vendor/linux-x64/Termexo.tar.gz",
     "README.md"
   ],
@@ -25,7 +23,7 @@
     "linux"
   ],
   "engines": {
-    "node": ">=24.0.0"
+    "node": ">=18.18.0"
   },
   "scripts": {
     "test": "node --test",

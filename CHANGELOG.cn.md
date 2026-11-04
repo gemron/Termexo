@@ -2,6 +2,14 @@
 
 按版本倒序记录每个版本的变更。当前版本的要点见 [README.cn.md](README.cn.md)。
 
+## V0.12.1
+
+- 移除内置 One Ring 面板、工作流引擎、内部 Worker 通道及相关 Agent 启动接入。
+- Windows、macOS、Linux 与 npm 包均不再携带其 Node.js 运行时、引擎、插件和资源，减小包体积。
+- npm 启动器最低要求恢复为 Node.js 18.18；全新检出后直接运行 Cargo 无需预生成工作流资源。
+- 旧工作流终端重新打开时转换为普通 Agent 会话，保留已保存的工作流数据。
+- 保留 Linux 支持、公开 MCP 工具、远程只读链接、常用命令环境、多账号授权及手机输入修复。
+
 ## V0.12.0
 
 - **Linux 桌面与 npm 分发。** 提供 Debian 安装包和完整应用压缩包，与 Windows、两种 macOS 架构统一发布；包含原生桌面、终端和 npm 安装检查。感谢 [wuyh410](https://github.com/wuyh410) 在 [#45](https://github.com/gemron/Termexo/pull/45) 中提供支持。

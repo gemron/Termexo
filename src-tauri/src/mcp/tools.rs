@@ -85,14 +85,14 @@ mod tests {
     use super::*;
 
     #[test]
-    fn permissions_filter_the_catalog_and_internal_groups_are_not_exposed() {
+    fn permissions_filter_the_catalog() {
         let settings = McpSettings {
             task_access: false,
             settings_access: false,
             ..Default::default()
         };
         let list = list(&settings);
-        assert_eq!(list["tools"].as_array().unwrap().len(), 16);
+        assert_eq!(list["tools"].as_array().unwrap().len(), 13);
         for tool in list["tools"].as_array().unwrap() {
             assert!(tool.get("group").is_none());
         }

@@ -171,69 +171,6 @@ impl OpenCodeAdapter {
             .ok_or(OpenCodeError::VersionUnavailable)
     }
 
-    pub fn worker_evidence(&self, session_id: &str) -> Result<Value, OpenCodeError> {
-        if !session_id.starts_with("ses_")
-            || !session_id
-                .chars()
-                .all(|c| c.is_ascii_alphanumeric() || c == '_')
-        {
-            return Err(OpenCodeError::CommandFailed(
-                "Invalid OpenCode session ID".into(),
-            ));
-        }
-        if self.plugin_api_version()? < 2 {
-            return Err(OpenCodeError::CommandFailed(
-                "One Ring requires OpenCode 2 session evidence".into(),
-            ));
-        }
-        let output = self.run(
-            &["session", "export", session_id, STANDALONE_FLAG],
-            SESSION_LIST_TIMEOUT,
-        )?;
-        if !output.status.success() {
-            let error = String::from_utf8_lossy(&output.stderr);
-            if error.contains("SessionNotFoundError") || error.contains("Session not found") {
-                return Ok(Value::Null);
-            }
-            return Err(OpenCodeError::SessionCommand(
-                String::from_utf8_lossy(&output.stderr).trim().into(),
-            ));
-        }
-        if output.stdout.len() > 16 * 1024 * 1024 {
-            return Err(OpenCodeError::SessionCommand(
-                "OpenCode session exceeds the evidence size limit".into(),
-            ));
-        }
-        let evidence: Value = serde_json::from_slice(&output.stdout)?;
-        if evidence["info"]["id"].as_str() != Some(session_id) {
-            return Err(OpenCodeError::SessionCommand(
-                "OpenCode returned another session".into(),
-            ));
-        }
-        Ok(evidence)
-    }
-
-    pub fn worker_models(&self, directory: Option<&str>) -> Result<Vec<String>, OpenCodeError> {
-        let output = self.run_at(
-            &["models", STANDALONE_FLAG],
-            SESSION_LIST_TIMEOUT,
-            directory,
-        )?;
-        if !output.status.success() {
-            return Err(OpenCodeError::CommandFailed(
-                String::from_utf8_lossy(&output.stderr).trim().into(),
-            ));
-        }
-        Ok(String::from_utf8_lossy(&output.stdout)
-            .lines()
-            .map(str::trim)
-            .filter(|line| {
-                !line.is_empty() && line.contains('/') && !line.contains(char::is_whitespace)
-            })
-            .map(str::to_owned)
-            .collect())
-    }
-
     fn supports_private_server(&self) -> Result<bool, OpenCodeError> {
         self.plugin_api_version().map(|major| major >= 2)
     }

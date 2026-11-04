@@ -98,11 +98,6 @@ try {
     fonts.some((font) => font.monospaced),
     'A terminal font should be available',
   );
-  const health = await invoke('inspect_one_ring', {
-    operation: 'one_ring_doctor',
-    workflowId: null,
-  });
-  assert.equal(health.platform, 'linux');
   const accounts = await invoke('list_account_profiles');
   assert(accounts.some((account) => account.id === 'claude-system'));
   assert(accounts.some((account) => account.id === 'codex-system'));
@@ -269,7 +264,6 @@ try {
     webview,
     backend,
     fontFamilies: fonts.length,
-    oneRing: health,
     realAgent,
     bashCommands,
     notification,
@@ -277,7 +271,6 @@ try {
       'native WebKit window',
       'Unix PTY backend',
       'Fontconfig families',
-      'bundled One Ring runtime',
       'seeded accounts',
       'Windows shell migration with SHELL unset',
       'Unicode working directory',
