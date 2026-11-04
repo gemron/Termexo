@@ -9,7 +9,7 @@ const translations = {
     mcpSourceBody: "Tell the agent what to send and which reply to bring back.",
     mcpHubLabel: "THE LOCAL CONNECTION",
     mcpHubBody: "Find the terminal → send input → submit Enter → read output",
-    mcpLocal: "Runs locally on Windows and macOS",
+    mcpLocal: "Runs locally on Windows, macOS and Linux",
     mcpTargetLabel: "SIX KINDS OF AGENT TERMINALS",
     mcpFlowCaption: "How the connection works. The target terminal must be running; a reply comes from its actual output.",
     mcpStep1Title: "Prepare your workspace",
@@ -45,7 +45,7 @@ const translations = {
     enterpriseProfilesTitle: "Providers and environments in one place",
     enterpriseProfilesBody: "Manage model, account, and network profiles for different providers and compatible gateways, with quota visibility where supported.",
     enterpriseRemoteTitle: "Access to the development PC you manage",
-    enterpriseRemoteBody: "Run the workbench on your organization's Windows PC or Mac. Use your own relay or trusted LAN / VPN to reconnect to long-running tasks.",
+    enterpriseRemoteBody: "Run the workbench on your organization's Windows, Mac or Linux computer. Use your own relay or trusted LAN / VPN to reconnect to long-running tasks.",
     solutionsBoundaryTitle: "Available today / longer-term direction",
     solutionsBoundaryBody: "Today, individuals and team members operate their own workbenches. Shared workspaces, granular permissions, centralized audit, and broader automatic orchestration remain planned capabilities.",
     solutionsDataNote: "Local-first describes where the workbench runs. Your agent and model configuration still determines where model requests and code are sent.",
@@ -61,14 +61,14 @@ const translations = {
     navPrinciples: "Privacy",
     navGuide: "User guide",
     github: "GitHub",
-    eyebrow: "WINDOWS + MACOS / MCP AGENT CONTROL",
+    eyebrow: "WINDOWS + MACOS + LINUX / MCP AGENT CONTROL",
     heroLine1: "Let AI operate your agents.",
     heroLine2: "Send work. Read results.",
     heroLead:
-      "Connect an AI to Termexo MCP. Ask it to find a Claude Code, Codex, OpenCode, Pi Agent, Grok Build or Antigravity terminal, send an instruction and read the real reply. Keep tasks, sessions and optional phone access together on Windows or macOS.",
+      "Connect an AI to Termexo MCP. Ask it to find a Claude Code, Codex, OpenCode, Pi Agent, Grok Build or Antigravity terminal, send an instruction and read the real reply. Keep tasks, sessions and optional phone access together on Windows, macOS or Linux.",
     heroRemoteNote:
       "Phone access is optional. Keep your PC running and use a reachable HTTPS relay plus a desktop access token, or connect directly over a trusted LAN or VPN.",
-    heroDownload: "Download for Windows / macOS",
+    heroDownload: "Download desktop app",
     heroMcp: "See how MCP works",
     heroDemo: "Watch the 30-second workbench demo →",
     heroRemoteGuide:
@@ -147,7 +147,7 @@ const translations = {
     modelPoint1:
       "Anthropic, DeepSeek, MiniMax, GLM, or any compatible endpoint",
     modelPoint2:
-      "API keys go into Windows Credential Manager or macOS Keychain",
+      "API keys go into Windows Credential Manager, macOS Keychain or Linux Secret Service",
     modelPoint3: "Switch every Claude terminal in a project at once",
     modelCaption:
       "Your operating system stores API keys; the interface shows whether a key is configured",
@@ -252,14 +252,14 @@ const translations = {
       "Your project paths, sessions, terminal state, and settings sit in a file on your disk. There is no cloud service to sign into.",
     principle2Title: "Your API keys are not in a config file",
     principle2Body:
-      "API keys go into Windows Credential Manager or macOS Keychain. The app stores a reference; the interface can tell you a key exists without returning its plaintext.",
+      "API keys go into Windows Credential Manager, macOS Keychain or Linux Secret Service. The app stores a reference; the interface can tell you a key exists without returning its plaintext.",
     principle3Title: "Your agent files are read-only",
     principle3Body:
       "Termexo reads what Claude Code and Codex write, and uses their own resume commands. It never rewrites, renames, or deletes your session history.",
 
     ctaTitle: "One command. No account.",
     ctaLead:
-      "The npm package includes Windows x64 and complete macOS apps for Apple Silicon and Intel. The same command starts the matching app locally, without a Termexo account.",
+      "The npm package includes Windows x64, complete macOS apps for Apple Silicon and Intel, and Linux x64. With Node.js 18.18+, the same command starts the matching app locally, without a Termexo account.",
     getRelease: "Download installer",
     starGithub: "Star on GitHub",
     supportProject:
@@ -280,23 +280,25 @@ const translations = {
     siteVisits: "Website visits (PV)",
     counterNotice:
       "Third-party website statistics only; “—” means unavailable.",
-    platformSupport: "Windows x64 · macOS 12+ on Apple Silicon / Intel · npm on both",
-    platformLimits: "Windows signing is awaiting approval. Mac builds use ad-hoc signing and are not notarized; macOS may require allowing the app in Privacy & Security.",
+    platformSupport: "Windows x64 · macOS 12+ (Apple Silicon / Intel) · Linux x64 · npm on all three",
+    platformLimits: "Windows packages are unsigned. Mac builds use ad-hoc signing and are not notarized. Linux needs a graphical desktop and GTK / WebKitGTK libraries; see the user guide for setup.",
     featurePreviewTitle: "Preview content beside your terminals",
     featurePreviewBody: "Open several file, image or website previews in their own tabs. Resize the panel and highlight code while preserving every line and space. Agents can open previews through MCP.",
     featureActionsTitle: "Save and review project actions",
     featureActionsBody: "Discover actions without switching away to start an Agent. Select all, edit entries and remove duplicates before confirming from the same window.",
     featureNotificationsTitle: "Pause third-party notifications",
     featureNotificationsBody: "A toolbar switch controls configured channels. Messages include time and session context; desktop WeChat notifications are available on Windows.",
-    featurePlatformsTitle: "One command on Windows or Mac",
-    featurePlatformsBody: "Choose Windows EXE/MSI or a Mac DMG for Apple Silicon or Intel. The npm package includes all three apps and starts the matching one locally.",
+    featurePlatformsTitle: "One command, three platforms",
+    featurePlatformsBody: "Choose Windows EXE/MSI, a Mac DMG for Apple Silicon or Intel, or the Linux x64 .deb. The npm package contains all four builds and starts the matching application locally.",
     roadmap11Title: "macOS, content previews and smoother saved actions",
     roadmap11Body: "v0.11.0 adds Apple Silicon and Intel packages, multiple preview tabs with code highlighting, a continuous saved-action review and third-party notification controls. GitHub Actions builds desktop installers and publishes the Windows/macOS npm package.",
+    roadmap12Title: "Linux, read-only access and a smaller desktop app",
+    roadmap12Body: "v0.12.1 includes Linux desktop and npm support, read-only remote links, command environments and mobile input improvements. The built-in One Ring engine and its runtime have been removed; public MCP tools and ordinary Agent terminals remain.",
     navRelay: "Remote relay",
     sceneProtocol: "RELAY / LAN / VPN",
     relayDeploy: "Deploy your relay ↗",
     relaySetup: "Read the connection guide ↗",
-    relayCompatibility: "Desktop app: Windows x64 and macOS Apple Silicon / Intel. Relay: Linux / macOS / Windows, x64 / arm64 and containers.",
+    relayCompatibility: "Desktop app: Windows x64, macOS Apple Silicon / Intel and Linux x64. Relay: Linux / macOS / Windows, x64 / arm64 and containers. Read-only links let others view without sending terminal input.",
   },
   zh: {
     navMcp: "MCP 操控",
@@ -308,7 +310,7 @@ const translations = {
     mcpSourceBody: "说明要发给哪个 Agent，以及需要读回什么结果。",
     mcpHubLabel: "本地连接",
     mcpHubBody: "找到终端 → 发送指令 → 提交回车 → 读取输出",
-    mcpLocal: "本地运行于 Windows 和 macOS",
+    mcpLocal: "本地运行于 Windows、macOS 和 Linux",
     mcpTargetLabel: "六种 AGENT 终端",
     mcpFlowCaption: "连接流程示意。目标终端需保持运行，回复来自终端的真实输出。",
     mcpStep1Title: "准备好工作台",
@@ -344,7 +346,7 @@ const translations = {
     enterpriseProfilesTitle: "统一管理供应商与环境配置",
     enterpriseProfilesBody: "集中管理不同供应商、兼容网关的模型、账号和网络 Profile，查看支持的供应商余量。",
     enterpriseRemoteTitle: "远程接入自己管理的研发电脑",
-    enterpriseRemoteBody: "工作台运行在企业控制的 Windows 电脑或 Mac 上，通过自建中继或可信局域网 / VPN，接回仍在运行的长任务。",
+    enterpriseRemoteBody: "工作台运行在企业控制的 Windows、Mac 或 Linux 电脑上，通过自建中继或可信局域网 / VPN，接回仍在运行的长任务。",
     solutionsBoundaryTitle: "当前能力与长期方向",
     solutionsBoundaryBody: "当前适合个人和团队成员使用各自的工作台；多人共享、细粒度权限、统一审计及更完整的自动编排仍属规划能力。",
     solutionsDataNote: "本地优先指工作台的运行与管理方式；代码和模型请求是否发往外部，仍由所选 Agent 与模型服务配置决定。",
@@ -360,14 +362,14 @@ const translations = {
     navPrinciples: "隐私",
     navGuide: "使用说明",
     github: "GitHub",
-    eyebrow: "WINDOWS + MACOS / MCP 操控 AGENT",
+    eyebrow: "WINDOWS + MACOS + LINUX / MCP 操控 AGENT",
     heroLine1: "让 AI 操控你的 Agent。",
     heroLine2: "发出指令，读回结果。",
     heroLead:
-      "通过 Termexo MCP，让 AI 找到 Claude Code、Codex、OpenCode、Pi Agent、Grok Build 或 Antigravity 终端，发送指令，再读回真实回复。在 Windows 或 macOS 上集中管理任务、会话，并按需接入手机访问。",
+      "通过 Termexo MCP，让 AI 找到 Claude Code、Codex、OpenCode、Pi Agent、Grok Build 或 Antigravity 终端，发送指令，再读回真实回复。在 Windows、macOS 或 Linux 上集中管理任务、会话，并按需接入手机访问。",
     heroRemoteNote:
       "手机访问按需开启：电脑需保持运行，使用双方可达的 HTTPS 中继与桌面访问令牌，也可在可信局域网或 VPN 内直连。",
-    heroDownload: "下载 Windows / macOS 版",
+    heroDownload: "下载桌面版",
     heroMcp: "了解 MCP 怎么用",
     heroDemo: "看 30 秒工作台实录 →",
     heroRemoteGuide:
@@ -434,7 +436,7 @@ const translations = {
     modelLead:
       "还是用 Claude Code，但把它指向 DeepSeek、MiniMax、GLM 或你自己的兼容网关。每个存成一个 Profile，两下就能切——不用重装，也不用手动改配置文件。",
     modelPoint1: "Anthropic、DeepSeek、MiniMax、GLM，或任意兼容 Endpoint",
-    modelPoint2: "API Key 由 Windows 凭据管理器或 macOS 钥匙串保存",
+    modelPoint2: "API Key 由 Windows 凭据管理器、macOS 钥匙串或 Linux Secret Service 保存",
     modelPoint3: "一个项目里的 Claude 终端可以一次性全部切换",
     modelCaption: "密钥由操作系统保管，界面只显示是否已配置",
 
@@ -533,14 +535,14 @@ const translations = {
       "项目路径、会话、终端状态和设置都存在你硬盘上的文件里，没有需要登录的云服务。",
     principle2Title: "API Key 不在配置文件里",
     principle2Body:
-      "API Key 由 Windows 凭据管理器或 macOS 钥匙串保存；程序记录凭据引用，界面可显示是否已配置，但不返回明文。",
+      "API Key 由 Windows 凭据管理器、macOS 钥匙串或 Linux Secret Service 保存；程序记录凭据引用，界面可显示是否已配置，但不返回明文。",
     principle3Title: "你的会话文件只读",
     principle3Body:
       "Termexo 读 Claude Code 和 Codex 写下的文件，并调用它们自己的恢复命令，绝不改写、重命名或删除你的历史记录。",
 
     ctaTitle: "一条命令，不用注册。",
     ctaLead:
-      "同一个 npm 包包含 Windows x64，以及 Apple Silicon 和 Intel 的完整 Mac 应用。一条命令自动选择对应版本，无需注册 Termexo 账号。",
+      "同一个 npm 包包含 Windows x64、Apple Silicon 和 Intel 的完整 Mac 应用，以及 Linux x64。安装 Node.js 18.18+ 后，一条命令自动选择对应版本，无需注册 Termexo 账号。",
     getRelease: "下载安装包",
     starGithub: "在 GitHub 上 Star",
     supportProject:
@@ -560,23 +562,25 @@ const translations = {
     footerTagline: "一个窗口，装下所有编程 Agent",
     siteVisits: "官网累计访问量（PV）",
     counterNotice: "第三方统计仅记录官网访问；“—”表示暂不可用。",
-    platformSupport: "Windows x64 · macOS 12+（Apple Silicon / Intel）· 两个平台均支持 npm",
-    platformLimits: "Windows 正式签名正在等待审核。Mac 版本使用 ad-hoc 临时签名，尚未公证；首次打开可能需要在“隐私与安全性”中允许运行。",
+    platformSupport: "Windows x64 · macOS 12+（Apple Silicon / Intel）· Linux x64 · 三大平台均支持 npm",
+    platformLimits: "Windows 安装包尚未正式签名，Mac 使用 ad-hoc 临时签名且尚未公证。Linux 需要图形桌面及 GTK / WebKitGTK 系统库，安装步骤见使用说明。",
     featurePreviewTitle: "内容预览，与终端并列打开",
     featurePreviewBody: "文件、图片和网站可打开为多个独立标签，窗口宽度可调。代码只加语法高亮，保留原始换行和空格；Agent 也能通过 MCP 打开预览。",
     featureActionsTitle: "识别、编辑并保存项目操作",
     featureActionsBody: "在同一窗口启动或选择 Agent 并识别常用操作；支持全选、逐项编辑、自动去重，再从固定在底部的按钮确认。",
     featureNotificationsTitle: "随时暂停第三方通知",
     featureNotificationsBody: "顶部开关统一控制已配置的通知渠道，消息包含时间和会话信息；桌面微信通知在 Windows 上提供。",
-    featurePlatformsTitle: "Windows 和 Mac，一条命令启动",
-    featurePlatformsBody: "提供 Windows EXE/MSI 和 Apple Silicon、Intel 的 Mac DMG。同一个 npm 包包含三个平台的应用，启动时自动选择对应版本。",
+    featurePlatformsTitle: "三大平台，一条命令启动",
+    featurePlatformsBody: "提供 Windows EXE/MSI、Apple Silicon 和 Intel 的 Mac DMG，以及 Linux x64 的 .deb。同一个 npm 包包含四种构建，启动时自动选择对应应用。",
     roadmap11Title: "macOS、内容预览与更连贯的常用操作",
     roadmap11Body: "v0.11.0 加入 Apple Silicon 与 Intel 安装包、多个内容预览标签与代码高亮、同一窗口的常用操作识别审核，以及第三方通知开关。GitHub Actions 自动编译桌面安装包并发布 Windows/macOS 通用 npm 包。",
+    roadmap12Title: "Linux、远程只读与更轻量的桌面版",
+    roadmap12Body: "v0.12.1 支持 Linux 桌面与 npm、远程只读链接、命令目录及环境变量，并改进手机输入。已移除内置 One Ring 及其运行时；保留公开 MCP 和普通 Agent 终端。",
     navRelay: "中继访问",
     sceneProtocol: "中继 / 局域网 / VPN",
     relayDeploy: "部署自己的中继 ↗",
     relaySetup: "查看连接步骤 ↗",
-    relayCompatibility: "桌面版支持 Windows x64 和 macOS Apple Silicon / Intel。中继支持 Linux / macOS / Windows、x64 / arm64 和容器部署。",
+    relayCompatibility: "桌面版支持 Windows x64、macOS Apple Silicon / Intel 和 Linux x64。中继支持 Linux / macOS / Windows、x64 / arm64 和容器部署。可使用只读链接分享查看，不开放终端输入。",
   },
 };
 

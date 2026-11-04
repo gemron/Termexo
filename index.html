@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta
       name="description"
-      content="Let one AI operate Claude Code, Codex, OpenCode, Pi Agent, Grok Build and Antigravity terminals through Termexo MCP. Send instructions, read real output and keep your Windows or macOS workbench in view."
+      content="Let one AI operate Claude Code, Codex, OpenCode, Pi Agent, Grok Build and Antigravity terminals through Termexo MCP. Send instructions, read real output and keep your Windows, macOS or Linux workbench in view."
     />
     <meta name="theme-color" content="#edf4f8" />
     <meta property="og:type" content="website" />
@@ -15,7 +15,7 @@
     />
     <meta
       property="og:description"
-      content="Connect an AI to Termexo MCP, send instructions to six kinds of coding agent terminals and read their real replies. A local Windows and macOS workbench with optional phone access."
+      content="Connect an AI to Termexo MCP, send instructions to six kinds of coding agent terminals and read their real replies. A local Windows, macOS and Linux workbench with optional phone access."
     />
     <meta
       property="og:image"
@@ -46,11 +46,11 @@
         "@context": "https://schema.org",
         "@type": "SoftwareApplication",
         "name": "Termexo",
-        "softwareVersion": "0.11.0",
+        "softwareVersion": "0.12.1",
         "url": "https://www.termexo.com/",
-        "description": "A local-first Windows and macOS workbench whose MCP server lets a connected AI read and operate Claude Code, Codex, OpenCode, Pi Agent, Grok Build and Antigravity terminals and manage tasks. The workbench also offers native session recovery and optional remote access.",
+        "description": "A local-first Windows, macOS and Linux workbench whose MCP server lets a connected AI read and operate Claude Code, Codex, OpenCode, Pi Agent, Grok Build and Antigravity terminals and manage tasks. The workbench also offers native session recovery and optional remote access.",
         "applicationCategory": "DeveloperApplication",
-        "operatingSystem": "Windows 10/11 x64, macOS 12+ (Apple Silicon and Intel)",
+        "operatingSystem": "Windows 10/11 x64, macOS 12+ (Apple Silicon and Intel), Linux x64 (glibc)",
         "license": "https://github.com/gemron/Termexo/blob/main/LICENSE",
         "downloadUrl": "https://github.com/gemron/Termexo/releases/latest",
         "sameAs": [
@@ -65,7 +65,7 @@
     <link rel="canonical" href="https://www.termexo.com/" />
     <link rel="icon" href="assets/termexo-mark.svg" type="image/svg+xml" />
     <link rel="stylesheet" href="styles.css?v=c64af7392e7e" />
-    <script src="app.js?v=61d83c240e8d" defer></script>
+    <script src="app.js?v=9ebc8bc1f770" defer></script>
     <script src="analytics.js" defer></script>
   </head>
   <body class="home-page">
@@ -78,7 +78,7 @@
             <img src="assets/termexo-mark.svg" alt="" />
           </span>
           <span>Termexo</span>
-          <small>0.11.0</small>
+          <small>0.12.1</small>
         </a>
 
         <nav
@@ -136,14 +136,13 @@
           <div class="eyebrow">
             <span class="live-dot"></span>
             <span data-i18n="eyebrow"
-              >WINDOWS + MACOS / MCP AGENT CONTROL</span
-            >
+              >WINDOWS + MACOS + LINUX / MCP AGENT CONTROL</span>
           </div>
           <h1>
             <span data-i18n="heroLine1">Let AI operate your agents.</span>
             <em data-i18n="heroLine2">Send work. Read results.</em>
           </h1>
-          <p class="hero-lead" data-i18n="heroLead">Connect an AI to Termexo MCP. Ask it to find a Claude Code, Codex, OpenCode, Pi Agent, Grok Build or Antigravity terminal, send an instruction and read the real reply. Keep tasks, sessions and optional phone access together on Windows or macOS.</p>
+          <p class="hero-lead" data-i18n="heroLead">Connect an AI to Termexo MCP. Ask it to find a Claude Code, Codex, OpenCode, Pi Agent, Grok Build or Antigravity terminal, send an instruction and read the real reply. Keep tasks, sessions and optional phone access together on Windows, macOS or Linux.</p>
           <ul class="hero-agents" aria-label="Supported agents">
             <li>
               <img src="assets/agent-claude.svg" alt="" width="22" height="22" loading="lazy" />
@@ -174,7 +173,7 @@
               target="_blank"
               rel="noreferrer"
             >
-              <span data-i18n="heroDownload">Download for Windows / macOS</span>
+              <span data-i18n="heroDownload">Download desktop app</span>
               <svg viewBox="0 0 24 24" aria-hidden="true">
                 <path d="m9 7 5 5-5 5m7 0h3" />
               </svg>
@@ -199,7 +198,7 @@
               >
             </button>
           </div>
-          <p class="hero-remote-note" data-i18n="platformSupport">Windows x64 · macOS 12+ on Apple Silicon / Intel · npm on both</p>
+          <p class="hero-remote-note" data-i18n="platformSupport">Windows x64 · macOS 12+ (Apple Silicon / Intel) · Linux x64 · npm on all three</p>
           <p class="hero-remote-note" data-i18n="heroRemoteNote">Phone access is optional. Keep your PC running and use a reachable HTTPS relay plus a desktop access token, or connect directly over a trusted LAN or VPN.</p>
           <a
             class="hero-guide-link"
@@ -229,7 +228,7 @@
                   >Local-first · MIT open source</b
                 ></span
               >
-              <span><i></i><b>Windows / macOS</b></span>
+              <span><i></i><b>Windows / macOS / Linux</b></span>
               <span
                 ><i></i><b data-i18n="metaNpm">One command to start</b></span
               >
@@ -414,7 +413,7 @@
               <span class="mcp-flow-label" data-i18n="mcpHubLabel">THE LOCAL CONNECTION</span>
               <strong>Termexo MCP</strong>
               <p data-i18n="mcpHubBody">Find the terminal → send input → submit Enter → read output</p>
-              <span class="mcp-local-badge" data-i18n="mcpLocal">Runs locally on Windows and macOS</span>
+              <span class="mcp-local-badge" data-i18n="mcpLocal">Runs locally on Windows, macOS and Linux</span>
             </div>
             <span class="mcp-flow-arrow" aria-hidden="true">⇄</span>
             <div class="mcp-flow-stage">
@@ -497,7 +496,7 @@
             <ul>
               <li><h4 data-i18n="enterpriseTasksTitle">Project work engineers can follow</h4><p data-i18n="enterpriseTasksBody">Group business projects into workspaces. Engineers use the task board and agent status to assign work, review results, and prepare handoffs.</p></li>
               <li><h4 data-i18n="enterpriseProfilesTitle">Providers and environments in one place</h4><p data-i18n="enterpriseProfilesBody">Manage model, account, and network profiles for different providers and compatible gateways, with quota visibility where supported.</p></li>
-              <li><h4 data-i18n="enterpriseRemoteTitle">Access to the development PC you manage</h4><p data-i18n="enterpriseRemoteBody">Run the workbench on your organization's Windows PC or Mac. Use your own relay or trusted LAN / VPN to reconnect to long-running tasks.</p></li>
+              <li><h4 data-i18n="enterpriseRemoteTitle">Access to the development PC you manage</h4><p data-i18n="enterpriseRemoteBody">Run the workbench on your organization's Windows, Mac or Linux computer. Use your own relay or trusted LAN / VPN to reconnect to long-running tasks.</p></li>
             </ul>
           </article>
         </div>
@@ -659,9 +658,7 @@
             <li data-i18n="modelPoint1">
               Anthropic, DeepSeek, MiniMax, GLM, or any compatible endpoint
             </li>
-            <li data-i18n="modelPoint2">
-              API keys go into Windows Credential Manager or macOS Keychain
-            </li>
+            <li data-i18n="modelPoint2">API keys go into Windows Credential Manager, macOS Keychain or Linux Secret Service</li>
             <li data-i18n="modelPoint3">
               Switch every Claude terminal in a project at once
             </li>
@@ -739,7 +736,7 @@
             <li data-i18n="remotePoint3">Keep your desktop on and Termexo connected; relay login and the desktop access token are separate checks</li>
           </ul>
           <div class="relay-links"><a href="https://github.com/gemron/termexo-relay" target="_blank" rel="noopener noreferrer" data-i18n="relayDeploy">Deploy your relay ↗</a><a href="guide.en.html#remote" data-i18n="relaySetup">Read the connection guide ↗</a></div>
-          <p class="relay-compatibility" data-i18n="relayCompatibility">Desktop app: Windows x64 and macOS Apple Silicon / Intel. Relay: Linux / macOS / Windows, x64 / arm64 and containers.</p>
+          <p class="relay-compatibility" data-i18n="relayCompatibility">Desktop app: Windows x64, macOS Apple Silicon / Intel and Linux x64. Relay: Linux / macOS / Windows, x64 / arm64 and containers. Read-only links let others view without sending terminal input.</p>
         </div>
         <figure class="settings-frame reveal" data-delay="1">
           <img
@@ -798,8 +795,8 @@
             <article class="bento reveal">
               <span class="card-tag now" data-i18n="now">WORKS TODAY</span>
               <div class="card-icon" aria-hidden="true">↗</div>
-              <h3 data-i18n="featurePlatformsTitle">One command on Windows or Mac</h3>
-              <p data-i18n="featurePlatformsBody">Choose Windows EXE/MSI or a Mac DMG for Apple Silicon or Intel. The npm package includes all three apps and starts the matching one locally.</p>
+              <h3 data-i18n="featurePlatformsTitle">One command, three platforms</h3>
+              <p data-i18n="featurePlatformsBody">Choose Windows EXE/MSI, a Mac DMG for Apple Silicon or Intel, or the Linux x64 .deb. The npm package contains all four builds and starts the matching application locally.</p>
             </article>
 
             <article class="bento bento-large reveal">
@@ -1033,9 +1030,14 @@
               <p data-i18n="roadmapLatestBody">Workspace folders, tags and icons, account login choices, model discovery and upgrade suggestions, and confirmation before closing active Agent terminals.</p>
             </article>
             <article class="roadmap-item current reveal" data-delay="3">
-              <div><span>V0.11.0</span><b data-i18n="current">YOU ARE HERE</b></div>
+              <div><span>V0.11.0</span><b data-i18n="shipped">SHIPPED</b></div>
               <h3 data-i18n="roadmap11Title">macOS, content previews and smoother saved actions</h3>
               <p data-i18n="roadmap11Body">v0.11.0 adds Apple Silicon and Intel packages, multiple preview tabs with code highlighting, a continuous saved-action review and third-party notification controls. GitHub Actions builds desktop installers and publishes the Windows/macOS npm package.</p>
+            </article>
+            <article class="roadmap-item current reveal" data-delay="3">
+              <div><span>V0.12.1</span><b data-i18n="current">YOU ARE HERE</b></div>
+              <h3 data-i18n="roadmap12Title">Linux, read-only access and a smaller desktop app</h3>
+              <p data-i18n="roadmap12Body">v0.12.1 includes Linux desktop and npm support, read-only remote links, command environments and mobile input improvements. The built-in One Ring engine and its runtime have been removed; public MCP tools and ordinary Agent terminals remain.</p>
             </article>
           </div>
         </div>
@@ -1066,9 +1068,7 @@ On your computer.</h2>
               <h3 data-i18n="principle2Title">
                 Your API keys are not in a config file
               </h3>
-              <p data-i18n="principle2Body">
-                API keys go into Windows Credential Manager or macOS Keychain. The app stores a reference; the interface can tell you a key exists without returning its plaintext.
-              </p>
+              <p data-i18n="principle2Body">API keys go into Windows Credential Manager, macOS Keychain or Linux Secret Service. The app stores a reference; the interface can tell you a key exists without returning its plaintext.</p>
             </div>
           </article>
           <article class="reveal" data-delay="2">
@@ -1089,8 +1089,8 @@ On your computer.</h2>
         <div>
           <span class="section-index" data-i18n="indexCta">BUILD WITH US</span>
           <h2 data-i18n="ctaTitle">One command. No account.</h2>
-          <p data-i18n="ctaLead">The npm package includes Windows x64 and complete macOS apps for Apple Silicon and Intel. The same command starts the matching app locally, without a Termexo account.</p>
-          <p class="hero-remote-note" data-i18n="platformLimits">Windows signing is awaiting approval. Mac builds use ad-hoc signing and are not notarized; macOS may require allowing the app in Privacy &amp; Security.</p>
+          <p data-i18n="ctaLead">The npm package includes Windows x64, complete macOS apps for Apple Silicon and Intel, and Linux x64. With Node.js 18.18+, the same command starts the matching app locally, without a Termexo account.</p>
+          <p class="hero-remote-note" data-i18n="platformLimits">Windows packages are unsigned. Mac builds use ad-hoc signing and are not notarized. Linux needs a graphical desktop and GTK / WebKitGTK libraries; see the user guide for setup.</p>
           <p data-i18n="supportProject">
             Built in the open, under the MIT license. If Termexo helps your workflow, a GitHub Star helps others discover it. Bug reports and contributions are welcome too.
           </p>
