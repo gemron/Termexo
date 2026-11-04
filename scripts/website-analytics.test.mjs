@@ -45,7 +45,9 @@ test('search and social metadata refer to real local assets', () => {
   const data = JSON.parse(html.match(/<script type="application\/ld\+json">([\s\S]*?)<\/script>/)[1]);
   assert.equal(data.name, 'Termexo');
   assert.equal(data.offers.price, '0');
-  assert.equal(data.operatingSystem, 'Windows 10/11 x64, macOS 12+ (Apple Silicon and Intel)');
+  assert.equal(data.operatingSystem, 'Windows 10/11 x64, macOS 12+ (Apple Silicon and Intel), Linux x64 (glibc)');
+  const pkg = JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8'));
+  assert.equal(data.softwareVersion, pkg.version);
   for (const match of html.matchAll(/(?:src|href)="([^"#?]+)"/g)) {
     if (/^(https?:|mailto:)/.test(match[1])) continue;
     assert.ok(existsSync(new URL(`../website/${match[1]}`, import.meta.url)), match[1]);

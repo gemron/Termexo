@@ -14,6 +14,7 @@
   <img alt="Version 0.12.1" src="https://img.shields.io/badge/version-0.12.1-58c7a0">
   <img alt="Windows" src="https://img.shields.io/badge/platform-Windows-0078D4?logo=windows">
   <img alt="macOS" src="https://img.shields.io/badge/platform-macOS-222222?logo=apple">
+  <img alt="Linux" src="https://img.shields.io/badge/platform-Linux-FCC624?logo=linux&logoColor=black">
   <img alt="Tauri 2" src="https://img.shields.io/badge/Tauri-2-24C8DB?logo=tauri&logoColor=white">
   <img alt="Angular 22" src="https://img.shields.io/badge/Angular-22-DD0031?logo=angular">
 </p>
@@ -35,7 +36,7 @@
 
 **让 AI 通过 MCP 操控 Claude Code、Codex、OpenCode、Pi Agent、Grok Build 和 Antigravity 的终端。**
 
-对一个已连接的 AI 说一句话，它就能通过 Termexo 找到另一个 Agent 的终端，发送提示词、提交回车，再读回实际回复。你可以随时在同一个 Windows 或 macOS 工作台查看过程、接手操作，集中查看执行、等待确认和完成状态。
+对一个已连接的 AI 说一句话，它就能通过 Termexo 找到另一个 Agent 的终端，发送提示词、提交回车，再读回实际回复。你可以随时在同一个 Windows、macOS 或 Linux 工作台查看过程、接手操作，集中查看执行、等待确认和完成状态。
 
 六种 Agent 都在本机真实终端运行。Termexo 还按项目组织工作区、恢复原生会话；需要离开电脑时，可通过自建中继、可信局域网或 VPN 从手机接回同一个工作台。
 
@@ -43,7 +44,7 @@
 
 *点击观看 30 秒 v0.10.6 真实桌面录屏：查看完成提醒、返回对应会话、回复后继续执行，再并排查看两个 Antigravity 会话的结果。附中英字幕，已剪去等待片段。*
 
-**[下载 Windows / macOS 安装包](https://github.com/gemron/Termexo/releases/latest)** · [观看演示](https://www.termexo.com/#workbench-demo) · [首次试用反馈](https://github.com/gemron/Termexo/issues/new?template=first-use.yml)
+**[下载 Windows / macOS / Linux 安装包](https://github.com/gemron/Termexo/releases/latest)** · [观看演示](https://www.termexo.com/#workbench-demo) · [首次试用反馈](https://github.com/gemron/Termexo/issues/new?template=first-use.yml)
 
 | 让 AI 操作其他 Agent | 知道谁在等你 | 手机上接着操作 |
 | --- | --- | --- |
@@ -71,7 +72,7 @@
 
 **当前能力与规划：** 上述场景以个人和团队成员使用各自的工作台为基础，由人分配任务和处理确认；多人共享、细粒度权限、统一审计及更完整的自动编排属于[长期产品规划](Termexo.md)，尚不是现成的企业管理平台能力。
 
-## 在 Windows 或 macOS 上开始使用
+## 在 Windows、macOS 或 Linux 上开始使用
 
 1. **[下载 v0.12.1](https://github.com/gemron/Termexo/releases/tag/v0.12.1)**：Windows 选择 EXE/MSI；Mac 按芯片选择 Apple Silicon（`aarch64`）或 Intel（`x64`）的 DMG；Linux x64 可选择 Debian 安装包，无需 Rust 或编译工具。
 2. 打开 Termexo，为本机项目目录创建工作区。
@@ -84,7 +85,9 @@
 npx termexo@latest
 ```
 
-Windows 需要 Windows 10 build 17763+ 与 WebView2 Chromium 111+；Mac 需要 macOS 12+，支持 Apple Silicon 与 Intel。同一个 npm 包包含三个平台的应用，Mac 会缓存并通过系统启动对应架构的完整应用。
+Windows 需要 Windows 10 build 17763+ 与 WebView2 Chromium 111+；Mac 需要 macOS 12+，支持 Apple Silicon 与 Intel；Linux 支持 x64，需要 glibc、GTK 3、WebKitGTK 4.1 和图形桌面会话。同一个 npm 包包含这三个操作系统的四种构建，启动时在本地选择对应应用。
+
+Mac 会缓存完整应用并通过系统启动。Linux 用户需要先安装系统库，npm 不会代装桌面依赖或执行 `sudo`；保存 API Key 还需要已解锁的 Secret Service 钥匙环。Ubuntu 安装命令与平台要求见 [npm 安装说明](packages/termexo/README.md#linux-system-libraries)。目前不包含 Linux ARM 或 Alpine/musl 构建。
 
 Windows 正式签名仍在等待 SignPath 审核；Mac 使用 ad-hoc 临时签名，尚未公证，首次打开可能需要在“隐私与安全性”中允许运行。Mac 的更多界面流程仍需实机验证。
 使用 Agent 需安装相应 CLI 并配置模型服务；Termexo 不包含模型订阅。
@@ -127,7 +130,7 @@ MCP 是 AI 与 Termexo 之间的连接。**你用日常语言提出要求，不�
 
 桌面主动建立出站隧道，无需公网 IP 或路由器端口映射。**电脑需保持开机、Termexo 运行并连接中继。** 同一可信局域网或受控 VPN 内，也可直接连接桌面地址。
 
-中继登录与桌面访问令牌独立校验；v2 会话握手后使用 AES-256-GCM 加密会话帧，中继转发加密的终端会话。中继服务支持 Linux、macOS、Windows 的 x64 / arm64 和容器部署；Termexo 桌面版提供 Windows x64 和 macOS Apple Silicon / Intel 安装包。
+中继登录与桌面访问令牌独立校验；v2 会话握手后使用 AES-256-GCM 加密会话帧，中继转发加密的终端会话。中继服务支持 Linux、macOS、Windows 的 x64 / arm64 和容器部署；Termexo 桌面版提供 Windows x64、macOS Apple Silicon / Intel 和 Linux x64 安装包。只读远程链接允许查看工作台，不允许发送终端输入或修改设置。
 
 [![Termexo 手机工作台](website/assets/termexo-phone.png)](https://www.termexo.com/guide.html#remote)
 
@@ -181,7 +184,7 @@ MCP 是 AI 与 Termexo 之间的连接。**你用日常语言提出要求，不�
     <td width="50%" valign="top">
       <strong>同一个 CLI，换个模型运行。</strong><br><br>
       让 Claude Code 使用 Anthropic、DeepSeek、MiniMax、GLM 或自定义 Anthropic 兼容 Endpoint。
-      供应商保存为 Profile，API Key 交给 Windows 凭据管理器或 macOS 钥匙串保管，还能一次切换工作空间里的全部 Claude 终端。
+      供应商保存为 Profile，API Key 交给 Windows 凭据管理器、macOS 钥匙串或 Linux Secret Service保管，还能一次切换工作空间里的全部 Claude 终端。
       <br><br>
       <a href="website/assets/termexo-models.png"><img src="website/assets/termexo-models.png" alt="Termexo 模型供应商 Profile"></a>
     </td>
@@ -222,7 +225,7 @@ MCP 是 AI 与 Termexo 之间的连接。**你用日常语言提出要求，不�
 </table>
 
 Termexo 默认只在本地工作：没有 Termexo 账号、云服务或强制同步。工作空间状态保存在本机
-SQLite，密钥保存在 Windows Credential Manager / macOS Keychain，Claude/Codex 历史会话只读。Agent CLI
+SQLite，密钥保存在 Windows Credential Manager / macOS Keychain / Linux Secret Service，Claude/Codex 历史会话只读。Agent CLI
 仍会按照你选择的供应商及其隐私政策连接对应模型服务。
 
 界面支持简体中文、英语、西班牙语、法语、德语、日语和韩语。默认自动跟随
@@ -282,7 +285,7 @@ Termexo 将扩展写入自己的运行时目录，以 `--extension` 注入每个
 | 会话交接           | 生成带脱敏和 Token 预算的 Git/任务包；导入导出文档并交给另一个 Agent 继续         |
 | Git Graph 与 Diff  | 展示当前终端的分支、提交拓扑和启动后的代码变更，支持单栏或双栏 Diff              |
 | 远程访问           | 以 HTTPS 把完整工作台提供给同网络的手机和其他电脑，凭访问令牌进入，支持二维码与令牌更换；远程调用需通过显式命令白名单 |
-| 本地数据与密钥     | Workspace、会话索引和事件保存到 SQLite；API Key 保存到 Windows Credential Manager / macOS Keychain |
+| 本地数据与密钥     | Workspace、会话索引和事件保存到 SQLite；API Key 保存到 Windows Credential Manager / macOS Keychain / Linux Secret Service |
 | 浏览器预览         | 无需 Rust 即可预览完整 UI，并使用可交互的模拟终端验证布局与基础流程               |
 
 ![Termexo 模型 Profile](website/assets/termexo-models.png)
@@ -305,6 +308,7 @@ Termexo 将扩展写入自己的运行时目录，以 `--extension` 注入每个
 ## 当前边界
 
 - macOS 通过新版 DMG 或 `npm install --global termexo@latest` 手动更新；Mac 当前不提供应用内自动更新及 Windows 系统代理导入。
+- Linux x64 可通过 `.deb` 或 npm 安装，需要图形桌面与 GTK / WebKitGTK 系统库，保存 API Key 需要已解锁的 Secret Service 钥匙环。通过新版安装包或 npm 手动更新；Windows 专属的微信窗口自动化和系统代理导入不适用。
 - Windows 和 macOS 构建均支持六类 Agent 的检测与启动，并从会话中心寻找和恢复原生会话。macOS 各 Agent 的运行验证范围不同，已知限制见发布说明。各 CLI 提供的状态事件与启动选项不同；兼容供应商模型切换目前适用于 Claude 终端。
 - 应用退出后，已退出的操作系统进程不会被“伪恢复”。Termexo 恢复终端配置；历史 Agent 会话需从会话中心显式恢复。
 - 原生会话文件只读，Termexo 不修改、重命名或删除。跨 Agent 交接使用脱敏上下文包，不改写供应商私有记录。
@@ -322,11 +326,11 @@ Termexo 将扩展写入自己的运行时目录，以 `--extension` 注入每个
 
 macOS 源码构建需要 macOS 12+ 与 Xcode 命令行工具。下方 Windows 专属运行时要求不适用于 Mac 构建。
 
-Linux 现支持从源码构建；依赖安装、`.deb` 打包和真实 WebKit/PTY 冒烟测试见 [Linux 构建与运行验证](docs/linux.md)。
+v0.12.1 已发布 Linux x64 桌面安装包和 npm 分发。依赖安装、`.deb` 打包和真实 WebKit/PTY 冒烟测试见 [Linux 构建与运行验证](docs/linux.md)。
 
-当前源码还加入 Linux x64 npm 打包和真实安装测试。构建 `.deb` 后运行
-`npm run npm:stage:linux`、`npm run npm:pack:linux` 即可生成本地 npm 包，具体步骤见 Linux 说明。
-已发布的旧 npm 版本不会自动包含这些修改。
+开发本地 Linux 包时，构建 `.deb` 后运行 `npm run npm:stage:linux`、`npm run npm:pack:linux`
+生成 Linux 专用测试包；它不同于 npm 上发布的多平台组合包。下方源码工具链要求与 npm 启动器的
+Node.js 18.18+ 要求分别适用。
 
 - Windows 10 build 17763（2018 年 10 月）或更高——终端所依赖的伪控制台从这个版本开始才有；
 - WebView2 运行时需 Chromium 111 或更高——界面的配色用 `color-mix()` 和 `oklch()` 表达，更旧的
@@ -386,7 +390,7 @@ flowchart LR
     Adapters["Agent Adapters"]
     Hooks["Hooks / Event Pipeline"]
     DB[("SQLite")]
-    Vault["Windows Credential Manager / macOS Keychain"]
+    Vault["Windows Credential Manager / macOS Keychain / Linux Secret Service"]
     Agents["Claude Code / Codex"]
 
     UI <--> IPC
@@ -416,7 +420,7 @@ flowchart LR
 | Agent 事件            | JSONL spool + SQLite       | 按 `event_key` 去重                    |
 | 模型与 MCP Profile    | SQLite                     | API Key 明文不进入数据库               |
 | 提示词资产与交接包    | SQLite                     | 保存前自动清除常见凭据                 |
-| API Key               | Windows Credential Manager / macOS Keychain | 前端只能读取 `hasCredential`           |
+| API Key               | Windows Credential Manager / macOS Keychain / Linux Secret Service | 前端只能读取 `hasCredential`           |
 | Agent 原始会话        | Claude/Codex 数据目录      | 只读，不修改、重命名或删除             |
 
 为兼容早期安装，数据库文件和部分 Tauri 内部标识仍沿用旧标识；这不影响产品名称

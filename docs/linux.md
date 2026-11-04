@@ -2,9 +2,9 @@
 
 Linux builds use GTK 3 and WebKitGTK 4.1. The source build supports native PTYs,
 Secret Service credentials, Fontconfig font discovery, and opening paths/URLs through
-`xdg-open`. The source now also includes Linux x64 npm distribution. The release
-workflow combines it with Windows/macOS payloads; existing published npm versions
-are unchanged until a new release is built and published.
+`xdg-open`. Linux x64 desktop and npm distribution are published in v0.12.1. The
+release workflow combines the Linux application with Windows and macOS payloads
+in the same npm package; this guide covers source builds and local validation.
 
 ## Build and run
 

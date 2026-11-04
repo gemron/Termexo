@@ -1,27 +1,46 @@
-# Termexo npm launcher
+# Termexo
 
 This package runs the Windows, macOS or Linux desktop application for
 [Termexo](https://www.termexo.com/). Let a connected AI use MCP to operate
 Claude Code, Codex, OpenCode, Pi Agent, Grok Build, and Antigravity terminals: find a
 terminal, send a prompt, submit it, and read the actual reply. All six agents
-run in a local workbench you can view and take over.
+run in a local workbench you can view and take over. Keep projects, native sessions,
+content previews and optional phone access together. MIT licensed, with no Termexo
+account required. Install and sign in to the Agent CLIs you use; Termexo does not
+include a model subscription.
 
 ## Install
 
 The npm launcher requires Node.js 18.18 or later.
 
-Supports Windows x64, macOS 12 or later on Apple Silicon and Intel, and Linux x64
-with glibc, GTK 3 and WebKitGTK 4.1. Linux needs a graphical desktop session.
+| Operating system | Included architecture | Requirements |
+| --- | --- | --- |
+| Windows | x64 | Windows 10 build 17763+; WebView2 Chromium 111+ |
+| macOS | Apple Silicon (arm64) and Intel (x64) | macOS 12+ |
+| Linux | x64 | glibc, GTK 3, WebKitGTK 4.1 and a graphical desktop session |
 
 ```sh
-npm install --global termexo
+npm install --global termexo@latest
 termexo
 ```
 
-The combined npm package includes the Windows executable, both macOS app archives,
-and the complete Linux application archive. No separate Termexo application download
-is needed. Linux system libraries are installed by the OS package manager; npm does
-not install them or run sudo. On Ubuntu 24.04 and later:
+The same npm package includes four complete application builds across these three
+operating systems, selecting the matching one locally. No separate Termexo
+application download is needed. To update a global installation, run the install
+command again, then restart Termexo and your Agent terminals.
+
+You can also run without a global installation:
+
+```sh
+npx termexo@latest
+```
+
+For a specific published release, run `npx termexo@0.12.1`.
+
+### Linux system libraries
+
+Unlike a `.deb` installation, npm does not install desktop libraries or run `sudo`.
+On Ubuntu 24.04 and later, install the required system libraries first:
 
 ```sh
 sudo apt-get install libwebkit2gtk-4.1-0 libgtk-3-0t64 libayatana-appindicator3-1 \
@@ -30,12 +49,6 @@ sudo apt-get install libwebkit2gtk-4.1-0 libgtk-3-0t64 libayatana-appindicator3-
 
 Other distributions require equivalent libraries; musl/Alpine and Linux ARM builds
 are not included. Saving API keys needs an unlocked Secret Service keyring.
-You can also
-run it without a global install:
-
-```sh
-npx termexo
-```
 
 ## Commands
 
@@ -52,7 +65,7 @@ bundled application. On macOS, the matching app is extracted once into
 `~/Library/Caches/Termexo/npm/` and opened through Launch Services. Its archive
 preserves executable permissions, resources and signatures. macOS packages use
 ad-hoc signing and are not notarized; macOS may ask you to allow the app in
-Privacy & Security.
+Privacy & Security. Windows packages are unsigned while code-signing approval is pending.
 
 On Linux, the complete `usr/bin` + `usr/lib/Termexo` application is extracted into
 `${XDG_CACHE_HOME:-~/.cache}/Termexo/npm/`, preserving executable permissions and
@@ -61,27 +74,23 @@ archive hash. Missing shared libraries, unsupported architectures and headless
 launches produce a diagnostic. Application data remains in its separate XDG data
 directory. `--help` and `--version` work without a display.
 
-Linux npm support is new in this source branch; earlier published packages may not
-contain it. To build a Linux-only npm archive locally after building the `.deb`:
+Linux desktop and npm distribution are available in v0.12.1. For source builds and
+local package validation, see the [Linux guide](https://github.com/gemron/Termexo/blob/main/docs/linux.md).
 
-```sh
-npm run npm:stage:linux
-npm run npm:pack:linux
-npm install --global ./validation-results/linux-npm/termexo-0.12.1.tgz
-```
+## Version 0.12.1
 
-Run these build commands from the repository root. The local Linux-only package has
-the same name/version as the combined release package; do not publish it over a
-combined release. See `docs/linux.md` in the repository for validation instructions.
+- Windows x64, macOS Apple Silicon / Intel and Linux x64 builds in one npm package.
+- Multiple content preview tabs and syntax highlighting that keeps source whitespace intact.
+- Saved project actions with working directories and environment variables.
+- Native Agent sessions, account and model profiles, and task status visibility.
+- Optional remote access, including read-only links; the host computer must stay on.
+- Local MCP control of supported agent terminals and tasks.
+- Removal of the built-in One Ring workflow engine and its bundled Node.js runtime
+  to reduce package size. Public MCP tools and ordinary Agent terminals remain available.
 
-## Version 0.11.0
-
-Adds multiple content preview tabs, syntax highlighting that preserves source
-whitespace, smoother saved-action discovery, and third-party notification controls.
-GitHub Actions combines Windows x64, macOS Apple Silicon, macOS Intel and Linux x64 builds
-into this package, selecting the matching application when you run `termexo`.
-Windows EXE/MSI, macOS DMG and Linux `.deb` installers are assembled for GitHub releases.
-Restart Termexo and Agent terminals after updating.
+GitHub Actions builds and publishes the combined npm package and the Windows EXE/MSI,
+macOS DMG and Linux `.deb` installers. See the [release notes](https://github.com/gemron/Termexo/releases/tag/v0.12.1)
+and [full changelog](https://github.com/gemron/Termexo/blob/main/CHANGELOG.md).
 
 ## Let one AI operate another through MCP
 

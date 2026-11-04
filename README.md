@@ -14,6 +14,7 @@
   <img alt="Version 0.12.1" src="https://img.shields.io/badge/version-0.12.1-58c7a0">
   <img alt="Windows" src="https://img.shields.io/badge/platform-Windows-0078D4?logo=windows">
   <img alt="macOS" src="https://img.shields.io/badge/platform-macOS-222222?logo=apple">
+  <img alt="Linux" src="https://img.shields.io/badge/platform-Linux-FCC624?logo=linux&logoColor=black">
   <img alt="Tauri 2" src="https://img.shields.io/badge/Tauri-2-24C8DB?logo=tauri&logoColor=white">
   <img alt="Angular 22" src="https://img.shields.io/badge/Angular-22-DD0031?logo=angular">
 </p>
@@ -35,7 +36,7 @@
 
 **Use MCP to let AI operate Claude Code, Codex, OpenCode, Pi Agent, Grok Build, and Antigravity terminals.**
 
-Give a connected AI an instruction. Through Termexo, it can find another agent's terminal, send a prompt, submit it, and read the actual reply. Watch the process or take over in the same Windows or macOS workbench, with working, approval, and completion states in view.
+Give a connected AI an instruction. Through Termexo, it can find another agent's terminal, send a prompt, submit it, and read the actual reply. Watch the process or take over in the same Windows, macOS or Linux workbench, with working, approval, and completion states in view.
 
 All six agents run in real terminals on your PC. Termexo also organizes projects into workspaces, resumes native sessions, and lets you reconnect from your phone through your own relay, a trusted LAN, or a VPN.
 
@@ -43,7 +44,7 @@ All six agents run in real terminals on your PC. Termexo also organizes projects
 
 *Watch 30 seconds of real v0.10.6 desktop use: completion notifications, return to a session, reply, and review two Antigravity sessions side by side. Includes Chinese and English captions; waiting intervals are cut.*
 
-**[Download for Windows and macOS](https://github.com/gemron/Termexo/releases/latest)** · [Watch the demo](https://www.termexo.com/#workbench-demo) · [Share first-use feedback](https://github.com/gemron/Termexo/issues/new?template=first-use.yml)
+**[Download for Windows, macOS and Linux](https://github.com/gemron/Termexo/releases/latest)** · [Watch the demo](https://www.termexo.com/#workbench-demo) · [Share first-use feedback](https://github.com/gemron/Termexo/issues/new?template=first-use.yml)
 
 | Let AI operate other agents | Know who needs you | Continue from your phone |
 | --- | --- | --- |
@@ -71,7 +72,7 @@ With several AI coding tools running, you spend time sending requests, checking 
 
 **Available today and planned:** These scenarios center on individuals and team members operating their own workbenches, with people assigning tasks and handling approvals. Shared workspaces, granular permissions, centralized audit, and broader automatic orchestration are part of the [long-term product direction](Termexo.md), not a ready-made enterprise administration platform.
 
-## Get started on Windows or macOS
+## Get started on Windows, macOS or Linux
 
 1. **[Download v0.12.1](https://github.com/gemron/Termexo/releases/tag/v0.12.1)** — choose Windows EXE/MSI, the Mac DMG for Apple Silicon (`aarch64`) or Intel (`x64`), or the Linux x64 Debian package. No Rust or build tools needed.
 2. Open Termexo and create a workspace for a project folder on your PC.
@@ -84,7 +85,9 @@ Already have Node.js 18.18+? Run:
 npx termexo@latest
 ```
 
-Windows requires Windows 10 build 17763+ and WebView2 Chromium 111+. Mac builds require macOS 12+ on Apple Silicon or Intel. The same npm package includes all three applications; on Mac, the matching complete app is cached and opened through Launch Services.
+Windows requires Windows 10 build 17763+ and WebView2 Chromium 111+. Mac builds require macOS 12+ on Apple Silicon or Intel. Linux builds support x64 with glibc, GTK 3, WebKitGTK 4.1 and a graphical desktop session. The same npm package contains four builds across these three operating systems and selects the matching application locally.
+
+On Mac, npm caches the complete app and opens it through Launch Services. On Linux, install the required system libraries first; npm does not install desktop libraries or run `sudo`. API key storage requires an unlocked Secret Service keyring. See the [npm installation guide](packages/termexo/README.md#linux-system-libraries) for the Ubuntu command and platform requirements. Linux ARM and Alpine/musl builds are not included.
 
 Windows code signing is awaiting SignPath approval. Mac builds use ad-hoc signing and are not notarized; macOS may require allowing the app in Privacy & Security. Broader Mac GUI testing is still needed.
 Install and configure your chosen agent CLI and model access; Termexo does not include a model subscription.
@@ -127,7 +130,7 @@ After that, try a project task:
 
 The desktop opens an outbound tunnel, with no public IP or router port forwarding required. **Keep the PC on with Termexo running and connected to the relay.** Direct access over a trusted LAN or controlled VPN is also available.
 
-Relay login and the desktop access token are independent checks. After the v2 handshake, session frames use AES-256-GCM; the relay forwards encrypted terminal sessions. The relay has Linux, macOS and Windows x64 / arm64 binaries and container deployment; Termexo desktop packages are available for Windows x64 and macOS Apple Silicon / Intel.
+Relay login and the desktop access token are independent checks. After the v2 handshake, session frames use AES-256-GCM; the relay forwards encrypted terminal sessions. The relay has Linux, macOS and Windows x64 / arm64 binaries and container deployment; Termexo desktop packages are available for Windows x64, macOS Apple Silicon / Intel and Linux x64. Read-only remote links let a viewer inspect the workbench without sending terminal input or changing settings.
 
 [![Termexo mobile workbench](website/assets/termexo-phone.png)](https://www.termexo.com/guide.en.html#remote)
 
@@ -185,7 +188,7 @@ Trying it for the first time? [Tell us what worked or where you got stuck](https
     <td width="50%" valign="top">
       <strong>Same CLI. Different model.</strong><br><br>
       Point Claude Code at Anthropic, DeepSeek, MiniMax, GLM, or a custom Anthropic-compatible
-      endpoint. Save providers as profiles, keep API keys in Windows Credential Manager / macOS Keychain, and
+      endpoint. Save providers as profiles, keep API keys in Windows Credential Manager / macOS Keychain / Linux Secret Service, and
       switch every Claude terminal in a workspace together.
       <br><br>
       <a href="website/assets/termexo-models.png"><img src="website/assets/termexo-models.png" alt="Termexo model provider profiles"></a>
@@ -230,7 +233,7 @@ Trying it for the first time? [Tell us what worked or where you got stuck](https
 </table>
 
 Termexo is local by default: it has no account, cloud service, or required sync. Workspace
-state stays in local SQLite storage, credentials stay in Windows Credential Manager / macOS Keychain, and
+state stays in local SQLite storage, credentials stay in Windows Credential Manager / macOS Keychain / Linux Secret Service, and
 Claude/Codex session histories are read-only. The agent CLIs still connect to the providers
 you configure under their own terms and privacy policies.
 
@@ -293,7 +296,7 @@ Set `TERMEXO_PI_PATH` to override the executable. Session discovery respects `PI
 | Session handoff          | Build redacted, token-budgeted Git/task packages; import/export documents and continue in another Agent            |
 | Git graph and diff       | Show the active terminal's branch, commit topology, and changes since terminal start with unified or split diff    |
 | Remote access            | Serve the whole workbench over HTTPS to phones and other computers on the network, gated by an access token with QR entry and rotation, with every remote call passing an explicit command allowlist |
-| Local data and secrets   | Store workspace/session/event data in SQLite and API keys in Windows Credential Manager / macOS Keychain                            |
+| Local data and secrets   | Store workspace/session/event data in SQLite and API keys in Windows Credential Manager / macOS Keychain / Linux Secret Service                            |
 | Browser preview          | Preview the complete UI without Rust and exercise layout flows through an interactive simulated terminal           |
 
 ![Termexo model profiles](website/assets/termexo-models.png)
@@ -322,6 +325,7 @@ Set `TERMEXO_PI_PATH` to override the executable. Session discovery respects `PI
 ## Current Boundaries
 
 - macOS updates use a new DMG or `npm install --global termexo@latest`; in-app automatic updates and Windows system-proxy discovery are not provided on Mac.
+- Linux x64 is available through `.deb` or npm. It requires a graphical desktop, GTK / WebKitGTK libraries and an unlocked Secret Service keyring for API keys. Update through a new package or npm; Windows-only WeChat automation and system-proxy discovery do not apply.
 - Windows and macOS builds support detection and launch for all six Agent types, with native sessions discoverable and resumable from the session center. macOS runtime coverage varies by Agent; see the release notes for known limits. Status events and launch options vary by CLI; compatible-provider model switching currently applies to Claude terminals.
 - Termexo restores terminal configuration after an app restart. An exited operating-system process is not treated as still running; resume a historical agent session explicitly from the session center.
 - Native session files remain read-only. Cross-agent handoff uses a redacted context package rather than rewriting a provider's private transcript.
@@ -339,11 +343,12 @@ These requirements are for contributors building Termexo, not for installing the
 
 macOS source builds require macOS 12+ and Xcode command-line tools. The Windows-specific runtime requirements below do not apply to Mac builds.
 
-Linux source builds are also available; see [Linux build and desktop testing](docs/linux.md) for dependencies, `.deb` packaging, and real WebKit/PTY smoke tests.
+Linux x64 desktop and npm packages are published in v0.12.1. See [Linux build and desktop testing](docs/linux.md) for dependencies, `.deb` packaging, and real WebKit/PTY smoke tests.
 
-This source branch also adds Linux x64 npm packaging and real installation tests.
-Build a local npm archive with `npm run npm:stage:linux` followed by `npm run npm:pack:linux`
-after building the `.deb`; see the Linux guide. Earlier published npm packages remain unchanged.
+For local Linux package development, build the `.deb`, then run `npm run npm:stage:linux`
+followed by `npm run npm:pack:linux`. This produces a Linux-only test archive, not the
+combined package distributed on npm. The source toolchain requirements below are separate
+from the npm launcher's Node.js 18.18+ requirement.
 
 - Windows 10 build 17763 (October 2018) or newer, the first to carry the pseudo console the
   terminals run on;
@@ -404,7 +409,7 @@ flowchart LR
     Adapters["Agent Adapters"]
     Hooks["Hooks / Event Pipeline"]
     DB[("SQLite")]
-    Vault["Windows Credential Manager / macOS Keychain"]
+    Vault["Windows Credential Manager / macOS Keychain / Linux Secret Service"]
     Agents["Claude Code / Codex"]
 
     UI <--> IPC
@@ -434,7 +439,7 @@ flowchart LR
 | Agent events                          | JSONL spool + SQLite          | Deduplicated by `event_key`                  |
 | Model and MCP profiles                | SQLite                        | Plaintext API keys never enter the database  |
 | Prompt assets and handoff packages    | SQLite                        | Common credentials are redacted before save  |
-| API keys                              | Windows Credential Manager / macOS Keychain    | The frontend can read only `hasCredential`   |
+| API keys                              | Windows Credential Manager / macOS Keychain / Linux Secret Service    | The frontend can read only `hasCredential`   |
 | Native agent sessions                 | Claude/Codex data directories | Read-only; never modified or deleted         |
 
 For compatibility with early installations, the database filename and some internal Tauri

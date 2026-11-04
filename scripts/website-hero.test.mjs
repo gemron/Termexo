@@ -15,6 +15,12 @@ const hero = html.slice(
   html.indexOf('<section class="signal-strip'),
 );
 const dictionaryContext = vm.createContext({});
+test("homepage keeps one complete, accessible main heading when copy changes", () => {
+  const headings = [...hero.matchAll(/<h1(?:\s[^>]*)?>([\s\S]*?)<\/h1>/g)];
+  assert.equal(headings.length, 1);
+  assert.match(headings[0][1], /data-i18n="heroLine1"/);
+  assert.match(headings[0][1], /data-i18n="heroLine2"/);
+});
 vm.runInContext(
   app.slice(0, app.indexOf("const languageButtons")),
   dictionaryContext,

@@ -107,7 +107,7 @@ def build(output, regular_font, bold_font, language="zh"):
         "h3": ParagraphStyle("heading", parent=base, fontName="GuideBold", fontSize=11, leading=18, spaceBefore=10, spaceAfter=4, keepWithNext=True),
         "meta": ParagraphStyle("meta", parent=base, fontSize=8, leading=13, textColor=colors.HexColor("#52685d")),
         "list": ParagraphStyle("list", parent=base, leftIndent=14, firstLineIndent=-14, spaceAfter=4),
-        "code": ParagraphStyle("code", parent=base, backColor=colors.HexColor("#f0f5f2"), borderPadding=10, spaceBefore=10, spaceAfter=16),
+        "code": ParagraphStyle("code", parent=base, backColor=colors.HexColor("#f0f5f2"), borderPadding=10, spaceBefore=8, spaceAfter=10),
         "callout": ParagraphStyle("callout", parent=base, backColor=colors.HexColor("#f0f5f2"), borderColor=colors.HexColor("#bfd9cb"), borderWidth=.5, borderPadding=10, spaceBefore=12, spaceAfter=14),
     }
     story = []
@@ -127,7 +127,10 @@ def build(output, regular_font, bold_font, language="zh"):
                 style = "meta"
             elif css == "guide-callout":
                 style = "callout"
-            paragraph = Paragraph(inline(node), styles[style])
+            markup = inline(node)
+            if node.tag == "pre":
+                markup = markup.replace("\n", "<br/>")
+            paragraph = Paragraph(markup, styles[style])
             if node.tag == "h2":
                 paragraph.guide_bookmark = section_id
             story.append(paragraph)

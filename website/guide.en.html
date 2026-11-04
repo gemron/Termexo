@@ -33,7 +33,7 @@
         </a>
         <nav aria-label="Guide navigation">
           <a href="./">Home</a>
-          <a class="guide-download" href="downloads/termexo-user-guide-en.pdf" download="Termexo-User-Guide-v0.11.0-en.pdf">Download PDF</a>
+          <a class="guide-download" href="downloads/termexo-user-guide-en.pdf" download="Termexo-User-Guide-v0.12.1-en.pdf">Download PDF</a>
         </nav>
         <div class="language-switch" role="group" aria-label="Guide language">
           <a href="guide.en.html" data-lang="en" lang="en" hreflang="en" aria-label="Read in English" aria-current="page" class="active">EN</a>
@@ -56,16 +56,16 @@
           <a href="#faq">08　FAQ</a>
           <a href="#privacy">09　Data &amp; security</a>
         </nav>
-        <p class="guide-sidebar-note">Windows / macOS desktop edition<br />V0.11.0 · English</p>
+        <p class="guide-sidebar-note">Windows / macOS / Linux desktop edition<br />V0.12.1 · English</p>
       </aside>
       <article id="guide-content" class="guide-content" lang="en">
         <header class="guide-intro">
           <p class="guide-label">TERMEXO / USER GUIDE</p>
           <h1>User guide</h1>
           <p class="guide-lead">Start with your first workspace. Keep your terminals, Agents and project progress together.</p>
-          <p class="guide-meta">For V0.11.0 · Updated 2026-10-27 · Windows x64 / macOS Apple Silicon and Intel</p>
+          <p class="guide-meta">For V0.12.1 · Updated 2026-11-04 · Windows x64 / macOS Apple Silicon and Intel / Linux x64</p>
           <div class="guide-actions" data-pdf-skip>
-            <a class="button primary" href="downloads/termexo-user-guide-en.pdf" download="Termexo-User-Guide-v0.11.0-en.pdf">Download English guide · PDF</a>
+            <a class="button primary" href="downloads/termexo-user-guide-en.pdf" download="Termexo-User-Guide-v0.12.1-en.pdf">Download English guide · PDF</a>
             <a class="button secondary" href="#quick-start">Start reading ↓</a>
           </div>
           <p class="guide-note" data-pdf-skip>The English PDF matches this page and works offline. Labels and button locations may vary by app language or version. The workbench screenshot shows the Chinese interface.</p>
@@ -73,19 +73,24 @@
 
         <section id="quick-start" class="guide-section">
           <h2>01 / Install and get started</h2>
-          <p>Termexo is a Windows and macOS workbench for real terminals and coding Agents. No Termexo account is required. To use an Agent, you still need its CLI and a signed-in account or a model provider's API key.</p>
+          <p>Termexo is a Windows, macOS and Linux workbench for real terminals and coding Agents. No Termexo account is required. To use an Agent, you still need its CLI and a signed-in account or a model provider's API key.</p>
           <h3>Choose an installation method</h3>
           <ul>
-            <li><strong>Download the installer:</strong> open the <a href="https://github.com/gemron/Termexo/releases/latest">latest GitHub release</a>, choose Windows EXE/MSI or a Mac DMG for Apple Silicon (aarch64) or Intel (x64) from Assets. Windows needs WebView2; Mac builds need macOS 12+. Installer users do not need Rust or the source development toolchain.</li>
-            <li><strong>Run through npm:</strong> with Node.js 18.18 or later installed, run the following command in a Windows terminal or macOS Terminal. The same npm package includes Windows x64 and both complete Mac apps, selecting the matching application at startup.</li>
+            <li><strong>Download the installer:</strong> open the <a href="https://github.com/gemron/Termexo/releases/latest">latest GitHub release</a> and choose Windows EXE/MSI, a Mac DMG for Apple Silicon (aarch64) or Intel (x64), or the Linux x64 .deb from Assets. Windows needs WebView2; Mac builds need macOS 12+. Linux needs glibc, GTK 3, WebKitGTK 4.1 and a graphical desktop. Installer users do not need Rust or the source development toolchain.</li>
+            <li><strong>Run through npm:</strong> with Node.js 18.18 or later installed, run the following command in a Windows, macOS or Linux terminal. The same npm package includes four complete application builds across these three operating systems, selecting the matching application at startup.</li>
           </ul>
           <pre><code>npx termexo@latest</code></pre>
           <p>For a global command, run <code>npm install --global termexo</code>, then launch <code>termexo</code>. Run the installation command again to update a global installation.</p>
           <p>On Mac, npm caches the matching complete app in <code>~/Library/Caches/Termexo/npm/</code>, preserving executable permissions and app resources. Windows code signing is awaiting approval. Mac builds use ad-hoc signing and are not notarized; macOS may require allowing the app in Privacy &amp; Security.</p>
+          <h3>Before launching through npm on Linux</h3>
+          <p>npm does not install system libraries or run sudo. On Ubuntu 24.04 and later, install the dependencies below first; other distributions need equivalent packages. API key storage requires an unlocked Secret Service keyring. Linux ARM and Alpine/musl builds are not included, and a graphical desktop session is required to launch the app.</p>
+          <pre><code>sudo apt-get install libwebkit2gtk-4.1-0 libgtk-3-0t64 \
+  libayatana-appindicator3-1 libsecret-1-0 \
+  gnome-keyring fontconfig xdg-utils</code></pre>
           <h3>Your first session in three steps</h3>
           <ol>
             <li><strong>Create a workspace.</strong> Use the first-run guide to create a workspace. Enter a project name and select a project folder that actually exists on this computer.</li>
-            <li><strong>Prepare an Agent.</strong> Check the detection status of Claude Code, Codex, OpenCode, Pi Agent, Antigravity and Grok Build in Settings. If needed, open Install & update, choose the Agent and click Install latest version. Complete the selected Agent's sign-in or model configuration. Starting a terminal for an agent that is not installed also offers Install from the dialog itself, opened on that agent.</li>
+            <li><strong>Prepare an Agent.</strong> In Settings → Install &amp; update, check your Agent and choose Install latest version if needed. Then sign in or configure its model. A missing Agent's launch dialog also links to its installer.</li>
             <li><strong>Open a terminal.</strong> Click New on the tab bar, select an Agent, and confirm the working folder, account and model. Start it and enter a task. You can also open a regular terminal first to check the project path and command environment.</li>
           </ol>
           <p class="guide-callout">Start with a small check, such as: "Read this project and explain how to run its tests. Do not change any files yet." Confirm the folder, account and connection before assigning code changes.</p>
@@ -137,7 +142,7 @@
             <li>Check that the protocol matches the selected Agent. A compatible Claude Code backend must support the relevant Anthropic API. An arbitrary model URL is not necessarily usable.</li>
             <li>Save the profile, select it when starting or resuming a terminal, and send a short test request. Before switching an existing terminal, read the app's notice and make sure the current task can be interrupted.</li>
           </ol>
-          <p>API keys are stored in Windows Credential Manager or macOS Keychain. The allowance panel shows reported quota for supported profiles, with Antigravity queried directly through its HTTP Quota endpoint. Grok Build's usage card recognizes an exhausted free allowance; an unavailable percentage is shown as unavailable, not as 0% used. Values marked as estimates or unavailable are not official billing data.</p>
+          <p>API keys are stored in Windows Credential Manager, macOS Keychain or Linux Secret Service. The allowance panel shows reported quota for supported profiles, with Antigravity queried directly through its HTTP Quota endpoint. Grok Build's usage card recognizes an exhausted free allowance; an unavailable percentage is shown as unavailable, not as 0% used. Values marked as estimates or unavailable are not official billing data.</p>
           <h3>Antigravity's models and status feed</h3>
           <p>Antigravity does not use Termexo's model profiles. Its model and reasoning effort are chosen in the new-terminal dialog, from what the agy on this machine offers.</p>
           <p>It also has no per-launch configuration of any kind, so for a terminal to know whether it is thinking, running a tool or waiting for an answer, Termexo writes into the status line in agy's own settings. This is on by default and can be turned off in Settings, which puts back whatever status line you had. Termexo only recognises the block it wrote itself and never touches one of your own.</p>
@@ -167,6 +172,7 @@
           <h3>Content previews and saved project actions</h3>
           <p>Create content preview tabs from the tab bar. Open several files, images or websites, adjust the preview width, and highlight code while preserving its original lines, spaces and indentation. Agents can also open project and web previews through MCP.</p>
           <p>Saved actions keep Agent selection or startup, discovery and review in one window. Select all, edit individual entries and remove duplicates before confirming from the fixed footer.</p>
+          <p>Saved commands can include a working directory and environment variables, which are applied when the command starts. Check environment values before sharing a command, as they may contain sensitive data.</p>
           <h3>Notifications</h3>
           <p>Windows uses system notifications and taskbar attention; macOS uses Notification Center, subject to system settings. The toolbar master switch pauses or resumes configured third-party channels. Messages include time and session context. Desktop WeChat delivery is available on Windows, and each channel still requires its own opt-in.</p>
         </section>
@@ -215,6 +221,7 @@
         <section id="remote" class="guide-section" data-pdf-page>
           <h2>07 / Mobile and remote access</h2>
           <p>Remote access is off by default. When enabled, a phone, tablet or another computer can operate the desktop's existing workspaces and terminals in a browser. You do not need to install the Agents on your phone.</p>
+          <p>For viewing only, use a read-only access link. Read-only connections cannot send terminal input, run actions or change settings. Use a full-access connection when you need to operate the workbench. The host must stay on with Termexo running.</p>
           <h3>Across networks: connect through your own relay</h3>
           <p>The desktop opens an outbound tunnel, so it needs no public IP or router port forwarding. Keep the PC on with Termexo running and connected. Terminal processes still run on the desktop.</p>
           <ol>
@@ -262,14 +269,15 @@
           <h3>I can see the terminal on my phone, but cannot copy or paste.</h3>
           <p>Browser clipboard access depends on a secure context and permissions. Use HTTPS and grant permission when prompted. If it remains unavailable, select text to copy or paste manually. Drag with a finger to scroll the terminal on a narrow screen.</p>
           <h3>How do I update Termexo?</h3>
-          <p>On macOS, update manually through a new DMG or npm; the current app does not offer automatic updates. Windows system-proxy discovery does not apply to Mac network settings.</p>
+          <p>On macOS and Linux, update manually through a new installer or npm; in-app automatic updates are not provided on these platforms. Windows system-proxy discovery does not apply, and desktop WeChat window automation is Windows-only.</p>
+          <p>v0.12.1 removes the built-in One Ring workflow entry and runtime to reduce package size. Ordinary Agent terminals, the task board and public MCP tools remain available. Previously managed workflow terminals reopen as ordinary Agent sessions; saved workflow data remains on the host.</p>
           <p>Installer users can download from the <a href="https://github.com/gemron/Termexo/releases/latest">latest release page</a>. npm users can run <code>npx termexo@latest</code> or update the global installation. Save files and finish or hand off running tasks before updating. Updating Termexo and updating an Agent CLI are separate operations; upgrade CLIs in their own management entry.</p>
         </section>
 
         <section id="privacy" class="guide-section" data-pdf-page>
           <h2>09 / Data and security</h2>
           <ul>
-            <li>Termexo works locally by default, with no Termexo account or mandatory cloud sync. Workspace state stays on the host, and API keys are stored in Windows Credential Manager or macOS Keychain.</li>
+            <li>Termexo works locally by default, with no Termexo account or mandatory cloud sync. Workspace state stays on the host, and API keys are stored in Windows Credential Manager, macOS Keychain or Linux Secret Service.</li>
             <li>The Storage panel in Settings names the data directory, lists what is in it with the size of each file, and gives the running executable's own path and version. The database is the thing worth watching.</li>
             <li>The data directory can be moved to another drive: choose an empty directory and Termexo copies everything there and records it for the next start. Nothing is deleted by the move: the panel names the previous copy, which you reclaim yourself once you are satisfied. The target directory must be empty.</li>
             <li>Agent CLIs still send requests to the model services you choose. Which code and context leave the computer depends on the CLI, provider configuration and privacy policy.</li>
@@ -281,7 +289,7 @@
       </article>
     </main>
     <footer class="guide-footer">
-      <div class="shell guide-footer-links"><span>Termexo User Guide · V0.11.0</span><a href="#guide-content">Back to top ↑</a><a href="downloads/termexo-user-guide-en.pdf" download="Termexo-User-Guide-v0.11.0-en.pdf">Download PDF</a></div>
+      <div class="shell guide-footer-links"><span>Termexo User Guide · V0.12.1</span><a href="#guide-content">Back to top ↑</a><a href="downloads/termexo-user-guide-en.pdf" download="Termexo-User-Guide-v0.12.1-en.pdf">Download PDF</a></div>
       <div class="shell site-counter">
         <p>Website visits (PV): <span id="busuanzi_value_site_pv" class="site-counter-value">—</span></p>
         <p>Third-party website statistics only; “-” means unavailable.</p>
