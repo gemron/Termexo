@@ -11,6 +11,7 @@ mod hooks;
 mod mcp;
 mod network;
 mod notification;
+mod one_ring;
 mod platform;
 mod process;
 mod pty;
@@ -155,6 +156,7 @@ pub fn run() {
             let events = Arc::new(RemoteEventHub::new());
             app.manage(events.clone());
             app.manage(PtyManager::new(events.clone()));
+            app.manage(one_ring::OneRingManager::new(app.handle().clone())?);
             app.manage(RepositoryManager::default());
             app.manage(RepositoryWatcher::new(app.handle().clone(), events.clone()));
             app.manage(QuotaCache::default());
@@ -168,6 +170,10 @@ pub fn run() {
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
+            commands::one_ring_plugin::get_one_ring_plugin,
+            commands::one_ring_plugin::check_one_ring_plugin,
+            commands::one_ring_plugin::save_one_ring_plugin,
+            commands::one_ring_plugin::complete_one_ring_worker,
             commands::mcp::get_mcp_server_status,
             commands::mcp::update_mcp_server_settings,
             commands::mcp::regenerate_mcp_server_token,

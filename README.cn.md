@@ -121,6 +121,8 @@ MCP 是 AI 与 Termexo 之间的连接。**你用日常语言提出要求，不�
 
 [完整 MCP 使用说明与排查](./docs/mcp-server.md) · [在线图文指南](https://www.termexo.com/guide.html#ai-control)
 
+开发版支持在 **设置 → Codex 插件** 连接外部 [One Ring](docs/one-ring-plugin.md)，在工作区内显示持续的 Worker 会话。插件默认关闭，当前支持 Linux/Codex。
+
 ## 通过自建中继，从电脑接到手机
 
 1. 在电脑上打开项目，启动 Claude Code、Codex、OpenCode、Pi Agent、Antigravity 或 Grok Build。

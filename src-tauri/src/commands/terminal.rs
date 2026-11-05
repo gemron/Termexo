@@ -176,6 +176,8 @@ pub fn create_terminal(
     }
     app.state::<std::sync::Arc<crate::mcp::McpManager>>()
         .prepare_agent_launch(&mut request, &mut environment)?;
+    app.state::<std::sync::Arc<crate::one_ring::OneRingManager>>()
+        .prepare_agent_launch(&mut request, &mut environment)?;
     apply_terminal_environment(&mut environment, &request.environment);
     if let Err(error) = repositories.capture_baseline(
         request.workspace_id.as_deref(),

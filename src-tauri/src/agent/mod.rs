@@ -3,6 +3,7 @@ pub mod antigravity_settings;
 mod claude;
 mod cli;
 mod codex;
+pub(crate) mod codex_config;
 mod grok;
 mod opencode;
 mod pi;

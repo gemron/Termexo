@@ -88,7 +88,7 @@ pub(super) fn inject(
                 "mcp_servers.{SERVER}={{command={},args=[{args}],enabled=true}}",
                 toml_literal(&executable.to_string_lossy()).map_err(|e| e.to_string())?
             );
-            command.push_str(&format!(" -c {}", quote(&config)));
+            crate::agent::codex_config::append_overrides(command, &[config]);
         }
         Some("opencode") => {
             let mut config: Value = match environment.get("OPENCODE_CONFIG_CONTENT") {
