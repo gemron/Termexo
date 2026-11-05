@@ -4108,6 +4108,11 @@ export class App {
       );
       const { McpDesktopService, mcpPreferenceActions } =
         await import('./core/services/mcp-desktop.service');
+      const { OneRingDesktopService } = await import('./core/services/one-ring-desktop.service');
+      await this.injector.get(OneRingDesktopService).start((workspaceId, terminalId) => {
+        this.selectWorkspace(workspaceId);
+        this.revealCreatedTerminal(terminalId);
+      });
       await this.injector.get(McpDesktopService).start({
         terminalCreated: (workspaceId, terminalId) => {
           this.selectWorkspace(workspaceId);
