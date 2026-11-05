@@ -55,11 +55,13 @@ import { registerMcpServerTranslations } from '../core/i18n/mcp-server.i18n';
 import { AGENT_ICONS } from '../core/models/workspace.models';
 import { ProjectLinksComponent } from './project-links';
 import { AgentInstallPanelComponent } from './agent-install-panel';
+import { CodexPluginsPanelComponent } from './codex-plugins-panel';
 import { isTauriRuntime } from '../core/services/tauri-runtime';
 
 export type SettingsTab =
   | 'diagnostics'
   | 'cli'
+  | 'codex-plugins'
   | 'accounts'
   | 'models'
   | 'mcp'
@@ -72,10 +74,12 @@ export type SettingsTab =
 registerMcpServerTranslations();
 registerTranslations({
   en: {
+    'settings.codexPlugins': 'Codex plugins',
     'wechat.tab': 'WeChat notifications',
     'settings.hostCredentialStorage': 'Host operating system credential store',
   },
   'zh-CN': {
+    'settings.codexPlugins': 'Codex 插件',
     'wechat.tab': '微信通知',
     'settings.hostCredentialStorage': '宿主操作系统凭据存储',
   },
@@ -115,6 +119,7 @@ const DEFAULT_ALERT_THRESHOLD = 80;
     McpServerPanelComponent,
     ProjectLinksComponent,
     AgentInstallPanelComponent,
+    CodexPluginsPanelComponent,
     TranslatePipe,
   ],
   template: `
@@ -1307,6 +1312,9 @@ const DEFAULT_ALERT_THRESHOLD = 80;
                 <section class="profile-editor"></section>
               }
             }
+            @case ('codex-plugins') {
+              @defer (on immediate) { <app-codex-plugins-panel /> }
+            }
             @case ('wechat') {
               @defer (on immediate) {
                 <app-wechat-notifications-panel />
@@ -1420,6 +1428,7 @@ export class AgentSettingsDialogComponent {
       tabs: [
         { id: 'diagnostics', label: 'settings.tabDiagnostics' },
         { id: 'cli', label: 'settings.tabCli' },
+        { id: 'codex-plugins', label: 'settings.codexPlugins' },
         { id: 'accounts', label: 'settings.tabAccounts' },
         { id: 'models', label: 'settings.tabModels' },
         { id: 'mcp', label: 'settings.tabMcp' },

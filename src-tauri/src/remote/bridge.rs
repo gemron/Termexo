@@ -143,6 +143,10 @@ pub const REMOTE_ALLOWED: &[&str] = &[
 /// Commands a remote client must never reach, with the reason each one is held back.
 pub const REMOTE_DENIED: &[&str] = &[
     // Selects executable local plugin code on the desktop host.
+    "get_one_ring_plugin",
+    "check_one_ring_plugin",
+    "save_one_ring_plugin",
+    "complete_one_ring_worker",
     // MCP grants access to the desktop independently of a remote workbench session.
     "get_mcp_server_status",
     "update_mcp_server_settings",

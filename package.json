@@ -15,6 +15,7 @@
     "npm:publish": "npm publish ./packages/termexo --access public",
     "npm:test": "npm --prefix packages/termexo test",
     "test:desktop:linux": "node scripts/linux-desktop-smoke.mjs",
+    "test:one-ring:desktop": "node scripts/one-ring-desktop-smoke.mjs",
     "tauri:dev": "node scripts/run-tauri.mjs dev",
     "tauri:build": "node scripts/run-tauri.mjs build",
     "tauri:dev:mac": "npm --prefix apps/desktop-ui run tauri:dev --",
