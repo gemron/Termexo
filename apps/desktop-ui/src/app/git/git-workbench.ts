@@ -1,8 +1,12 @@
+import { NgTemplateOutlet } from '@angular/common';
+import './git-workbench.i18n';
 import {
   Component,
+  afterNextRender,
   computed,
+  DestroyRef,
   effect,
-  type ElementRef,
+  ElementRef,
   HostListener,
   inject,
   input,
@@ -28,6 +32,7 @@ import {
 import { I18nService } from '../core/i18n/i18n.service';
 import { TranslatePipe } from '../core/i18n/translate.pipe';
 import { GitService } from '../core/services/git.service';
+import { writeClipboardText } from '../core/services/clipboard-text';
 import { IconComponent } from '../shared/icon/icon';
 
 /**
@@ -37,6 +42,8 @@ import { IconComponent } from '../shared/icon/icon';
  * whether this is the edit being looked for.
  */
 const CHANGE_SCROLL_HEADROOM = 0.3;
+const CLIPBOARD_FEEDBACK_MS = 1500;
+const COMPACT_GIT_WIDTH = 680;
 
 interface CommitGraphRow {
   commit: RepositoryCommit;
@@ -48,12 +55,15 @@ interface CommitGraphRow {
 
 @Component({
   selector: 'app-git-workbench',
-  imports: [IconComponent, TranslatePipe],
+  imports: [IconComponent, NgTemplateOutlet, TranslatePipe],
   templateUrl: './git-workbench.html',
   styleUrl: './git-workbench.scss',
 })
 export class GitWorkbenchComponent {
   private readonly git = inject(GitService);
+  private readonly destroyRef = inject(DestroyRef);
+  private readonly host = inject<ElementRef<HTMLElement>>(ElementRef);
+  private clipboardTimer?: ReturnType<typeof setTimeout>;
   private diffRequestRevision = 0;
   private loadedDiffKey = '';
   protected readonly i18n = inject(I18nService);
@@ -106,6 +116,45 @@ export class GitWorkbenchComponent {
     }
     return { added, removed };
   });
+  /** Narrows the change list by path; the diff of a filtered-out selection stays open. */
+  protected readonly fileFilter = signal('');
+  protected readonly treeView = signal(false);
+  private readonly collapsedDirs = signal<ReadonlySet<string>>(new Set());
+  protected readonly copiedValue = signal('');
+  protected readonly copyError = signal('');
+  protected readonly sidebarTab = signal<'changes' | 'history'>('changes');
+  private readonly compact = signal(false);
+  private readonly focusPreference = signal<boolean | null>(null);
+  protected readonly focusDiff = computed(() => this.focusPreference() ?? this.compact());
+  protected readonly wrapLines = signal(false);
+  private readonly changeList = viewChild<ElementRef<HTMLElement>>('changeList');
+
+  protected readonly filteredChanges = computed(() => {
+    const query = this.fileFilter().trim().toLowerCase();
+    const changes = this.overview()?.changes ?? [];
+    return query ? changes.filter((change) => change.path.toLowerCase().includes(query)) : changes;
+  });
+
+  protected readonly filePosition = computed(() => {
+    const files = this.filteredChanges();
+    const index = files.findIndex((change) => change.path === this.selectedPath());
+    return `${index < 0 ? '–' : index + 1}/${files.length}`;
+  });
+
+  /** Changes grouped by directory, each group collapsible. Flat when the tree view is off. */
+  protected readonly changeGroups = computed(() => {
+    const groups = new Map<string, RepositoryChange[]>();
+    for (const change of this.filteredChanges()) {
+      const slash = change.path.lastIndexOf('/');
+      const dir = slash < 0 ? '' : change.path.slice(0, slash);
+      groups.set(dir, [...(groups.get(dir) ?? []), change]);
+    }
+    const collapsed = this.collapsedDirs();
+    return [...groups.entries()]
+      .sort(([a], [b]) => a.localeCompare(b))
+      .map(([dir, changes]) => ({ dir, changes, collapsed: collapsed.has(dir) }));
+  });
+
   protected readonly graphRows = computed(() => buildCommitGraph(this.overview()?.commits ?? []));
 
   private readonly diffViewport = viewChild<ElementRef<HTMLElement>>('diffViewport');
@@ -127,12 +176,21 @@ export class GitWorkbenchComponent {
   });
 
   constructor() {
+    this.destroyRef.onDestroy(() => clearTimeout(this.clipboardTimer));
+    afterNextRender(() => {
+      if (typeof ResizeObserver === 'undefined') return;
+      const observer = new ResizeObserver(([entry]) => {
+        if (!this.destroyRef.destroyed) this.compact.set(entry.contentRect.width <= COMPACT_GIT_WIDTH);
+      });
+      observer.observe(this.host.nativeElement);
+      this.destroyRef.onDestroy(() => observer.disconnect());
+    });
     effect(() => {
       const overview = this.overview();
       const target = this.target();
       // Without an overview there is no file list to pick from, and whatever diff is on screen
       // belongs to an answer that no longer stands.
-      if (!overview || !target) {
+      if (!overview?.available || !target) {
         this.resetDiff();
         return;
       }
@@ -217,6 +275,65 @@ export class GitWorkbenchComponent {
 
   protected selectFile(change: RepositoryChange): void {
     this.git.selectPath(change.path);
+    if (this.compact()) this.focusPreference.set(true);
+  }
+
+  protected toggleFocusDiff(): void {
+    this.focusPreference.set(!this.focusDiff());
+  }
+
+  protected stepFile(step: 1 | -1): void {
+    const files = this.filteredChanges();
+    if (!files.length) return;
+    const index = files.findIndex((change) => change.path === this.selectedPath());
+    const next = index < 0 ? (step > 0 ? 0 : files.length - 1)
+      : (index + step + files.length) % files.length;
+    const path = files[next].path;
+    const directory = path.includes('/') ? path.slice(0, path.lastIndexOf('/')) : '';
+    this.collapsedDirs.update((items) => new Set([...items].filter((item) => item !== directory)));
+    this.sidebarTab.set('changes');
+    this.git.selectPath(path);
+    queueMicrotask(() => this.changeList()?.nativeElement
+      .querySelector<HTMLElement>('.change-file.active')?.scrollIntoView?.({ block: 'nearest' }));
+  }
+
+  protected onFilterInput(event: Event): void {
+    this.fileFilter.set((event.target as HTMLInputElement).value);
+  }
+
+  protected toggleDir(dir: string): void {
+    const next = new Set(this.collapsedDirs());
+    if (!next.delete(dir)) next.add(dir);
+    this.collapsedDirs.set(next);
+  }
+
+  protected fileName(path: string): string {
+    return path.split('/').at(-1) ?? path;
+  }
+
+  protected copyOid(oid: string): Promise<void> {
+    return this.copyText(oid);
+  }
+
+  protected copyPath(): Promise<void> {
+    const path = this.selectedPath();
+    return path ? this.copyText(path) : Promise.resolve();
+  }
+
+  private async copyText(value: string): Promise<void> {
+    this.copyError.set('');
+    try {
+      await writeClipboardText(value);
+      if (this.destroyRef.destroyed) return;
+      clearTimeout(this.clipboardTimer);
+      this.copiedValue.set(value);
+      this.clipboardTimer = setTimeout(() => this.copiedValue.set(''), CLIPBOARD_FEEDBACK_MS);
+    } catch (error) {
+      if (!this.destroyRef.destroyed)
+        this.copyError.set(this.i18n.t('git.ui.copyFailed', {
+          error: error instanceof Error ? error.message : String(error),
+        }));
+    }
   }
 
   protected changeStatus(change: RepositoryChange): string {

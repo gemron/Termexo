@@ -13,6 +13,7 @@ pub mod open;
 pub mod preview;
 pub mod quota;
 pub mod remote;
+pub mod remote_hosts;
 pub mod storage;
 pub mod terminal;
 pub mod todo;

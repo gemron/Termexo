@@ -16,6 +16,7 @@ mod process;
 mod pty;
 mod quota;
 mod remote;
+mod remote_hosts;
 mod storage;
 mod system_proxy;
 mod third_party_notifications;
@@ -37,6 +38,7 @@ use crate::git::RepositoryManager;
 use crate::hooks::HookEventStore;
 use crate::pty::PtyManager;
 use crate::remote::{RemoteAccessManager, RemoteEventHub};
+use crate::remote_hosts::RemoteHostManager;
 
 pub fn capture_hook_event_from_cli() -> Result<(), String> {
     hooks::capture_hook_event_from_cli().map_err(|error| error.to_string())
@@ -162,6 +164,8 @@ pub fn run() {
             let remote = RemoteAccessManager::new(app.handle().clone(), events);
             app.manage(remote.clone());
             tauri::async_runtime::spawn(async move { remote.start_if_enabled().await });
+            let remote_hosts = RemoteHostManager::new(app.handle().clone());
+            app.manage(remote_hosts);
             let mcp = mcp::McpManager::new(app.handle().clone())?;
             app.manage(mcp.clone());
             tauri::async_runtime::spawn(async move { mcp.start_if_enabled().await });
@@ -285,6 +289,14 @@ pub fn run() {
             commands::remote::render_remote_access_qr,
             commands::remote::enroll_relay_device,
             commands::remote::disconnect_relay,
+            commands::remote_hosts::list_remote_hosts,
+            commands::remote_hosts::save_remote_host,
+            commands::remote_hosts::delete_remote_host,
+            commands::remote_hosts::reorder_remote_hosts,
+            commands::remote_hosts::probe_remote_host,
+            commands::remote_hosts::refresh_remote_hosts,
+            commands::remote_hosts::open_remote_host,
+            commands::remote_hosts::close_remote_host,
         ])
         .run(tauri::generate_context!())
         .expect("failed to run Termexo");

@@ -1,8 +1,10 @@
 import { Component, computed, input, output } from '@angular/core';
 
 import { AccountProfile, ManagedAgentType, terminalAccountName } from '../core/models/agent.models';
+import { terminalCommonAction, type CommonActionTerminalRequest } from '../core/models/common-action';
 import {
   AgentType,
+  type CommonAction,
   DEFAULT_TERMINAL_GRID_DIMENSION,
   LayoutMode,
   normalizeTerminalGridDimension,
@@ -23,6 +25,9 @@ import type { TerminalCloseRequest } from './terminal-close-request';
 })
 export class TerminalWorkbenchComponent {
   readonly terminals = input.required<TerminalSession[]>();
+  readonly commonActions = input<CommonAction[]>([]);
+  readonly commonActionBusy = input(false);
+  readonly commonActionRequested = output<CommonActionTerminalRequest>();
   /** Passed to each panel so a reconnecting terminal can rebuild its launch environment. */
   readonly workspaceId = input('');
   readonly workspace = input<Pick<Workspace, 'name' | 'projectPath'> | null>(null);
@@ -80,5 +85,9 @@ export class TerminalWorkbenchComponent {
       terminal.agentType,
       terminal.accountProfileId,
     );
+  }
+
+  protected commonAction(terminal: TerminalSession): CommonAction | undefined {
+    return terminalCommonAction(terminal, this.commonActions());
   }
 }

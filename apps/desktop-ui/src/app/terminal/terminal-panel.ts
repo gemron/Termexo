@@ -23,6 +23,7 @@ import { I18nService } from '../core/i18n/i18n.service';
 import { TranslatePipe } from '../core/i18n/translate.pipe';
 import {
   AGENT_ICONS,
+  type CommonAction,
   normalizeTerminalFontSize,
   TerminalSession,
   TerminalStatus,
@@ -54,7 +55,8 @@ import {
 } from './terminal-links';
 import { TerminalReplayGate } from './terminal-replay-gate';
 import { canSetTerminalIdle, terminalStatusAfterStart } from './terminal-startup-status';
-import { isFinishedCommonAction } from '../core/models/common-action';
+import { isFinishedCommonAction, type CommonActionTerminalRequest } from '../core/models/common-action';
+import { CommonActionTerminalControlsComponent } from './common-action-terminal-controls';
 import { TerminalOutputBuffer } from './terminal-output-buffer';
 import { RemoteConnectionService } from '../core/services/remote-connection.service';
 import { AccountLoginCodeComponent } from './account-login-code';
@@ -121,7 +123,7 @@ const RUNTIME_ISSUE_NOTICE_KEYS: Readonly<
 
 @Component({
   selector: 'app-terminal-panel',
-  imports: [IconComponent, TerminalQuickKeysComponent, TranslatePipe, AccountLoginCodeComponent, TerminalMobileInputComponent],
+  imports: [IconComponent, TerminalQuickKeysComponent, TranslatePipe, AccountLoginCodeComponent, TerminalMobileInputComponent, CommonActionTerminalControlsComponent],
   templateUrl: './terminal-panel.html',
   styleUrl: './terminal-panel.scss',
 })
@@ -211,6 +213,9 @@ export class TerminalPanelComponent implements AfterViewInit {
   private touchPoint = { x: 0, y: 0 };
 
   readonly session = input.required<TerminalSession>();
+  readonly commonAction = input<CommonAction>();
+  readonly commonActionBusy = input(false);
+  readonly commonActionRequested = output<CommonActionTerminalRequest>();
   protected readonly canSetIdle = computed(() => canSetTerminalIdle(this.session()));
 
   protected setIdle(): void {

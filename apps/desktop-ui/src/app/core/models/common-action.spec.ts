@@ -5,6 +5,7 @@ import {
   commonActionTerminal,
   parseActionSuggestions,
   relativeActionDirectory,
+  terminalCommonAction,
   validateCommonAction,
 } from './common-action';
 import { recognitionPrompt } from './common-action-recognition';
@@ -97,6 +98,15 @@ describe('common action validation and identity', () => {
 });
 
 describe('common action runtime presentation', () => {
+  it('resolves controls only for the current terminal of a saved action', () => {
+    const terminal = { id: 't', commonActionId: action.id } as TerminalSession;
+    const linked = { ...action, terminalId: terminal.id };
+    expect(terminalCommonAction(terminal, [linked])).toBe(linked);
+    expect(terminalCommonAction(terminal, [{ ...linked, terminalId: 'new-run' }])).toBeUndefined();
+    expect(terminalCommonAction({ ...terminal, commonActionId: undefined }, [linked])).toBeUndefined();
+    expect(terminalCommonAction(terminal, [])).toBeUndefined();
+  });
+
   it('distinguishes starting, completed, failed and stopped and never binds an unrelated terminal', () => {
     const terminal = { id: 't', commonActionId: 'build', status: 'COMPLETED' } as TerminalSession;
     expect(commonActionState()).toBe('unstarted');

@@ -127,11 +127,36 @@ impl SessionSecrets {
         client_nonce: &[u8; NONCE_BYTES],
         proof: &[u8],
     ) -> bool {
+        self.proof_mac(server_nonce, client_nonce)
+            .verify_slice(proof)
+            .is_ok()
+    }
+
+    /// The proof a client sends in its `auth` frame: what [`Self::proof_matches`] checks.
+    ///
+    /// Only the desktop's own probe of another Termexo plays the client side in Rust; the
+    /// browser computes the same value in `remote-session-crypto.ts`.
+    pub fn proof(
+        &self,
+        server_nonce: &[u8; NONCE_BYTES],
+        client_nonce: &[u8; NONCE_BYTES],
+    ) -> Vec<u8> {
+        self.proof_mac(server_nonce, client_nonce)
+            .finalize()
+            .into_bytes()
+            .to_vec()
+    }
+
+    fn proof_mac(
+        &self,
+        server_nonce: &[u8; NONCE_BYTES],
+        client_nonce: &[u8; NONCE_BYTES],
+    ) -> Hmac<Sha256> {
         // Spelled out because `aead::KeyInit` is also in scope and offers the same constructor.
         let mut mac = <Hmac<Sha256> as Mac>::new_from_slice(&self.auth)
             .expect("HMAC accepts a key of any length");
         mac.update(&handshake_salt(server_nonce, client_nonce));
-        mac.verify_slice(proof).is_ok()
+        mac
     }
 
     pub fn sealer(&self, direction: Direction) -> FrameSealer {
@@ -334,6 +359,14 @@ mod tests {
             )
         );
         assert!(!secrets.proof_matches(&server_nonce, &client_nonce, b""));
+    }
+
+    #[test]
+    fn the_client_side_proof_is_the_pinned_cross_language_value() {
+        let (server_nonce, client_nonce) = nonces();
+        let proof = vector_secrets().proof(&server_nonce, &client_nonce);
+
+        assert_eq!(BASE64URL_NOPAD.encode(&proof), VECTOR_PROOF);
     }
 
     #[test]

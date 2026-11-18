@@ -31,6 +31,13 @@ pub fn describe(error: &(dyn Error + 'static)) -> String {
     }
 }
 
+/// Whether the platform's roots refused the certificate, which is what a self-signed one gets.
+///
+/// The remote host probe uses it to tell a self-signed Termexo apart from one that is down.
+pub fn is_untrusted_certificate(error: &(dyn Error + 'static)) -> bool {
+    tls_failure(error) == Some(TlsFailure::UntrustedCertificate)
+}
+
 #[derive(Debug, PartialEq, Eq)]
 enum TlsFailure {
     /// No fingerprint was pinned and the platform's roots do not vouch for the certificate.
@@ -70,7 +77,7 @@ fn next_layer<'a>(error: &'a (dyn Error + 'static)) -> Option<&'a (dyn Error + '
 }
 
 /// Every layer's wording, outermost first, leaving out a layer that only repeats the one above it.
-fn error_chain(error: &(dyn Error + 'static)) -> String {
+pub fn error_chain(error: &(dyn Error + 'static)) -> String {
     let mut layers: Vec<String> = Vec::new();
     for layer in chain(error).map(ToString::to_string) {
         if layers

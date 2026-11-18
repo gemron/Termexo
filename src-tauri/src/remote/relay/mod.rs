@@ -26,6 +26,7 @@ use crate::remote::server::ConnectionCommand;
 
 use client::{SessionConfig, SessionEnd, SessionOutcome};
 
+pub use connect_failure::{error_chain, is_untrusted_certificate};
 pub use endpoint::RelayEndpoint;
 pub use enroll::{enroll, RelayEnrollRequest};
 

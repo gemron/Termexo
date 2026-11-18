@@ -98,6 +98,86 @@ describe('TerminalGatewayService attachment', () => {
     delete runtime['__TAURI_INTERNALS__'];
   });
 
+  it('waits for a pending spawn before closing and coalesces repeated operations', async () => {
+    const calls: string[] = [];
+    let finishStart!: (value: unknown) => void;
+    let finishClose!: (value: unknown) => void;
+    commandHandler = (command) => {
+      calls.push(command);
+      return new Promise((resolve) => {
+        if (command === 'create_terminal') finishStart = resolve;
+        if (command === 'close_terminal') finishClose = resolve;
+      });
+    };
+    const started = service.start(startableSession(), 120, 30);
+    const alsoStarted = service.start(startableSession(), 120, 30);
+    const closed = service.close('terminal-1');
+    const alsoClosed = service.close('terminal-1');
+    expect(calls).toEqual(['create_terminal']);
+    await expect(service.start(startableSession(), 120, 30)).rejects.toThrow('closing');
+    finishStart({ attached: false, runtimeRevision: 3, cols: 120, rows: 30 });
+    await Promise.all([started, alsoStarted]);
+    await vi.waitFor(() => expect(calls).toEqual(['create_terminal', 'close_terminal']));
+    finishClose(undefined);
+    await Promise.all([closed, alsoClosed]);
+  });
+
+  it('still closes a partially failed launch', async () => {
+    let failStart!: (error: unknown) => void;
+    const calls: string[] = [];
+    commandHandler = (command) => {
+      calls.push(command);
+      return command === 'create_terminal'
+        ? new Promise((_resolve, reject) => { failStart = reject; })
+        : Promise.resolve(undefined);
+    };
+    const started = service.start(startableSession(), 120, 30);
+    const failed = expect(started).rejects.toThrow('spawn failed');
+    const closed = service.close('terminal-1');
+    failStart(new Error('spawn failed'));
+    await failed;
+    await closed;
+    expect(calls).toEqual(['create_terminal', 'close_terminal']);
+  });
+
+  it('cleans up a duplicate close reported by an older host', async () => {
+    await service.connect('terminal-1', 3, () => undefined);
+    commandHandler = () => Promise.reject('terminal terminal-1 was not found');
+    await expect(service.close('terminal-1')).resolves.toBeUndefined();
+    const replay = vi.fn().mockResolvedValue({ data: '', sequence: 0 });
+    commandHandler = replay;
+    await service.redraw('terminal-1');
+    expect(replay).not.toHaveBeenCalled();
+  });
+
+  it('preserves an attachment on a real close error and allows a retry', async () => {
+    await service.connect('terminal-1', 3, () => undefined);
+    commandHandler = () => Promise.reject(new Error('Access denied'));
+    await expect(service.close('terminal-1')).rejects.toThrow('Access denied');
+    const retry = vi.fn().mockResolvedValue({ data: 'still running', runtimeRevision: 3, sequence: 0 });
+    commandHandler = retry;
+    await service.redraw('terminal-1');
+    expect(retry).toHaveBeenCalledWith('read_terminal_scrollback', expect.anything());
+    await expect(service.close('terminal-1')).resolves.toBeUndefined();
+  });
+
+  it('does not preserve a model-switch baseline when a permanent close follows it', async () => {
+    const flags: boolean[] = [];
+    let finishClose!: (value: unknown) => void;
+    commandHandler = (_command, args) => {
+      flags.push(args['preserveRepositoryBaseline'] as boolean);
+      return flags.length === 1
+        ? new Promise((resolve) => { finishClose = resolve; })
+        : Promise.resolve(undefined);
+    };
+    const switching = service.close('terminal-1', true);
+    const closing = service.close('terminal-1', false);
+    await vi.waitFor(() => expect(flags).toEqual([true]));
+    finishClose(undefined);
+    await Promise.all([switching, closing]);
+    expect(flags).toEqual([true, false]);
+  });
+
   it('writes the scrollback before the output that arrived while it was loading', async () => {
     const output: string[] = [];
     await service.connect('terminal-1', 3, (data) => output.push(data));

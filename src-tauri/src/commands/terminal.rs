@@ -359,16 +359,16 @@ pub fn close_terminal(
     watcher: State<'_, RepositoryWatcher>,
     hooks: State<'_, HookEventStore>,
 ) -> Result<(), String> {
-    hooks.forget_codex_rollout(&terminal_id);
-    let result = manager
+    manager
         .close(&terminal_id)
-        .map_err(|error| error.to_string());
+        .map_err(|error| error.to_string())?;
+    hooks.forget_codex_rollout(&terminal_id);
     watcher.release(&terminal_id);
     if !preserve_repository_baseline {
         repositories.remove_terminal(&terminal_id);
         manager.forget_palette(&terminal_id);
     }
-    result
+    Ok(())
 }
 
 #[cfg(test)]

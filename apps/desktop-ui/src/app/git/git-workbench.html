@@ -36,27 +36,72 @@
   </header>
 
   @if (overview(); as repository) {
+    @if (repository.available) {
     @if (repository.historyRewritten) {
       <div class="git-warning">
         <app-icon name="triangle-alert" [size]="13" />{{ repository.diagnostic }}
       </div>
     }
 
-    <div class="git-content">
-      <aside class="git-sidebar">
-        <section class="changes-panel">
-          <header>
-            <strong>{{ 'git.sessionChanges' | t }}</strong>
-            <span>{{ repository.changes.length }}</span>
-          </header>
+    <div class="git-content" [class.focused]="focusDiff()">
+      <aside class="git-sidebar" [hidden]="focusDiff()">
+        <nav class="sidebar-tabs" role="group" [attr.aria-label]="'git.ui.views' | t">
+          <button type="button" [class.active]="sidebarTab() === 'changes'"
+            [attr.aria-pressed]="sidebarTab() === 'changes'" (click)="sidebarTab.set('changes')">
+            {{ 'git.sessionChanges' | t }}<span>{{ repository.changes.length }}</span>
+          </button>
+          <button type="button" [class.active]="sidebarTab() === 'history'"
+            [attr.aria-pressed]="sidebarTab() === 'history'" (click)="sidebarTab.set('history')">
+            {{ 'git.graph' | t }}<span>{{ repository.commits.length }}</span>
+          </button>
+          <button type="button" class="sidebar-close" [title]="'git.ui.focusDiff' | t"
+            [attr.aria-label]="'git.ui.focusDiff' | t" (click)="toggleFocusDiff()">
+            <app-icon name="x" [size]="13" />
+          </button>
+        </nav>
+        <section class="changes-panel" [hidden]="sidebarTab() !== 'changes'">
           <p class="baseline-note">
             {{ (repository.baselineCaptured ? 'git.baselineCaptured' : 'git.noBaseline') | t }}
           </p>
-          <div class="change-list">
-            @for (change of repository.changes; track change.path) {
+          <div class="change-tools">
+            <label class="file-filter">
+              <app-icon name="search" [size]="12" />
+              <input
+                type="search"
+                [value]="fileFilter()"
+                [placeholder]="'git.filterFiles' | t"
+                [attr.aria-label]="'git.filterFiles' | t"
+                (input)="onFilterInput($event)"
+                (keydown.escape)="fileFilter.set(''); $event.stopPropagation()"
+              />
+              @if (fileFilter()) {
+                <button type="button" class="clear-filter" [title]="'git.ui.clearFilter' | t"
+                  [attr.aria-label]="'git.ui.clearFilter' | t" (click)="fileFilter.set('')">
+                  <app-icon name="x" [size]="12" />
+                </button>
+              }
+            </label>
+            <button
+              type="button"
+              class="view-toggle"
+              [class.active]="treeView()"
+              [title]="(treeView() ? 'git.viewList' : 'git.viewTree') | t"
+              [attr.aria-label]="(treeView() ? 'git.viewList' : 'git.viewTree') | t"
+              [attr.aria-pressed]="treeView()"
+              (click)="treeView.set(!treeView())"
+            >
+              <app-icon [name]="treeView() ? 'rows' : 'folder'" [size]="13" />
+            </button>
+          </div>
+          <div #changeList class="change-list">
+            @if (fileFilter()) {
+              <p class="filter-results" role="status">{{ 'git.ui.matches' | t: { count: filteredChanges().length, total: repository.changes.length } }}</p>
+            }
+            <ng-template #fileRow let-change let-nested="nested">
               <button
                 type="button"
                 class="change-file"
+                [class.nested]="nested"
                 [class.active]="change.path === selectedPath()"
                 [title]="changeLabel(change) + ' · ' + change.path"
                 (click)="selectFile(change)"
@@ -65,12 +110,14 @@
                   changeStatus(change)
                 }}</span>
                 <span class="file-copy">
-                  <strong>{{ change.path.split('/').at(-1) }}</strong>
-                  <small>{{
-                    change.path.includes('/')
-                      ? change.path.slice(0, change.path.lastIndexOf('/'))
-                      : '.'
-                  }}</small>
+                  <strong>{{ fileName(change.path) }}</strong>
+                  @if (!nested) {
+                    <small>{{
+                      change.path.includes('/')
+                        ? change.path.slice(0, change.path.lastIndexOf('/'))
+                        : '.'
+                    }}</small>
+                  }
                 </span>
                 @if (change.committed) {
                   <span class="change-tag">{{ 'git.committed' | t }}</span>
@@ -80,21 +127,52 @@
                 }
                 <span class="sr-only">{{ changeLabel(change) }}</span>
               </button>
-            } @empty {
+            </ng-template>
+            @if (treeView()) {
+              @for (group of changeGroups(); track group.dir) {
+                <button
+                  type="button"
+                  class="dir-row"
+                  [class.collapsed]="group.collapsed"
+                  [attr.aria-expanded]="!group.collapsed"
+                  (click)="toggleDir(group.dir)"
+                >
+                  <app-icon name="chevron-down" [size]="12" />
+                  <span>{{ group.dir || '.' }}</span>
+                  <em>{{ group.changes.length }}</em>
+                </button>
+                @if (!group.collapsed) {
+                  @for (change of group.changes; track change.path) {
+                    <ng-container
+                      [ngTemplateOutlet]="fileRow"
+                      [ngTemplateOutletContext]="{ $implicit: change, nested: true }"
+                    />
+                  }
+                }
+              }
+            } @else {
+              @for (change of filteredChanges(); track change.path) {
+                <ng-container
+                  [ngTemplateOutlet]="fileRow"
+                  [ngTemplateOutletContext]="{ $implicit: change, nested: false }"
+                />
+              }
+            }
+            @if (filteredChanges().length === 0) {
               <div class="empty-state compact">
-                <app-icon name="check" [size]="20" />
-                <strong>{{ 'git.clean' | t }}</strong>
-                <span>{{ 'git.cleanHelp' | t }}</span>
+                @if (repository.changes.length === 0) {
+                  <app-icon name="check" [size]="20" />
+                  <strong>{{ 'git.clean' | t }}</strong>
+                  <span>{{ 'git.cleanHelp' | t }}</span>
+                } @else {
+                  <strong>{{ 'git.noMatch' | t }}</strong>
+                }
               </div>
             }
           </div>
         </section>
 
-        <section class="graph-panel">
-          <header>
-            <strong>{{ 'git.graph' | t }}</strong>
-            <span>{{ repository.commits.length }}</span>
-          </header>
+        <section class="graph-panel" [hidden]="sidebarTab() !== 'history'">
           <div class="commit-list">
             @for (row of graphRows(); track row.commit.oid) {
               <article class="commit-row" [class.in-session]="row.commit.inSession">
@@ -118,9 +196,14 @@
                   <circle [attr.cx]="row.lane * 16 + 8" cy="24" r="4" />
                 </svg>
                 <div class="commit-copy">
-                  <strong>{{ row.commit.summary }}</strong>
+                  <strong [title]="row.commit.summary">{{ row.commit.summary }}</strong>
                   <span>
-                    <code>{{ row.commit.shortOid }}</code>
+                    <button type="button"
+                      class="oid"
+                      [title]="'git.copyHash' | t"
+                      [attr.aria-label]="('git.copyHash' | t) + ': ' + row.commit.shortOid"
+                      (click)="copyOid(row.commit.oid)"
+                      ><code>{{ copiedValue() === row.commit.oid ? '✓' : row.commit.shortOid }}</code></button>
                     {{ row.commit.author }} · {{ commitTime(row.commit) }}
                   </span>
                   @if (row.commit.decorations.length > 0) {
@@ -142,7 +225,17 @@
       <section class="diff-panel">
         <header class="diff-toolbar">
           <div class="diff-file">
-            <strong>{{ selectedPath() || ('git.noFile' | t) }}</strong>
+            <button type="button" class="diff-option focus-toggle"
+              [title]="(focusDiff() ? 'git.ui.showFiles' : 'git.ui.focusDiff') | t"
+              [attr.aria-label]="(focusDiff() ? 'git.ui.showFiles' : 'git.ui.focusDiff') | t"
+              [attr.aria-pressed]="focusDiff()" (click)="toggleFocusDiff()">
+              <app-icon [name]="focusDiff() ? 'panel-left-open' : 'panel-left-close'" [size]="13" />
+            </button>
+            <strong [title]="selectedPath()">{{ selectedPath() || ('git.noFile' | t) }}</strong>
+            <button type="button" class="copy-path" [disabled]="!selectedPath()"
+              [title]="'git.ui.copyPath' | t" [attr.aria-label]="'git.ui.copyPath' | t" (click)="copyPath()">
+              <app-icon [name]="copiedValue() === selectedPath() ? 'check' : 'copy'" [size]="12" />
+            </button>
             <div class="diff-meta">
               @if (rows().length > 0) {
                 <b class="added">+{{ diffStats().added }}</b>
@@ -152,6 +245,17 @@
                 <span>{{ 'git.truncated' | t }}</span>
               }
             </div>
+          </div>
+          <div class="diff-nav file-nav" role="group" [attr.aria-label]="'git.ui.files' | t">
+            <button type="button" [disabled]="filteredChanges().length < 2"
+              [title]="'git.ui.previousFile' | t" [attr.aria-label]="'git.ui.previousFile' | t" (click)="stepFile(-1)">
+              <app-icon name="arrow-left" [size]="13" />
+            </button>
+            <span>{{ filePosition() }}</span>
+            <button type="button" [disabled]="filteredChanges().length < 2"
+              [title]="'git.ui.nextFile' | t" [attr.aria-label]="'git.ui.nextFile' | t" (click)="stepFile(1)">
+              <app-icon name="arrow-right" [size]="13" />
+            </button>
           </div>
           @if (changeBlocks().length > 0) {
             <div class="diff-nav">
@@ -198,7 +302,7 @@
           </div>
         </header>
 
-        <div #diffViewport class="diff-viewport" [class.split]="layout() === 'split'">
+        <div #diffViewport class="diff-viewport" [class.split]="layout() === 'split'" [class.wrap-lines]="wrapLines()">
           @if (diffLoading()) {
             <div class="empty-state">
               <span class="loading loading-spinner loading-sm"></span>{{ 'git.loadingDiff' | t }}
@@ -335,8 +439,25 @@
             </div>
           }
         </div>
+        <footer class="diff-status">
+          <span class="copy-feedback" role="status" [class.error]="!!copyError()" [title]="copyError()">
+            {{ copyError() || ((copiedValue() ? 'git.ui.copied' : 'git.ui.previewOnly') | t) }}
+          </span>
+          <button type="button" class="diff-option" [class.active]="wrapLines()"
+            [attr.aria-pressed]="wrapLines()" (click)="wrapLines.set(!wrapLines())">
+            {{ 'git.ui.wrapLines' | t }}
+          </button>
+        </footer>
       </section>
     </div>
+    } @else {
+      <div class="empty-state">
+        <app-icon name="git-branch" [size]="26" />
+        <strong>{{ 'git.ui.noRepository' | t }}</strong>
+        <span>{{ repository.diagnostic }}</span>
+        <button type="button" class="retry-button" [disabled]="refreshing()" (click)="refresh()">{{ 'common.retry' | t }}</button>
+      </div>
+    }
   } @else {
     <!--
       The repository read has no answer yet, or failed. Before, the view rendered nothing at all

@@ -302,6 +302,9 @@
         }
         @defer (on immediate) {
           <app-language-selector />
+          @if (!remoteMode) {
+            <app-remote-hosts-button (opened)="remoteHostsOpen.set(true)" />
+          }
           <app-remote-access-button (opened)="openSettings('remote')" />
           <app-third-party-notifications-toggle (failed)="reportFailure($event)" />
         }
@@ -678,6 +681,9 @@
               workspace.id !== activeWorkspace.id || workspaceView() !== 'terminal'
             "
             [terminals]="workspace.terminals"
+            [commonActions]="workspace.commonActions ?? []"
+            [commonActionBusy]="commonActions.busy().has(workspace.id)"
+            (commonActionRequested)="controlCommonAction($event)"
             [workspaceId]="workspace.id"
             [workspace]="workspace"
             [layout]="renderedLayout(workspace.layout)"
@@ -953,6 +959,12 @@
     (resumed)="resumeAgent($event)"
     (cancelled)="sessionCenterOpen.set(false)"
   />
+}
+
+@defer (when remoteHostsOpen()) {
+  @if (remoteHostsOpen()) {
+    <app-remote-hosts-dialog (cancelled)="remoteHostsOpen.set(false)" />
+  }
 }
 
 @defer (when piLaunchOpen()) {

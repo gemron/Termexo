@@ -24,8 +24,9 @@ const CREDENTIAL_TARGET: &str = "gemini:antigravity";
 const FALLBACK_TOKEN_FILE: &str = "jetski-standalone-oauth-token";
 const API_ORIGIN: &str = "https://daily-cloudcode-pa.googleapis.com";
 const TOKEN_URL: &str = "https://oauth2.googleapis.com/token";
-// loadCodeAssist omits the project for generic clients, even with a valid agy login.
-const API_USER_AGENT: &str = "antigravity/cli";
+// loadCodeAssist omits the project for generic clients, and retrieveUserQuotaSummary omits
+// the Gemini and Claude/GPT groups unless the CLI version is present in User-Agent.
+const API_USER_AGENT: &str = "antigravity/cli/1.4.12";
 const SECRET_PREFIX: &[u8] = b"GOCSPX-";
 const SECRET_LENGTH: usize = 35;
 const CLIENT_ID_SUFFIX: &[u8] = b".apps.googleusercontent.com";
@@ -186,12 +187,26 @@ fn usage_from_summary(summary: QuotaSummary) -> Result<AntigravityUsage, String>
             })
             .collect::<Vec<_>>()
     };
+    let ungrouped = summary
+        .buckets
+        .into_iter()
+        .filter(|bucket| {
+            !summary.groups.iter().any(|group| {
+                group.buckets.iter().any(|grouped| {
+                    grouped
+                        .display_name
+                        .trim()
+                        .eq_ignore_ascii_case(bucket.display_name.trim())
+                })
+            })
+        })
+        .collect::<Vec<_>>();
     let mut groups = Vec::new();
-    // The ungrouped windows lead, as they do in the CLI's own `/usage` panel.
-    if !summary.buckets.is_empty() {
+    // Legacy responses report the five-hour window at the top level instead of inside each group.
+    if !ungrouped.is_empty() {
         groups.push(AntigravityUsageGroup {
             name: String::new(),
-            buckets: convert(summary.buckets),
+            buckets: convert(ungrouped),
         });
     }
     groups.extend(
@@ -558,6 +573,34 @@ mod tests {
         assert_eq!(usage.groups[0].name, "");
         assert_eq!(usage.groups[0].buckets[0].name, "Five Hour Limit Remaining");
         assert_eq!(usage.groups[1].name, "Gemini 4 Argon");
+    }
+
+    #[test]
+    fn drops_deprecated_top_level_buckets_already_present_in_groups() {
+        let summary: QuotaSummary = serde_json::from_value(json!({
+            "buckets": [
+                { "displayName": "Five Hour Limit Remaining", "remainingFraction": 1.0 }
+            ],
+            "groups": [
+                { "displayName": "Gemini Models", "buckets": [
+                    { "displayName": "Weekly Limit Remaining", "remainingFraction": 0.9981 },
+                    { "displayName": "Five Hour Limit Remaining", "remainingFraction": 1.0 }
+                ]},
+                { "displayName": "Claude and GPT models", "buckets": [
+                    { "displayName": "Weekly Limit Remaining", "remainingFraction": 0.555 },
+                    { "displayName": "Five Hour Limit Remaining", "remainingFraction": 1.0 }
+                ]},
+                { "displayName": "Gemini 4 Argon", "buckets": [
+                    { "displayName": "Gemini 4 Argon Weekly Limit", "remainingFraction": 0.8251 }
+                ]}
+            ]
+        }))
+        .unwrap();
+        let usage = usage_from_summary(summary).unwrap();
+        assert_eq!(usage.groups.len(), 3);
+        assert_eq!(usage.groups[0].name, "Gemini Models");
+        assert_eq!(usage.groups[1].name, "Claude and GPT models");
+        assert_eq!(usage.groups[2].name, "Gemini 4 Argon");
     }
 
     #[test]

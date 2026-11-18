@@ -1,5 +1,5 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type {
   RepositoryChange,
@@ -7,7 +7,10 @@ import type {
   RepositoryOverview,
 } from '../core/models/git.models';
 import { GitService } from '../core/services/git.service';
+import { I18nService } from '../core/i18n/i18n.service';
 import { buildCommitGraph, GitWorkbenchComponent } from './git-workbench';
+
+const clipboardWrite = vi.fn<(text: string) => Promise<void>>();
 
 function change(path: string): RepositoryChange {
   return {
@@ -81,14 +84,148 @@ describe('GitWorkbenchComponent states', () => {
   let fixture: ComponentFixture<GitWorkbenchComponent>;
   let root: HTMLElement;
   let git: GitService;
+  let clipboardDescriptor: PropertyDescriptor | undefined;
 
   beforeEach(async () => {
     window.localStorage.clear();
+    clipboardDescriptor = Object.getOwnPropertyDescriptor(navigator, 'clipboard');
+    clipboardWrite.mockReset().mockResolvedValue(undefined);
+    Object.defineProperty(navigator, 'clipboard', { configurable: true, value: { writeText: clipboardWrite } });
     await TestBed.configureTestingModule({ imports: [GitWorkbenchComponent] }).compileComponents();
+    TestBed.inject(I18nService).setPreference('en');
     git = TestBed.inject(GitService);
     git.selectPath('');
     fixture = TestBed.createComponent(GitWorkbenchComponent);
     root = fixture.nativeElement as HTMLElement;
+  });
+
+  afterEach(() => {
+    if (clipboardDescriptor) Object.defineProperty(navigator, 'clipboard', clipboardDescriptor);
+    else Reflect.deleteProperty(navigator, 'clipboard');
+    vi.unstubAllGlobals();
+  });
+
+  async function showRepository(overview = OVERVIEW) {
+    const diff = vi.spyOn(git, 'loadDiff').mockImplementation(async (_target, path) => ({
+      path, oldText: 'old content', newText: 'updated content', binary: false, truncated: false,
+    }));
+    fixture.componentRef.setInput('overview', overview);
+    fixture.componentRef.setInput('target', {
+      workspaceId: 'workspace-1', terminalId: 'terminal-1', runtimeRevision: 0,
+    });
+    fixture.detectChanges();
+    await fixture.whenStable();
+    fixture.detectChanges();
+    return diff;
+  }
+
+  it('gives changes and history separate views while preserving the current diff', async () => {
+    await showRepository({ ...OVERVIEW, commits: [commit('abc123', [])] });
+    const tabs = root.querySelectorAll<HTMLButtonElement>('.sidebar-tabs button');
+    const changes = root.querySelector<HTMLElement>('.changes-panel')!;
+    const history = root.querySelector<HTMLElement>('.graph-panel')!;
+    expect(changes.hidden).toBe(false);
+    expect(history.hidden).toBe(true);
+    tabs[1].click();
+    fixture.detectChanges();
+    expect(changes.hidden).toBe(true);
+    expect(history.hidden).toBe(false);
+    expect(tabs[1].getAttribute('aria-pressed')).toBe('true');
+    expect(root.querySelector('.diff-viewport')?.textContent).toContain('updated content');
+    tabs[0].click();
+    fixture.detectChanges();
+    expect(root.querySelectorAll('.change-file')).toHaveLength(2);
+    expect(git.selectedPath()).toBe(OVERVIEW.changes[0].path);
+  });
+
+  it('filters paths with a visible result count and clears the filter without losing selection', async () => {
+    await showRepository();
+    const input = root.querySelector<HTMLInputElement>('.file-filter input')!;
+    input.value = 'GIT-WORKBENCH';
+    input.dispatchEvent(new Event('input', { bubbles: true }));
+    fixture.detectChanges();
+    expect(root.querySelectorAll('.change-file')).toHaveLength(1);
+    expect(root.querySelector('.filter-results')?.textContent).toContain('1 of 2');
+    expect(git.selectedPath()).toBe(OVERVIEW.changes[0].path);
+    root.querySelector<HTMLButtonElement>('.clear-filter')!.click();
+    fixture.detectChanges();
+    expect(root.querySelectorAll('.change-file')).toHaveLength(2);
+    expect(root.querySelector('.change-file.active')).not.toBeNull();
+  });
+
+  it('steps through filtered files and reveals a selected file in a collapsed directory', async () => {
+    await showRepository({ ...OVERVIEW, changes: [...OVERVIEW.changes, change('scripts/build.sh')] });
+    const input = root.querySelector<HTMLInputElement>('.file-filter input')!;
+    input.value = 'src/';
+    input.dispatchEvent(new Event('input', { bubbles: true }));
+    root.querySelector<HTMLButtonElement>('.view-toggle')!.click();
+    fixture.detectChanges();
+    const directory = [...root.querySelectorAll<HTMLButtonElement>('.dir-row')]
+      .find((item) => item.textContent?.includes('src/app/git'))!;
+    directory.click();
+    fixture.detectChanges();
+    expect(root.querySelectorAll('.change-file')).toHaveLength(1);
+    const buttons = root.querySelectorAll<HTMLButtonElement>('.file-nav button');
+    buttons[1].click();
+    fixture.detectChanges();
+    await fixture.whenStable();
+    fixture.detectChanges();
+    expect(git.selectedPath()).toBe(OVERVIEW.changes[1].path);
+    expect(root.querySelector('.file-nav span')?.textContent).toBe('2/2');
+    expect(root.querySelector('.change-file.active strong')?.textContent).toBe('git-workbench.ts');
+    buttons[1].click();
+    fixture.detectChanges();
+    expect(git.selectedPath()).toBe(OVERVIEW.changes[0].path);
+  });
+
+  it('toggles wrapping and focused reading without reloading the file or changing its layout', async () => {
+    const load = await showRepository();
+    const layout = git.diffLayout();
+    root.querySelector<HTMLButtonElement>('.diff-option:not(.focus-toggle)')!.click();
+    root.querySelector<HTMLButtonElement>('.focus-toggle')!.click();
+    fixture.detectChanges();
+    expect(root.querySelector('.diff-viewport.wrap-lines')).not.toBeNull();
+    expect(root.querySelector<HTMLElement>('.git-sidebar')!.hidden).toBe(true);
+    expect(root.querySelector('.diff-viewport')?.textContent).toContain('updated content');
+    expect(git.diffLayout()).toBe(layout);
+    expect(load).toHaveBeenCalledTimes(1);
+    root.querySelector<HTMLButtonElement>('.focus-toggle')!.click();
+    fixture.detectChanges();
+    expect(root.querySelector<HTMLElement>('.git-sidebar')!.hidden).toBe(false);
+  });
+
+  it('copies the selected path and complete commit hash through the desktop-aware clipboard helper', async () => {
+    await showRepository({ ...OVERVIEW, commits: [commit('full-commit-hash', [])] });
+    root.querySelector<HTMLButtonElement>('.copy-path')!.click();
+    await fixture.whenStable();
+    fixture.detectChanges();
+    expect(clipboardWrite).toHaveBeenCalledWith(OVERVIEW.changes[0].path);
+    expect(root.querySelector('.copy-feedback')?.textContent).toContain('Copied');
+    root.querySelectorAll<HTMLButtonElement>('.sidebar-tabs button')[1].click();
+    fixture.detectChanges();
+    root.querySelector<HTMLButtonElement>('.oid')!.click();
+    await fixture.whenStable();
+    expect(clipboardWrite).toHaveBeenCalledWith('full-commit-hash');
+  });
+
+  it('reports clipboard failures instead of showing a false success', async () => {
+    await showRepository();
+    clipboardWrite.mockRejectedValue(new Error('clipboard denied'));
+    root.querySelector<HTMLButtonElement>('.copy-path')!.click();
+    await fixture.whenStable();
+    fixture.detectChanges();
+    expect(root.querySelector('.copy-feedback.error')?.textContent).toContain('clipboard denied');
+  });
+
+  it('explains a non-repository directory instead of presenting it as a clean repository', async () => {
+    const load = await showRepository({
+      ...OVERVIEW, available: false, diagnostic: 'Choose a project containing a .git directory', changes: [],
+    });
+    expect(root.querySelector('.git-content')).toBeNull();
+    expect(root.textContent).toContain('No Git repository');
+    expect(root.textContent).toContain('Choose a project');
+    expect(root.querySelector('.retry-button')).not.toBeNull();
+    expect(load).not.toHaveBeenCalled();
   });
 
   it('waits visibly while the repository read has no answer', () => {

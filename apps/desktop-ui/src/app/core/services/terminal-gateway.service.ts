@@ -143,6 +143,8 @@ export class TerminalGatewayService {
   private readonly remoteConnection = inject(RemoteConnectionService);
   private readonly zone = inject(NgZone);
   private readonly connections = new Map<string, TerminalConnection>();
+  private readonly starting = new Map<string, Promise<TerminalStartResult>>();
+  private readonly closing = new Map<string, { operation: Promise<void>; preserveBaseline: boolean }>();
   private readonly browserListeners = new Map<string, (data: string) => void>();
   private readonly browserInputs = new Map<string, TerminalPromptCapture>();
   /** The one output subscription every terminal is dispatched from. */
@@ -320,7 +322,23 @@ export class TerminalGatewayService {
     return this.remoteConnection.onReconnected(handler);
   }
 
-  async start(
+  start(
+    session: TerminalSession,
+    cols: number,
+    rows: number,
+    workspaceId?: string,
+  ): Promise<TerminalStartResult> {
+    if (this.closing.has(session.id)) return Promise.reject(new Error('Terminal is closing'));
+    const pending = this.starting.get(session.id);
+    if (pending) return pending;
+    const operation = this.startRuntime(session, cols, rows, workspaceId).finally(() => {
+      if (this.starting.get(session.id) === operation) this.starting.delete(session.id);
+    });
+    this.starting.set(session.id, operation);
+    return operation;
+  }
+
+  private async startRuntime(
     session: TerminalSession,
     cols: number,
     rows: number,
@@ -478,10 +496,36 @@ export class TerminalGatewayService {
     await invoke('open_directory', { path });
   }
 
-  async close(terminalId: string, preserveRepositoryBaseline = false): Promise<void> {
-    if (this.remoteConnection.readOnly()) return;
+  close(terminalId: string, preserveRepositoryBaseline = false): Promise<void> {
+    if (this.remoteConnection.readOnly()) return Promise.resolve();
+    const pending = this.closing.get(terminalId);
+    if (pending) {
+      // A permanent close still has to clear the baseline if a model-switch close kept it.
+      return pending.operation.then(() => {
+        if (!preserveRepositoryBaseline && pending.preserveBaseline)
+          return this.close(terminalId, false);
+        return undefined;
+      });
+    }
+    const operation = this.closeRuntime(terminalId, preserveRepositoryBaseline).finally(() => {
+      if (this.closing.get(terminalId)?.operation === operation) this.closing.delete(terminalId);
+    });
+    this.closing.set(terminalId, { operation, preserveBaseline: preserveRepositoryBaseline });
+    return operation;
+  }
+
+  private async closeRuntime(terminalId: string, preserveRepositoryBaseline: boolean): Promise<void> {
+    // A failed start can still leave a partially created PTY. Its caller handles the launch
+    // error; closing must finish cleanup even in that case, and must not race a pending spawn.
+    await this.starting.get(terminalId)?.catch(() => undefined);
     if (hasBackend()) {
-      await invoke('close_terminal', { terminalId, preserveRepositoryBaseline });
+      try {
+        await invoke('close_terminal', { terminalId, preserveRepositoryBaseline });
+      } catch (error) {
+        // Older hosts report a duplicate close as an error. Never suppress real I/O or RPC errors.
+        const message = error instanceof Error ? error.message : String(error);
+        if (message !== `terminal ${terminalId} was not found`) throw error;
+      }
     }
     this.connections.delete(terminalId);
     this.browserListeners.delete(terminalId);

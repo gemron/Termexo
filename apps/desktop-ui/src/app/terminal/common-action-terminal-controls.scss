@@ -1,0 +1,52 @@
+:host {
+  display: block;
+  flex: 0 0 auto;
+}
+
+.common-action-controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 12px;
+  padding: 6px 10px;
+  border-bottom: 1px solid var(--border);
+  background: var(--surface-inset);
+}
+
+.action-command {
+  display: flex;
+  flex: 1 1 100px;
+  min-width: 0;
+  align-items: center;
+  gap: 6px;
+  color: color-mix(in srgb, var(--text) 60%, transparent);
+
+  app-icon { flex: 0 0 auto; }
+
+  code {
+    overflow: hidden;
+    font-size: 11px;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+}
+
+.action-buttons {
+  display: flex;
+  flex: 0 0 auto;
+  gap: 6px;
+
+  button { min-height: 26px; }
+
+  .run-action { color: var(--accent); }
+  .stop-action { color: var(--color-error); }
+}
+
+@container terminal-panel (max-width: 420px) {
+  .action-command { flex-basis: 100%; }
+  .action-buttons {
+    margin-left: auto;
+
+    button { min-height: 30px; }
+  }
+}

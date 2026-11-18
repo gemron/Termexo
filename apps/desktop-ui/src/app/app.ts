@@ -4,6 +4,7 @@ import { ProjectPreviewPanelComponent } from './preview/project-preview-panel';
 import { ProjectPreviewService } from './core/services/project-preview.service';
 import { CommonActionsDialogComponent } from './dialogs/common-actions-dialog';
 import { CommonActionsService } from './core/services/common-actions.service';
+import { terminalCommonAction, type CommonActionTerminalRequest } from './core/models/common-action';
 import type { ProfileSaveCompleted, SettingsProfileKind } from './dialogs/profile-drafts';
 import { ModelCatalogService } from './core/services/model-catalog.service';
 import {
@@ -146,6 +147,7 @@ import {
   type HandoffSendRequest,
 } from './dialogs/handoff-dialog';
 import { PromptLibraryDialogComponent } from './dialogs/prompt-library-dialog';
+import { RemoteHostsDialogComponent } from './dialogs/remote-hosts-dialog';
 import { ResumeSessionValue, SessionCenterDialogComponent } from './dialogs/session-center-dialog';
 import { InspectorPanelComponent } from './inspector/inspector-panel';
 import { RemoteAccessGateComponent } from './remote/remote-access-gate';
@@ -155,6 +157,7 @@ import { IconComponent } from './shared/icon/icon';
 import { LanguageSelectorComponent } from './shared/language-selector/language-selector';
 import { TopbarOverflowMenuComponent } from './shared/topbar-overflow-menu/topbar-overflow-menu';
 import { RemoteAccessButtonComponent } from './shared/remote-access-button';
+import { RemoteHostsButtonComponent } from './shared/remote-hosts-button';
 import { ThirdPartyNotificationsToggleComponent } from './shared/third-party-notifications-toggle';
 import { WorkspaceOnboardingComponent } from './workspace/workspace-onboarding';
 import {
@@ -294,6 +297,7 @@ function readStoredString(key: string, fallback: string): string {
     LanguageSelectorComponent,
     TopbarOverflowMenuComponent,
     RemoteAccessButtonComponent,
+    RemoteHostsButtonComponent,
     ThirdPartyNotificationsToggleComponent,
     WorkspaceOnboardingComponent,
     MergeWorkspaceDialogComponent,
@@ -302,6 +306,7 @@ function readStoredString(key: string, fallback: string): string {
     PromptLibraryDialogComponent,
     RemoteAccessGateComponent,
     RemoteConnectionBadgeComponent,
+    RemoteHostsDialogComponent,
     SessionCenterDialogComponent,
     TerminalToolbarComponent,
     TerminalWorkbenchComponent,
@@ -399,6 +404,7 @@ export class App {
   protected readonly antigravityLaunchOpen = signal(false);
   protected readonly launchingAntigravity = signal(false);
   protected readonly sessionCenterOpen = signal(false);
+  protected readonly remoteHostsOpen = signal(false);
   protected readonly promptLibraryOpen = signal(false);
   /** Empty until the shell reports it, and in browser preview, where there is no packaged build. */
   protected readonly appVersion = signal('');
@@ -934,6 +940,26 @@ export class App {
 
   protected openCommonActionTerminal(terminalId: string): void {
     this.revealCreatedTerminal(terminalId);
+  }
+
+  protected async controlCommonAction(request: CommonActionTerminalRequest): Promise<void> {
+    if (this.remoteConnection.readOnly()) return;
+    const located = this.findTerminal(request.terminalId);
+    if (!located || this.commonActions.busy().has(located.workspace.id)) return;
+    const action = terminalCommonAction(located.terminal, located.workspace.commonActions ?? []);
+    if (!action) return;
+    try {
+      if (request.operation === 'stop') {
+        await this.commonActions.stop(located.workspace.id, action.id);
+      } else {
+        const terminalId = await this.commonActions.run(
+          located.workspace.id, action.id, request.operation === 'restart',
+        );
+        this.openCommonActionTerminal(terminalId);
+      }
+    } catch (error) {
+      this.showToast(this.errorMessage(error), 'error');
+    }
   }
 
   protected async startCommonActionAgent(): Promise<void> {
@@ -1574,11 +1600,11 @@ export class App {
   protected requestCloseTerminal(terminalId: string, event?: MouseEvent): void {
     const located = this.findTerminal(terminalId);
     if (!located) {
-      this.closeTerminal(terminalId);
+      void this.closeTerminal(terminalId);
       return;
     }
     if (this.isTerminalSettled(located.terminal.status)) {
-      this.closeTerminal(terminalId);
+      void this.closeTerminal(terminalId);
       return;
     }
     const trigger =
@@ -1607,9 +1633,9 @@ export class App {
     }
     this.pendingTerminalClose.set(null);
     this.closingTerminal.set(true);
-    this.closeTerminal(terminalId);
-    // `closeTerminal` is synchronous on the state and async on the gateway; the signal flips
-    // back on the next microtask so the user can still close another terminal right after.
+    void this.closeTerminal(terminalId);
+    // Shutdown is serialized per terminal by the gateway. Release the popup guard so another
+    // terminal can still be closed while this one is waiting for the backend.
     queueMicrotask(() => this.closingTerminal.set(false));
   }
 
@@ -1626,9 +1652,17 @@ export class App {
     );
   }
 
-  protected closeTerminal(terminalId: string): void {
-    void this.terminalGateway.close(terminalId).catch(() => undefined);
-    this.removeClosedTerminal(terminalId);
+  protected async closeTerminal(terminalId: string): Promise<boolean> {
+    if (this.remoteConnection.readOnly()) return false;
+    try {
+      await this.terminalGateway.close(terminalId);
+      this.removeClosedTerminal(terminalId);
+      return true;
+    } catch (error) {
+      // Keep the console and its process handle available for a retry when shutdown failed.
+      this.showToast(this.errorMessage(error), 'error');
+      return false;
+    }
   }
 
   private removeClosedTerminal(terminalId: string): void {
@@ -1919,11 +1953,11 @@ export class App {
    * The task keeps its native session id, so a routine task that runs again still resumes the same
    * agent session in a fresh terminal.
    */
-  protected closeTodoTerminal(terminalId: string): void {
+  protected async closeTodoTerminal(terminalId: string): Promise<void> {
     const located = this.findTerminal(terminalId);
     if (!located) return;
-    this.closeTerminal(terminalId);
-    this.showToast(this.i18n.t('taskFlow.toast.terminalClosed', { name: located.terminal.name }));
+    if (await this.closeTerminal(terminalId))
+      this.showToast(this.i18n.t('taskFlow.toast.terminalClosed', { name: located.terminal.name }));
   }
 
   protected openPromptLibrary(): void {

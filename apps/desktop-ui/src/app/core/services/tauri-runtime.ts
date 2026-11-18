@@ -15,9 +15,13 @@ export interface RemoteRuntimeInfo {
 
 const REMOTE_MARKER_SELECTOR = 'meta[name="termexo-remote"]';
 
-/** True only where native windows, dialogs and notification plugins exist. */
+/** True only in the local desktop window, where native dialogs and window controls are permitted. */
 export function isTauriRuntime(): boolean {
-  return typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window;
+  return (
+    typeof window !== 'undefined' &&
+    '__TAURI_INTERNALS__' in window &&
+    remoteRuntimeInfo() === null
+  );
 }
 
 /** The marker the remote server injects into `index.html`; null anywhere else. */
@@ -50,10 +54,10 @@ export function remoteRuntimeInfo(): RemoteRuntimeInfo | null {
 }
 
 export function runtimeMode(): RuntimeMode {
-  if (isTauriRuntime()) {
-    return 'desktop';
+  if (remoteRuntimeInfo()) {
+    return 'remote';
   }
-  return remoteRuntimeInfo() ? 'remote' : 'preview';
+  return isTauriRuntime() ? 'desktop' : 'preview';
 }
 
 /** True when backend commands can be invoked, whichever transport carries them. */

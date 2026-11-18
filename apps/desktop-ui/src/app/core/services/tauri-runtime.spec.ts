@@ -32,6 +32,15 @@ describe('runtimeMode', () => {
     expect(remoteRuntimeInfo()).toEqual({ version: '0.7.0', secure: true });
   });
 
+  it('treats a remote workbench opened inside a Tauri window as remote rather than desktop', () => {
+    runtime['__TAURI_INTERNALS__'] = {};
+    markRemote('{"version":"0.12.1","secure":true}');
+
+    expect(runtimeMode()).toBe('remote');
+    expect(isTauriRuntime()).toBe(false);
+    expect(hasBackend()).toBe(true);
+  });
+
   it('reports browser preview without any marker', () => {
     expect(runtimeMode()).toBe('preview');
     expect(hasBackend()).toBe(false);

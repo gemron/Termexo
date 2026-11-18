@@ -869,11 +869,21 @@ impl PtyManager {
 
     pub fn close(&self, terminal_id: &str) -> Result<(), PtyError> {
         let mut sessions = lock_recovering(&self.sessions);
-        let mut session = sessions
-            .remove(terminal_id)
-            .ok_or_else(|| PtyError::NotFound(terminal_id.into()))?;
-        session.stop_requested.store(true, Ordering::Release);
-        normalize_kill_result(session.killer.kill())
+        let Some(session) = sessions.get_mut(terminal_id) else {
+            return Ok(());
+        };
+        let was_stopping = session.stop_requested.swap(true, Ordering::AcqRel);
+        if let Err(error) = normalize_kill_result(session.killer.kill()) {
+            session
+                .stop_requested
+                .store(was_stopping, Ordering::Release);
+            return Err(error);
+        }
+        let closed = sessions.remove(terminal_id);
+        // ConPTY cleanup can wait for its output reader; never hold the global map while it does.
+        drop(sessions);
+        drop(closed);
+        Ok(())
     }
 }
 
@@ -1204,6 +1214,99 @@ mod tests {
 
     #[derive(Debug, Clone)]
     struct AttachmentKiller;
+
+    #[derive(Debug, Clone)]
+    struct ClosingKiller {
+        calls: Arc<std::sync::atomic::AtomicUsize>,
+        fail_once: Arc<AtomicBool>,
+    }
+
+    impl ChildKiller for ClosingKiller {
+        fn kill(&mut self) -> std::io::Result<()> {
+            self.calls.fetch_add(1, Ordering::AcqRel);
+            if self.fail_once.swap(false, Ordering::AcqRel) {
+                return Err(std::io::Error::new(
+                    std::io::ErrorKind::PermissionDenied,
+                    "kill denied",
+                ));
+            }
+            Ok(())
+        }
+
+        fn clone_killer(&self) -> Box<dyn ChildKiller + Send + Sync> {
+            Box::new(self.clone())
+        }
+    }
+
+    fn close_test_process(killer: ClosingKiller) -> PtyProcess {
+        let pair = native_pty_system()
+            .openpty(PtySize {
+                cols: 80,
+                rows: 24,
+                pixel_width: 0,
+                pixel_height: 0,
+            })
+            .unwrap();
+        PtyProcess {
+            writer: Arc::new(Mutex::new(pair.master.take_writer().unwrap())),
+            master: pair.master,
+            killer: Box::new(killer),
+            stop_requested: Arc::new(AtomicBool::new(false)),
+            runtime_revision: 0,
+            history: Arc::new(Mutex::new(OutputHistory::new(80, 24))),
+            active_viewport: None,
+            applied_viewport: None,
+        }
+    }
+
+    #[test]
+    fn concurrent_and_repeated_closes_are_idempotent() {
+        let manager = Arc::new(PtyManager::new(Arc::new(RemoteEventHub::new())));
+        let calls = Arc::new(std::sync::atomic::AtomicUsize::new(0));
+        let process = close_test_process(ClosingKiller {
+            calls: calls.clone(),
+            fail_once: Arc::new(AtomicBool::new(false)),
+        });
+        lock_recovering(&manager.sessions).insert("closing".into(), process);
+        let barrier = Arc::new(std::sync::Barrier::new(3));
+        let workers: Vec<_> = (0..2)
+            .map(|_| {
+                let manager = manager.clone();
+                let barrier = barrier.clone();
+                thread::spawn(move || {
+                    barrier.wait();
+                    manager.close("closing")
+                })
+            })
+            .collect();
+        barrier.wait();
+        for worker in workers {
+            assert!(worker.join().unwrap().is_ok());
+        }
+        assert!(manager.close("closing").is_ok());
+        assert!(manager.close("never-started").is_ok());
+        assert_eq!(calls.load(Ordering::Acquire), 1);
+        assert!(manager.attachment("closing").unwrap().is_none());
+    }
+
+    #[cfg(not(windows))]
+    #[test]
+    fn a_failed_close_keeps_the_process_and_can_be_retried() {
+        let manager = PtyManager::new(Arc::new(RemoteEventHub::new()));
+        let calls = Arc::new(std::sync::atomic::AtomicUsize::new(0));
+        let process = close_test_process(ClosingKiller {
+            calls: calls.clone(),
+            fail_once: Arc::new(AtomicBool::new(true)),
+        });
+        let stopping = process.stop_requested.clone();
+        lock_recovering(&manager.sessions).insert("retry".into(), process);
+        assert!(manager.close("retry").is_err());
+        assert!(manager.attachment("retry").unwrap().is_some());
+        assert!(!stopping.load(Ordering::Acquire));
+        assert!(manager.close("retry").is_ok());
+        assert!(manager.attachment("retry").unwrap().is_none());
+        assert_eq!(calls.load(Ordering::Acquire), 2);
+    }
 
     impl ChildKiller for AttachmentKiller {
         fn kill(&mut self) -> std::io::Result<()> {

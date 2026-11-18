@@ -8,6 +8,8 @@ import { CommonActionsService } from './core/services/common-actions.service';
 import { AgentStartupService, type AgentStartupRequest } from './core/services/agent-startup.service';
 import { WorkspaceRepository } from './core/services/workspace.repository';
 import type { TerminalExitEvent } from './core/services/terminal-gateway.service';
+import type { CommonActionTerminalRequest } from './core/models/common-action';
+import { RemoteConnectionService } from './core/services/remote-connection.service';
 
 interface RecognitionFlow {
   commonActionsOpen: WritableSignal<boolean>;
@@ -19,6 +21,9 @@ interface RecognitionFlow {
   deliverTerminalPrompt(terminalId: string, content: string, submit: boolean): Promise<void>;
   viewCommonActionAgent(terminalId: string): void;
   handleTerminalExit(event: TerminalExitEvent): void;
+  controlCommonAction(request: CommonActionTerminalRequest): Promise<void>;
+  openCommonActionTerminal(terminalId: string): void;
+  showToast(message: string, tone?: string): void;
 }
 
 describe('continuous common action recognition', () => {
@@ -56,6 +61,67 @@ describe('continuous common action recognition', () => {
     flow.armStartupDialogs(terminal.id);
     return { terminal, request: startup.arm.mock.calls.at(-1)![1] as AgentStartupRequest };
   }
+
+  async function actionConsole() {
+    const terminal = state.createTerminal({ agentType: 'shell', commonActionId: 'dev' })!;
+    const workspace = state.activeWorkspace()!;
+    await state.saveCommonActions(workspace.id, [{
+      id: 'dev', name: 'Dev server', command: 'npm run dev', description: '',
+      workingDirectory: 'D:/project/web', environment: { PORT: '4300' }, terminalId: terminal.id,
+    }]);
+    return { workspace, terminal };
+  }
+
+  it.each(['run', 'restart'] as const)('routes %s through the saved action and reveals the replacement console', async (operation) => {
+    const { workspace, terminal } = await actionConsole();
+    const run = vi.spyOn(actions, 'run').mockImplementation(async () => {
+      state.removeTerminal(terminal.id);
+      return state.createTerminal({ agentType: 'shell', commonActionId: 'dev' })!.id;
+    });
+    const reveal = vi.spyOn(flow, 'openCommonActionTerminal');
+    await flow.controlCommonAction({ terminalId: terminal.id, operation });
+    expect(run).toHaveBeenCalledExactlyOnceWith(workspace.id, 'dev', operation === 'restart');
+    expect(reveal).toHaveBeenCalledExactlyOnceWith(state.activeTerminal()!.id);
+    expect(state.activeTerminal()!.id).not.toBe(terminal.id);
+  });
+
+  it('stops through the shared action service without closing the output window', async () => {
+    const { workspace, terminal } = await actionConsole();
+    const stop = vi.spyOn(actions, 'stop').mockResolvedValue(undefined);
+    await flow.controlCommonAction({ terminalId: terminal.id, operation: 'stop' });
+    expect(stop).toHaveBeenCalledExactlyOnceWith(workspace.id, 'dev');
+    expect(state.activeWorkspace()!.terminals.some((item) => item.id === terminal.id)).toBe(true);
+  });
+
+  it('does not let an obsolete console stop the action currently bound to another terminal', async () => {
+    const { workspace, terminal } = await actionConsole();
+    const replacement = state.createTerminal({ agentType: 'shell', commonActionId: 'dev' })!;
+    await state.saveCommonActions(workspace.id, [{
+      ...state.activeWorkspace()!.commonActions![0], terminalId: replacement.id,
+    }]);
+    const stop = vi.spyOn(actions, 'stop').mockResolvedValue(undefined);
+    await flow.controlCommonAction({ terminalId: terminal.id, operation: 'stop' });
+    expect(stop).not.toHaveBeenCalled();
+  });
+
+  it('ignores action requests in read-only mode or while another operation is pending', async () => {
+    const { workspace, terminal } = await actionConsole();
+    const stop = vi.spyOn(actions, 'stop').mockResolvedValue(undefined);
+    const readOnly = vi.spyOn(TestBed.inject(RemoteConnectionService), 'readOnly').mockReturnValue(true);
+    await flow.controlCommonAction({ terminalId: terminal.id, operation: 'stop' });
+    readOnly.mockReturnValue(false);
+    actions.busy.set(new Set([workspace.id]));
+    await flow.controlCommonAction({ terminalId: terminal.id, operation: 'stop' });
+    expect(stop).not.toHaveBeenCalled();
+  });
+
+  it('reports launch errors without leaving an unhandled button rejection', async () => {
+    const { terminal } = await actionConsole();
+    vi.spyOn(actions, 'run').mockRejectedValue(new Error('Port is unavailable'));
+    const toast = vi.spyOn(flow, 'showToast');
+    await flow.controlCommonAction({ terminalId: terminal.id, operation: 'restart' });
+    expect(toast).toHaveBeenCalledWith('Port is unavailable', 'error');
+  });
 
   it('returns from launching and sends recognition only after the Agent is ready', async () => {
     const { terminal, request } = await launch();

@@ -2,6 +2,10 @@ import { registerTranslations, type TranslationBundle } from './i18n.service';
 
 const TRANSLATIONS: TranslationBundle = {
   en: {
+    'commonActions.terminalControls': 'Common action controls',
+    'commonActions.runAgain': 'Run again',
+    'commonActions.restart': 'Restart',
+    'commonActions.stop': 'Stop',
     'commonActions.title': 'Common actions',
     'commonActions.reviewPending': 'Review pending',
     'thirdParty.label': 'Third-party notifications',
@@ -14,6 +18,10 @@ const TRANSLATIONS: TranslationBundle = {
     'thirdParty.failed': 'Could not update notifications: {error}',
   },
   'zh-CN': {
+    'commonActions.terminalControls': '常用操作控制',
+    'commonActions.runAgain': '重新运行',
+    'commonActions.restart': '重启',
+    'commonActions.stop': '停止',
     'commonActions.title': '常用操作',
     'commonActions.reviewPending': '待审核',
     'thirdParty.label': '第三方通知',
@@ -26,6 +34,10 @@ const TRANSLATIONS: TranslationBundle = {
     'thirdParty.failed': '第三方通知开关操作失败：{error}',
   },
   de: {
+    'commonActions.terminalControls': 'Aktionssteuerung',
+    'commonActions.runAgain': 'Erneut ausführen',
+    'commonActions.restart': 'Neustarten',
+    'commonActions.stop': 'Stoppen',
     'commonActions.title': 'Häufige Aktionen',
     'commonActions.reviewPending': 'Prüfung ausstehend',
     'thirdParty.label': 'Drittanbieter-Benachrichtigungen',
@@ -38,6 +50,10 @@ const TRANSLATIONS: TranslationBundle = {
     'thirdParty.failed': 'Benachrichtigungen konnten nicht aktualisiert werden: {error}',
   },
   es: {
+    'commonActions.terminalControls': 'Controles de la acción',
+    'commonActions.runAgain': 'Ejecutar de nuevo',
+    'commonActions.restart': 'Reiniciar',
+    'commonActions.stop': 'Detener',
     'commonActions.title': 'Acciones frecuentes',
     'commonActions.reviewPending': 'Revisión pendiente',
     'thirdParty.label': 'Notificaciones de terceros',
@@ -50,6 +66,10 @@ const TRANSLATIONS: TranslationBundle = {
     'thirdParty.failed': 'No se pudieron actualizar las notificaciones: {error}',
   },
   fr: {
+    'commonActions.terminalControls': 'Commandes de l’action',
+    'commonActions.runAgain': 'Relancer',
+    'commonActions.restart': 'Redémarrer',
+    'commonActions.stop': 'Arrêter',
     'commonActions.title': 'Actions fréquentes',
     'commonActions.reviewPending': 'À vérifier',
     'thirdParty.label': 'Notifications tierces',
@@ -62,6 +82,10 @@ const TRANSLATIONS: TranslationBundle = {
     'thirdParty.failed': 'Impossible de mettre à jour les notifications : {error}',
   },
   ja: {
+    'commonActions.terminalControls': '操作の制御',
+    'commonActions.runAgain': '再実行',
+    'commonActions.restart': '再起動',
+    'commonActions.stop': '停止',
     'commonActions.title': 'よく使う操作',
     'commonActions.reviewPending': '確認待ち',
     'thirdParty.label': '外部サービス通知',
@@ -74,6 +98,10 @@ const TRANSLATIONS: TranslationBundle = {
     'thirdParty.failed': '通知を更新できませんでした：{error}',
   },
   ko: {
+    'commonActions.terminalControls': '작업 제어',
+    'commonActions.runAgain': '다시 실행',
+    'commonActions.restart': '다시 시작',
+    'commonActions.stop': '중지',
     'commonActions.title': '자주 쓰는 작업',
     'commonActions.reviewPending': '검토 대기',
     'thirdParty.label': '외부 서비스 알림',

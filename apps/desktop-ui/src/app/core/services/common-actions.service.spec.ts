@@ -171,15 +171,48 @@ describe('CommonActionsService confirmation and execution boundaries', () => {
     expect(gateway.close).toHaveBeenCalledWith(id);
     expect(state.activeWorkspace()?.terminals[0].status).toBe('STOPPED');
     gateway.liveTerminals.mockResolvedValue(new Map());
-    gateway.close.mockRejectedValue(new Error('terminal not found'));
+    gateway.close.mockResolvedValue(undefined);
     repository.list.mockResolvedValue(state.workspaces());
     await state.initialize();
     await service.stop('w', 'frontend');
     const next = await service.run('w', 'frontend', true);
-    expect(gateway.close).toHaveBeenCalledTimes(1);
+    expect(gateway.close).toHaveBeenCalledTimes(3);
     expect(next).not.toBe(id);
     expect(state.activeWorkspace()?.terminals).toHaveLength(1);
     expect(state.activeWorkspace()?.commonActions?.[0].terminalId).toBe(next);
+  });
+
+  it('waits for authoritative shutdown before restarting even when the liveness query is unavailable', async () => {
+    (window as unknown as Record<string, unknown>)['__TAURI_INTERNALS__'] = {};
+    await service.save('w', { ...draft, id: 'frontend' });
+    const previous = await service.run('w', 'frontend');
+    gateway.liveTerminals.mockClear();
+    gateway.liveTerminals.mockRejectedValue(new Error('snapshot unavailable'));
+    let finishClose!: () => void;
+    gateway.close.mockImplementationOnce(() => new Promise<void>((resolve) => { finishClose = resolve; }));
+    const restarting = service.run('w', 'frontend', true);
+    expect(gateway.close).toHaveBeenCalledWith(previous);
+    expect(gateway.start).toHaveBeenCalledTimes(1);
+    expect(state.activeWorkspace()?.terminals.some((item) => item.id === previous)).toBe(true);
+    finishClose();
+    const next = await restarting;
+    expect(next).not.toBe(previous);
+    expect(gateway.start).toHaveBeenCalledTimes(2);
+    expect(gateway.liveTerminals).not.toHaveBeenCalled();
+  });
+
+  it('keeps a failed shutdown retryable without starting a duplicate process', async () => {
+    (window as unknown as Record<string, unknown>)['__TAURI_INTERNALS__'] = {};
+    await service.save('w', { ...draft, id: 'frontend' });
+    const previous = await service.run('w', 'frontend');
+    gateway.close.mockRejectedValueOnce(new Error('shutdown denied'));
+    await expect(service.run('w', 'frontend', true)).rejects.toThrow('shutdown denied');
+    expect(state.activeWorkspace()?.terminals.some((item) => item.id === previous)).toBe(true);
+    expect(state.activeWorkspace()?.commonActions?.[0].terminalId).toBe(previous);
+    expect(service.busy().size).toBe(0);
+    expect(gateway.start).toHaveBeenCalledTimes(1);
+    const next = await service.run('w', 'frontend', true);
+    expect(next).not.toBe(previous);
   });
 
   it('does not auto restart a saved project command when restoring workspaces', async () => {

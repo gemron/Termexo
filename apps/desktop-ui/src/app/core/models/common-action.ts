@@ -167,6 +167,21 @@ export function commonActionTerminal(
   );
 }
 
+export type CommonActionOperation = 'run' | 'restart' | 'stop';
+export interface CommonActionTerminalRequest {
+  terminalId: string;
+  operation: CommonActionOperation;
+}
+
+/** An old console must never control a newer run of the same saved action. */
+export function terminalCommonAction(
+  terminal: TerminalSession,
+  actions: readonly CommonAction[],
+): CommonAction | undefined {
+  const action = actions.find((item) => item.id === terminal.commonActionId);
+  return action && commonActionTerminal(action, [terminal]) ? action : undefined;
+}
+
 export type CommonActionState =
   'unstarted' | 'starting' | 'running' | 'completed' | 'failed' | 'stopped' | 'disconnected';
 export const COMMON_ACTION_STATUS_LABELS: Record<CommonActionState, string> = {

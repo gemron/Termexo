@@ -180,10 +180,10 @@ export class CommonActionsService {
       const action = this.action(workspaceId, id);
       const validated = validateCommonAction(action);
       const previous = commonActionTerminal(action, workspace.terminals);
-      const live = await this.gateway.liveTerminals();
-      if (previous && live.has(previous.id) && !restart) return previous.id;
       if (previous) {
-        if (live.has(previous.id)) await this.gateway.close(previous.id);
+        if (!restart && (await this.gateway.liveTerminals()).has(previous.id)) return previous.id;
+        // Close is idempotent and authoritative; a liveness snapshot can already be stale.
+        await this.gateway.close(previous.id);
         this.state.removeTerminal(previous.id);
       }
       const terminal = this.state.createTerminal(
@@ -240,8 +240,7 @@ export class CommonActionsService {
       const action = this.action(workspaceId, id);
       const terminal = commonActionTerminal(action, this.workspace(workspaceId).terminals);
       if (!terminal) throw new Error('操作尚未启动。');
-      const live = await this.gateway.liveTerminals();
-      if (live.has(terminal.id)) await this.gateway.close(terminal.id);
+      await this.gateway.close(terminal.id);
       this.state.markTerminalExited(terminal.id, 'STOPPED');
       await this.repository.flush();
     });

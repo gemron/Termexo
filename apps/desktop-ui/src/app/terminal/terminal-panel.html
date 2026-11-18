@@ -120,6 +120,15 @@
     </div>
   </header>
   }
+  @if (commonAction(); as action) {
+    <app-common-action-terminal-controls
+      [action]="action"
+      [status]="session().status"
+      [busy]="commonActionBusy()"
+      [readOnly]="readOnly()"
+      (operationRequested)="commonActionRequested.emit({ terminalId: session().id, operation: $event })"
+    />
+  }
   @if (!readOnly() && session().accountLogin) {
     <app-account-login-code [session]="session()" (retryRequested)="accountLoginRetryRequested.emit($event)" />
   }

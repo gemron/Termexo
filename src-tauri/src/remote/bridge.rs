@@ -190,6 +190,16 @@ pub const REMOTE_DENIED: &[&str] = &[
     // from outside, and the person holding the phone is not the one who has to live with it.
     "enroll_relay_device",
     "disconnect_relay",
+    // Saved remote hosts carry credentials to other machines; a remote viewer of this machine must
+    // never be able to enumerate, modify, or pivot into them.
+    "list_remote_hosts",
+    "save_remote_host",
+    "delete_remote_host",
+    "reorder_remote_hosts",
+    "probe_remote_host",
+    "refresh_remote_hosts",
+    "open_remote_host",
+    "close_remote_host",
 ];
 
 pub fn is_remote_command_allowed(command: &str) -> bool {
