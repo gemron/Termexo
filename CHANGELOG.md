@@ -2,6 +2,14 @@
 
 Release notes for every Termexo version, newest first. The current release is summarised in [README.md](README.md).
 
+## V0.13.0
+
+- **Simpler model settings.** Choose a provider, account and model when launching an Agent. Switch Claude Code and Codex models from the terminal header and review the choice before restarting the session.
+- **A compact workbench.** A single tab row keeps workspaces and terminals close together. Open saved actions, tasks, Git and session history as tabs from **New**, and find settings, language, remote access and notifications in the **⋯** menu.
+- **Two terminal layout controls.** Maximize a terminal from its title bar to hide the workspace sidebar, Work status and tabs. Fill layout expands a pane within the terminal area. Restore the prior layout with the title-bar control or **Shift+Esc**.
+- **Saved remote hosts.** Save and check connections from a single list, and open each host in a dedicated window.
+- **Git, saved actions and session reliability.** Navigate diffs more easily, control saved actions from their terminals, retry a failed terminal shutdown, and see grouped Antigravity quota windows.
+
 ## V0.12.1
 
 - Remove the built-in One Ring panel, workflow engine, internal Worker bridge and related agent launch integration.
