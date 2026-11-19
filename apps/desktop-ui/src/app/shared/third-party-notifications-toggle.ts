@@ -23,14 +23,14 @@ import { IconComponent } from './icon/icon';
     </button>
   `,
   styles: `
-    :host { display: inline-flex; }
-    button { display: inline-flex; align-items: center; gap: 6px; min-height: 28px;
+    :host { display: block; }
+    button { display: flex; width: 100%; align-items: center; gap: 8px; min-height: 36px;
       padding: 0 8px; border: 0; border-radius: 3px; color: var(--text-secondary);
-      background: transparent; font-size: 11px; white-space: nowrap; }
+      background: transparent; font-size: 12px; white-space: nowrap; }
     button:hover, button:focus-visible { color: var(--text); background: var(--surface-2); }
     button:disabled { opacity: .5; cursor: not-allowed; }
     .switch-track { display: inline-flex; align-items: center; width: 24px; height: 14px;
-      padding: 2px; border-radius: 999px; background: var(--text-muted); }
+      margin-inline-start: auto; padding: 2px; border-radius: 999px; background: var(--text-muted); }
     i { width: 10px; height: 10px; border-radius: 50%; background: var(--surface-0);
       transition: transform .15s; }
     .enabled .switch-track { background: var(--color-success); }

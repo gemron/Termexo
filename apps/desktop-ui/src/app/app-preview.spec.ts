@@ -8,8 +8,14 @@ import { ProjectPreviewService } from './core/services/project-preview.service';
 import { WorkspaceRepository } from './core/services/workspace.repository';
 
 interface PreviewFlow {
-  workspaceView: WritableSignal<'terminal' | 'tasks' | 'git' | 'preview'>;
-  workspaceMaximized: WritableSignal<boolean>;
+  workspaceView: WritableSignal<'terminal' | 'tasks' | 'git' | 'preview' | 'common-actions' | 'sessions'>;
+  terminalFocusMode(): boolean;
+  visibleTerminalIds(): string[];
+  toggleTerminalFocus(id: string): void;
+  toggleTerminalLayoutFill(id: string): void;
+  workspaceTools(): readonly { tool: string }[];
+  chooseWorkspaceAction(tool: 'common-actions' | 'tasks' | 'git' | 'sessions'): void;
+  closeWorkspaceTool(tool: 'common-actions' | 'tasks' | 'git' | 'sessions'): void;
   previewWidth: WritableSignal<number>;
   inspectorWidth: WritableSignal<number>;
   selectTerminal(id: string): void;
@@ -146,15 +152,74 @@ describe('content preview tab', () => {
     TestBed.tick();
     expect(flow.workspaceView()).toBe('terminal');
 
-    flow.workspaceView.set('tasks');
+    flow.chooseWorkspaceAction('tasks');
     state.updateTerminalStatus(background.id, 'COMPLETED');
     TestBed.tick();
     expect(flow.workspaceView()).toBe('tasks');
     expect(preview.open()).toBe(true);
   });
 
-  it('resizes and remembers the preview width separately, including in a maximized workspace', () => {
-    flow.workspaceMaximized.set(true);
+  it('reuses an open tool tab, includes it in shortcuts, and keeps tools scoped to their workspace', async () => {
+    const workspace = state.activeWorkspace()!;
+    state.createTerminal({ agentType: 'shell' }, workspace.id);
+    flow.chooseWorkspaceAction('tasks');
+    flow.chooseWorkspaceAction('sessions');
+    flow.chooseWorkspaceAction('tasks');
+    expect(flow.workspaceTools().map((tab) => tab.tool)).toEqual(['tasks', 'sessions']);
+    expect(flow.workspaceView()).toBe('tasks');
+
+    flow.handleWindowKeydown(new KeyboardEvent('keydown', { key: 'Tab', ctrlKey: true }));
+    expect(flow.workspaceView()).toBe('sessions');
+    flow.closeWorkspaceTool('sessions');
+    expect(flow.workspaceView()).toBe('tasks');
+
+    await state.createWorkspace('Other', 'D:/other');
+    expect(flow.workspaceTools()).toHaveLength(0);
+    expect(flow.workspaceView()).toBe('terminal');
+    state.selectWorkspace(workspace.id);
+    expect(flow.workspaceTools().map((tab) => tab.tool)).toEqual(['tasks']);
+  });
+
+  it('focuses the selected pane and restores the previous split or layout fill', () => {
+    const workspace = state.activeWorkspace()!;
+    const first = state.createTerminal({ agentType: 'shell' }, workspace.id)!;
+    const second = state.createTerminal({ agentType: 'shell' }, workspace.id)!;
+    state.setLayout('columns');
+    flow.selectTerminal(second.id);
+    expect(flow.visibleTerminalIds()).toHaveLength(2);
+
+    flow.toggleTerminalFocus(first.id);
+    expect(flow.terminalFocusMode()).toBe(true);
+    expect(flow.visibleTerminalIds()).toEqual([first.id]);
+    flow.selectTerminal(second.id);
+    expect(flow.terminalFocusMode()).toBe(true);
+    expect(flow.visibleTerminalIds()).toEqual([second.id]);
+    flow.toggleTerminalFocus(second.id);
+    expect(flow.terminalFocusMode()).toBe(false);
+    expect(flow.visibleTerminalIds()).toHaveLength(2);
+
+    flow.toggleTerminalLayoutFill(first.id);
+    expect(flow.terminalFocusMode()).toBe(false);
+    expect(flow.visibleTerminalIds()).toEqual([first.id]);
+    flow.toggleTerminalFocus(first.id);
+    flow.handleWindowKeydown(new KeyboardEvent('keydown', { key: 'Escape', shiftKey: true }));
+    expect(flow.terminalFocusMode()).toBe(false);
+    expect(flow.visibleTerminalIds()).toEqual([first.id]);
+    flow.toggleTerminalLayoutFill(first.id);
+    expect(flow.visibleTerminalIds()).toHaveLength(2);
+
+    flow.toggleTerminalFocus(second.id);
+    flow.chooseWorkspaceAction('tasks');
+    expect(flow.terminalFocusMode()).toBe(false);
+    flow.selectTerminal(second.id);
+    expect(flow.terminalFocusMode()).toBe(false);
+    flow.toggleTerminalFocus(second.id);
+    state.removeTerminal(first.id);
+    state.removeTerminal(second.id);
+    expect(flow.terminalFocusMode()).toBe(false);
+  });
+
+  it('resizes and remembers the preview width separately', () => {
     flow.previewWidth.set(500);
     const inspectorWidth = flow.inspectorWidth();
     flow.startSidebarResize('preview', { button: 0, clientX: 500, preventDefault: vi.fn() } as unknown as PointerEvent);

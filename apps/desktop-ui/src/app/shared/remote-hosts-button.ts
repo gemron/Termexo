@@ -29,15 +29,16 @@ registerRemoteHostsTranslations();
   styles: `
     button {
       display: inline-flex;
+      width: 100%;
       align-items: center;
-      gap: 6px;
-      min-height: 28px;
+      gap: 8px;
+      min-height: 36px;
       padding: 0 8px;
       border: 0;
       border-radius: 3px;
       color: var(--text-secondary);
       background: transparent;
-      font-size: 11px;
+      font-size: 12px;
       white-space: nowrap;
     }
 
@@ -48,6 +49,7 @@ registerRemoteHostsTranslations();
     }
 
     em {
+      margin-inline-start: auto;
       padding: 1px 5px;
       border-radius: 999px;
       color: var(--text-muted);

@@ -23,6 +23,22 @@ describe('CreateWorkspaceDialogComponent', () => {
     root = fixture.nativeElement as HTMLElement;
   });
 
+  it('suggests the folder name as the path changes and submits it when the name is empty', async () => {
+    fixture.componentInstance.name.set(null);
+    fixture.componentInstance.projectPath.set('/projects/example/');
+    fixture.detectChanges();
+    await fixture.whenStable();
+    expect(root.querySelector<HTMLInputElement>('#workspace-display-name')?.value).toBe('example');
+    fixture.componentInstance.projectPath.set('D:\\projects\\next');
+    fixture.componentInstance.name.set('');
+    fixture.detectChanges();
+    await fixture.whenStable();
+    const created = vi.fn();
+    fixture.componentInstance.created.subscribe(created);
+    root.querySelector<HTMLButtonElement>('.primary')!.click();
+    expect(created).toHaveBeenCalledWith({ name: 'next', projectPath: 'D:\\projects\\next' });
+  });
+
   it('blocks resubmission and dismissal while the workspace is being saved', async () => {
     const created = vi.fn();
     const cancelled = vi.fn();

@@ -30,8 +30,6 @@ import { IconComponent } from '../icon/icon';
       display: inline-flex;
       min-width: 0;
     }
-    /* Mirrors .window-tools .window-tool so the selector reads as a peer of the flat
-       icon buttons, not a raised island with its own border and fill. */
     .language-selector {
       position: relative;
       display: inline-flex;
@@ -68,7 +66,7 @@ import { IconComponent } from '../icon/icon';
       font-weight: 700;
       text-align: center;
     }
-    .language-selector:hover {
+    .language-selector:is(:hover, :focus-within) {
       color: var(--text);
       background: var(--surface-2);
     }

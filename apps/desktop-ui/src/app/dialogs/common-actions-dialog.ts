@@ -35,18 +35,16 @@ import {
 import { writeClipboardText } from '../core/services/clipboard-text';
 import { hasBackend, isTauriRuntime } from '../core/services/tauri-runtime';
 import { DirectoryPickerService } from '../core/services/directory-picker.service';
-import { ModalFocusDirective } from '../shared/modal-focus.directive';
 import { IconComponent } from '../shared/icon/icon';
 
 @Component({
   selector: 'app-common-actions-dialog',
-  imports: [FormsModule, ModalFocusDirective, IconComponent],
+  imports: [FormsModule, IconComponent],
   templateUrl: './common-actions-dialog.html',
   styleUrls: ['./dialog.scss', './common-actions-dialog.scss'],
 })
 export class CommonActionsDialogComponent {
   readonly workspace = input.required<Workspace>();
-  readonly closed = output<void>();
   readonly recognitionRequested = output<{ workspaceId: string; terminalId: string }>();
   readonly terminalRequested = output<string>();
   readonly agentRequested = output<void>();
@@ -413,7 +411,6 @@ export class CommonActionsDialogComponent {
     const terminal = commonActionTerminal(action, this.workspace().terminals);
     if (terminal) {
       this.terminalRequested.emit(terminal.id);
-      this.closed.emit();
     }
   }
 }

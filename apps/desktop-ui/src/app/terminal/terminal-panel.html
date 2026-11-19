@@ -8,7 +8,7 @@
   @if (readOnly()) {
     <header><strong>{{ session().name }}</strong><span>{{ statusLabel(session().status) }}</span></header>
   } @else {
-  <header>
+  <header [attr.data-tauri-drag-region]="focusMode() ? 'deep' : null">
     <div class="terminal-identity">
       <span class="agent-icon" [attr.data-agent]="session().agentType">
         <app-icon [name]="agentIcon()" [size]="14" />
@@ -84,27 +84,44 @@
         </button>
       }
       @if (session().agentType === 'claude' || session().agentType === 'codex') {
+        @let modelLabel = session().model || ('common.defaultModel' | t);
         <button
           type="button"
           class="model-chip"
+          aria-haspopup="dialog"
+          [attr.aria-label]="('terminal.switchOneTitle' | t: { name: session().name }) + ' · ' + modelLabel"
           [title]="'terminal.switchThisModel' | t"
           (click)="$event.stopPropagation(); modelSwitchRequested.emit(session().id)"
         >
-          <span>{{ session().model }}</span>
+          <span>{{ modelLabel }}</span>
           <app-icon name="chevron-down" [size]="11" />
         </button>
       } @else {
         <span>{{ session().model }}</span>
       }
+      @if (!focusMode()) {
+        <button
+          type="button"
+          class="btn btn-square btn-ghost btn-xs"
+          data-testid="terminal-layout-fill-toggle"
+          [title]="(fillsLayout() ? 'terminal.restoreSplit' : 'terminal.fillLayout') | t"
+          [attr.aria-label]="(fillsLayout() ? 'terminal.restoreSplit' : 'terminal.fillLayout') | t"
+          [class.active]="fillsLayout()"
+          (click)="$event.stopPropagation(); layoutFillRequested.emit(session().id)"
+        >
+          <app-icon [name]="fillsLayout() ? 'layout' : 'square'" [size]="13" />
+        </button>
+      }
       <button
         type="button"
         class="btn btn-square btn-ghost btn-xs"
-        [title]="maximized() ? ('terminal.restoreShortcut' | t) : ('terminal.maximize' | t)"
-        [attr.aria-label]="maximized() ? ('terminal.restore' | t) : ('terminal.maximize' | t)"
-        [class.active]="maximized()"
-        (click)="$event.stopPropagation(); maximizeRequested.emit(session().id)"
+        data-testid="terminal-focus-toggle"
+        [title]="(focusMode() ? 'terminal.restoreShortcut' : 'terminal.maximize') | t"
+        [attr.aria-label]="(focusMode() ? 'terminal.restore' : 'terminal.maximize') | t"
+        [class.active]="focusMode()"
+        (click)="$event.stopPropagation(); focusModeRequested.emit(session().id)"
       >
-        <app-icon [name]="maximized() ? 'minimize' : 'maximize'" [size]="13" />
+        <app-icon [name]="focusMode() ? 'minimize' : 'maximize'" [size]="13" />
       </button>
       <button
         type="button"
@@ -117,6 +134,9 @@
       >
         <app-icon name="x" [size]="13" />
       </button>
+      @if (focusMode()) {
+        <ng-container *ngTemplateOutlet="windowControlsTemplate()" />
+      }
     </div>
   </header>
   }

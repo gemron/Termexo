@@ -1,9 +1,6 @@
-<aside class="inspector bg-base-200">
-  <header class="inspector-heading">
-    <div>
-      <strong>{{ 'inspector.title' | t }}</strong>
-      <small>{{ 'inspector.currentWorkspace' | t }}</small>
-    </div>
+<aside class="inspector bg-base-200" [attr.aria-label]="'inspector.title' | t">
+  <header class="inspector-heading" data-tauri-drag-region="deep">
+    <strong>{{ 'inspector.title' | t }}</strong>
     <span class="terminal-count">{{ workspace()?.terminals?.length ?? 0 }}</span>
     <button
       type="button"
@@ -14,6 +11,7 @@
     >
       <app-icon name="panel-close" [size]="15" />
     </button>
+    <ng-content select="[inspector-window-controls]" />
   </header>
 
   <div class="inspector-body">

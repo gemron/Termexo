@@ -5,7 +5,7 @@
       | t: { visible: visibleCount(), total: terminalCount(), limit: visibleLimit() }
   "
 >
-  {{ visibleCount() }}/{{ visibleLimit() }}
+  {{ visibleCount() }}/{{ terminalCount() }}
 </span>
 
 <div class="join" role="group" [attr.aria-label]="'prompt.tools' | t">

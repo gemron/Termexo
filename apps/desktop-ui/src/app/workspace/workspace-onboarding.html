@@ -1,144 +1,132 @@
 <section class="onboarding">
   <header class="onboarding-head">
-    <img src="termexo-mark.svg" width="30" height="30" alt="" />
-    <h1>{{ 'onboarding.title' | t }}</h1>
-    <p>{{ 'onboarding.lead' | t }}</p>
-  </header>
-
-  <ol class="onboarding-steps">
-    <li [class.done]="workspace()" [attr.aria-current]="workspace() ? null : 'step'">
-      <b>
-        @if (workspace()) {
-          <app-icon name="check" [size]="12" />
-        } @else {
-          1
-        }
-      </b>
-      {{ 'onboarding.projectTitle' | t }}
-    </li>
-    <li [attr.aria-current]="workspace() ? 'step' : null">
-      <b>2</b>{{ 'onboarding.agentTitle' | t }}
-    </li>
-    <li><b>3</b>{{ 'onboarding.runTitle' | t }}</li>
-  </ol>
-
-  <section class="project-card" [attr.aria-label]="'onboarding.projectTitle' | t">
-    <app-icon name="folder" [size]="20" />
+    <span class="project-icon"><app-icon name="folder" [size]="24" /></span>
     <div>
       @if (workspace(); as project) {
-        <strong>{{ project.name }}</strong>
+        <h1>{{ project.name }}</h1>
         <p class="project-path">{{ project.projectPath }}</p>
       } @else {
-        <strong>{{ 'onboarding.projectTitle' | t }}</strong>
+        <h1>{{ 'onboarding.projectTitle' | t }}</h1>
         <p>{{ 'onboarding.projectHelp' | t }}</p>
       }
     </div>
-    @if (workspace()) {
-      <span class="ready-label"
-        ><app-icon name="check" [size]="12" />{{ 'onboarding.projectReady' | t }}</span
-      >
-    } @else {
+    @if (!workspace()) {
       <button
         type="button"
         class="btn btn-primary btn-sm"
         data-testid="onboarding-create-workspace"
         (click)="createRequested.emit()"
       >
-        {{ 'onboarding.projectAction' | t }}
+        <app-icon name="folder" [size]="15" />{{ 'onboarding.projectAction' | t }}
       </button>
     }
-  </section>
+  </header>
 
   @if (preview) {
     <p class="preview-note" role="status">{{ 'onboarding.preview' | t }}</p>
+  } @else if (workspace()) {
+    <ng-container *ngTemplateOutlet="assistants" />
   } @else {
+    <details class="assistant-disclosure">
+      <summary>{{ 'onboarding.agentFirst' | t }}</summary>
+      <ng-container *ngTemplateOutlet="assistants" />
+    </details>
+  }
+
+  <ng-template #assistants>
     <section class="agent-section" [attr.aria-label]="'onboarding.agentTitle' | t">
       <header class="agent-heading">
-        <div>
-          <h2>{{ 'onboarding.agentTitle' | t }}</h2>
-          <p aria-live="polite">{{ 'onboarding.readyCount' | t: { count: readyCount() } }}</p>
-        </div>
+        <h2>{{ 'onboarding.agentTitle' | t }}</h2>
         <button
           type="button"
           class="btn btn-ghost btn-sm"
           [disabled]="checking()"
           (click)="agents.refreshInstallations()"
         >
-          <app-icon name="refresh" [size]="12" />{{ 'onboarding.checkAgain' | t }}
+          <app-icon name="refresh" [size]="14" />{{ 'onboarding.checkAgain' | t }}
         </button>
       </header>
-      <ul class="agent-list">
-        @for (agent of agentRows(); track agent.type) {
-          <li [attr.data-agent]="agent.type" [attr.data-status]="agent.status">
-            <span class="agent-icon"><app-icon [name]="agent.icon" [size]="18" /></span>
-            <div class="agent-detail">
-              <strong>{{ agent.name }}</strong>
-              <span class="agent-status">
-                {{ 'onboarding.status.' + agent.status | t }}
-                @if (agent.status === 'ready' && agent.version) {
-                  · {{ agent.version }}
-                }
-              </span>
-              @if (agent.detail) {
-                <p class="diagnostic">{{ agent.detail }}</p>
-              }
-            </div>
-            @switch (agent.status) {
-              @case ('ready') {
-                <button
-                  type="button"
-                  class="btn btn-primary btn-sm"
-                  [attr.aria-label]="'onboarding.useNamedAgent' | t: { name: agent.name }"
-                  (click)="launch(agent.type)"
-                >
-                  {{ (workspace() ? 'onboarding.startAgent' : 'onboarding.useAgent') | t }}
-                  <app-icon name="arrow-right" [size]="12" />
-                </button>
-              }
-              @case ('error') {
-                <button
-                  type="button"
-                  class="btn btn-ghost btn-sm"
-                  (click)="agents.detectAgent(agent.type)"
-                >
-                  {{ 'onboarding.checkAgain' | t }}
-                </button>
-              }
-              @case ('checking') {
-                <app-icon name="refresh" [size]="14" />
-              }
-              @default {
-                @if (desktop) {
-                  <button
-                    type="button"
-                    class="btn btn-ghost btn-sm"
-                    (click)="installRequested.emit(agent.type)"
-                  >
-                    {{
-                      (agent.status === 'unhealthy' ? 'onboarding.repair' : 'onboarding.install')
-                        | t
-                    }}
-                  </button>
-                }
-              }
-            }
-          </li>
+      @if (readyRows().length) {
+        <ul class="agent-list">
+          @for (agent of readyRows(); track agent.type) {
+            <ng-container *ngTemplateOutlet="agentRow; context: { $implicit: agent }" />
+          }
+        </ul>
+        @if (otherRows().length) {
+          <details class="assistant-disclosure">
+            <summary>{{ 'onboarding.otherAgents' | t: { count: otherRows().length } }}</summary>
+            <ng-container *ngTemplateOutlet="otherAgents" />
+          </details>
         }
-      </ul>
-      <p class="configuration-note">{{ 'onboarding.configurationNote' | t }}</p>
-      @if (!desktop) {
+      } @else {
+        <ng-container *ngTemplateOutlet="otherAgents" />
+      }
+      @if (!desktop && otherRows().length) {
         <p class="configuration-note">{{ 'onboarding.remoteInstall' | t }}</p>
       }
     </section>
-  }
+  </ng-template>
+  <ng-template #otherAgents>
+    <ul class="agent-list">
+      @for (agent of otherRows(); track agent.type) {
+        <ng-container *ngTemplateOutlet="agentRow; context: { $implicit: agent }" />
+      }
+    </ul>
+  </ng-template>
+  <ng-template #agentRow let-agent>
+    <li [attr.data-agent]="agent.type" [attr.data-status]="agent.status">
+      <span class="agent-icon"><app-icon [name]="agent.icon" [size]="18" /></span>
+      <div class="agent-detail">
+        <strong>{{ agent.name }}</strong>
+        <span class="agent-status">
+          {{ 'onboarding.status.' + agent.status | t }}
+          @if (agent.status === 'ready' && agent.version) {
+            · {{ agent.version }}
+          }
+        </span>
+        @if (agent.detail) {
+          <p class="diagnostic">{{ agent.detail }}</p>
+        }
+      </div>
+      @switch (agent.status) {
+        @case ('ready') {
+          <button
+            type="button"
+            class="btn btn-primary btn-sm"
+            [attr.aria-label]="'onboarding.useNamedAgent' | t: { name: agent.name }"
+            (click)="launch(agent.type)"
+          >
+            {{ (workspace() ? 'onboarding.startAgent' : 'onboarding.useAgent') | t }}
+            <app-icon name="arrow-right" [size]="12" />
+          </button>
+        }
+        @case ('error') {
+          <button
+            type="button"
+            class="btn btn-ghost btn-sm"
+            (click)="agents.detectAgent(agent.type)"
+          >
+            {{ 'onboarding.checkAgain' | t }}
+          </button>
+        }
+        @case ('checking') {
+          <app-icon name="refresh" [size]="14" />
+        }
+        @default {
+          @if (desktop) {
+            <button
+              type="button"
+              class="btn btn-ghost btn-sm"
+              (click)="installRequested.emit(agent.type)"
+            >
+              {{ (agent.status === 'unhealthy' ? 'onboarding.repair' : 'onboarding.install') | t }}
+            </button>
+          }
+        }
+      }
+    </li>
+  </ng-template>
 
-  <aside class="run-note">
-    <app-icon name="bell" [size]="16" />
-    <div>
-      <strong>{{ 'onboarding.runTitle' | t }}</strong>
-      <p>{{ 'onboarding.runBody' | t }}</p>
-    </div>
-  </aside>
   <footer>
     <button
       type="button"
@@ -146,8 +134,7 @@
       data-testid="onboarding-shell"
       (click)="launchRequested.emit('shell')"
     >
-      <app-icon name="terminal" [size]="14" />{{ 'onboarding.shell' | t }}
+      <app-icon name="terminal" [size]="15" />{{ 'onboarding.shell' | t }}
     </button>
-    <p class="onboarding-privacy">{{ 'onboarding.privacy' | t }}</p>
   </footer>
 </section>

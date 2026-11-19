@@ -1,3 +1,4 @@
+import { NgTemplateOutlet } from '@angular/common';
 import { ProjectPreviewService } from '../core/services/project-preview.service';
 import {
   AfterViewInit,
@@ -11,6 +12,7 @@ import {
   NgZone,
   output,
   signal,
+  type TemplateRef,
   untracked,
   viewChild,
 } from '@angular/core';
@@ -123,7 +125,7 @@ const RUNTIME_ISSUE_NOTICE_KEYS: Readonly<
 
 @Component({
   selector: 'app-terminal-panel',
-  imports: [IconComponent, TerminalQuickKeysComponent, TranslatePipe, AccountLoginCodeComponent, TerminalMobileInputComponent, CommonActionTerminalControlsComponent],
+  imports: [NgTemplateOutlet, IconComponent, TerminalQuickKeysComponent, TranslatePipe, AccountLoginCodeComponent, TerminalMobileInputComponent, CommonActionTerminalControlsComponent],
   templateUrl: './terminal-panel.html',
   styleUrl: './terminal-panel.scss',
 })
@@ -227,7 +229,9 @@ export class TerminalPanelComponent implements AfterViewInit {
   readonly workspaceId = input('');
   readonly active = input(false);
   readonly visible = input(true);
-  readonly maximized = input(false);
+  readonly fillsLayout = input(false);
+  readonly focusMode = input(false);
+  readonly windowControlsTemplate = input<TemplateRef<unknown> | null>(null);
   /** Name of the signed-in account this terminal runs on; empty for agents without one. */
   readonly accountName = input('');
   readonly layoutRevision = input(0);
@@ -236,7 +240,8 @@ export class TerminalPanelComponent implements AfterViewInit {
   readonly themeColor = input<string>();
   readonly selected = output<string>();
   readonly closeRequested = output<TerminalCloseRequest>();
-  readonly maximizeRequested = output<string>();
+  readonly focusModeRequested = output<string>();
+  readonly layoutFillRequested = output<string>();
   readonly statusChanged = output<{ terminalId: string; status: TerminalStatus }>();
   readonly runtimeAttached = output<{ terminalId: string; runtimeRevision: number }>();
   readonly completionConfirmed = output<string>();
@@ -990,7 +995,8 @@ export class TerminalPanelComponent implements AfterViewInit {
     if (this.readOnly()) return false;
     // Tab shortcuts belong to the workbench. Declining them here keeps xterm from writing an
     // escape sequence to the PTY; the event still bubbles to the shell, which acts on it.
-    if (workbenchShortcut(event)) {
+    const restoreLayout = event.shiftKey && event.key === 'Escape' && (this.focusMode() || this.fillsLayout());
+    if (workbenchShortcut(event) || restoreLayout) {
       return false;
     }
     if (terminalPasteShortcut(event)) {

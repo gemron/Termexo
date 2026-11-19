@@ -1,3 +1,4 @@
+import { NgTemplateOutlet } from '@angular/common';
 import './core/i18n/workspace-tools.i18n';
 import { RemoteReadOnlyViewComponent } from './remote/remote-read-only-view';
 import { ProjectPreviewPanelComponent } from './preview/project-preview-panel';
@@ -14,6 +15,7 @@ import {
   HostListener,
   inject,
   Injector,
+  linkedSignal,
   signal,
   untracked,
 } from '@angular/core';
@@ -34,6 +36,7 @@ import {
   NetworkProfileInput,
   NetworkTestResult,
   profileModel,
+  profileServes,
   resolveAccountProfileId,
 } from './core/models/agent.models';
 import {
@@ -153,12 +156,9 @@ import { InspectorPanelComponent } from './inspector/inspector-panel';
 import { RemoteAccessGateComponent } from './remote/remote-access-gate';
 import { RemoteConnectionBadgeComponent } from './remote/remote-connection-badge';
 import { AgentLaunchOptionsComponent } from './shared/agent-launch-options/agent-launch-options';
+import { AnchoredMenuDirective } from './shared/anchored-menu.directive';
 import { IconComponent } from './shared/icon/icon';
-import { LanguageSelectorComponent } from './shared/language-selector/language-selector';
 import { TopbarOverflowMenuComponent } from './shared/topbar-overflow-menu/topbar-overflow-menu';
-import { RemoteAccessButtonComponent } from './shared/remote-access-button';
-import { RemoteHostsButtonComponent } from './shared/remote-hosts-button';
-import { ThirdPartyNotificationsToggleComponent } from './shared/third-party-notifications-toggle';
 import { WorkspaceOnboardingComponent } from './workspace/workspace-onboarding';
 import {
   DEFAULT_TERMINAL_FONT_NAME,
@@ -178,12 +178,20 @@ import { TerminalWorkbenchComponent } from './terminal/terminal-workbench';
 import { TerminalCloseConfirmComponent } from './terminal/terminal-close-confirm';
 import type { CloseConfirmAnchor } from './terminal/terminal-close-request';
 import { TodoBoardComponent } from './todo/todo-board';
-import { CLI_NATIVE_PROFILE_ID, explicitCliModel } from './core/models/launch-model-choice';
+import { CLI_NATIVE_PROFILE_ID, explicitCliModel, matchesRunningModel } from './core/models/launch-model-choice';
 import { WorkspaceSidebarComponent } from './workspace/workspace-sidebar';
 import { GitWorkbenchComponent } from './git/git-workbench';
 
 type SidebarResizeTarget = 'workspace' | 'inspector' | 'preview';
-type WorkspaceView = 'terminal' | 'tasks' | 'git' | 'preview';
+type WorkspaceTool = 'common-actions' | 'tasks' | 'git' | 'sessions';
+type WorkspaceView = 'terminal' | 'preview' | WorkspaceTool;
+
+const WORKSPACE_TOOL_TABS = {
+  'common-actions': { label: 'commonActions.title', icon: 'command' },
+  tasks: { label: 'workspace.viewTasks', icon: 'layout' },
+  git: { label: 'git.button', icon: 'git-branch' },
+  sessions: { label: 'terminal.sessionCenter', icon: 'history' },
+} satisfies Record<WorkspaceTool, { label: string; icon: string }>;
 
 /** How a resume should proceed once the CLI's hold on the session has been dealt with. */
 interface BackgroundReclaim {
@@ -274,10 +282,12 @@ function readStoredString(key: string, fallback: string): string {
 @Component({
   selector: 'app-root',
   imports: [
+    NgTemplateOutlet,
     RemoteReadOnlyViewComponent,
     ProjectPreviewPanelComponent,
     CommonActionsDialogComponent,
     AgentLaunchOptionsComponent,
+    AnchoredMenuDirective,
     AgentSettingsDialogComponent,
     ClaudeLaunchDialogComponent,
     CodexLaunchDialogComponent,
@@ -294,11 +304,7 @@ function readStoredString(key: string, fallback: string): string {
     GitWorkbenchComponent,
     IconComponent,
     InspectorPanelComponent,
-    LanguageSelectorComponent,
     TopbarOverflowMenuComponent,
-    RemoteAccessButtonComponent,
-    RemoteHostsButtonComponent,
-    ThirdPartyNotificationsToggleComponent,
     WorkspaceOnboardingComponent,
     MergeWorkspaceDialogComponent,
     AccountSwitchDialogComponent,
@@ -340,7 +346,6 @@ export class App {
   protected readonly state = inject(AppStateService);
   protected readonly commonActions = inject(CommonActionsService);
   protected readonly preview = inject(ProjectPreviewService);
-  protected readonly commonActionsOpen = signal(false);
   private pendingCommonActionLaunch: string | null = null;
   private readonly returnToCommonActionReview = signal<{ workspaceId: string; requestId: string } | null>(null);
   protected readonly agents = inject(AgentService);
@@ -392,7 +397,17 @@ export class App {
   protected readonly creatingWorkspace = signal(false);
   protected readonly createWorkspaceError = signal<string | null>(null);
   private readonly pendingOnboardingAgent = signal<AgentType | null>(null);
-  protected readonly workspaceView = signal<WorkspaceView>('terminal');
+  private readonly workspaceTabScope = computed(() => this.state.activeWorkspace()?.id ?? null);
+  protected readonly workspaceView = linkedSignal({
+    source: this.workspaceTabScope,
+    computation: (): WorkspaceView => 'terminal',
+  });
+  private readonly openedWorkspaceTools = signal<{ workspaceId: string | null; tool: WorkspaceTool }[]>([]);
+  protected readonly workspaceTools = computed(() => {
+    const workspaceId = this.workspaceTabScope();
+    return this.openedWorkspaceTools().filter((tab) => tab.workspaceId === workspaceId);
+  });
+  protected readonly workspaceToolTabs = WORKSPACE_TOOL_TABS;
   protected readonly busyTodoTaskId = signal<string | null>(null);
   protected readonly editingWorkspaceId = signal<string | null>(null);
   protected readonly claudeLaunchOpen = signal(false);
@@ -403,7 +418,6 @@ export class App {
   protected readonly launchingPi = signal(false);
   protected readonly antigravityLaunchOpen = signal(false);
   protected readonly launchingAntigravity = signal(false);
-  protected readonly sessionCenterOpen = signal(false);
   protected readonly remoteHostsOpen = signal(false);
   protected readonly promptLibraryOpen = signal(false);
   /** Empty until the shell reports it, and in browser preview, where there is no packaged build. */
@@ -424,16 +438,10 @@ export class App {
   protected readonly modelSwitchTerminalId = signal<string | null>(null);
   /** Agent type to preselect when the switch targets one terminal. */
   protected readonly modelSwitchAgentType = signal<AgentProtocol | null>(null);
-  /** Name of the single target, so the dialog can say which terminal it will change. */
-  protected readonly modelSwitchTerminalName = computed(() => {
-    const terminalId = this.modelSwitchTerminalId();
-    if (!terminalId) {
-      return '';
-    }
-    return (
-      this.state.activeWorkspace()?.terminals.find((item) => item.id === terminalId)?.name ?? ''
-    );
-  });
+  protected readonly modelSwitchTerminal = computed(() =>
+    this.state.activeWorkspace()?.terminals.find(terminal => terminal.id === this.modelSwitchTerminalId()),
+  );
+  protected readonly switchSettingsProfile = signal('');
   protected readonly accountSwitchOpen = signal(false);
   /** Terminal the account switch applies to; accounts are always switched one terminal at a time. */
   protected readonly accountSwitchTerminalId = signal<string | null>(null);
@@ -457,17 +465,6 @@ export class App {
         terminal.agentType,
         terminal.accountProfileId,
       ) ?? ''
-    );
-  });
-  /** Profile currently running in the one-terminal switcher. Batch switches have no single current item. */
-  protected readonly modelSwitchCurrentProfileId = computed(() => {
-    const terminalId = this.modelSwitchTerminalId();
-    if (!terminalId) {
-      return '';
-    }
-    return (
-      this.state.activeWorkspace()?.terminals.find((item) => item.id === terminalId)?.profileId ??
-      ''
     );
   });
   protected readonly agentMenuOpen = signal(false);
@@ -521,8 +518,7 @@ export class App {
       PREVIEW_MAX_WIDTH,
     ),
   );
-  protected readonly workspaceMaximized = signal(false);
-  protected readonly terminalMaximized = signal(false);
+  protected readonly terminalFillsLayout = signal(false);
   protected readonly layoutRevision = signal(0);
   protected readonly launchingClaude = signal(false);
   protected readonly launchingCodex = signal(false);
@@ -556,6 +552,16 @@ export class App {
   protected readonly agentIcons = AGENT_ICONS;
 
   protected readonly activeTerminalId = computed(() => this.state.activeTerminal()?.id ?? null);
+  protected readonly terminalFocusMode = linkedSignal<string | null, boolean>({
+    source: () => this.workspaceView() === 'terminal' && this.activeTerminalId()
+      ? this.workspaceTabScope()
+      : null,
+    computation: (workspaceId, previous) =>
+      workspaceId !== null && previous?.source === workspaceId && previous.value,
+  });
+  protected readonly showOnlyActiveTerminal = computed(
+    () => this.terminalFillsLayout() || this.terminalFocusMode(),
+  );
   protected readonly gitTarget = computed<RepositoryTarget | null>(() => {
     const workspace = this.state.activeWorkspace();
     const terminal = this.state.activeTerminal();
@@ -658,7 +664,7 @@ export class App {
       this.activeTerminalId(),
       this.preferredTerminalIds()[workspace.id] ?? [],
       this.renderedLayout(workspace.layout),
-      this.terminalMaximized(),
+      this.showOnlyActiveTerminal(),
       this.gridColumns(),
       this.gridRows(),
     );
@@ -673,7 +679,7 @@ export class App {
         this.returnToCommonActionReview.set(null);
       } else if (!review.waiting) {
         this.returnToCommonActionReview.set(null);
-        if (this.state.activeWorkspace()?.id === pending.workspaceId) this.commonActionsOpen.set(true);
+        if (this.state.activeWorkspace()?.id === pending.workspaceId) this.openWorkspaceTool('common-actions');
       }
     });
     effect(() => {
@@ -720,14 +726,6 @@ export class App {
           : GIT_POLL_INTERVAL_MS;
       const timer = window.setInterval(() => void this.git.refresh(), interval);
       onCleanup(() => window.clearInterval(timer));
-    });
-    effect(() => {
-      // Only a finished read that reports no repository sends the user back to the terminals. A
-      // missing overview means the read is still running or has failed, and leaving on that threw
-      // the user out of the view every time they switched the active terminal.
-      if (this.workspaceView() === 'git' && this.git.overview()?.available === false) {
-        this.workspaceView.set('terminal');
-      }
     });
     effect(() => {
       if (!this.workspacesLoaded()) return;
@@ -970,11 +968,9 @@ export class App {
       return;
     }
     this.pendingCommonActionLaunch = workspace.id;
-    this.commonActionsOpen.set(false);
     await this.openCodexLaunch();
     if (!this.codexLaunchOpen()) {
       this.pendingCommonActionLaunch = null;
-      this.commonActionsOpen.set(true);
     }
   }
 
@@ -984,7 +980,6 @@ export class App {
     if (workspace && review?.waiting && review.terminalId === terminalId) {
       this.returnToCommonActionReview.set({ workspaceId: workspace.id, requestId: review.requestId });
     }
-    this.commonActionsOpen.set(false);
     this.revealCreatedTerminal(terminalId);
   }
 
@@ -1378,8 +1373,8 @@ export class App {
       this.codexLaunchOpen.set(false);
       this.selectedTerminalDirectory.set(null);
       if (terminal) {
-        this.armStartupDialogs(terminal.id);
         this.revealCreatedTerminal(terminal.id);
+        this.armStartupDialogs(terminal.id);
         this.showToast(this.i18n.t('terminal.started', { name: terminal.name }));
       }
     } catch (error) {
@@ -1392,10 +1387,7 @@ export class App {
   protected closeCodexLaunch(): void {
     this.codexLaunchOpen.set(false);
     this.selectedTerminalDirectory.set(null);
-    if (this.pendingCommonActionLaunch) {
-      this.pendingCommonActionLaunch = null;
-      this.commonActionsOpen.set(true);
-    }
+    this.pendingCommonActionLaunch = null;
   }
 
   protected async launchClaude(value: ClaudeLaunchDialogValue): Promise<void> {
@@ -1455,11 +1447,6 @@ export class App {
   protected closeClaudeLaunch(): void {
     this.claudeLaunchOpen.set(false);
     this.selectedTerminalDirectory.set(null);
-  }
-
-  protected async openSessionCenter(): Promise<void> {
-    this.sessionCenterOpen.set(true);
-    await this.refreshSessions(this.state.activeWorkspace()?.projectPath);
   }
 
   protected async refreshSessions(projectPath?: string): Promise<void> {
@@ -1577,7 +1564,6 @@ export class App {
             : value.accountProfileId,
         autoConfirm: value.autoConfirm,
       });
-      this.sessionCenterOpen.set(false);
       if (terminal) {
         if (agentType !== 'grok' && agentType !== 'pi') this.armStartupDialogs(terminal.id);
         this.revealCreatedTerminal(terminal.id);
@@ -1670,11 +1656,11 @@ export class App {
     this.loginFeedback.forget(terminalId);
     const workspace = this.state.activeWorkspace();
     if (
-      this.terminalMaximized() &&
+      this.terminalFillsLayout() &&
       this.activeTerminalId() === terminalId &&
       workspace?.terminals.length === 1
     ) {
-      this.terminalMaximized.set(false);
+      this.terminalFillsLayout.set(false);
     }
     this.agentStartup.cancel(terminalId);
     this.todos.handleTerminalStatus(terminalId, 'STOPPED');
@@ -1699,7 +1685,7 @@ export class App {
       return;
     }
     this.workspaceView.set('terminal');
-    if (!this.terminalMaximized()) {
+    if (!this.showOnlyActiveTerminal()) {
       const preferredIds = revealTerminalInLayout(
         this.visibleTerminalIds(),
         this.activeTerminalId(),
@@ -2214,6 +2200,7 @@ export class App {
       : this.i18n.t('terminal.showInLayout');
     return [
       `${terminal.name} · ${this.statusLabel(terminal.status)}`,
+      ...(terminal.model ? [terminal.model] : []),
       terminal.workingDirectory,
       `${action} · ${this.i18n.t('terminal.tabHint')}`,
     ].join('\n');
@@ -2232,7 +2219,7 @@ export class App {
   }
 
   protected visibleTerminalLimit(): number {
-    return this.terminalMaximized()
+    return this.showOnlyActiveTerminal()
       ? 1
       : layoutTerminalCapacity(
           this.state.activeWorkspace()?.layout ?? 'single',
@@ -2241,15 +2228,25 @@ export class App {
         );
   }
 
-  protected toggleTerminalMaximize(terminalId: string): void {
-    const shouldRestore = this.terminalMaximized() && this.activeTerminalId() === terminalId;
+  protected toggleTerminalLayoutFill(terminalId: string): void {
+    const shouldRestore = this.terminalFillsLayout() && this.activeTerminalId() === terminalId;
     this.selectTerminal(terminalId);
-    this.terminalMaximized.set(!shouldRestore);
+    this.terminalFillsLayout.set(!shouldRestore);
     this.requestTerminalRefit();
   }
 
-  protected toggleWorkspaceMaximize(): void {
-    this.workspaceMaximized.update((maximized) => !maximized);
+  protected toggleTerminalFocus(terminalId: string): void {
+    if (this.terminalFocusMode()) {
+      this.restoreTerminalFocusMode();
+      return;
+    }
+    this.selectTerminal(terminalId);
+    this.terminalFocusMode.set(true);
+    this.requestTerminalRefit();
+  }
+
+  private restoreTerminalFocusMode(): void {
+    this.terminalFocusMode.set(false);
     this.requestTerminalRefit();
   }
 
@@ -2289,6 +2286,7 @@ export class App {
   protected toggleInspector(): void {
     this.inspectorOpen.update((open) => {
       const next = !open;
+      if (next && this.phoneLayout()) this.workspaceSidebarOpen.set(false);
       this.storePreference('termexo.inspectorOpen', next);
       return next;
     });
@@ -2300,14 +2298,14 @@ export class App {
    */
   protected openGitView(change: { path: string } | null | undefined | void): void {
     const path = change?.path;
-    this.workspaceView.set('git');
+    this.openWorkspaceTool('git');
     if (path) {
       this.git.selectPath(path);
     }
   }
 
   protected startSidebarResize(target: SidebarResizeTarget, event: PointerEvent): void {
-    if (event.button !== 0 || (this.workspaceMaximized() && target !== 'preview')) {
+    if (event.button !== 0 || (this.terminalFocusMode() && target !== 'preview')) {
       return;
     }
     event.preventDefault();
@@ -2324,7 +2322,7 @@ export class App {
   }
 
   protected previewMaxWidth(): number {
-    const sidebar = this.workspaceSidebarOpen() && !this.workspaceMaximized()
+    const sidebar = this.workspaceSidebarOpen() && !this.terminalFocusMode()
       ? Math.min(window.innerWidth * 0.3, Math.max(152, this.workspaceSidebarWidth())) + 5
       : 0;
     return Math.max(PREVIEW_MIN_WIDTH, Math.min(PREVIEW_MAX_WIDTH, window.innerWidth - sidebar - 15));
@@ -2397,26 +2395,47 @@ export class App {
     this.layoutRevision.update((revision) => revision + 1);
   }
 
-  /**
-   * Closes the agent menu when the click lands outside it.
-   *
-   * Registered on the document rather than a backdrop element so the menu also closes when the
-   * click goes to a terminal, which has no overlay to catch it.
-   */
-  @HostListener('document:pointerdown', ['$event'])
-  protected closeAgentMenuOnOutsideClick(event: PointerEvent): void {
-    if (!this.agentMenuOpen()) {
-      return;
-    }
-    const target = event.target as HTMLElement | null;
-    if (!target?.closest('.menu-anchor')) {
-      this.agentMenuOpen.set(false);
-    }
+  protected chooseWorkspaceAction(tool: WorkspaceTool): void {
+    this.agentMenuOpen.set(false);
+    this.openWorkspaceTool(tool);
   }
 
-  @HostListener('document:keydown.escape')
-  protected closeAgentMenuOnEscape(): void {
-    this.agentMenuOpen.set(false);
+  private openWorkspaceTool(tool: WorkspaceTool): void {
+    const workspaceId = this.workspaceTabScope();
+    if (workspaceId === null && tool !== 'sessions') return;
+    if (!this.workspaceTools().some((tab) => tab.tool === tool)) {
+      this.openedWorkspaceTools.update((tabs) => [...tabs, { workspaceId, tool }]);
+    }
+    this.selectWorkspaceTool(tool);
+  }
+
+  protected selectWorkspaceTool(tool: WorkspaceTool): void {
+    this.workspaceView.set(tool);
+    window.requestAnimationFrame(() => {
+      if (this.workspaceView() !== tool) return;
+      const tab = document.getElementById('workspace-tool-tab-' + tool);
+      tab?.scrollIntoView?.({ block: 'nearest', inline: 'nearest' });
+      tab?.focus({ preventScroll: true });
+    });
+  }
+
+  protected closeWorkspaceTool(tool: WorkspaceTool): void {
+    const tabs = this.workspaceTools();
+    const index = tabs.findIndex((tab) => tab.tool === tool);
+    if (index < 0) return;
+    const closed = tabs[index];
+    this.openedWorkspaceTools.update((open) => open.filter((tab) => tab !== closed));
+    if (tool === 'common-actions') this.returnToCommonActionReview.set(null);
+    if (this.workspaceView() !== tool) return;
+
+    const previous = tabs[index - 1];
+    const preview = this.preview.workspaceTabs().at(-1);
+    const terminal = this.state.activeTerminal();
+    if (previous) this.selectWorkspaceTool(previous.tool);
+    else if (preview) this.preview.activate(preview.id);
+    else if (terminal) this.selectTerminal(terminal.id);
+    else if (tabs[index + 1]) this.selectWorkspaceTool(tabs[index + 1].tool);
+    else this.workspaceView.set('terminal');
   }
 
   /**
@@ -2439,59 +2458,57 @@ export class App {
 
   private runTabShortcut(event: KeyboardEvent): void {
     const shortcut = workbenchShortcut(event);
-    const terminals = this.state.activeWorkspace()?.terminals ?? [];
-    if (!shortcut || !['terminal', 'preview'].includes(this.workspaceView())) {
-      return;
-    }
-    // An open dialog owns the keyboard; the strip behind it must not react to keys typed into it.
+    if (!shortcut) return;
     const target = event.target;
-    if (target instanceof Element && target.closest('[role="dialog"]')) {
-      return;
-    }
+    if (target instanceof Element && target.closest('[role="dialog"], [role="menu"]')) return;
 
+    const view = this.workspaceView();
     if (shortcut.action === 'moveTab') {
-      if (this.workspaceView() === 'terminal' && this.moveActiveTerminal(shortcut.delta)) {
-        event.preventDefault();
-      }
+      if (view === 'terminal' && this.moveActiveTerminal(shortcut.delta)) event.preventDefault();
       return;
     }
 
-    const tabs = terminals.map((terminal) => terminal.id);
-    tabs.push(...this.preview.workspaceTabs().map((tab) => tab.id));
-    if (tabs.length === 0) return;
-    const activeIndex = this.workspaceView() === 'preview'
-      ? tabs.indexOf(this.preview.activeTab()?.id ?? '')
-      : tabs.indexOf(this.activeTerminalId() ?? '');
-    const selectedId =
-      shortcut.action === 'selectTab'
-        ? tabs[shortcut.index]
+    const tabs = [
+      ...(this.state.activeWorkspace()?.terminals ?? []).map((terminal) => ({
+        view: 'terminal' as const, id: terminal.id,
+      })),
+      ...this.preview.workspaceTabs().map((tab) => ({ view: 'preview' as const, id: tab.id })),
+      ...this.workspaceTools().map((tab) => ({ view: tab.tool, id: tab.tool })),
+    ];
+    if (!tabs.length) return;
+    const activeId = view === 'terminal' ? this.activeTerminalId()
+      : view === 'preview' ? this.preview.activeTab()?.id : view;
+    const activeIndex = tabs.findIndex((tab) => tab.view === view && tab.id === activeId);
+    const selected = shortcut.action === 'selectTab'
+      ? tabs[shortcut.index]
+      : activeIndex < 0
+        ? (shortcut.delta < 0 ? tabs.at(-1) : tabs[0])
         : tabs[(activeIndex + shortcut.delta + tabs.length) % tabs.length];
-    if (selectedId) {
-      event.preventDefault();
-      if (terminals.some((terminal) => terminal.id === selectedId)) this.selectTerminal(selectedId);
-      else this.preview.activate(selectedId);
-    }
+    if (!selected) return;
+    event.preventDefault();
+    if (selected.view === 'terminal') this.selectTerminal(selected.id);
+    else if (selected.view === 'preview') this.preview.activate(selected.id);
+    else this.selectWorkspaceTool(selected.view);
   }
 
   private restoreMaximizedView(event: KeyboardEvent): void {
     if (!event.shiftKey) {
       return;
     }
-    if (this.terminalMaximized()) {
+    if (this.terminalFocusMode()) {
       event.preventDefault();
-      this.terminalMaximized.set(false);
-      return;
-    }
-    if (this.workspaceMaximized()) {
+      this.restoreTerminalFocusMode();
+    } else if (this.terminalFillsLayout()) {
       event.preventDefault();
-      this.workspaceMaximized.set(false);
+      this.terminalFillsLayout.set(false);
+      this.requestTerminalRefit();
     }
   }
 
   /** Whether a panel is currently floating over the workspace, which only happens on a phone. */
   protected readonly overlayPanelOpen = computed(
     () =>
-      !this.workspaceMaximized() &&
+      !this.terminalFocusMode() &&
       (this.workspaceSidebarOpen() ||
         (this.inspectorOpen() && this.workspaceView() === 'terminal')),
   );
@@ -2613,6 +2630,7 @@ export class App {
       this.mountedWorkspaceIds.update((workspaceIds) =>
         workspaceIds.filter((workspaceId) => workspaceId !== workspace.id),
       );
+      this.openedWorkspaceTools.update((tabs) => tabs.filter((tab) => tab.workspaceId !== workspace.id));
       this.todos.deleteWorkspace(workspace.id);
       this.mountWorkspace(this.state.activeWorkspace()?.id);
       this.preferredTerminalIds.update((items) => {
@@ -2620,7 +2638,7 @@ export class App {
         delete next[workspace.id];
         return next;
       });
-      this.terminalMaximized.set(false);
+      this.terminalFillsLayout.set(false);
       this.workspacePendingDeletion.set(null);
       this.showToast(this.i18n.t('workspace.deleted', { name: workspace.name }));
     } catch (error) {
@@ -2670,6 +2688,7 @@ export class App {
         throw new Error(this.i18n.t('workspace.mergeEndpointsNotFound'));
       }
 
+      this.openedWorkspaceTools.update((tabs) => tabs.filter((tab) => tab.workspaceId !== sourceWorkspace.id));
       this.todos.mergeWorkspaces(sourceWorkspace.id, mergedWorkspace);
 
       this.mountedWorkspaceIds.update((workspaceIds) =>
@@ -2690,7 +2709,7 @@ export class App {
         delete next[sourceWorkspace.id];
         return next;
       });
-      this.terminalMaximized.set(false);
+      this.terminalFillsLayout.set(false);
       this.workspacePendingMerge.set(null);
       this.showToast(
         this.i18n.t('workspace.merged', {
@@ -2714,6 +2733,7 @@ export class App {
 
   protected selectWorkspace(workspaceId: string): void {
     this.globalNoticeOpen.set(false);
+    this.agentMenuOpen.set(false);
     this.mountWorkspace(workspaceId);
     this.state.selectWorkspace(workspaceId);
     const workspace = this.state.activeWorkspace();
@@ -2965,31 +2985,37 @@ export class App {
 
   /** Closes the switcher and clears its scope, so the next open starts as a batch switch. */
   protected closeModelSwitch(): void {
+    this.switchSettingsProfile.set('');
     this.modelSwitchOpen.set(false);
     this.modelSwitchTerminalId.set(null);
     this.modelSwitchAgentType.set(null);
   }
 
+  protected openSwitchSettings(profileId: string, choice: string): void {
+    this.switchSettingsProfile.set(choice);
+    this.openSettings('models', profileId);
+  }
+
   protected async switchModels(value: ModelSwitchValue): Promise<void> {
     const isClaude = value.agent === 'claude';
-    if (isClaude ? this.launchingClaude() : this.launchingCodex()) {
+    if (this.remoteConnection.readOnly() || this.launchingClaude() || this.launchingCodex()) {
       return;
     }
 
     const workspace = this.state.activeWorkspace();
     const profile = this.agents.modelProfiles().find((item) => item.id === value.profileId);
-    const agentType = isClaude ? 'claude' : 'codex';
+    const native = value.profileId === CLI_NATIVE_PROFILE_ID;
     // A single-terminal switch reuses this whole flow, narrowed to one target.
     const targetId = this.modelSwitchTerminalId();
     const terminals = (workspace?.terminals ?? []).filter(
       (terminal) =>
-        terminal.agentType === agentType && (targetId === null || terminal.id === targetId),
+        terminal.agentType === value.agent && (targetId === null || terminal.id === targetId),
     );
-    if (!profile || terminals.length === 0) {
+    if ((!native && (!profile || !profileServes(profile, value.agent))) || terminals.length === 0) {
       this.closeModelSwitch();
       this.showToast(
         this.i18n.t(
-          profile
+          terminals.length === 0
             ? isClaude
               ? 'profile.noClaudeTerminals'
               : 'profile.noCodexTerminals'
@@ -2998,13 +3024,16 @@ export class App {
       );
       return;
     }
-    if (needsCredential(profile, isClaude ? 'claude' : 'codex')) {
-      this.openModelCredentialSettings(profile.id, profile.name);
+    if (profile && needsCredential(profile, value.agent)) {
+      this.openSwitchSettings(profile.id, profile.id);
       return;
     }
-    // The dialog disables the current profile; this guard also prevents a stale or scripted event
-    // from needlessly closing and restarting the same single terminal.
-    if (targetId !== null && terminals.length === 1 && terminals[0].profileId === profile.id) {
+    const requestedModel = profile ? profileModel(profile, value.agent) : value.model;
+    const model = requestedModel || this.i18n.t(isClaude ? 'terminal.defaultClaudeModel' : 'terminal.defaultCodexModel');
+    const targets = targetId === null ? terminals : terminals.filter(terminal =>
+      !matchesRunningModel(terminal.profileId, terminal.model, value.profileId, requestedModel),
+    );
+    if (!targets.length) {
       this.closeModelSwitch();
       return;
     }
@@ -3014,13 +3043,14 @@ export class App {
       // Build every launch command before touching a PTY. A missing credential or incompatible
       // profile therefore aborts the whole plan with every existing session still running.
       const plans = await Promise.all(
-        terminals.map(async (terminal) => ({
+        targets.map(async (terminal) => ({
           original: { ...terminal },
           launch: isClaude
             ? await this.agents.prepareLaunch({
                 terminalId: terminal.id,
                 workspaceId: workspace?.id,
                 profileId: value.profileId,
+                model: native ? value.model : undefined,
                 mcpProfileId: terminal.mcpProfileId,
                 accountProfileId: terminal.accountProfileId,
                 autoConfirm: terminal.autoConfirm,
@@ -3029,19 +3059,21 @@ export class App {
                 terminalId: terminal.id,
                 workspaceId: workspace?.id,
                 profileId: value.profileId,
+                model: native ? value.model : undefined,
                 accountProfileId: terminal.accountProfileId,
                 autoConfirm: terminal.autoConfirm,
               }),
         })),
       );
-      const switched: typeof plans = [];
+      const closed: typeof plans = [];
       let failure: unknown = null;
       for (const plan of plans) {
         try {
           await this.terminalGateway.close(plan.original.id, true);
+          closed.push(plan);
           if (
             !this.state.restartTerminalWithProfile(plan.original.id, plan.launch.command, {
-              model: profileModel(profile, value.agent),
+              model,
               profileId: value.profileId,
               mcpProfileId: isClaude ? plan.original.mcpProfileId : undefined,
             })
@@ -3053,7 +3085,6 @@ export class App {
               }),
             );
           }
-          switched.push(plan);
         } catch (error) {
           failure = error;
           break;
@@ -3062,9 +3093,7 @@ export class App {
 
       let rollbackFailures = 0;
       if (failure) {
-        // Include the failed target: its PTY may already have closed before the state update failed.
-        const rollbackTargets = plans.slice(0, Math.min(switched.length + 1, plans.length));
-        for (const plan of rollbackTargets.reverse()) {
+        for (const plan of closed.reverse()) {
           try {
             await this.terminalGateway.close(plan.original.id, true).catch(() => undefined);
             if (
@@ -3088,7 +3117,7 @@ export class App {
         failure
           ? this.i18n.t('profile.switchPartial', {
               switched: 0,
-              failed: terminals.length,
+              failed: targets.length,
               error: `${this.errorMessage(failure)} · ${
                 rollbackFailures === 0
                   ? this.i18n.t('profile.rollbackComplete')
@@ -3096,8 +3125,8 @@ export class App {
               }`,
             })
           : this.i18n.t(isClaude ? 'profile.switched' : 'profile.switchedCodex', {
-              count: switched.length,
-              name: profile.name,
+              count: closed.length,
+              name: profile?.name || model,
             }),
         failure ? 'attention' : 'success',
       );
@@ -3133,6 +3162,7 @@ export class App {
       input.id,
       async () => {
         await this.agents.saveModelProfile(input);
+        if (this.modelSwitchOpen()) this.switchSettingsProfile.set(input.id);
       },
       'profile.saved',
     );
@@ -3156,7 +3186,7 @@ export class App {
     this.openSettings('cli');
   }
 
-  protected openSettings(tab: SettingsTab = 'diagnostics', modelProfileId = ''): void {
+  protected openSettings(tab: SettingsTab = 'models', modelProfileId = ''): void {
     this.settingsInitialTab.set(tab);
     this.settingsInitialModelProfileId.set(modelProfileId);
     // Settings is where sign-in states are read and where login is started from, so the list is
@@ -3824,7 +3854,7 @@ export class App {
       : undefined;
     if (resumeRecognition) {
       this.pendingCommonActionLaunch = null;
-      this.commonActionsOpen.set(true);
+      this.openWorkspaceTool('common-actions');
     }
     this.agentStartup.arm(terminalId, {
       confirm: (writes) => this.writeTerminalSequence(terminalId, writes),
@@ -4044,7 +4074,6 @@ export class App {
     this.claudeLaunchOpen.set(false);
     this.codexLaunchOpen.set(false);
     this.openCodeLaunchOpen.set(false);
-    this.sessionCenterOpen.set(false);
     this.closeModelSwitch();
     this.selectedTerminalDirectory.set(null);
     this.openSettings('models', profileId);

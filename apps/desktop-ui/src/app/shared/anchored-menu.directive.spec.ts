@@ -60,9 +60,13 @@ describe('AnchoredMenuDirective', () => {
     expect(menu.style.top).toBe('156px');
   });
 
-  it('supports arrow navigation and restores focus when Escape closes the menu', async () => {
+  it('wraps arrow navigation and restores focus when Escape closes the menu', async () => {
     const { menu, anchor, fixture, root } = await render(100, 100);
     const buttons = menu.querySelectorAll('button');
+    expect(document.activeElement).toBe(buttons[0]);
+    buttons[0].dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowUp', bubbles: true }));
+    expect(document.activeElement).toBe(buttons[1]);
+    buttons[1].dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true }));
     expect(document.activeElement).toBe(buttons[0]);
     buttons[0].dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true }));
     expect(document.activeElement).toBe(buttons[1]);

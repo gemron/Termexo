@@ -34,8 +34,9 @@ try {
   await page.goto(APP_URL, { waitUntil: 'networkidle' });
   await page.locator('.terminal-panel').first().waitFor();
 
-  const toolbar = page.getByRole('toolbar', { name: '工作区工具' });
-  await toolbar.getByRole('button', { name: '新建终端', exact: true }).click();
+  await page.getByTestId('new-terminal-menu').click();
+  await page.locator('.agent-menu [data-agent="shell"]').click();
+  await page.getByRole('button', { name: '使用此目录', exact: true }).click();
   const shellPanel = page.locator('.terminal-panel').last();
   await shellPanel.getByText('运行中', { exact: true }).waitFor();
   await page.getByTitle('网格布局').click();
@@ -50,10 +51,11 @@ try {
     fullPage: true,
   });
 
-  await page.getByRole('button', { name: '设置', exact: true }).click();
-  const settingsDialog = page.getByRole('dialog', { name: 'Agent 与开发环境设置' });
+  await page.getByTestId('overflow-menu').click();
+  await page.getByTestId('settings-open').click();
+  const settingsDialog = page.getByRole('dialog', { name: '设置', exact: true });
   await settingsDialog.waitFor();
-  await settingsDialog.getByRole('button', { name: '模型 Profile' }).click();
+  await settingsDialog.getByRole('button', { name: '模型配置' }).click();
   await page.screenshot({
     path: resolve(imageDirectory, 'termexo-model-profiles.png'),
     fullPage: true,

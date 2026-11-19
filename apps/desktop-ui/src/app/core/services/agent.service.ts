@@ -76,6 +76,13 @@ const MAX_RECENT_EVENTS = 250;
 export type AgentDetectionState =
   { status: 'checking' | 'complete' } | { status: 'error'; message: string };
 
+export function agentReadiness(installation: AgentInstallation | null, detection?: AgentDetectionState) {
+  if (detection?.status === 'error') return 'error';
+  if (detection?.status === 'checking' || !installation) return 'checking';
+  if (installation.healthy) return 'ready';
+  return installation.installed ? 'unhealthy' : 'missing';
+}
+
 const DETECTION_COMMANDS: Record<ManagedAgentType, string> = {
   claude: 'detect_claude',
   codex: 'detect_codex',
@@ -95,6 +102,8 @@ export class AgentService {
   private readonly piInstallationState = signal<AgentInstallation | null>(null);
   private readonly antigravityInstallationState = signal<AgentInstallation | null>(null);
   private readonly sessionItems = signal<AgentSession[]>([]);
+  private sessionScanGeneration = 0;
+  private sessionScanPath: string | undefined;
   private readonly eventItems = signal<AgentEvent[]>([]);
   private readonly modelProfileItems = signal<ModelProfile[]>([]);
   private readonly mcpProfileItems = signal<McpProfile[]>([]);
@@ -276,6 +285,11 @@ export class AgentService {
   }
 
   async refreshSessions(projectPath?: string): Promise<void> {
+    const generation = ++this.sessionScanGeneration;
+    if (this.sessionScanPath !== projectPath) {
+      this.sessionScanPath = projectPath;
+      this.sessionItems.set([]);
+    }
     if (!hasBackend()) {
       this.sessionItems.set([]);
       return;
@@ -300,6 +314,7 @@ export class AgentService {
         }),
       ]);
 
+      if (generation !== this.sessionScanGeneration) return;
       const sessions = results.flatMap((result) =>
         result.status === 'fulfilled' ? result.value : [],
       );

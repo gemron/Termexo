@@ -6,12 +6,11 @@ import {
   Component,
   computed,
   effect,
-  type ElementRef,
   inject,
   input,
+  linkedSignal,
   output,
   signal,
-  viewChild,
 } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 
@@ -30,7 +29,6 @@ import {
 import { AGENT_ICONS } from '../core/models/workspace.models';
 import { I18nService } from '../core/i18n/i18n.service';
 import { TranslatePipe } from '../core/i18n/translate.pipe';
-import { ModalFocusDirective } from '../shared/modal-focus.directive';
 import { IconComponent } from '../shared/icon/icon';
 
 export interface ResumeSessionValue {
@@ -111,19 +109,9 @@ function presentationOf(agentType: NativeAgentType): AgentPresentation {
 
 @Component({
   selector: 'app-session-center-dialog',
-  imports: [ModalFocusDirective, DatePipe, FormsModule, IconComponent, TranslatePipe],
+  imports: [DatePipe, FormsModule, IconComponent, TranslatePipe],
   template: `
-    <div class="backdrop modal modal-open" (mousedown)="cancelled.emit()">
-      <section
-        class="agent-dialog session-center modal-box"
-        appModal
-        (dismissModal)="cancelled.emit()"
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="session-center-title"
-        (mousedown)="$event.stopPropagation()"
-        (keydown)="handleKeydown($event)"
-      >
+    <section class="agent-dialog session-center" aria-labelledby="session-center-title">
         <header>
           <div class="dialog-title">
             <span class="title-icon"><app-icon name="history" [size]="17" /></span>
@@ -143,15 +131,6 @@ function presentationOf(agentType: NativeAgentType): AgentPresentation {
               </p>
             </div>
           </div>
-          <button
-            type="button"
-            class="btn btn-square btn-ghost btn-sm"
-            [title]="'common.close' | t"
-            [attr.aria-label]="'common.close' | t"
-            (click)="cancelled.emit()"
-          >
-            <app-icon name="x" [size]="15" />
-          </button>
         </header>
 
         <div class="agent-health-strip" [attr.aria-label]="'session.connectionStatus' | t">
@@ -176,7 +155,6 @@ function presentationOf(agentType: NativeAgentType): AgentPresentation {
           <label class="dialog-search input input-bordered input-sm">
             <app-icon name="search" [size]="14" />
             <input
-              #searchInput
               type="search"
               [placeholder]="'session.searchPlaceholder' | t"
               [attr.aria-label]="'session.searchAria' | t"
@@ -490,18 +468,13 @@ function presentationOf(agentType: NativeAgentType): AgentPresentation {
             }}
           </span>
           <span class="session-read-only">{{ 'session.readOnly' | t }}</span>
-          <button type="button" class="secondary" (click)="cancelled.emit()">
-            {{ 'common.close' | t }}
-          </button>
         </footer>
-      </section>
-    </div>
+    </section>
   `,
   styleUrl: './agent-dialog.scss',
 })
 export class SessionCenterDialogComponent {
   private readonly i18n = inject(I18nService);
-  private readonly searchInput = viewChild<ElementRef<HTMLInputElement>>('searchInput');
   readonly installation = input<AgentInstallation | null>(null);
   readonly codexInstallation = input<AgentInstallation | null>(null);
   readonly openCodeInstallation = input<AgentInstallation | null>(null);
@@ -521,10 +494,9 @@ export class SessionCenterDialogComponent {
   );
   readonly refreshed = output<string | undefined>();
   readonly resumed = output<ResumeSessionValue>();
-  readonly cancelled = output<void>();
 
   protected readonly search = signal('');
-  protected readonly onlyWorkspace = signal(true);
+  protected readonly onlyWorkspace = linkedSignal(() => !!this.projectPath());
   protected readonly agentFilter = signal<SessionAgentFilter>('all');
   protected readonly optionsExpanded = signal(false);
   private readonly catalogs = inject(CodexModelCatalogService);
@@ -758,24 +730,12 @@ export class SessionCenterDialogComponent {
         if (generation === this.catalogGeneration) this.codexModelSuggestions.set(catalog.models.map(model => model.id));
       }).catch(() => {});
     });
-    // `autofocus` only applies while the document is being parsed, so a dialog created later never
-    // receives it. Focusing the search field also puts Escape inside the dialog, where it closes
-    // this dialog instead of reaching the workbench shortcut on the window.
-    afterNextRender(() => this.searchInput()?.nativeElement.focus());
+    afterNextRender(() => this.refresh());
     // Both `effect()` instances subscribe to filter signals and reset the visible row window or
     // debounce the search; registering them as field initialisers keeps them alive even though
     // their values are otherwise unused.
     this.resetVisibleRows;
     void this.rescheduleDebounce;
-  }
-
-  protected handleKeydown(event: KeyboardEvent): void {
-    if (event.key !== 'Escape') {
-      return;
-    }
-    // The workbench listens for Escape on the window; an open dialog owns the key instead.
-    event.stopPropagation();
-    this.cancelled.emit();
   }
 
   protected filterLabel(filter: SessionAgentFilter): string {

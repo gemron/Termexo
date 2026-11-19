@@ -3,27 +3,29 @@ import { registerTranslations, type TranslationBundle } from './i18n.service';
 /** Loaded with the guide for a new or empty workspace. */
 export const ONBOARDING_TRANSLATIONS: TranslationBundle = {
   en: {
+    'onboarding.agentFirst': 'Choose an assistant first',
+    'onboarding.otherAgents': 'Other assistants ({count})',
     'onboarding.title': 'Start your first Agent',
     'onboarding.lead':
       'Choose a project and an available Agent. Termexo keeps your sessions together and helps you spot who needs you.',
     'onboarding.projectTitle': 'Choose a project',
     'onboarding.projectReady': 'Selected',
-    'onboarding.projectHelp': 'A workspace keeps a project folder and its terminals together.',
+    'onboarding.projectHelp': 'Choose the folder you want to work in. Then open an assistant or a terminal here.',
     'onboarding.projectAction': 'Choose project folder',
-    'onboarding.agentTitle': 'Choose an Agent',
+    'onboarding.agentTitle': 'Choose an assistant',
     'onboarding.runTitle': 'Send a task',
     'onboarding.preview':
-      'Browser preview cannot detect or launch local CLIs. Continue in the Windows desktop app.',
+      'Open the Termexo desktop app to use assistants installed on your computer.',
     'onboarding.readyCount': '{count} Agent CLIs available',
     'onboarding.checkAgain': 'Check again',
     'onboarding.status.checking': 'Checking…',
-    'onboarding.status.ready': 'CLI available',
+    'onboarding.status.ready': 'Ready to use',
     'onboarding.status.missing': 'Not installed',
     'onboarding.status.unhealthy': 'Needs repair',
     'onboarding.status.error': 'Detection failed',
     'onboarding.useNamedAgent': 'Continue with {name}',
-    'onboarding.startAgent': 'Configure & start',
-    'onboarding.useAgent': 'Use this Agent',
+    'onboarding.startAgent': 'Start assistant',
+    'onboarding.useAgent': 'Use this assistant',
     'onboarding.install': 'Install',
     'onboarding.repair': 'Repair',
     'onboarding.configurationNote':
@@ -36,36 +38,40 @@ export const ONBOARDING_TRANSLATIONS: TranslationBundle = {
       'No Termexo account required. Model requests use your configured Agent service. Phone access is optional.',
   },
   'zh-CN': {
+    'onboarding.agentFirst': '先选择助手',
+    'onboarding.otherAgents': '其他助手（{count}）',
     'onboarding.title': '启动你的第一个 Agent',
     'onboarding.lead': '选好项目和可用的 Agent，即可开始。Termexo 帮你集中管理会话，看清谁在等你。',
     'onboarding.projectTitle': '选择项目',
     'onboarding.projectReady': '已选择',
-    'onboarding.projectHelp': '一个工作区，保存一个项目目录和它的终端。',
+    'onboarding.projectHelp': '选择你要处理的文件夹，之后可以在这里打开助手或普通终端。',
     'onboarding.projectAction': '选择项目文件夹',
-    'onboarding.agentTitle': '选择 Agent',
+    'onboarding.agentTitle': '选择助手',
     'onboarding.runTitle': '发送任务',
-    'onboarding.preview': '浏览器预览无法检测或启动本机 CLI，请在 Windows 桌面版继续。',
+    'onboarding.preview': '要使用电脑上安装的助手，请打开 Termexo 桌面版。',
     'onboarding.readyCount': '{count} 个 Agent CLI 可用',
     'onboarding.checkAgain': '重新检测',
     'onboarding.status.checking': '检测中…',
-    'onboarding.status.ready': 'CLI 可用',
+    'onboarding.status.ready': '可直接使用',
     'onboarding.status.missing': '未安装',
     'onboarding.status.unhealthy': '需要修复',
     'onboarding.status.error': '检测失败',
     'onboarding.useNamedAgent': '使用 {name} 继续',
-    'onboarding.startAgent': '配置并启动',
-    'onboarding.useAgent': '使用此 Agent',
+    'onboarding.startAgent': '启动助手',
+    'onboarding.useAgent': '使用此助手',
     'onboarding.install': '安装',
     'onboarding.repair': '修复',
     'onboarding.configurationNote':
       '下一步确认要使用的模型和账号。CLI 可用不代表已登录，启动后可能仍需登录。',
-    'onboarding.remoteInstall': '请在主机电脑上安装或修复 CLI。',
+    'onboarding.remoteInstall': '如需安装或修复助手，请在主机电脑上操作。',
     'onboarding.runBody':
       '在终端里发送任务。Agent 等待输入或审批时，点击提醒即可回到对应会话，即使你正在另一个项目中。',
     'onboarding.shell': '打开普通终端',
     'onboarding.privacy': '无需注册 Termexo 账号。模型请求使用你配置的 Agent 服务；手机连接可选。',
   },
   es: {
+    'onboarding.agentFirst': 'Elegir un asistente primero',
+    'onboarding.otherAgents': 'Otros asistentes ({count})',
     'onboarding.title': 'Inicia tu primer agente',
     'onboarding.lead':
       'Elige un proyecto y un agente disponible. Termexo reúne tus sesiones y te ayuda a ver quién te necesita.',
@@ -99,6 +105,8 @@ export const ONBOARDING_TRANSLATIONS: TranslationBundle = {
       'No necesitas una cuenta de Termexo. Las solicitudes usan el servicio de agente configurado. El acceso desde el móvil es opcional.',
   },
   fr: {
+    'onboarding.agentFirst': 'Choisir d’abord un assistant',
+    'onboarding.otherAgents': 'Autres assistants ({count})',
     'onboarding.title': 'Démarrez votre premier agent',
     'onboarding.lead':
       'Choisissez un projet et un agent disponible. Termexo regroupe vos sessions et vous aide à voir qui vous attend.',
@@ -132,6 +140,8 @@ export const ONBOARDING_TRANSLATIONS: TranslationBundle = {
       'Aucun compte Termexo requis. Les requêtes utilisent le service d’agent configuré. L’accès mobile est facultatif.',
   },
   de: {
+    'onboarding.agentFirst': 'Zuerst einen Assistenten wählen',
+    'onboarding.otherAgents': 'Weitere Assistenten ({count})',
     'onboarding.title': 'Starten Sie Ihren ersten Agenten',
     'onboarding.lead':
       'Wählen Sie ein Projekt und einen verfügbaren Agenten. Termexo bündelt Ihre Sitzungen und zeigt, wer Sie braucht.',
@@ -165,6 +175,8 @@ export const ONBOARDING_TRANSLATIONS: TranslationBundle = {
       'Kein Termexo-Konto erforderlich. Modellanfragen nutzen den konfigurierten Agenten-Dienst. Der Handy-Zugriff ist optional.',
   },
   ja: {
+    'onboarding.agentFirst': '先にアシスタントを選ぶ',
+    'onboarding.otherAgents': 'その他のアシスタント（{count}）',
     'onboarding.title': '最初のエージェントを起動',
     'onboarding.lead':
       'プロジェクトと利用可能なエージェントを選びます。Termexo はセッションをまとめ、対応が必要なものを見つけやすくします。',
@@ -198,6 +210,8 @@ export const ONBOARDING_TRANSLATIONS: TranslationBundle = {
       'Termexo アカウントは不要です。モデルへのリクエストは設定したエージェントサービスを使います。スマートフォン接続は任意です。',
   },
   ko: {
+    'onboarding.agentFirst': '먼저 도우미 선택',
+    'onboarding.otherAgents': '다른 도우미 ({count})',
     'onboarding.title': '첫 에이전트 시작하기',
     'onboarding.lead':
       '프로젝트와 사용 가능한 에이전트를 선택하세요. Termexo가 세션을 모아 누가 기다리는지 쉽게 보여 줍니다.',

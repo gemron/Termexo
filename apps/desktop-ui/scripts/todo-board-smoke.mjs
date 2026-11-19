@@ -44,6 +44,7 @@ try {
   await page.goto(APP_URL, { waitUntil: 'networkidle' });
   await page.evaluate(() => localStorage.clear());
   await page.reload({ waitUntil: 'networkidle' });
+  await page.getByTestId('new-terminal-menu').click();
   await page.getByTestId('task-board-toggle').click();
   const board = page.getByTestId('task-kanban');
   await board.waitFor();
@@ -453,6 +454,7 @@ try {
     );
   }
 
+  await page.getByTestId('new-terminal-menu').click();
   await page.getByTestId('task-board-toggle').click();
   await board.waitFor();
   const firstExecution = await page.evaluate(() => {
@@ -772,6 +774,7 @@ try {
   }
 
   await page.reload({ waitUntil: 'networkidle' });
+  await page.getByTestId('new-terminal-menu').click();
   await page.getByTestId('task-board-toggle').click();
   await page
     .locator('.kanban-column[data-stage="verified"] .task-card')
@@ -809,12 +812,12 @@ try {
   await page.waitForTimeout(180);
   const attentionLayout = await page.evaluate(() => {
     const bounds = (selector) => document.querySelector(selector)?.getBoundingClientRect() ?? null;
-    const topbar = bounds('.topbar');
+    const tabRow = bounds('.terminal-tabs');
     const banner = bounds('.attention-banner');
     const workbench = bounds('.workbench-area');
     const text = document.querySelector('.attention-banner-text');
     return {
-      clearsTopbar: Boolean(topbar && banner && banner.top >= topbar.bottom),
+      clearsTopbar: Boolean(tabRow && banner && banner.top >= tabRow.bottom),
       clearsWorkbench: Boolean(workbench && banner && banner.bottom <= workbench.top),
       containsText: Boolean(
         text &&

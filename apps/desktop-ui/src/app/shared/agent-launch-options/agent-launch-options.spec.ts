@@ -32,6 +32,7 @@ describe('AgentLaunchOptionsComponent', () => {
   let root: HTMLElement;
 
   beforeEach(() => {
+    Object.defineProperty(window, '__TAURI_INTERNALS__', { value: {}, configurable: true });
     TestBed.configureTestingModule({
       imports: [AgentLaunchOptionsComponent],
       providers: [{ provide: AgentService, useClass: AgentServiceStub }],
@@ -39,6 +40,10 @@ describe('AgentLaunchOptionsComponent', () => {
     fixture = TestBed.createComponent(AgentLaunchOptionsComponent);
     fixture.detectChanges();
     root = fixture.nativeElement as HTMLElement;
+  });
+
+  afterEach(() => {
+    Reflect.deleteProperty(window, '__TAURI_INTERNALS__');
   });
 
   function optionTypes(): (string | null)[] {
@@ -49,8 +54,8 @@ describe('AgentLaunchOptionsComponent', () => {
 
   it('offers every Agent alongside a plain shell', () => {
     expect(optionTypes()).toEqual([
-      'claude',
       'codex',
+      'claude',
       'opencode',
       'pi',
       'grok',
@@ -64,8 +69,19 @@ describe('AgentLaunchOptionsComponent', () => {
     const hint = (type: AgentType) =>
       root.querySelector(`button[data-agent="${type}"] small`)?.textContent;
 
-    expect(hint('codex')).toBe('0.145.0');
-    expect(hint('claude')).toBe(i18n.t('common.loading'));
+    expect(hint('codex')).toBe(i18n.t('launcher.ready') + ' · 0.145.0');
+    expect(hint('claude')).toBe(i18n.t('launcher.checking'));
+  });
+
+  it('labels preview choices without reporting an installation result for a real computer', () => {
+    Reflect.deleteProperty(window, '__TAURI_INTERNALS__');
+    const preview = TestBed.createComponent(AgentLaunchOptionsComponent);
+    preview.detectChanges();
+    const element: HTMLElement = preview.nativeElement;
+    expect(element.querySelector('.menu-group')?.textContent).toBe(
+      TestBed.inject(I18nService).t('launcher.previewGroup'),
+    );
+    expect(element.querySelector('[data-agent="codex"] small')).toBeNull();
   });
 
   it('emits the picked option', () => {
@@ -86,8 +102,12 @@ describe('AgentLaunchOptionsComponent', () => {
     const preview = root.querySelector<HTMLButtonElement>('button[data-action="preview"]')!;
     expect(preview.getAttribute('role')).toBe('menuitem');
     expect(preview.querySelector('span[data-tone="slate"] app-icon')).not.toBeNull();
-    expect(preview.querySelector('strong')?.textContent).toBe('内容预览');
-    expect(preview.querySelector('small')?.textContent).toContain('文件');
+    expect(preview.querySelector('strong')?.textContent).toBe(
+      TestBed.inject(I18nService).t('terminal.openPreview'),
+    );
+    expect(preview.querySelector('small')?.textContent).toBe(
+      TestBed.inject(I18nService).t('terminal.previewHint'),
+    );
     expect(preview.parentElement).toBe(shell.parentElement);
     const selected = vi.fn();
     fixture.componentInstance.previewRequested.subscribe(selected);

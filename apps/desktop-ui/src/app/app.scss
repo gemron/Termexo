@@ -6,24 +6,21 @@
 .app-shell {
   --workspace-sidebar-track: clamp(152px, var(--workspace-sidebar-width, 208px), 30vw);
   --inspector-track: clamp(240px, var(--inspector-width, 280px), 32vw);
-  // The bar spans the window, so its height is the shell's to set and the panels below start
-  // beneath it. Kept as a variable because the short-viewport query shrinks it.
-  --topbar-height: 52px;
-  // First row under the bar: the tab strip in the main column, the headings in the two panels.
-  // One value keeps all three dividers on a single line now that nothing spans across them.
-  --panel-header-height: 44px;
+  // One row for the tab strip, workspace header and window controls.
+  --panel-header-height: 36px;
+  --statusbar-height: 22px;
 
   display: grid;
   height: 100%;
   min-width: 0;
   min-height: 0;
   grid-template-areas:
-    'topbar topbar topbar topbar topbar'
+    'workspace-sidebar workspace-resizer tab-header inspector-resizer inspector'
     'workspace-sidebar workspace-resizer workspace-main inspector-resizer inspector';
   grid-template-columns:
     var(--workspace-sidebar-track) 5px minmax(0, 1fr) 5px
     var(--inspector-track);
-  grid-template-rows: var(--topbar-height) minmax(0, 1fr);
+  grid-template-rows: var(--panel-header-height) minmax(0, 1fr);
   overflow: hidden;
   color: var(--text);
   background:
@@ -34,37 +31,34 @@
     ),
     var(--surface-0);
 
-  &.workspace-sidebar-collapsed:not(.workspace-maximized) {
+  &.workspace-sidebar-collapsed:not(.terminal-focus-mode) {
     grid-template-columns: 0 0 minmax(0, 1fr) 5px var(--inspector-track);
   }
 
-  &.inspector-collapsed:not(.workspace-maximized) {
+  &.inspector-collapsed:not(.terminal-focus-mode) {
     grid-template-columns: var(--workspace-sidebar-track) 5px minmax(0, 1fr) 0 0;
   }
 
-  &.workspace-sidebar-collapsed.inspector-collapsed:not(.workspace-maximized) {
+  &.workspace-sidebar-collapsed.inspector-collapsed:not(.terminal-focus-mode) {
     grid-template-columns: 0 0 minmax(0, 1fr) 0 0;
   }
 
-  // Maximizing hides the panels, but never the bar: it carries the window controls.
-  &.workspace-maximized {
-    grid-template-areas:
-      'topbar'
-      'workspace-main';
+  &.terminal-focus-mode {
+    --statusbar-height: 0px;
+    grid-template-areas: 'workspace-main';
     grid-template-columns: minmax(0, 1fr);
-    grid-template-rows: var(--topbar-height) minmax(0, 1fr);
+    grid-template-rows: minmax(0, 1fr);
 
     app-workspace-sidebar,
     app-inspector-panel,
     .sidebar-resizer,
+    .terminal-tabs,
     .statusbar {
       display: none;
     }
 
-    .workspace-main {
-      width: 100%;
-      height: 100%;
-      grid-template-rows: var(--panel-header-height) auto minmax(0, 1fr) 0;
+    .workbench-area {
+      padding: 0;
     }
   }
 
@@ -131,61 +125,32 @@ app-inspector-panel {
   // the status bar's unwrappable text — so the whole column grew past a phone viewport and the
   // terminal's close and maximise buttons ended up outside it, with no way to scroll to them.
   grid-template-columns: minmax(0, 1fr);
-  grid-template-rows: var(--panel-header-height) auto minmax(0, 1fr) 22px;
+  grid-template-rows: auto minmax(0, 1fr) var(--statusbar-height);
   background: var(--surface-0);
 }
 
-.workspace-main.auxiliary-view-active {
-  grid-template-rows: 0 auto minmax(0, 1fr) 22px;
+// macOS window controls overlay the leftmost header.
+.app-shell.native-traffic-lights {
+  --native-window-inset: 80px;
+
+  &.workspace-sidebar-collapsed .tab-row-brand {
+    padding-left: var(--native-window-inset);
+  }
 }
 
-.app-shell.workspace-maximized .workspace-main.auxiliary-view-active {
-  grid-template-rows: 0 auto minmax(0, 1fr) 0;
-}
-
-.topbar {
-  grid-area: topbar;
-  position: relative;
-  z-index: var(--z-panel);
-  display: grid;
-  height: var(--topbar-height);
-  min-width: 0;
-  min-height: 0;
-  // Equal side columns keep the toolbar centred, but the right one may never fall below its
-  // own content width — that floor is what stops the window tools overlapping the toolbar.
-  grid-template-columns: minmax(0, 1fr) auto minmax(min-content, 1fr);
-  align-items: center;
-  padding: 0;
-  overflow: visible;
-  border-bottom: 1px solid var(--border);
-  background: var(--surface-0);
-  box-shadow: 0 8px 28px rgb(0 0 0 / 10%);
-}
-
-.topbar-lead {
+.tab-row-brand {
   display: flex;
-  min-width: 0;
+  flex: none;
   align-items: center;
-  gap: 4px;
-  padding-left: 10px;
+  gap: 8px;
+  padding-inline: 8px 2px;
 }
 
-// The three macOS window buttons sit over the topbar's left edge.
-.topbar .topbar-lead.native-traffic-lights {
-  padding-left: 80px;
-}
-
-/*
-   Product identity, moved off the workspace panel so it survives that panel being hidden.
-   A separator sets it apart from the workspace title beside it, which changes per workspace.
-   --------------------------------------------------------------------------- */
 .app-brand {
   display: flex;
   min-width: 0;
   align-items: center;
   gap: 8px;
-  padding-right: 10px;
-  border-right: 1px solid var(--border);
 
   .brand-mark {
     display: block;
@@ -209,17 +174,37 @@ app-inspector-panel {
   }
 }
 
-/* Appears only while its panel is hidden, so the topbar carries no control it does not need. */
+.sidebar-brand {
+  flex: none;
+}
+
+@container workspace-heading (max-width: 164px) {
+  .sidebar-brand .app-brand strong {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+  }
+}
+
+/* Each reveal button sits next to the edge where its panel opens. */
 .rail-reveal {
-  display: grid;
-  width: 28px;
+  display: inline-flex;
+  min-width: 28px;
   height: 28px;
   flex: none;
-  place-items: center;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  padding: 0 6px;
   border: 0;
   border-radius: 3px;
-  color: var(--text-muted);
+  color: var(--text-secondary);
   background: transparent;
+  font-size: 11px;
+  font-weight: 600;
+  white-space: nowrap;
   transition:
     color 140ms ease,
     background-color 140ms ease;
@@ -231,96 +216,37 @@ app-inspector-panel {
   }
 }
 
-.workspace-title {
-  min-width: 0;
-  padding-left: 5px;
+.inspector-reveal {
+  margin-inline-end: 6px;
+}
 
-  strong,
-  .workspace-path {
-    display: block;
+.workspace-reveal {
+  max-width: clamp(76px, 26cqi, 176px);
+
+  app-icon {
+    flex: none;
+  }
+
+  span {
+    min-width: 0;
     overflow: hidden;
     text-overflow: ellipsis;
-    white-space: nowrap;
-  }
-
-  strong {
-    color: color-mix(in srgb, var(--accent) 76%, var(--text));
-    font-size: 13px;
-    font-weight: 650;
-    text-shadow: 0 0 10px color-mix(in srgb, var(--accent) 18%, transparent);
-  }
-
-  .workspace-path {
-    max-width: 100%;
-    margin-top: 4px;
-    padding: 0;
-    border: 0;
-    color: var(--text-muted);
-    background: transparent;
-    font: 10px/1 var(--mono);
-    text-align: left;
-
-    &:enabled:hover {
-      color: var(--accent);
-      text-decoration: underline;
-    }
   }
 }
 
-.toolbar,
+@container terminal-tabs (max-width: 560px) {
+  .inspector-reveal > span {
+    display: none;
+  }
+}
+
 .window-tools {
   display: flex;
+  flex: none;
   align-items: center;
-  // Neither cluster may give up width to its neighbour; overlapping buttons are worse than a
-  // truncated workspace title.
-  flex-shrink: 0;
-}
-
-.toolbar {
-  height: 32px;
-  gap: 8px;
-}
-
-.workspace-view-switch,
-.toolbar-actions {
-  display: flex;
-  height: 32px;
-  align-items: center;
+  justify-content: flex-end;
   gap: 2px;
-  padding: 2px;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-field);
-  background: color-mix(in oklab, var(--surface-raised) 88%, transparent);
-  box-shadow:
-    inset 0 1px 0 rgb(255 255 255 / 2%),
-    0 7px 20px rgb(0 0 0 / 12%);
-}
-
-.workspace-view-switch {
-  border-color: color-mix(in srgb, var(--accent) 28%, var(--border));
-  background: color-mix(in srgb, var(--accent) 6%, var(--surface-raised));
-  gap: 1px;
-
-  .tool-button {
-    position: relative;
-
-    &.active {
-      color: color-mix(in srgb, var(--accent) 72%, var(--text));
-      box-shadow: inset 0 -1px 0 color-mix(in srgb, var(--accent) 74%, transparent);
-    }
-
-    b {
-      display: grid;
-      min-width: 15px;
-      height: 15px;
-      place-items: center;
-      padding: 0 3px;
-      border-radius: 8px;
-      color: var(--text-secondary);
-      background: var(--surface-inset);
-      font: 700 8px/1 var(--mono);
-    }
-  }
+  padding-inline-end: 4px;
 }
 
 .tool-button {
@@ -355,21 +281,10 @@ app-inspector-panel {
   }
 }
 
-.tool-divider {
-  width: 1px;
-  height: 16px;
-  margin: 0 2px;
-  background: var(--border);
-}
-
 .menu-anchor {
   position: relative;
   display: flex;
   align-items: center;
-}
-
-.global-notice-anchor {
-  position: relative;
 }
 
 .global-notice-trigger {
@@ -400,8 +315,8 @@ app-inspector-panel {
 .global-notice-panel {
   position: absolute;
   z-index: var(--z-popover);
-  top: 34px;
-  right: 0;
+  top: calc(100% + 4px);
+  right: 8px;
   width: min(370px, calc(100vw - 24px));
   overflow: hidden;
   border: 1px solid var(--border-strong);
@@ -603,54 +518,99 @@ app-inspector-panel {
 }
 
 .agent-menu {
-  position: absolute;
-  z-index: var(--z-panel);
-  top: 34px;
-  left: 0;
-  width: 210px;
+  position: fixed;
+  z-index: var(--z-popover);
+  inset: auto;
+  display: grid;
+  align-items: start;
+  gap: 5px;
+  width: 208px;
+  margin: 0;
   padding: 5px;
+  overflow: auto;
   border: 1px solid var(--border-strong);
   border-radius: var(--radius-box);
+  color: var(--text);
   background: var(--surface-raised);
   box-shadow: 0 14px 35px rgb(0 0 0 / 40%);
-  transform-origin: top left;
-  animation: menu-enter 140ms ease-out;
 }
 
-.window-tools {
-  justify-content: flex-end;
-  gap: 2px;
-  padding-right: 10px;
+.agent-menu.with-launch-options {
+  width: 420px;
+  grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr);
 
-  .window-tool {
-    display: grid;
-    width: 28px;
-    height: 28px;
-    place-items: center;
-    border: 0;
-    border-radius: 3px;
+  .workspace-menu {
+    padding-inline-start: 5px;
+    border-inline-start: 1px solid var(--border);
+  }
+}
+
+.workspace-menu {
+  > p {
+    padding: 7px 7px 4px;
+    margin: 0;
     color: var(--text-muted);
-    background: transparent;
-    transition:
-      color 140ms ease,
-      background-color 140ms ease;
+    font-size: 10px;
+    font-weight: 600;
+  }
 
-    &:hover,
-    &:focus-visible,
-    &.active {
+  > button {
+    display: grid;
+    grid-template-columns: 26px minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 6px;
+    width: 100%;
+    min-height: 38px;
+    padding: 4px 7px;
+    border-radius: var(--radius-field);
+    color: var(--text-secondary);
+    text-align: start;
+
+    &:not(:disabled):is(:hover, :focus-visible),
+    &[aria-current='page'] {
       color: var(--text);
-      background: var(--surface-2);
+      background: color-mix(in srgb, var(--accent) 14%, var(--surface-2));
+    }
+
+    &:disabled { opacity: 0.42; }
+  }
+
+  app-icon {
+    display: grid;
+    height: 26px;
+    place-items: center;
+    border-radius: var(--radius-selector);
+    background: var(--surface-2);
+  }
+
+  strong {
+    min-width: 0;
+    overflow-wrap: anywhere;
+    font-size: 12px;
+    font-weight: 620;
+  }
+
+  small {
+    max-width: 48px;
+    overflow-wrap: anywhere;
+    color: var(--text-muted);
+    font-size: 10px;
+    text-align: end;
+  }
+}
+
+@media (max-width: 340px) {
+  .agent-menu.with-launch-options {
+    grid-template-columns: minmax(0, 1fr);
+
+    .workspace-menu {
+      padding: 5px 0 0;
+      border-inline-start: 0;
+      border-top: 1px solid var(--border);
     }
   }
 }
 
-/*
-   System window buttons, standing in for the title bar the window no longer draws.
-
-   They are separated from the app's own tools by a rule and sit flush with the window edge, so
-   the cluster reads as window chrome rather than as three more workspace actions — the maximize
-   control right next to them belongs to the workspace, not the window.
-   --------------------------------------------------------------------------- */
 .window-controls {
   display: flex;
   align-items: center;
@@ -678,7 +638,6 @@ app-inspector-panel {
     }
   }
 
-  /* The one destructive control in the topbar earns the Windows close-button red. */
   .window-close:hover,
   .window-close:focus-visible {
     color: #fff;
@@ -687,6 +646,7 @@ app-inspector-panel {
 }
 
 .terminal-tabs {
+  grid-area: tab-header;
   // The toolbar sheds its labels on this row's own width, not the window's: the two sidebars
   // take most of what a window query would measure.
   container: terminal-tabs / inline-size;
@@ -694,15 +654,13 @@ app-inspector-panel {
   z-index: var(--z-sticky);
   display: flex;
   min-width: 0;
+  height: var(--panel-header-height);
   align-items: center;
   gap: 6px;
   border-bottom: 1px solid var(--border);
   background: var(--surface-1);
   box-shadow: 0 8px 24px rgb(0 0 0 / 8%);
 
-  &.view-hidden {
-    display: none;
-  }
 }
 
 /* Takes every pixel the toolbar does not need: the tabs are the control used most here. */
@@ -918,8 +876,8 @@ app-inspector-panel {
 }
 
 .workbench-area {
-  // Pinned so the optional attention banner row above can collapse to zero when absent.
-  grid-row: 3;
+  // Pinned so the optional attention row can collapse when absent.
+  grid-row: 2;
   min-width: 0;
   min-height: 0;
   padding: 5px;
@@ -932,29 +890,31 @@ app-inspector-panel {
     display: none;
   }
 
-  > app-todo-board {
-    display: block;
-    width: 100%;
-    height: 100%;
-    min-width: 0;
-    min-height: 0;
-  }
-
-  > app-git-workbench {
-    display: block;
-    width: 100%;
-    height: 100%;
-    min-width: 0;
-    min-height: 0;
-  }
 
   &.board-active {
     padding: 7px;
   }
 }
 
+.workspace-tool-panel {
+  height: 100%;
+  min-width: 0;
+  min-height: 0;
+
+  &[hidden] {
+    display: none;
+  }
+
+  > * {
+    display: block;
+    width: 100%;
+    height: 100%;
+    min-height: 0;
+  }
+}
+
 .statusbar {
-  grid-row: 4;
+  grid-row: 3;
   // A flex container refuses to shrink below its content unless told to, and this one sits in the
   // grid column every other row shares.
   min-width: 0;
@@ -1113,7 +1073,7 @@ app-inspector-panel {
 }
 
 @media (max-width: 1120px) {
-  .tool-button > span {
+  .window-tools .tool-button > span {
     display: none;
   }
 
@@ -1129,62 +1089,21 @@ app-inspector-panel {
   }
 }
 
-/*
-   Phone widths, reached through remote access rather than by resizing the desktop window.
-   The toolbar carries more buttons than a phone is wide, and the topbar is a grid whose clusters
-   refuse to shrink, so controls at the right edge — settings among them — used to sit off screen
-   with no way to reach them. Identity text gives up its space first, and whatever still overflows
-   becomes horizontally scrollable rather than unreachable.
-   --------------------------------------------------------------------------- */
 @media (max-width: 640px) {
   .app-shell {
-    --topbar-height: 48px;
     position: relative;
   }
 
-  .topbar {
-    // The lead absorbs the slack and gives it back first: the workspace name truncates cleanly,
-    // while the two clusters beside it are icon buttons with no way to shrink. That keeps the
-    // waiting-agent bell — which only joins the toolbar while an agent waits — on screen.
-    grid-template-columns: minmax(0, 1fr) auto auto;
+  .tab-row-brand .app-brand strong {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
   }
 
-  .topbar-lead {
-    // The workspace name ends right against the first toolbar button without the trailing side.
-    padding: 0 6px;
-  }
-
-  .app-brand {
-    padding-right: 6px;
-
-    strong {
-      display: none;
-    }
-  }
-
-  .workspace-title .workspace-path {
-    display: none;
-  }
-
-  .toolbar {
-    min-width: 0;
-    gap: 6px;
-    overflow-x: auto;
-    overflow-y: hidden;
-    flex-shrink: 1;
-    // A visible scrollbar would eat into the 48px the bar has to work with.
-    scrollbar-width: none;
-    -ms-overflow-style: none;
-
-    &::-webkit-scrollbar {
-      display: none;
-    }
-  }
-
-  // Rules between button groups, which each group's own border already draws. The nine pixels
-  // they cost go back to the workspace name, which has the least room here.
-  .tool-divider {
-    display: none;
+  .app-shell.native-traffic-lights .tab-row-brand {
+    padding-left: var(--native-window-inset);
   }
 
   // The side panels float over the workspace instead of taking a column: sharing the width three
@@ -1192,7 +1111,7 @@ app-inspector-panel {
   // terminal among them — past the right edge with no way back.
   // The class is repeated to outweigh the collapsed-panel rules above, which carry four classes
   // each; a media query on its own does not raise specificity.
-  .app-shell.app-shell.app-shell:not(.workspace-maximized) {
+  .app-shell.app-shell.app-shell:not(.terminal-focus-mode) {
     grid-template-columns: 0 0 100% 0 0;
   }
 
@@ -1202,28 +1121,13 @@ app-inspector-panel {
   .panel-scrim {
     position: absolute;
     z-index: var(--z-panel);
-    inset: var(--topbar-height) 0 0;
+    inset: 0;
     border: 0;
     background: #00000075;
   }
 
-  // The toolbar scrolls sideways here, and a scrolling ancestor clips absolutely positioned
-  // descendants: both popups were being rendered outside its box, invisible and untappable.
-  // Fixed takes them out of it, and spanning the width suits a phone better anyway.
-  .agent-menu,
-  .global-notice-panel {
-    position: fixed;
-    top: calc(var(--topbar-height) + 4px);
-    inset-inline: 8px;
-    width: auto;
-    max-height: 80dvh;
-    overflow-y: auto;
-  }
-
-  // A finger needs more than the 26px a mouse is comfortable with, and the toolbar already
-  // scrolls sideways when the row runs out of room.
+  // Leave enough room for touch targets in each toolbar.
   .tool-button,
-  .window-tool,
   .rail-reveal,
   .tab-close {
     min-width: 32px;
@@ -1232,31 +1136,13 @@ app-inspector-panel {
 }
 
 @media (max-height: 560px) {
-  // Both rows live on the shell now, so shrinking them is two variables.
   .app-shell {
-    --topbar-height: 46px;
-    --panel-header-height: 40px;
-  }
-
-  .workspace-main,
-  .app-shell.workspace-maximized .workspace-main {
-    grid-template-rows: var(--panel-header-height) auto minmax(0, 1fr) 0;
-  }
-
-  .workspace-main.auxiliary-view-active,
-  .app-shell.workspace-maximized .workspace-main.auxiliary-view-active {
-    grid-template-rows: 0 auto minmax(0, 1fr) 0;
+    --statusbar-height: 0px;
   }
 
   .statusbar {
     display: none;
   }
-}
-
-.preview-badge {
-  flex-shrink: 0;
-  color: var(--color-warning);
-  font-size: 9px;
 }
 
 .preview-tab-content {

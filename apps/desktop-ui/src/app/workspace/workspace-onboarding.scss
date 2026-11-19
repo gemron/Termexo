@@ -9,105 +9,72 @@
 
 .onboarding {
   display: grid;
-  width: min(100%, 680px);
+  width: min(100%, 660px);
   box-sizing: border-box;
   gap: 18px;
-  padding: 28px 24px;
+  padding: clamp(18px, 5cqi, 48px) clamp(14px, 3cqi, 26px);
   margin: 0 auto;
   color: var(--text);
-  font-size: 12px;
+  font-size: 13px;
 }
 
 .onboarding-head {
   display: grid;
-  justify-items: center;
-  gap: 10px;
-  text-align: center;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: 16px;
+  padding: 22px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-box);
+  background: var(--surface-raised);
 
   h1 {
-    margin: 0;
-    font-size: 21px;
+    margin: 0 0 4px;
+    font-size: 20px;
     font-weight: 650;
+    overflow-wrap: anywhere;
   }
-  p {
-    max-width: 42em;
+  button {
+    grid-column: 2;
+    justify-self: start;
   }
 }
-
+.project-icon {
+  display: grid;
+  width: 42px;
+  height: 42px;
+  place-items: center;
+  border-radius: var(--radius-box);
+  color: var(--accent);
+  background: var(--primary-soft);
+}
 p {
   margin: 0;
   color: var(--text-secondary);
-  line-height: 1.6;
+  line-height: 1.55;
+}
+.project-path {
+  overflow-wrap: anywhere;
+  font: 12px/1.5 var(--mono);
 }
 h2 {
-  margin: 0 0 3px;
-  font-size: 13px;
+  margin: 0;
+  font-size: 15px;
 }
 strong {
   font-weight: 620;
 }
-
-.onboarding-steps {
-  display: flex;
-  justify-content: space-between;
-  flex-wrap: wrap;
-  gap: 10px;
-  padding: 0;
-  margin: 0;
-  list-style: none;
-  color: var(--text-muted);
-
-  li {
-    display: flex;
-    align-items: center;
-    gap: 7px;
+.assistant-disclosure {
+  margin: 8px 0 0;
+  summary {
+    width: fit-content;
+    padding: 8px 2px;
+    color: var(--text-secondary);
+    cursor: pointer;
   }
-  b {
-    display: grid;
-    width: 22px;
-    height: 22px;
-    place-items: center;
-    border: 1px solid var(--border);
-    border-radius: 50%;
-    font: 600 11px var(--mono);
+  summary:focus-visible {
+    outline: 2px solid var(--accent);
   }
-  [aria-current='step'],
-  .done {
-    color: var(--accent);
-  }
-  [aria-current='step'] b,
-  .done b {
-    border-color: color-mix(in srgb, var(--accent) 40%, var(--border));
-    background: color-mix(in srgb, var(--accent) 10%, var(--surface-2));
-  }
-}
-
-.project-card {
-  display: grid;
-  grid-template-columns: 20px minmax(0, 1fr) auto;
-  align-items: center;
-  gap: 12px;
-  padding: 14px;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-box);
-  background: var(--surface-1);
-
-  p {
-    margin-top: 4px;
-    font-size: 11px;
-  }
-  .project-path {
-    overflow-wrap: anywhere;
-    font-family: var(--mono);
-  }
-}
-
-.ready-label {
-  display: flex;
-  align-items: center;
-  gap: 5px;
-  color: var(--color-primary);
-  font-size: 11px;
 }
 .agent-heading {
   display: flex;
@@ -115,9 +82,6 @@ strong {
   justify-content: space-between;
   gap: 12px;
   margin-bottom: 10px;
-}
-.agent-heading p {
-  font-size: 11px;
 }
 .agent-list {
   padding: 0;
@@ -174,45 +138,25 @@ strong {
   margin-top: 8px;
   font-size: 11px;
 }
-.run-note {
-  display: flex;
-  align-items: flex-start;
-  gap: 10px;
-  padding: 12px 14px;
-  border-radius: var(--radius-box);
-  background: var(--surface-2);
-}
-.run-note p {
-  margin-top: 4px;
-  font-size: 11px;
-}
 .preview-note {
   padding: 14px;
   border: 1px dashed var(--border);
   border-radius: var(--radius-box);
 }
 footer {
-  display: grid;
-  justify-items: center;
-  gap: 10px;
-  text-align: center;
+  padding-top: 12px;
+  border-top: 1px solid var(--border);
 }
-.onboarding-privacy {
-  color: var(--text-muted);
-  font-size: 10px;
-}
-
 @container (max-width: 520px) {
   .onboarding {
-    padding: 20px 14px;
+    padding: 16px 12px;
   }
-  .project-card {
-    grid-template-columns: 20px minmax(0, 1fr);
+  .onboarding-head {
+    gap: 12px;
+    padding: 16px;
   }
-  .project-card > button,
-  .project-card > .ready-label {
-    grid-column: 2;
-    justify-self: start;
+  .onboarding-head button {
+    grid-column: 1 / -1;
   }
   .agent-list li {
     grid-template-columns: 30px minmax(0, 1fr);

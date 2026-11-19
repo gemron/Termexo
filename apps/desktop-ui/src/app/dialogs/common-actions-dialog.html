@@ -1,8 +1,6 @@
-<div class="backdrop modal modal-open" (mousedown)="closed.emit()">
-  <section class="dialog modal-box common-actions" appModal (dismissModal)="closed.emit()" role="dialog" aria-modal="true" aria-labelledby="common-actions-title" (mousedown)="$event.stopPropagation()">
+<section class="dialog common-actions" aria-labelledby="common-actions-title">
     <header>
       <div class="heading"><app-icon name="command" [size]="18" /><h2 id="common-actions-title">常用操作</h2><span>{{ workspace().name }}</span></div>
-      <button type="button" aria-label="关闭" (click)="closed.emit()"><app-icon name="x" [size]="16" /></button>
     </header>
     <div class="actions-toolbar">
       <div class="list-tabs" role="tablist" aria-label="操作列表">
@@ -155,7 +153,6 @@
       @if (activeTab() === 'suggestions' && review() && !review()?.waiting) {
         <button type="button" class="btn btn-outline btn-sm" [disabled]="busy()" (click)="actions.discard(workspace().id); activeTab.set('saved')">放弃建议</button>
         <button type="button" class="btn btn-primary btn-sm" [disabled]="busy() || !selectedCount() || !!editor()" (click)="confirm()">确认添加 {{ selectedCount() }} 项操作</button>
-      } @else { <button type="button" class="btn btn-outline btn-sm" (click)="closed.emit()">关闭</button> }
+      }
     </footer>
-  </section>
-</div>
+</section>

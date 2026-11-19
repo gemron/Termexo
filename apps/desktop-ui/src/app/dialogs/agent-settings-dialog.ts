@@ -27,6 +27,7 @@ import {
   AccountProfile,
   AccountProfileInput,
   AgentInstallation,
+  type AgentProtocol,
   CLAUDE_EFFORT_LEVELS,
   CODEX_REASONING_EFFORT_LEVELS,
   CUSTOM_PROVIDER,
@@ -132,8 +133,7 @@ const DEFAULT_ALERT_THRESHOLD = 80;
           <div class="dialog-title">
             <span class="title-icon"><app-icon name="settings" [size]="17" /></span>
             <div>
-              <h2 id="agent-settings-title">{{ 'settings.title' | t }}</h2>
-              <p>{{ 'settings.subtitle' | t }}</p>
+              <h2 id="agent-settings-title">{{ 'workspace.settings' | t }}</h2>
             </div>
           </div>
           <button
@@ -147,19 +147,26 @@ const DEFAULT_ALERT_THRESHOLD = 80;
           </button>
         </header>
 
-        <nav class="settings-tabs tabs tabs-border" [attr.aria-label]="'settings.categories' | t">
-          @for (group of tabGroups; track group.section) {
-            @for (category of group.tabs; track category.id) {
-              <button
-                type="button"
-                class="tab"
-                [class.active]="tab() === category.id"
-                [attr.aria-current]="tab() === category.id ? 'page' : null"
-                (click)="selectTab(category.id)"
-              >
-                {{ category.label | t }}
-              </button>
-            }
+        <nav class="settings-navigation" [attr.aria-label]="'settings.categories' | t">
+          <label class="settings-search">
+            <app-icon name="search" [size]="15" />
+            <input type="search" [attr.aria-label]="'settings.findCategory' | t"
+              [placeholder]="'settings.findCategory' | t" [ngModel]="categoryQuery()"
+              (ngModelChange)="categoryQuery.set($event)" (keydown.escape)="clearSearch($event)"
+              (keydown.enter)="openSearchResult($event)" />
+          </label>
+          @for (group of visibleGroups(); track group.section) {
+            <section>
+              <h3>{{ group.section | t }}</h3>
+              @for (category of group.tabs; track category.id) {
+                <button type="button" [class.active]="tab() === category.id"
+                  [attr.aria-current]="tab() === category.id ? 'page' : null" (click)="selectTab(category.id)">
+                  <app-icon [name]="category.icon" [size]="15" />{{ category.label | t }}
+                </button>
+              }
+            </section>
+          } @empty {
+            <p role="status">{{ 'settings.noCategory' | t }}</p>
           }
         </nav>
         <select
@@ -649,7 +656,7 @@ const DEFAULT_ALERT_THRESHOLD = 80;
                             <em>Claude · {{ profile.claudeModel }}</em>
                           }
                           @if (profile.codexEnabled) {
-                            <em>Codex · {{ profile.codexModel }}</em>
+                            <em>Codex · {{ profile.codexModel || ('common.defaultModel' | t) }}</em>
                           }
                         </small>
                         @if (profileUsesEndpoint(profile)) {
@@ -670,29 +677,115 @@ const DEFAULT_ALERT_THRESHOLD = 80;
                 </div>
                 <div class="profile-editor">
                   <div class="profile-fields">
-                    <div class="model-catalog-tools">
-                      <strong>{{ 'settings.modelCatalog' | t }}</strong>
-                      <button
-                        type="button"
-                        class="secondary"
-                        data-testid="model-catalog-refresh"
-                        [disabled]="catalog.loading()"
-                        (click)="catalog.refresh(true)"
-                      >
-                        <app-icon name="refresh" [size]="13" />
-                        {{
-                          (catalog.loading()
-                            ? 'settings.catalogChecking'
-                            : 'settings.catalogRefresh'
-                          ) | t
-                        }}
-                      </button>
+                    <div class="two-columns">
+                      <label>
+                        <span>{{ 'settings.modelProvider' | t }}</span>
+                        <select [ngModel]="modelProvider" (ngModelChange)="selectProvider($event)">
+                          @for (preset of allPresets; track preset.provider) {
+                            <option [value]="preset.provider">{{ preset.label }}</option>
+                          }
+                          @if (!isPresetProvider(modelProvider)) {
+                            <option [value]="modelProvider">{{ modelProvider }}</option>
+                          }
+                        </select>
+                      </label>
+                      <label>
+                        <span>{{ 'settings.name' | t }}</span>
+                        <input [(ngModel)]="modelName" />
+                      </label>
                     </div>
-                    <p class="model-catalog-help">{{ 'settings.catalogHelp' | t }}</p>
-                    @if (catalog.error()) {
-                      <p class="model-catalog-help" role="status">
-                        {{ 'settings.catalogOffline' | t }}
-                      </p>
+                    <fieldset class="agent-endpoint model-agent">
+                      <label class="checkbox-control">
+                        <input type="checkbox" [(ngModel)]="claudeEnabled" />
+                        <span>{{ 'settings.enableForClaude' | t }}</span>
+                      </label>
+                      @if (claudeEnabled) {
+                        <select
+                            data-testid="claude-model-choice"
+                            [ngModel]="claudeModel"
+                            (ngModelChange)="claudeModel = $event"
+                            [attr.aria-label]="('settings.catalogPick' | t) + ' · Claude'"
+                          >
+                            <option [value]="claudeModel">
+                              {{ claudeModel || ('settings.catalogPick' | t) }}
+                            </option>
+                            @for (
+                              model of catalog.choices(modelProvider, 'claude');
+                              track model.id
+                            ) {
+                              @if (model.id !== claudeModel) {
+                                <option [value]="model.id">
+                                  {{ model.name }} · {{ model.id }}
+                                </option>
+                              }
+                            }</select>
+                      }
+                    </fieldset>
+                    <fieldset class="agent-endpoint model-agent">
+                      <label class="checkbox-control">
+                        <input type="checkbox" [(ngModel)]="codexEnabled" />
+                        <span>{{ 'settings.enableForCodex' | t }}</span>
+                      </label>
+                      @if (codexEnabled) {
+                        <select
+                            data-testid="codex-model-choice"
+                            [ngModel]="codexModel"
+                            (ngModelChange)="codexModel = $event"
+                            [attr.aria-label]="('settings.catalogPick' | t) + ' · Codex'"
+                          >
+                            <option [value]="codexModel">
+                              {{ codexModel || ((modelProvider === 'OpenAI' && !codexBaseUrl.trim() ? 'launch.cliDefaultModel' : 'settings.catalogPick') | t) }}
+                            </option>
+                            @if (modelProvider === 'OpenAI' && codexModel && !codexBaseUrl.trim()) {
+                              <option value="">{{ 'launch.cliDefaultModel' | t }}</option>
+                            }
+                            @for (
+                              model of catalog.choices(modelProvider, 'codex');
+                              track model.id
+                            ) {
+                              @if (model.id !== codexModel) {
+                                <option [value]="model.id">
+                                  {{ model.name }} · {{ model.id }}
+                                </option>
+                              }
+                            }</select>
+                      }
+                    </fieldset>
+                    <label>
+                      <span>{{ (usesEndpoint() ? 'settings.requiredKey' : 'settings.optionalKey') | t }}</span>
+                      <input
+                        type="password"
+                        [disabled]="clearCredential"
+                        [placeholder]="
+                          hasUsableModelKey()
+                            ? ('settings.keySavedPlaceholder' | t)
+                            : usesEndpoint()
+                              ? ('settings.keyThirdPartyRequired' | t)
+                              : ('settings.keyOfficialOptional' | t)
+                        "
+                        [(ngModel)]="apiKey"
+                      />
+                    </label>
+                    @if (hasCredential() && !hasUsableModelKey()) {
+                      <p class="field-hint">{{ 'settings.providerKeyChange' | t }}</p>
+                    }
+                    @if (modelCredentialMissing()) {
+                      <div class="credential-warning" role="alert">
+                        <app-icon name="triangle-alert" [size]="15" />
+                        <div>
+                          <strong>{{ 'settings.profileKeyMissing' | t }}</strong>
+                          <span>{{ 'settings.profileKeyHelp' | t }}</span>
+                        </div>
+                      </div>
+                    }
+                    <label class="checkbox-control editor-checkbox">
+                      <input type="checkbox" [(ngModel)]="isDefault" />
+                      <span>{{ 'settings.defaultProfile' | t }}</span>
+                    </label>
+                    @if (!claudeEnabled && !codexEnabled) {
+                      <p class="field-hint">{{ 'settings.chooseAgent' | t }}</p>
+                    } @else if (missingModelId()) {
+                      <p class="field-hint">{{ 'settings.enterModel' | t }}</p>
                     }
                     @for (upgrade of selectedModelUpgrades(); track upgrade.key) {
                       <div class="model-upgrade" role="status" data-testid="model-upgrade">
@@ -722,189 +815,93 @@ const DEFAULT_ALERT_THRESHOLD = 80;
                         </div>
                       </div>
                     }
-                    <div class="two-columns">
-                      <label
-                        ><span>{{ 'settings.name' | t }}</span
-                        ><input [(ngModel)]="modelName"
-                      /></label>
-                      <label>
-                        <span>{{ 'settings.modelProvider' | t }}</span>
-                        <select [ngModel]="modelProvider" (ngModelChange)="selectProvider($event)">
-                          @for (preset of allPresets; track preset.provider) {
-                            <option [value]="preset.provider">{{ preset.label }}</option>
-                          }
-                          @if (!isPresetProvider(modelProvider)) {
-                            <option [value]="modelProvider">{{ modelProvider }}</option>
-                          }
-                        </select>
-                      </label>
-                    </div>
-                    @if (presetDocsUrl()) {
-                      <small class="preset-source">{{
-                        'settings.presetSource' | t: { url: presetDocsUrl() }
-                      }}</small>
-                    }
+                    <details class="model-advanced" [open]="modelProvider === customProvider">
+                      <summary>{{ 'settings.modelAdvanced' | t }}</summary>
+                      @if (claudeEnabled) {
+                        <fieldset class="agent-endpoint">
+                          <legend>Claude Code</legend>
+                          <div class="two-columns">
+                            <label><span>{{ 'settings.catalogCustom' | t }} · Claude Code</span><input [(ngModel)]="claudeModel" /></label>
+                            <label><span>{{ 'settings.endpointAnthropic' | t }}</span>
+                              <input [(ngModel)]="claudeBaseUrl" [placeholder]="'settings.endpointPlaceholder' | t" /></label>
+                            <label><span>{{ 'settings.effortLevel' | t }}</span>
+                              <select [(ngModel)]="claudeEffort">
+                                <option value="">{{ 'settings.effortDefault' | t }}</option>
+                                @for (level of claudeEffortLevels; track level) { <option [value]="level">{{ level }}</option> }
+                              </select>
+                            </label>
+                            <label class="checkbox-control" [title]="'settings.context1mHelp' | t">
+                              <input type="checkbox" [(ngModel)]="claudeContext1m" />
+                              <span>{{ 'settings.context1m' | t }}</span>
+                            </label>
+                          </div>
+                        </fieldset>
+                      }
+                      @if (codexEnabled) {
+                        <fieldset class="agent-endpoint">
+                          <legend>Codex CLI</legend>
+                          <div class="two-columns">
+                            <label><span>{{ 'settings.catalogCustom' | t }} · Codex CLI</span><input [(ngModel)]="codexModel" /></label>
+                            <label><span>{{ 'settings.endpointOpenAI' | t }}</span>
+                              <input [(ngModel)]="codexBaseUrl" [placeholder]="'settings.endpointPlaceholder' | t" /></label>
+                            <label><span>{{ 'settings.effortLevel' | t }}</span>
+                              <select [(ngModel)]="codexReasoningEffort">
+                                <option value="">{{ 'settings.effortDefault' | t }}</option>
+                                @for (level of codexEffortLevels; track level) { <option [value]="level">{{ level }}</option> }
+                              </select>
+                            </label>
+                          </div>
+                        </fieldset>
+                      }
+                      <fieldset class="agent-endpoint">
+                        <legend>{{ 'settings.planMonitoring' | t }}</legend>
+                        <label
+                          ><span>{{ 'settings.planAlertThreshold' | t }}</span
+                          ><input
+                            type="number"
+                            min="1"
+                            max="100"
+                            [(ngModel)]="modelPlanAlertThreshold"
+                        /></label>
+                        <small class="preset-source">{{ 'settings.planQuotaHelp' | t }}</small>
+                      </fieldset>
+                      @if (hasUsableModelKey()) {
+                        <label class="checkbox-control editor-checkbox">
+                          <input type="checkbox" [(ngModel)]="clearCredential" />
+                          <span>{{ 'settings.clearKey' | t }}</span>
+                        </label>
+                      }
+                      @if (presetDocsUrl()) {
+                        <small class="preset-source">{{
+                          'settings.presetSource' | t: { url: presetDocsUrl() }
+                        }}</small>
+                      }
 
-                    <!-- One provider, two protocols: each agent gets its own endpoint and switch. -->
-                    <fieldset class="agent-endpoint" [class.disabled]="!claudeEnabled">
-                      <label class="checkbox-control">
-                        <input type="checkbox" [(ngModel)]="claudeEnabled" />
-                        <span>{{ 'settings.enableForClaude' | t }}</span>
-                      </label>
-                      <div class="two-columns">
-                        <label
-                          ><span>{{ 'settings.model' | t }}</span
-                          ><select
-                            data-testid="claude-model-choice"
-                            [disabled]="!claudeEnabled"
-                            [ngModel]="claudeModel"
-                            (ngModelChange)="claudeModel = $event"
-                            [attr.aria-label]="('settings.catalogPick' | t) + ' · Claude'"
-                          >
-                            <option [value]="claudeModel">
-                              {{ claudeModel || ('settings.catalogPick' | t) }}
-                            </option>
-                            @for (
-                              model of catalog.choices(modelProvider, 'claude');
-                              track model.id
-                            ) {
-                              @if (model.id !== claudeModel) {
-                                <option [value]="model.id">
-                                  {{ model.name }} · {{ model.id }}
-                                </option>
-                              }
-                            }</select
-                          ><input
-                            [disabled]="!claudeEnabled"
-                            [(ngModel)]="claudeModel"
-                            [attr.aria-label]="('settings.catalogCustom' | t) + ' · Claude'"
-                        /></label>
-                        <label
-                          ><span>{{ 'settings.endpointAnthropic' | t }}</span
-                          ><input
-                            [disabled]="!claudeEnabled"
-                            [placeholder]="'settings.endpointPlaceholder' | t"
-                            [(ngModel)]="claudeBaseUrl"
-                        /></label>
-                      </div>
-                      <div class="two-columns">
-                        <label
-                          ><span>{{ 'settings.effortLevel' | t }}</span
-                          ><select [disabled]="!claudeEnabled" [(ngModel)]="claudeEffort">
-                            <option value="">{{ 'settings.effortDefault' | t }}</option>
-                            @for (level of claudeEffortLevels; track level) {
-                              <option [value]="level">{{ level }}</option>
-                            }
-                          </select>
-                        </label>
-                        <label class="checkbox-control" [title]="'settings.context1mHelp' | t"
-                          ><input
-                            type="checkbox"
-                            [disabled]="!claudeEnabled"
-                            [(ngModel)]="claudeContext1m"
-                          /><span>{{ 'settings.context1m' | t }}</span></label
+                      <div class="model-catalog-tools">
+                        <strong>{{ 'settings.modelCatalog' | t }}</strong>
+                        <button
+                          type="button"
+                          class="secondary"
+                          data-testid="model-catalog-refresh"
+                          [disabled]="catalog.loading()"
+                          (click)="catalog.refresh(true)"
                         >
+                          <app-icon name="refresh" [size]="13" />
+                          {{
+                            (catalog.loading()
+                              ? 'settings.catalogChecking'
+                              : 'settings.catalogRefresh'
+                            ) | t
+                          }}
+                        </button>
                       </div>
-                    </fieldset>
-                    <fieldset class="agent-endpoint" [class.disabled]="!codexEnabled">
-                      <label class="checkbox-control">
-                        <input type="checkbox" [(ngModel)]="codexEnabled" />
-                        <span>{{ 'settings.enableForCodex' | t }}</span>
-                      </label>
-                      <div class="two-columns">
-                        <label
-                          ><span>{{ 'settings.model' | t }}</span
-                          ><select
-                            data-testid="codex-model-choice"
-                            [disabled]="!codexEnabled"
-                            [ngModel]="codexModel"
-                            (ngModelChange)="codexModel = $event"
-                            [attr.aria-label]="('settings.catalogPick' | t) + ' · Codex'"
-                          >
-                            <option [value]="codexModel">
-                              {{ codexModel || ('settings.catalogPick' | t) }}
-                            </option>
-                            @for (
-                              model of catalog.choices(modelProvider, 'codex');
-                              track model.id
-                            ) {
-                              @if (model.id !== codexModel) {
-                                <option [value]="model.id">
-                                  {{ model.name }} · {{ model.id }}
-                                </option>
-                              }
-                            }</select
-                          ><input
-                            [disabled]="!codexEnabled"
-                            [(ngModel)]="codexModel"
-                            [attr.aria-label]="('settings.catalogCustom' | t) + ' · Codex'"
-                        /></label>
-                        <label
-                          ><span>{{ 'settings.endpointOpenAI' | t }}</span
-                          ><input
-                            [disabled]="!codexEnabled"
-                            [placeholder]="'settings.endpointPlaceholder' | t"
-                            [(ngModel)]="codexBaseUrl"
-                        /></label>
-                      </div>
-                      <div class="two-columns">
-                        <label
-                          ><span>{{ 'settings.effortLevel' | t }}</span
-                          ><select [disabled]="!codexEnabled" [(ngModel)]="codexReasoningEffort">
-                            <option value="">{{ 'settings.effortDefault' | t }}</option>
-                            @for (level of codexEffortLevels; track level) {
-                              <option [value]="level">{{ level }}</option>
-                            }
-                          </select>
-                        </label>
-                      </div>
-                    </fieldset>
-                    <label>
-                      <span>API Key</span>
-                      <input
-                        type="password"
-                        [disabled]="clearCredential"
-                        [placeholder]="
-                          hasCredential()
-                            ? ('settings.keySavedPlaceholder' | t)
-                            : usesEndpoint()
-                              ? ('settings.keyThirdPartyRequired' | t)
-                              : ('settings.keyOfficialOptional' | t)
-                        "
-                        [(ngModel)]="apiKey"
-                      />
-                    </label>
-                    @if (modelCredentialMissing()) {
-                      <div class="credential-warning" role="alert">
-                        <app-icon name="triangle-alert" [size]="15" />
-                        <div>
-                          <strong>{{ 'settings.profileKeyMissing' | t }}</strong>
-                          <span>{{ 'settings.profileKeyHelp' | t }}</span>
-                        </div>
-                      </div>
-                    }
-                    <fieldset class="agent-endpoint">
-                      <legend>{{ 'settings.planMonitoring' | t }}</legend>
-                      <label
-                        ><span>{{ 'settings.planAlertThreshold' | t }}</span
-                        ><input
-                          type="number"
-                          min="1"
-                          max="100"
-                          [(ngModel)]="modelPlanAlertThreshold"
-                      /></label>
-                      <small class="preset-source">{{ 'settings.planQuotaHelp' | t }}</small>
-                    </fieldset>
-                    <label class="checkbox-control editor-checkbox">
-                      <input type="checkbox" [(ngModel)]="isDefault" />
-                      <span>{{ 'settings.defaultProfile' | t }}</span>
-                    </label>
-                    @if (hasCredential()) {
-                      <label class="checkbox-control editor-checkbox">
-                        <input type="checkbox" [(ngModel)]="clearCredential" />
-                        <span>{{ 'settings.clearKey' | t }}</span>
-                      </label>
-                    }
+                      <p class="model-catalog-help">{{ 'settings.catalogHelp' | t }}</p>
+                      @if (catalog.error()) {
+                        <p class="model-catalog-help" role="status">
+                          {{ 'settings.catalogOffline' | t }}
+                        </p>
+                      }
+                    </details>
                   </div>
                   <div class="editor-actions">
                     @if (modelDirty()) {
@@ -945,6 +942,11 @@ const DEFAULT_ALERT_THRESHOLD = 80;
                       }
                     }
                     <span></span>
+                    @if (switchAgent()) {
+                      <button type="button" class="secondary" [disabled]="saving()" (click)="requestClose()">
+                        {{ 'modelSwitch.return' | t }}
+                      </button>
+                    }
                     <button
                       type="button"
                       class="primary"
@@ -1367,6 +1369,7 @@ export class AgentSettingsDialogComponent {
   /** The agent the CLI tab opens on, when something sent the user here to install it. */
   readonly initialCliAgent = input<ManagedAgentType | ''>('');
   readonly initialModelProfileId = input('');
+  readonly switchAgent = input<AgentProtocol | null>(null);
   readonly networkTestResult = input<NetworkTestResult | null>(null);
   readonly busy = input(false);
   /** A profile save is in flight; its result lands in this dialog, so it cannot close meanwhile. */
@@ -1410,35 +1413,65 @@ export class AgentSettingsDialogComponent {
   protected readonly pendingAccountDelete = signal<string | null>(null);
   protected readonly pendingMcpDelete = signal<string | null>(null);
   protected readonly pendingNetworkDelete = signal<string | null>(null);
-  /** Tabs grouped by their purpose, in display order. Section labels come from i18n. */
+  protected readonly categoryQuery = signal('');
   protected readonly tabGroups: readonly {
     section: string;
-    tabs: readonly { id: SettingsTab; label: string }[];
+    tabs: readonly { id: SettingsTab; label: string; icon: string; keywords: string }[];
   }[] = [
     {
-      section: 'settings.sectionAgent',
+      section: 'settings.sectionBasics',
       tabs: [
-        { id: 'diagnostics', label: 'settings.tabDiagnostics' },
-        { id: 'cli', label: 'settings.tabCli' },
-        { id: 'accounts', label: 'settings.tabAccounts' },
-        { id: 'models', label: 'settings.tabModels' },
-        { id: 'mcp', label: 'settings.tabMcp' },
-        { id: 'network', label: 'settings.tabNetwork' },
+        { id: 'models', label: 'settings.tabModels', icon: 'sliders', keywords: 'settings.modelSearchTerms' },
+        { id: 'accounts', label: 'settings.tabAccounts', icon: 'users', keywords: 'settings.accountSearchTerms' },
+        { id: 'cli', label: 'settings.tabCli', icon: 'download', keywords: 'settings.installSearchTerms' },
       ],
     },
     {
-      section: 'settings.sectionRemote',
-      tabs: [{ id: 'remote', label: 'settings.tabRemote' }],
+      section: 'settings.sectionConnections',
+      tabs: [
+        { id: 'remote', label: 'settings.tabRemote', icon: 'devices', keywords: 'settings.remoteSearchTerms' },
+        { id: 'network', label: 'settings.tabNetwork', icon: 'wifi', keywords: 'settings.networkSearchTerms' },
+        { id: 'wechat', label: 'wechat.tab', icon: 'message', keywords: 'wechat.tab' },
+      ],
     },
     {
-      section: 'settings.sectionApp',
+      section: 'settings.sectionTools',
       tabs: [
-        { id: 'mcp-server', label: 'mcpServer.tab' },
-        { id: 'wechat', label: 'wechat.tab' },
-        { id: 'storage', label: 'settings.tabStorage' },
+        { id: 'diagnostics', label: 'settings.tabDiagnostics', icon: 'activity', keywords: 'settings.tabDiagnostics' },
+        { id: 'storage', label: 'settings.tabStorage', icon: 'boxes', keywords: 'settings.tabStorage' },
+        { id: 'mcp', label: 'settings.tabMcp', icon: 'link', keywords: 'settings.tabMcp' },
+        { id: 'mcp-server', label: 'mcpServer.tab', icon: 'server', keywords: 'mcpServer.tab' },
       ],
     },
   ];
+
+  protected readonly visibleGroups = computed(() => {
+    const query = this.categoryQuery().trim().toLocaleLowerCase();
+    if (!query) return this.tabGroups;
+    const terms = query.split(/\s+/);
+    return this.tabGroups.map(group => ({
+      section: group.section,
+      tabs: group.tabs.filter(category => {
+        const text = [this.i18n.t(category.label), this.i18n.t(category.keywords), this.i18n.t(group.section)]
+          .join(' ').toLocaleLowerCase();
+        return terms.every(term => text.includes(term));
+      }),
+    })).filter(group => group.tabs.length);
+  });
+
+  protected clearSearch(event: Event): void {
+    if (!this.categoryQuery()) return;
+    event.stopPropagation();
+    event.preventDefault();
+    this.categoryQuery.set('');
+  }
+
+  protected openSearchResult(event: Event): void {
+    if (!this.categoryQuery().trim()) return;
+    event.preventDefault();
+    const first = this.visibleGroups()[0]?.tabs[0];
+    if (first) this.selectTab(first.id);
+  }
   private readonly modelDrafts = new ProfileDrafts<ModelEditorDraft>();
   private readonly accountDrafts = new ProfileDrafts<ReturnType<typeof this.captureAccountDraft>>();
   private readonly mcpDrafts = new ProfileDrafts<ReturnType<typeof this.captureMcpDraft>>();
@@ -1467,6 +1500,7 @@ export class AgentSettingsDialogComponent {
     );
   });
   protected readonly hasNetworkCredential = signal(false);
+  protected readonly customProvider = CUSTOM_PROVIDER;
   protected readonly allPresets = PROVIDER_PRESETS;
   protected modelName = 'Claude Sonnet';
   protected modelProvider = 'Anthropic';
@@ -1869,7 +1903,7 @@ export class AgentSettingsDialogComponent {
   protected newModel(): void {
     this.rememberModelDraft();
     this.modelId.set('');
-    this.selectProvider(PROVIDER_PRESETS[0].provider);
+    this.selectProvider(this.switchAgent() === 'codex' ? 'OpenAI' : 'Anthropic');
     this.apiKey = '';
     this.isDefault = false;
     this.clearCredential = false;
@@ -1892,8 +1926,8 @@ export class AgentSettingsDialogComponent {
       id: profileId,
       name: this.modelName.trim(),
       provider: this.modelProvider.trim(),
-      apiKey: this.apiKey || undefined,
-      clearCredential: this.clearCredential,
+      apiKey: this.clearCredential ? undefined : this.apiKey.trim() || undefined,
+      clearCredential: this.clearCredential || (this.hasCredential() && !this.hasUsableModelKey() && !this.apiKey.trim()),
       isDefault: this.isDefault,
       claudeEnabled: this.claudeEnabled,
       claudeModel: this.claudeModel.trim(),
@@ -1918,6 +1952,10 @@ export class AgentSettingsDialogComponent {
    * configured, which is what keeps "enabled" meaning "reachable".
    */
   protected selectProvider(provider: string): void {
+    if (this.modelProvider !== provider) {
+      this.apiKey = '';
+      this.clearCredential = false;
+    }
     this.modelProvider = provider;
     const preset = findProviderPreset(provider);
     if (!preset) {
@@ -1963,9 +2001,14 @@ export class AgentSettingsDialogComponent {
     );
   }
 
+  protected hasUsableModelKey(): boolean {
+    const saved = this.modelProfiles().find(profile => profile.id === this.modelId());
+    return this.hasCredential() && saved?.provider === this.modelProvider;
+  }
+
   protected modelCredentialMissing(): boolean {
     return (
-      this.usesEndpoint() && (!this.hasCredential() || this.clearCredential) && !this.apiKey.trim()
+      this.usesEndpoint() && (this.clearCredential || (!this.hasUsableModelKey() && !this.apiKey.trim()))
     );
   }
 
@@ -1976,11 +2019,12 @@ export class AgentSettingsDialogComponent {
     if (!this.claudeEnabled && !this.codexEnabled) {
       return false;
     }
-    // An enabled side without a model would launch its agent with nothing to run.
-    return (
-      (!this.claudeEnabled || Boolean(this.claudeModel.trim())) &&
-      (!this.codexEnabled || Boolean(this.codexModel.trim()) || (this.modelProvider === 'OpenAI' && !this.codexBaseUrl.trim()))
-    );
+    return !this.missingModelId();
+  }
+
+  protected missingModelId(): boolean {
+    return (this.claudeEnabled && !this.claudeModel.trim()) ||
+      (this.codexEnabled && !this.codexModel.trim() && (this.modelProvider !== 'OpenAI' || !!this.codexBaseUrl.trim()));
   }
 
   protected editMcp(profile: McpProfile): void {

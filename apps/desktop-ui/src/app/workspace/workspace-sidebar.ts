@@ -67,6 +67,7 @@ export class WorkspaceSidebarComponent {
     position: 'before' | 'after';
   }>();
   readonly createRequested = output<void>();
+  readonly collapseRequested = output<void>();
   readonly folderCreateRequested = output<{ name: string; parentId: string | null }>();
   readonly folderRenameRequested = output<{ folderId: string; name: string }>();
   readonly folderDeleteRequested = output<string>();

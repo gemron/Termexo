@@ -104,8 +104,15 @@ describe('WorkspaceOnboardingComponent', () => {
     fixture.detectChanges();
     expect(root.querySelector('[data-testid="onboarding-create-workspace"]')).toBeNull();
     expect(root.querySelector('.project-path')?.textContent).toBe('D:/demo');
+    expect(root.querySelector('[data-agent="codex"]')!.closest('details')).toBeNull();
+    expect(root.querySelector('[data-agent="opencode"]')!.closest('details')?.open).toBe(false);
+    agents.codexInstallation.set(installation('codex', false));
+    fixture.detectChanges();
+    expect(root.querySelector('[data-agent="opencode"]')!.closest('details')).toBeNull();
+    agents.codexInstallation.set(installation('codex', true));
+    fixture.detectChanges();
     const i18n = TestBed.inject(I18nService);
-    expect(root.querySelector('[aria-current="step"]')?.textContent).toContain(
+    expect(root.querySelector('.agent-heading h2')?.textContent).toContain(
       i18n.t('onboarding.agentTitle'),
     );
     expect(root.querySelector('[data-agent="codex"] button')?.textContent).toContain(

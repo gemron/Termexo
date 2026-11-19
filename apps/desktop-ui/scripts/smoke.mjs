@@ -155,11 +155,11 @@ try {
   await createWorkspaceDialog.getByRole('button', { name: '选择目录', exact: true }).click();
   const smokeDirectory = join(tmpdir(), 'smoke-workspace');
   await confirmDirectory(smokeDirectory);
-  await createWorkspaceDialog.getByLabel('工作区项目目录').waitFor({ state: 'visible' });
-  if ((await createWorkspaceDialog.getByLabel('工作区项目目录').inputValue()) !== smokeDirectory) {
+  await createWorkspaceDialog.getByLabel('项目目录', { exact: true }).waitFor({ state: 'visible' });
+  if ((await createWorkspaceDialog.getByLabel('项目目录', { exact: true }).inputValue()) !== smokeDirectory) {
     throw new Error('workspace directory picker did not populate the project path');
   }
-  if ((await createWorkspaceDialog.locator('input').first().inputValue()) !== 'smoke-workspace') {
+  if ((await createWorkspaceDialog.getByLabel('工作区名称（选填）', { exact: true }).inputValue()) !== 'smoke-workspace') {
     throw new Error('workspace directory picker did not infer the workspace name');
   }
   await createWorkspaceDialog
@@ -273,10 +273,10 @@ try {
   await page.keyboard.press('Escape');
   await fontSizeOutput.waitFor({ state: 'detached' });
 
-  const terminalTabLabels = page.locator('.tab-strip button[role="tab"] > span');
+  const terminalTabLabels = page.locator('.tab-strip button[role="tab"] .tab-caption > span');
   const tabOrderBefore = await terminalTabLabels.allTextContents();
   const activeTabName = (
-    await page.locator('.tab-strip button.active > span').textContent()
+    await page.locator('.tab-strip button.active .tab-caption > span').textContent()
   )?.trim();
   const activeTabIndexBefore = tabOrderBefore.findIndex((name) => name.trim() === activeTabName);
   // Ctrl+Shift+PageUp replaces the toolbar arrows the tab strip used to spend its width on.
@@ -298,7 +298,7 @@ try {
   await page.keyboard.press('Control+Tab');
   await page.waitForTimeout(120);
   const cycledTabName = (
-    await page.locator('.tab-strip button.active > span').textContent()
+    await page.locator('.tab-strip button.active .tab-caption > span').textContent()
   )?.trim();
   if (cycledTabName === activeTabName) {
     throw new Error(`Ctrl+Tab did not move to another terminal tab: ${cycledTabName}`);
@@ -616,15 +616,30 @@ try {
   ) {
     throw new Error('workspace sidebar width did not respond to dragging');
   }
-  await page.getByTestId('workspace-sidebar-toggle').click();
+  const workspaceTitle = (await workspaceSidebar.locator('.workspace-item.active strong').textContent())?.trim();
+  if (await workspaceSidebar.locator('.sidebar-heading .sidebar-project').count()) {
+    throw new Error('expanded sidebar repeated the active project in its header');
+  }
+  const workspaceCollapse = workspaceSidebar.getByTestId('workspace-sidebar-toggle');
+  await workspaceSidebar.locator('.sidebar-heading > .sidebar-brand + button').waitFor();
+  await workspaceCollapse.click();
   await workspaceSidebar.waitFor({ state: 'detached' });
-  await page.getByTestId('workspace-sidebar-toggle').click();
+  const collapsedHeader = page.locator('.tab-row-brand');
+  await collapsedHeader.locator('.app-brand + .workspace-reveal').waitFor();
+  if (await collapsedHeader.locator('.app-brand strong').count()) {
+    throw new Error('collapsed workspace header still shows the Termexo wordmark');
+  }
+  const workspaceReveal = collapsedHeader.getByTestId('workspace-sidebar-toggle');
+  if (!workspaceTitle || (await workspaceReveal.textContent())?.trim() !== workspaceTitle) {
+    throw new Error('collapsed sidebar did not show the active workspace name beside the tabs');
+  }
+  await workspaceReveal.click();
   await workspaceSidebar.waitFor();
 
   const inspectorPanel = page.locator('app-inspector-panel');
-  await page.getByRole('button', { name: '折叠 Agent 侧栏' }).click();
+  await inspectorPanel.getByRole('button', { name: '折叠工作状态' }).click();
   await inspectorPanel.waitFor({ state: 'detached' });
-  await page.getByRole('button', { name: '展开 Agent 侧栏' }).click();
+  await page.locator('.terminal-tabs').getByRole('button', { name: '展开工作状态' }).click();
   await inspectorPanel.waitFor();
 
   await openNewMenu();
@@ -659,9 +674,9 @@ try {
   await openCodeLaunchDialog.getByRole('button', { name: '关闭' }).click();
 
   await page.locator('.tab-strip').getByRole('tab').filter({ hasText: 'Claude - Core' }).click();
-  await page.locator('.terminal-panel .model-chip').first().click();
+  await activeTerminalPanel.locator('.model-chip').click();
   const modelSwitchDialog = page.getByRole('dialog', {
-    name: '切换 Claude Code 后端模型',
+    name: '切换模型',
   });
   await modelSwitchDialog.waitFor();
   await assertWithinViewport(modelSwitchDialog, 'model switch dialog');
@@ -690,8 +705,9 @@ try {
   await page.keyboard.press('Escape');
   await gridDimensions.waitFor({ state: 'detached' });
 
+  await openNewMenu();
   await page.getByTestId('session-center-open').click();
-  const sessionDialog = page.getByRole('dialog', { name: 'Agent 会话中心' });
+  const sessionDialog = page.locator('#workspace-tool-panel-sessions');
   await sessionDialog.waitFor();
   await sessionDialog.getByText('当前工作区没有本地会话').waitFor();
 
@@ -712,10 +728,11 @@ try {
     fullPage: true,
   });
 
-  await sessionDialog.locator('.session-footer').getByRole('button', { name: '关闭' }).click();
+  await page.locator('#workspace-tool-tab-sessions + .tab-close').click();
   await page.setViewportSize({ width: 1024, height: 720 });
-  await page.getByRole('button', { name: '设置', exact: true }).click();
-  const settingsDialog = page.getByRole('dialog', { name: 'Agent 与开发环境设置' });
+  await page.getByTestId('overflow-menu').click();
+  await page.getByTestId('settings-open').click();
+  const settingsDialog = page.getByRole('dialog', { name: '设置', exact: true });
   await settingsDialog.waitFor();
   await settingsDialog.getByRole('button', { name: '登录账号', exact: true }).click();
   await settingsDialog.getByRole('button', { name: '添加隔离账号', exact: true }).click();
@@ -740,11 +757,12 @@ try {
     throw new Error('saving a new account twice created duplicate profiles');
   }
 
-  await settingsDialog.getByRole('button', { name: '模型 Profile' }).click();
-  await settingsDialog.getByRole('button', { name: /新建 Profile/ }).click();
+  await settingsDialog.getByRole('button', { name: '模型配置' }).click();
+  await settingsDialog.getByRole('button', { name: /添加模型配置/ }).click();
   await settingsDialog.getByLabel('名称', { exact: true }).fill('Smoke Profile');
-  await settingsDialog.getByLabel('模型 ID（可修改） · Claude', { exact: true }).fill('sonnet');
-  const saveProfileButton = settingsDialog.getByRole('button', { name: '保存 Profile' });
+  await settingsDialog.getByText('高级设置', { exact: true }).click();
+  await settingsDialog.getByLabel('模型 ID（可修改） · Claude Code', { exact: true }).fill('sonnet');
+  const saveProfileButton = settingsDialog.getByRole('button', { name: '保存模型配置' });
   await saveProfileButton.click();
   await settingsDialog
     .locator('.profile-nav button')

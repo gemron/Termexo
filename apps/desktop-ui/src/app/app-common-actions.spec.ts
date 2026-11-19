@@ -12,7 +12,9 @@ import type { CommonActionTerminalRequest } from './core/models/common-action';
 import { RemoteConnectionService } from './core/services/remote-connection.service';
 
 interface RecognitionFlow {
-  commonActionsOpen: WritableSignal<boolean>;
+  workspaceView: WritableSignal<string>;
+  workspaceTools(): { tool: string }[];
+  chooseWorkspaceAction(tool: 'common-actions'): void;
   codexLaunchOpen: WritableSignal<boolean>;
   openCodexLaunch(): Promise<void>;
   closeCodexLaunch(): void;
@@ -48,7 +50,7 @@ describe('continuous common action recognition', () => {
     (window as unknown as Record<string, unknown>)['__TAURI_INTERNALS__'] = {};
     vi.spyOn(flow, 'openCodexLaunch').mockImplementation(async () => flow.codexLaunchOpen.set(true));
     vi.spyOn(flow, 'deliverTerminalPrompt').mockResolvedValue(undefined);
-    flow.commonActionsOpen.set(true);
+    flow.chooseWorkspaceAction('common-actions');
   });
   afterEach(() => {
     delete (window as unknown as Record<string, unknown>)['__TAURI_INTERNALS__'];
@@ -125,7 +127,7 @@ describe('continuous common action recognition', () => {
 
   it('returns from launching and sends recognition only after the Agent is ready', async () => {
     const { terminal, request } = await launch();
-    expect(flow.commonActionsOpen()).toBe(true);
+    expect(flow.workspaceView()).toBe('common-actions');
     const review = actions.reviews()[state.activeWorkspace()!.id];
     expect(review).toMatchObject({ waiting: true, terminalId: terminal.id, phase: 'starting' });
     expect(flow.deliverTerminalPrompt).not.toHaveBeenCalled();
@@ -147,24 +149,25 @@ describe('continuous common action recognition', () => {
     const review = actions.reviews()[workspaceId];
     flow.viewCommonActionAgent(terminal.id);
     TestBed.tick();
-    expect(flow.commonActionsOpen()).toBe(false);
+    expect(flow.workspaceView()).toBe('terminal');
     actions.propose(workspaceId, review.requestId, JSON.stringify([
       { name: '测试', command: 'npm test', workingDirectory: 'D:/project', description: '' },
     ]));
     TestBed.tick();
-    expect(flow.commonActionsOpen()).toBe(true);
+    expect(flow.workspaceView()).toBe('common-actions');
     expect(state.activeWorkspace()!.commonActions).toBeUndefined();
   });
 
-  it('shows launch failure inline and returns to the original dialog when launch is cancelled', async () => {
+  it('shows launch failure inline and keeps the tab when launch is cancelled', async () => {
     const { request } = await launch();
     request.onFailed('Agent 未就绪');
     expect(actions.reviews()[state.activeWorkspace()!.id]).toMatchObject({ waiting: false, error: 'Agent 未就绪' });
     actions.discard(state.activeWorkspace()!.id);
     await flow.startCommonActionAgent();
-    expect(flow.commonActionsOpen()).toBe(false);
+    expect(flow.codexLaunchOpen()).toBe(true);
+    expect(flow.workspaceTools().map((tab) => tab.tool)).toEqual(['common-actions']);
     flow.closeCodexLaunch();
-    expect(flow.commonActionsOpen()).toBe(true);
+    expect(flow.workspaceView()).toBe('common-actions');
     expect(actions.reviews()[state.activeWorkspace()!.id]).toBeUndefined();
   });
 

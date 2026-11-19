@@ -179,9 +179,17 @@ textarea {
 
 .session-center {
   display: flex;
-  width: min(980px, 100%);
-  height: min(780px, calc(100vh - 36px));
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  max-height: none;
   flex-direction: column;
+  box-shadow: none;
+
+  > header {
+    min-height: 50px;
+    flex: none;
+  }
 }
 
 /* Health reads as a status line, not as cards competing with the session rows. */
@@ -718,37 +726,6 @@ textarea {
   }
 }
 
-.settings-dialog {
-  grid-template-rows: 68px 38px minmax(0, 1fr);
-}
-
-.settings-tabs {
-  display: flex;
-  // DaisyUI's own tab styling wraps, and the row is pinned to one line's height, so in languages
-  // with longer category names the overflowing tabs were laid out below the visible strip and
-  // could not be reached at all. They scroll instead.
-  flex-wrap: nowrap;
-  overflow-x: auto;
-  padding: 0 14px;
-  border-bottom: 1px solid var(--border);
-
-  button {
-    flex: 0 0 auto;
-    padding: 0 13px;
-    border: 0;
-    border-bottom: 2px solid transparent;
-    color: var(--text-muted);
-    background: transparent;
-    font-size: 11px;
-    font-weight: 580;
-
-    &.active {
-      border-bottom-color: var(--color-primary);
-      color: var(--text);
-    }
-  }
-}
-
 .account-status {
   display: grid;
   grid-template-columns: 28px minmax(0, 1fr);
@@ -1206,10 +1183,6 @@ textarea {
 
   .settings-split {
     grid-template-columns: 150px minmax(0, 1fr);
-  }
-
-  .session-center {
-    height: calc(100vh - 20px);
   }
 
   .session-row {

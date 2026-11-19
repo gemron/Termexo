@@ -71,7 +71,8 @@ try {
       ];
       const screens = panels.map((panel) => panel.querySelector('.xterm-screen')).filter(Boolean);
       const gridStyle = grid ? getComputedStyle(grid) : null;
-      const toolbar = document.querySelector('.topbar .toolbar');
+      const tabHeader = document.querySelector('.app-shell > .terminal-tabs');
+      const toolbar = tabHeader && getComputedStyle(tabHeader).display !== 'none' ? tabHeader : null;
 
       return {
         viewport: { width: innerWidth, height: innerHeight },
@@ -82,11 +83,14 @@ try {
           scrollHeight: document.documentElement.scrollHeight,
         },
         shell: toRect(shell),
+        tabRow: toRect(toolbar),
         workbench: toRect(workbench),
         grid: toRect(grid),
         workspaceSidebar: toRect(workspaceSidebar),
         workspaceSidebarVisible:
           Boolean(workspaceSidebar) && getComputedStyle(workspaceSidebar).display !== 'none',
+        brandCount: [...document.querySelectorAll('.app-brand')].filter((brand) => brand.getClientRects().length).length,
+        sidebarBrand: Boolean(workspaceSidebar?.querySelector('.sidebar-heading .app-brand')?.getClientRects().length),
         inspector: toRect(inspector),
         inspectorVisible: Boolean(inspector) && getComputedStyle(inspector).display !== 'none',
         statusDisplay: getComputedStyle(document.querySelector('.statusbar')).display,
@@ -135,6 +139,24 @@ try {
     ) {
       throw new Error(`${label}: sidebar state is incorrect: ${JSON.stringify(snapshot)}`);
     }
+    if (snapshot.workspaceSidebarVisible && Math.abs(snapshot.workspaceSidebar.y - snapshot.shell.y) > 1) {
+      throw new Error(`${label}: workspace sidebar does not start at the top of the window`);
+    }
+    if (snapshot.inspectorVisible && Math.abs(snapshot.inspector.y - snapshot.shell.y) > 1) {
+      throw new Error(`${label}: the Work status panel does not start at the top of the window`);
+    }
+    if (expected.focusMode) {
+      if (snapshot.tabRow || snapshot.brandCount !== 0 || Math.abs(snapshot.workbench.y - snapshot.shell.y) > 1) {
+        throw new Error(`${label}: the terminal does not fill the window with its tabs hidden`);
+      }
+    } else {
+      if (!snapshot.tabRow || Math.abs(snapshot.tabRow.y - snapshot.shell.y) > 1) {
+        throw new Error(`${label}: the terminal tabs are not at the window edge`);
+      }
+      if (snapshot.brandCount !== 1 || snapshot.sidebarBrand !== snapshot.workspaceSidebarVisible) {
+        throw new Error(`${label}: brand is not in the leftmost header`);
+      }
+    }
     if (
       snapshot.columnTracks !== expected.columnTracks ||
       snapshot.rowTracks !== expected.rowTracks
@@ -151,11 +173,10 @@ try {
         `${label}: terminal header controls are off screen: ${JSON.stringify(snapshot.headerControls)}`,
       );
     }
-    // The bar scrolls sideways rather than overlapping, but nothing hints that it does: whatever
-    // ends up past its right edge — new terminal, the view switch — is unreachable in practice.
+    // The scrollable tab strip leaves room for the menu trigger and terminal controls.
     if (snapshot.toolbarClipped > 1) {
       throw new Error(
-        `${label}: ${snapshot.toolbarClipped}px of the topbar toolbar is hidden behind a scroll`,
+        `${label}: ${snapshot.toolbarClipped}px of the terminal toolbar is hidden behind a scroll`,
       );
     }
     if (
@@ -198,29 +219,34 @@ try {
       },
     }),
   );
-  const workspaceMaximizeButton = page.locator('[data-testid="workspace-maximize-toggle"]');
-  await workspaceMaximizeButton.click();
-  await page.locator('.app-shell.workspace-maximized').waitFor();
+  const activeTerminal = page.locator('app-terminal-workbench:not(.workspace-hidden) .terminal-panel.active');
+  const terminalFocusToggle = activeTerminal.getByTestId('terminal-focus-toggle');
+  const layoutFillToggle = activeTerminal.getByTestId('terminal-layout-fill-toggle');
+  const enterTerminalFocus = async () => {
+    await terminalFocusToggle.click();
+    await page.locator('.app-shell.terminal-focus-mode').waitFor();
+  };
+  const waitForRestoredLayout = () => page.locator('.app-shell:not(.terminal-focus-mode)').waitFor();
+  await enterTerminalFocus();
   results.push(
     await inspectViewport({
-      label: 'workspace-maximized',
+      label: 'terminal-focus-desktop',
       width: 1440,
       height: 900,
       expected: {
+        focusMode: true,
         workspaceSidebar: false,
         inspector: false,
-        columnTracks: 2,
+        visibleCount: 1,
+        columnTracks: 1,
         rowTracks: 1,
         statusDisplay: 'none',
       },
     }),
   );
-  await workspaceMaximizeButton.click();
-  await page.locator('.app-shell:not(.workspace-maximized)').waitFor();
-  const terminalMaximizeButton = page
-    .locator('.terminal-panel:not(.workbench-hidden) .terminal-meta button.btn')
-    .first();
-  await terminalMaximizeButton.click();
+  await terminalFocusToggle.click();
+  await waitForRestoredLayout();
+  await layoutFillToggle.click();
   results.push(
     await inspectViewport({
       label: 'terminal-maximized',
@@ -236,7 +262,7 @@ try {
       },
     }),
   );
-  await terminalMaximizeButton.click();
+  await layoutFillToggle.click();
   results.push(
     await inspectViewport({
       label: 'compact-workspace',
@@ -265,22 +291,26 @@ try {
       },
     }),
   );
-  await workspaceMaximizeButton.click();
+  await enterTerminalFocus();
   results.push(
     await inspectViewport({
-      label: 'minimum-window-maximized',
+      label: 'terminal-focus-minimum-window',
       width: 720,
       height: 480,
       expected: {
+        focusMode: true,
         workspaceSidebar: false,
         inspector: false,
+        visibleCount: 1,
         columnTracks: 1,
-        rowTracks: 2,
+        rowTracks: 1,
         statusDisplay: 'none',
       },
     }),
   );
-  await workspaceMaximizeButton.click();
+  await page.locator('app-terminal-panel:not(.workbench-hidden) .xterm-helper-textarea').focus();
+  await page.keyboard.press('Shift+Escape');
+  await waitForRestoredLayout();
 
   // A phone reached through remote access. The workspace still stores the grid layout; drawing
   // falls back to a single terminal, and both side panels float instead of taking a column.

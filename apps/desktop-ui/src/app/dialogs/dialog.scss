@@ -239,6 +239,15 @@
   }
 }
 
+.switch-current, .switch-impact {
+  margin: 12px 0 0;
+  color: var(--text-secondary);
+  font-size: 12px;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+.model-dialog select { width: 100%; }
+
 .switch-plan {
   display: grid;
   grid-template-columns: repeat(3, 1fr);

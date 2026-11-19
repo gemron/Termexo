@@ -371,7 +371,7 @@ summary:focus-visible,
   app-inspector-panel {
     position: absolute;
     z-index: 30;
-    inset-block: var(--topbar-height) 0;
+    inset-block: 0;
     width: min(82vw, 300px);
   }
 
@@ -390,9 +390,13 @@ summary:focus-visible,
  * because app.scss is at its stylesheet budget; see the two blocks above.
  */
 .tab-bar .add-tab {
-  display: grid;
-  width: 26px;
-  height: 26px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  padding: 0 8px;
+  font-size: 12px;
+  height: 30px;
   flex: 0 0 auto;
   place-items: center;
   margin: 0 7px;
@@ -410,7 +414,7 @@ summary:focus-visible,
 @media (max-width: 640px) {
   /* A finger needs more than a mouse does; the phone rules in app.scss cover the other controls. */
   .tab-bar .add-tab {
-    width: 32px;
+    min-width: 32px;
     height: 32px;
   }
 }
@@ -449,5 +453,24 @@ app-terminal-panel .terminal-host .xterm-viewport {
     transition-duration: 0.01ms !important;
     animation-duration: 0.01ms !important;
     animation-iteration-count: 1 !important;
+  }
+}
+
+.tab-strip .tab-caption {
+  display: flex;
+  min-width: 0;
+  align-items: baseline;
+  gap: 6px;
+  text-align: start;
+  line-height: 1.25;
+  white-space: nowrap;
+
+  > small {
+    overflow: hidden;
+    max-width: 45%;
+    flex: none;
+    text-overflow: ellipsis;
+    font-size: 10px;
+    font-weight: 450;
   }
 }

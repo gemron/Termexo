@@ -168,9 +168,7 @@ describe('common action review and editing', () => {
 
   it('keeps launch controls on each compact operation and stays open after starting one', async () => {
     const fixture = create();
-    const closed = vi.fn();
     const terminal = vi.fn();
-    fixture.componentInstance.closed.subscribe(closed);
     fixture.componentInstance.terminalRequested.subscribe(terminal);
     const card = fixture.nativeElement.querySelector('.saved-action') as HTMLElement;
     const labels = [...card.querySelectorAll('.card-buttons button')].map((button) =>
@@ -181,7 +179,6 @@ describe('common action review and editing', () => {
     await (fixture.componentInstance as unknown as { run(id: string): Promise<void> }).run('a');
     fixture.detectChanges();
     expect(actions.run).toHaveBeenCalledWith('w', 'a', false);
-    expect(closed).not.toHaveBeenCalled();
     expect(terminal).not.toHaveBeenCalled();
     expect(fixture.nativeElement.querySelector('[role="status"]').textContent).toContain('已启动');
   });

@@ -1,4 +1,4 @@
-import { Component, inject, input, output, signal } from '@angular/core';
+import { Component, computed, inject, input, output, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 
 import { I18nService } from '../core/i18n/i18n.service';
@@ -25,7 +25,6 @@ import { IconComponent } from '../shared/icon/icon';
         <header>
           <div>
             <h2 id="workspace-dialog-title">{{ 'dialog.workspaceCreateTitle' | t }}</h2>
-            <p>{{ 'dialog.workspaceCreateDescription' | t }}</p>
           </div>
           <button
             type="button"
@@ -38,45 +37,49 @@ import { IconComponent } from '../shared/icon/icon';
             <app-icon name="x" [size]="15" />
           </button>
         </header>
-        <label>
-          <span>{{ 'dialog.name' | t }}</span>
-          <input
-            type="text"
-            class="input input-bordered input-sm"
-            [placeholder]="'dialog.nameExample' | t"
-            [ngModel]="name()"
-            [disabled]="busy()"
-            (ngModelChange)="name.set($event)"
-            autofocus
-          />
-        </label>
-        <label>
-          <span>{{ 'dialog.workspaceDefaultDirectory' | t }}</span>
-          <div class="directory-field">
+        <form class="workspace-form" id="create-workspace-form" (ngSubmit)="submit()">
+          <div>
+            <label for="workspace-project-path">{{ 'dialog.projectDirectory' | t }}</label>
+            <div class="directory-field">
+              <input
+                id="workspace-project-path"
+                type="text"
+                name="projectPath"
+                required
+                class="input input-bordered input-sm"
+                [placeholder]="'dialog.chooseOrPasteFolder' | t"
+                [ngModel]="projectPath()"
+                [disabled]="busy() || selectingDirectory()"
+                (ngModelChange)="projectPath.set($event); directoryError.set(null)"
+              />
+              <button
+                type="button"
+                class="directory-button btn btn-outline btn-sm"
+                [disabled]="busy() || selectingDirectory()"
+                (click)="selectProjectDirectory()"
+              >
+                <app-icon name="folder" [size]="15" />
+                {{ (selectingDirectory() ? 'common.selecting' : 'common.selectDirectory') | t }}
+              </button>
+            </div>
+            @if (directoryError(); as error) {
+              <small class="field-error" role="alert">{{ error }}</small>
+            }
+          </div>
+          <div>
+            <label for="workspace-display-name">{{ 'dialog.workspaceDisplayName' | t }}</label>
             <input
+              id="workspace-display-name"
+              name="displayName"
               type="text"
               class="input input-bordered input-sm"
-              placeholder="/path/to/project"
-              [attr.aria-label]="'dialog.workspaceProjectDirectory' | t"
-              [ngModel]="projectPath()"
+              [placeholder]="folderName() || ('dialog.nameFromFolder' | t)"
+              [ngModel]="name() ?? folderName()"
+              (ngModelChange)="name.set($event)"
               [disabled]="busy()"
-              (ngModelChange)="projectPath.set($event); directoryError.set(null)"
             />
-            <button
-              type="button"
-              class="directory-button btn btn-outline btn-sm"
-              [disabled]="busy() || selectingDirectory()"
-              (click)="selectProjectDirectory()"
-            >
-              <app-icon name="folder" [size]="14" />
-              {{ selectingDirectory() ? ('common.selecting' | t) : ('common.selectDirectory' | t) }}
-            </button>
           </div>
-          <small>{{ 'dialog.workspaceDirectoryHelp' | t }}</small>
-          @if (directoryError(); as error) {
-            <small class="field-error">{{ error }}</small>
-          }
-        </label>
+        </form>
         @if (error(); as message) {
           <p class="field-error" role="alert">{{ message }}</p>
         }
@@ -90,10 +93,10 @@ import { IconComponent } from '../shared/icon/icon';
             {{ 'common.cancel' | t }}
           </button>
           <button
-            type="button"
+            type="submit"
+            form="create-workspace-form"
             class="primary btn btn-primary btn-sm"
             [disabled]="busy() || selectingDirectory() || !isValid()"
-            (click)="submit()"
           >
             {{ (busy() ? 'common.loading' : 'dialog.createWorkspace') | t }}
           </button>
@@ -111,8 +114,11 @@ export class CreateWorkspaceDialogComponent {
   readonly error = input<string | null>(null);
   readonly created = output<{ name: string; projectPath: string }>();
   readonly cancelled = output<void>();
-  readonly name = signal('');
+  readonly name = signal<string | null>(null);
   readonly projectPath = signal('');
+  readonly folderName = computed(() =>
+    this.projectPath().trim() ? this.directoryName(this.projectPath()) : '',
+  );
   readonly selectingDirectory = signal(false);
   readonly directoryError = signal<string | null>(null);
 
@@ -133,9 +139,6 @@ export class CreateWorkspaceDialogComponent {
       }
 
       this.projectPath.set(selected);
-      if (!this.name().trim()) {
-        this.name.set(this.directoryName(selected));
-      }
     } catch {
       this.directoryError.set(this.i18n.t('dialog.directoryPickerFailed'));
     } finally {
@@ -144,13 +147,13 @@ export class CreateWorkspaceDialogComponent {
   }
 
   protected isValid(): boolean {
-    return this.name().trim().length > 0 && this.projectPath().trim().length > 0;
+    return !!this.projectPath().trim();
   }
 
   protected submit(): void {
     if (!this.busy() && !this.selectingDirectory() && this.isValid()) {
       this.created.emit({
-        name: this.name().trim(),
+        name: this.name()?.trim() || this.folderName(),
         projectPath: this.projectPath().trim(),
       });
     }

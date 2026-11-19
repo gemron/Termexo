@@ -94,6 +94,7 @@ export class AnchoredMenuDirective implements AfterViewInit, OnDestroy {
   }
 
   protected onEscape(event: Event): void {
+    event.preventDefault();
     event.stopPropagation();
     this.appAnchoredMenu().focus();
     this.dismissed.emit();
@@ -104,6 +105,7 @@ export class AnchoredMenuDirective implements AfterViewInit, OnDestroy {
   }
 
   protected onKeydown(event: KeyboardEvent): void {
+    if (this.element.getAttribute('role') !== 'menu') return;
     if (event.key === 'Tab') {
       this.appAnchoredMenu().focus({ preventScroll: true });
       this.dismissed.emit();
@@ -130,7 +132,15 @@ export class AnchoredMenuDirective implements AfterViewInit, OnDestroy {
         return;
     }
     event.preventDefault();
-    items[next].focus({ preventScroll: true });
+    const item = items[next];
+    item.focus({ preventScroll: true });
+    const menuBounds = this.element.getBoundingClientRect();
+    const itemBounds = item.getBoundingClientRect();
+    if (itemBounds.top < menuBounds.top) {
+      this.element.scrollTop += itemBounds.top - menuBounds.top;
+    } else if (itemBounds.bottom > menuBounds.bottom) {
+      this.element.scrollTop += itemBounds.bottom - menuBounds.bottom;
+    }
   }
 
   private readonly onScroll = (event: Event): void => {

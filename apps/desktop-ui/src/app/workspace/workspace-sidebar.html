@@ -1,4 +1,20 @@
-<aside class="workspace-sidebar bg-base-200">
+<aside id="workspace-sidebar" class="workspace-sidebar bg-base-200" [attr.aria-label]="'workspace.section' | t">
+  <header class="sidebar-heading" data-tauri-drag-region="deep">
+    <ng-content select="[workspace-brand]" />
+    <button
+      type="button"
+      class="icon-button btn btn-square btn-ghost btn-sm"
+      data-testid="workspace-sidebar-toggle"
+      aria-controls="workspace-sidebar"
+      aria-expanded="true"
+      [title]="'workspace.collapseSidebar' | t"
+      [attr.aria-label]="'workspace.collapseSidebar' | t"
+      (click)="collapseRequested.emit()"
+    >
+      <app-icon name="panel-left-close" [size]="15" />
+    </button>
+    <ng-content select="[workspace-tools]" />
+  </header>
   <div class="sidebar-tools">
     <label class="search-field input input-bordered input-sm">
       <app-icon name="search" [size]="14" />
@@ -41,8 +57,6 @@
   </div>
 
   <nav [attr.aria-label]="'workspace.section' | t">
-    <p class="section-label">{{ 'workspace.section' | t }}</p>
-
     @if (tagFilters().length) {
       <div class="tag-filters" [attr.aria-label]="'workspace.filterByTag' | t">
         @for (tag of tagFilters(); track tag.name) {

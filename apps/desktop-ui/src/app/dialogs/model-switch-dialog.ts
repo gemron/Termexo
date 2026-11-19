@@ -1,10 +1,28 @@
-import { Component, computed, inject, input, output, signal } from '@angular/core';
+import {
+  Component,
+  computed,
+  effect,
+  inject,
+  input,
+  linkedSignal,
+  output,
+  signal,
+} from '@angular/core';
 
-import { I18nService } from '../core/i18n/i18n.service';
+import { FormsModule } from '@angular/forms';
+import { CodexModelCatalogService } from '../core/services/codex-model-catalog.service';
+import { ModelCatalogService } from '../core/services/model-catalog.service';
+import {
+  CLI_NATIVE_PROFILE_ID,
+  matchesRunningModel,
+  OFFICIAL_MODEL_PREFIX,
+  officialModelId,
+} from '../core/models/launch-model-choice';
 import { TranslatePipe } from '../core/i18n/translate.pipe';
 import {
   AgentProtocol,
   ModelProfile,
+  needsCredential,
   profileModel,
   profileServes,
 } from '../core/models/agent.models';
@@ -14,13 +32,14 @@ import { IconComponent } from '../shared/icon/icon';
 export interface ModelSwitchValue {
   profileId: string;
   agent: AgentProtocol;
+  model?: string;
 }
 
 @Component({
   selector: 'app-model-switch-dialog',
-  imports: [ModalFocusDirective, IconComponent, TranslatePipe],
+  imports: [FormsModule, ModalFocusDirective, IconComponent, TranslatePipe],
   template: `
-    <div class="backdrop modal modal-open" (mousedown)="cancelled.emit()">
+    <div class="backdrop modal modal-open" (mousedown)="!busy() && cancelled.emit()">
       <section
         class="dialog model-dialog modal-box"
         appModal
@@ -33,13 +52,14 @@ export interface ModelSwitchValue {
         <header>
           <div>
             <h2 id="model-dialog-title">{{ 'modelSwitch.title' | t }}</h2>
-            <p>{{ description() }}</p>
+            <p>{{ singleTerminalName() || agentLabel() }}</p>
           </div>
           <button
             type="button"
             class="btn btn-square btn-ghost btn-sm"
             [title]="'common.close' | t"
             [attr.aria-label]="'common.close' | t"
+            [disabled]="busy()"
             (click)="cancelled.emit()"
           >
             <app-icon name="x" [size]="15" />
@@ -59,6 +79,7 @@ export interface ModelSwitchValue {
               class="tab"
               [class.active]="agentType() === 'claude'"
               [attr.aria-selected]="agentType() === 'claude'"
+              [disabled]="busy()"
               (click)="agentTypeValue.set('claude')"
             >
               {{ 'modelSwitch.claudeTab' | t }}
@@ -70,6 +91,7 @@ export interface ModelSwitchValue {
               class="tab"
               [class.active]="agentType() === 'codex'"
               [attr.aria-selected]="agentType() === 'codex'"
+              [disabled]="busy()"
               (click)="agentTypeValue.set('codex')"
             >
               {{ 'modelSwitch.codexTab' | t }}
@@ -78,68 +100,76 @@ export interface ModelSwitchValue {
           </nav>
         }
 
-        <div class="profile-list">
-          @for (profile of filteredProfiles(); track profile.id) {
-            <button
-              type="button"
-              class="profile-option card"
-              [class.selected]="profile.id === resolvedProfileId()"
-              [class.current]="profile.id === currentProfileId()"
-              [disabled]="profile.id === currentProfileId()"
-              [attr.aria-current]="profile.id === currentProfileId() ? 'true' : null"
-              (click)="selectedProfileId.set(profile.id)"
-            >
-              <i [style.background]="profileTone(profile.provider)"></i>
-              <span
-                ><strong>{{ profile.name }}</strong
-                ><small>{{ profile.provider }} · {{ modelOf(profile) }}</small></span
-              >
-              @if (profile.id === currentProfileId()) {
-                <span class="current-tag">{{ 'modelSwitch.current' | t }}</span>
-              } @else if (profile.id === resolvedProfileId()) {
-                <app-icon name="check" [size]="15" />
+        @if (lockedAgentType()) {
+          <p class="switch-current">
+            {{ 'modelSwitch.current' | t }} ·
+            <strong>{{ currentModel() || ('common.defaultModel' | t) }}</strong>
+          </p>
+        }
+        <label>
+          <span>{{ 'launch.modelChoice' | t }}</span>
+          <select
+            class="select select-bordered select-sm"
+            [disabled]="busy()"
+            [ngModel]="choice()"
+            (ngModelChange)="choice.set($event)"
+          >
+            <option value="" disabled>{{ 'modelSwitch.choose' | t }}</option>
+            <optgroup [label]="'launch.officialModels' | t">
+              <option [value]="officialPrefix" [disabled]="isCurrent(officialPrefix)">
+                {{ 'launch.cliDefaultModel' | t }}
+              </option>
+              @for (model of officialModels(); track model.id) {
+                <option
+                  [value]="officialPrefix + model.id"
+                  [disabled]="isCurrent(officialPrefix + model.id)"
+                >
+                  {{ model.name }}
+                </option>
               }
-            </button>
-          } @empty {
-            <div class="dialog-empty">
-              <strong>{{ emptyTitle() }}</strong>
-              <span>{{ emptyDescription() }}</span>
-            </div>
-          }
-        </div>
-        <div class="switch-plan">
-          <div>
-            <strong>{{ 'modelSwitch.cliUnchanged' | t }}</strong
-            ><span>CLI {{ agentType() === 'codex' ? 'Codex CLI' : 'Claude Code' }}</span>
-          </div>
-          <div>
-            <strong>{{ singleTerminalName() ? 1 : agentCount() }}</strong
-            ><span>{{ 'modelSwitch.terminalsRestart' | t }}</span>
-          </div>
-          <div>
-            <strong>{{ 'modelSwitch.newSession' | t }}</strong
-            ><span>{{ 'modelSwitch.newSessionHelp' | t }}</span>
-          </div>
-        </div>
+            </optgroup>
+            @if (filteredProfiles().length) {
+              <optgroup [label]="'launch.savedProfiles' | t">
+                @for (profile of filteredProfiles(); track profile.id) {
+                  <option [value]="profile.id" [disabled]="isCurrent(profile.id)">
+                    {{ profile.name }} · {{ modelOf(profile) || ('common.defaultModel' | t) }}
+                    @if (missingKey(profile)) {
+                      ({{ 'settings.keyRequired' | t }})
+                    }
+                  </option>
+                }
+              </optgroup>
+            }
+          </select>
+        </label>
+        @if (catalogNotice()) {
+          <p class="field-hint" role="status">{{ catalogNotice() | t }}</p>
+        }
+        <p class="switch-impact">{{ 'modelSwitch.restartHint' | t: { count: targetCount() } }}</p>
         <button
           type="button"
           class="secondary btn btn-sm manage-profile"
           [disabled]="busy()"
-          (click)="settingsRequested.emit()"
+          (click)="openSettings()"
         >
           {{ 'settings.manageModels' | t }}
         </button>
         <footer>
-          <button type="button" class="secondary btn btn-ghost btn-sm" (click)="cancelled.emit()">
+          <button
+            type="button"
+            class="secondary btn btn-ghost btn-sm"
+            [disabled]="busy()"
+            (click)="cancelled.emit()"
+          >
             {{ 'common.cancel' | t }}
           </button>
           <button
             type="button"
             class="primary btn btn-primary btn-sm"
-            [disabled]="busy() || !resolvedProfileId()"
+            [disabled]="!canConfirm()"
             (click)="confirm()"
           >
-            {{ 'modelSwitch.execute' | t }}
+            {{ (requiresKey() ? 'modelSwitch.addKey' : 'modelSwitch.execute') | t }}
           </button>
         </footer>
       </section>
@@ -148,90 +178,154 @@ export interface ModelSwitchValue {
   styleUrl: './dialog.scss',
 })
 export class ModelSwitchDialogComponent {
-  private readonly i18nService = inject(I18nService);
-  readonly agentCount = input(0);
+  private readonly catalog = inject(ModelCatalogService);
+  private readonly codexCatalog = inject(CodexModelCatalogService);
   readonly claudeCount = input(0);
   readonly codexCount = input(0);
   readonly profiles = input<ModelProfile[]>([]);
   readonly busy = input(false);
-  /** Name of the single terminal being switched; empty for a batch switch. */
   readonly singleTerminalName = input('');
-  /** Fixes the agent type, hiding the tabs when the target terminal already decides it. */
   readonly lockedAgentType = input<AgentProtocol | null>(null);
-  /** Profile already running in a single terminal; it remains visible but cannot be selected. */
   readonly currentProfileId = input('');
+  readonly currentModel = input('');
+  readonly accountId = input('');
+  readonly directory = input('');
+  readonly preferredProfileId = input('');
   readonly confirmed = output<ModelSwitchValue>();
   readonly cancelled = output<void>();
-  readonly settingsRequested = output<void>();
-  readonly selectedProfileId = signal('');
+  readonly settingsRequested = output<{ profileId: string; choice: string }>();
   protected readonly agentTypeValue = signal<AgentProtocol>('claude');
   readonly agentType = computed(() => this.lockedAgentType() ?? this.agentTypeValue());
-  protected readonly selectedAgent = computed<AgentProtocol>(() => this.agentType());
-
-  /** Only profiles switched on for the agent being changed can be offered. */
+  protected readonly agentLabel = computed(() =>
+    this.agentType() === 'claude' ? 'Claude Code' : 'Codex CLI',
+  );
+  protected readonly targetCount = computed(() =>
+    this.lockedAgentType()
+      ? 1
+      : this.agentType() === 'codex'
+        ? this.codexCount()
+        : this.claudeCount(),
+  );
+  protected readonly officialPrefix = OFFICIAL_MODEL_PREFIX;
   protected readonly filteredProfiles = computed(() =>
-    this.profiles().filter((profile) => profileServes(profile, this.selectedAgent())),
+    this.profiles().filter((p) => profileServes(p, this.agentType())),
   );
-  protected readonly switchableProfiles = computed(() =>
-    this.filteredProfiles().filter((profile) => profile.id !== this.currentProfileId()),
+  protected readonly choice = linkedSignal({
+    source: () => ({ preferred: this.preferredProfileId(), agent: this.agentType() }),
+    computation: ({ preferred }) => preferred,
+  });
+  private readonly codexModels = signal<{ id: string; name: string }[]>([]);
+  protected readonly catalogNotice = signal('');
+  protected readonly officialModels = computed(() =>
+    this.agentType() === 'claude'
+      ? this.catalog.choices('Anthropic', 'claude')
+      : this.codexModels(),
   );
-  protected readonly resolvedProfileId = computed(() => {
-    const profiles = this.switchableProfiles();
-    const selected = this.selectedProfileId();
+  protected readonly selectedProfile = computed(() =>
+    this.filteredProfiles().find((p) => p.id === this.choice()),
+  );
+  protected readonly settingsProfileId = computed(() => {
+    const profiles = this.filteredProfiles();
     return (
-      profiles.find((profile) => profile.id === selected)?.id ||
-      profiles.find((profile) => profile.isDefault)?.id ||
-      profiles[0]?.id ||
+      this.selectedProfile()?.id ??
+      profiles.find((p) => p.id === this.currentProfileId())?.id ??
+      profiles.find((p) => p.isDefault)?.id ??
+      profiles[0]?.id ??
       ''
     );
   });
-  protected readonly description = computed(() => {
-    // A single-terminal switch names the terminal, so the scope is unmistakable.
-    const name = this.singleTerminalName();
-    if (name) {
-      return this.i18nService.t('terminal.switchOneTitle', { name });
-    }
-    return this.agentType() === 'codex'
-      ? this.i18n('modelSwitch.codexDescription')
-      : this.i18n('modelSwitch.description');
+  protected readonly requiresKey = computed(() => {
+    const profile = this.selectedProfile();
+    return !!profile && this.missingKey(profile);
   });
-  protected readonly emptyTitle = computed(() => {
-    if (this.agentType() === 'codex') {
-      return this.i18n('modelSwitch.codexEmpty');
-    }
-    return this.i18n('modelSwitch.empty');
-  });
-  protected readonly emptyDescription = computed(() => {
-    if (this.agentType() === 'codex') {
-      return this.i18n('modelSwitch.codexEmptyHelp');
-    }
-    return this.i18n('modelSwitch.emptyHelp');
+  protected readonly canConfirm = computed(() => {
+    const choice = this.choice();
+    if (this.busy() || !this.targetCount() || !choice || this.isCurrent(choice)) return false;
+    const native = officialModelId(choice);
+    return (
+      !!this.selectedProfile() ||
+      native === '' ||
+      this.officialModels().some((m) => m.id === native)
+    );
   });
 
-  protected confirm(): void {
-    const profileId = this.resolvedProfileId();
-    if (!profileId) {
-      return;
+  constructor() {
+    effect((onCleanup) => {
+      this.catalogNotice.set('');
+      if (this.agentType() !== 'codex') return;
+      this.codexModels.set([]);
+      // A batch may use different accounts. Only the default is common to all of them.
+      if (!this.lockedAgentType()) return;
+      let active = true;
+      onCleanup(() => {
+        active = false;
+      });
+      this.catalogNotice.set('launch.loadingModels');
+      void this.codexCatalog.load(this.accountId(), this.directory()).then(
+        (result) => {
+          if (!active) return;
+          this.codexModels.set(
+            result.models.map((m) => ({ id: m.id, name: m.displayName || m.id })),
+          );
+          this.catalogNotice.set('');
+        },
+        () => {
+          if (active) this.catalogNotice.set('modelSwitch.catalogUnavailable');
+        },
+      );
+    });
+  }
+
+  protected isCurrent(choice: string): boolean {
+    if (!this.lockedAgentType()) return false;
+    const native = officialModelId(choice);
+    if (native !== undefined) {
+      return matchesRunningModel(
+        this.currentProfileId(),
+        this.currentModel(),
+        CLI_NATIVE_PROFILE_ID,
+        native,
+      );
     }
-    this.confirmed.emit({ profileId, agent: this.selectedAgent() });
+    const profile = this.filteredProfiles().find((item) => item.id === choice);
+    return (
+      !!profile &&
+      matchesRunningModel(
+        this.currentProfileId(),
+        this.currentModel(),
+        profile.id,
+        this.modelOf(profile),
+      )
+    );
   }
 
   protected modelOf(profile: ModelProfile): string {
-    return profileModel(profile, this.selectedAgent());
+    return profileModel(profile, this.agentType());
   }
 
-  protected profileTone(provider: string): string {
-    const tones: Record<string, string> = {
-      Anthropic: '#d97757',
-      ChatGPT: '#10a37f',
-      DeepSeek: '#4d6bfe',
-      MiniMax: '#7f68dc',
-      GLM: '#58c7a0',
-    };
-    return tones[provider] ?? '#68a9e8';
+  protected missingKey(profile: ModelProfile): boolean {
+    return needsCredential(profile, this.agentType());
   }
 
-  private i18n(key: string): string {
-    return this.i18nService.t(key);
+  protected openSettings(): void {
+    this.settingsRequested.emit({ profileId: this.settingsProfileId(), choice: this.choice() });
+  }
+
+  protected confirm(): void {
+    if (!this.canConfirm()) return;
+    if (this.requiresKey()) {
+      this.openSettings();
+      return;
+    }
+    const model = officialModelId(this.choice());
+    if (model !== undefined) {
+      this.confirmed.emit({
+        agent: this.agentType(),
+        profileId: CLI_NATIVE_PROFILE_ID,
+        model: model || undefined,
+      });
+    } else {
+      this.confirmed.emit({ agent: this.agentType(), profileId: this.choice() });
+    }
   }
 }

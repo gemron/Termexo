@@ -249,7 +249,7 @@ async function seedDemoWorkspace(page) {
     },
   );
   await page.reload({ waitUntil: 'domcontentloaded' });
-  await page.getByRole('toolbar', { name: '工作区工具' }).waitFor();
+  await page.getByTestId('new-terminal-menu').waitFor();
   await page.waitForTimeout(SETTLE_MS);
 
   // A fresh database ships with sample workspaces whose paths do not exist on disk. Selecting
@@ -292,23 +292,12 @@ async function resetToTerminalView(page) {
   await page.waitForTimeout(SETTLE_MS / 2);
 }
 
-/**
- * 终端 and 任务 are two separate view buttons, not one toggle: clicking 任务 while the board is
- * already open leaves it open. Switching views therefore has to name the view it wants.
- * The 终端 name is anchored so it does not also match 新建终端.
- */
 async function showTerminalView(page) {
   const kanban = page.getByTestId('task-kanban');
   if (!(await kanban.isVisible().catch(() => false))) {
     return;
   }
-  // The open board lays a .board-backdrop over the workbench, and that backdrop swallows the
-  // click aimed at the 终端 tab. Dispatching the click on the element itself gets past it.
-  await page
-    .locator('[role="toolbar"] button')
-    .filter({ hasText: /^终端$/ })
-    .first()
-    .evaluate((button) => button.click());
+  await page.locator('.tab-strip [id^="terminal-tab-"]').first().click();
   await kanban.waitFor({ state: 'hidden', timeout: VIEW_SWITCH_TIMEOUT_MS });
 }
 
@@ -317,6 +306,7 @@ async function showTaskBoard(page) {
   if (await kanban.isVisible().catch(() => false)) {
     return;
   }
+  await page.getByTestId('new-terminal-menu').click();
   await page.getByTestId('task-board-toggle').click();
   await kanban.waitFor({ timeout: VIEW_SWITCH_TIMEOUT_MS });
 }
@@ -328,8 +318,7 @@ function visibleTerminalPanel(page) {
 
 /** Task board: record a task, run it as a real Agent terminal, then accept the result. */
 async function recordTaskBoardScene(page, recorder) {
-  const boardToggle = page.getByTestId('task-board-toggle');
-  await boardToggle.click();
+  await showTaskBoard(page);
   await page.getByTestId('task-kanban').waitFor();
   await page.waitForTimeout(READING_PAUSE_MS);
 
@@ -442,8 +431,9 @@ async function recordWorkbenchScene(page) {
 
 /** Session centre: search across native sessions and resume one. */
 async function recordSessionCenterScene(page) {
-  await page.getByRole('button', { name: '恢复', exact: true }).click();
-  const dialog = page.getByRole('dialog', { name: 'Agent 会话中心' });
+  await page.getByTestId('new-terminal-menu').click();
+  await page.getByTestId('session-center-open').click();
+  const dialog = page.locator('#workspace-tool-panel-sessions');
   await dialog.waitFor();
 
   // The scan reads native transcripts off disk; showing the spinner is not the point of the clip.
@@ -463,16 +453,17 @@ async function recordSessionCenterScene(page) {
   await page.mouse.wheel(0, -SESSION_LIST_SCROLL_PIXELS);
   await page.waitForTimeout(READING_PAUSE_MS);
 
-  await dialog.getByRole('button', { name: '关闭' }).first().click();
+  await page.locator('#workspace-tool-tab-sessions + .tab-close').click();
 }
 
 /** Settings: the model and provider profiles that back the switching workflow. */
 async function recordModelProfileScene(page) {
-  await page.getByRole('button', { name: '设置', exact: true }).click();
-  const dialog = page.getByRole('dialog', { name: 'Agent 与开发环境设置' });
+  await page.getByTestId('overflow-menu').click();
+  await page.getByTestId('settings-open').click();
+  const dialog = page.getByRole('dialog', { name: '设置', exact: true });
   await dialog.waitFor();
   await page.waitForTimeout(SETTLE_MS);
-  await dialog.getByRole('button', { name: '模型 Profile' }).click();
+  await dialog.getByRole('button', { name: '模型配置' }).click();
   await page.waitForTimeout(READING_PAUSE_MS * 2);
   await dialog.getByRole('button', { name: '网络与 npm', exact: true }).click();
   await page.waitForTimeout(READING_PAUSE_MS);

@@ -1,4 +1,4 @@
-import { Component, DestroyRef, HostListener, inject, input, output, signal } from '@angular/core';
+import { Component, DestroyRef, inject, input, output, signal } from '@angular/core';
 
 import { registerFullscreenTranslations } from '../../core/i18n/fullscreen.i18n';
 import { I18nService } from '../../core/i18n/i18n.service';
@@ -10,200 +10,155 @@ import {
   watchPageFullscreen,
 } from '../../core/services/page-fullscreen';
 import { runtimeMode } from '../../core/services/tauri-runtime';
+import { AnchoredMenuDirective } from '../anchored-menu.directive';
 import { IconComponent } from '../icon/icon';
 import { LanguageSelectorComponent } from '../language-selector/language-selector';
+import { RemoteAccessButtonComponent } from '../remote-access-button';
+import { RemoteHostsButtonComponent } from '../remote-hosts-button';
+import { ThirdPartyNotificationsToggleComponent } from '../third-party-notifications-toggle';
 
 registerFullscreenTranslations();
 
-/**
- * Stands in for the tools at the right of the topbar while the window is phone width.
- *
- * Those tools plus the toolbar are wider than a phone, and the bar answers that by scrolling
- * sideways — which hides whatever ends up past its right edge, new terminal included, behind a
- * gesture nothing hints at. Every tool folded in here is occasional, so a tap to reach them buys
- * the room the frequent controls need.
- *
- * Loaded only at phone width, which is also why the styles carry no media query: the desktop bar
- * never renders this.
- */
 @Component({
   selector: 'app-topbar-overflow-menu',
-  imports: [IconComponent, LanguageSelectorComponent, TranslatePipe],
+  imports: [
+    AnchoredMenuDirective,
+    IconComponent,
+    LanguageSelectorComponent,
+    RemoteAccessButtonComponent,
+    RemoteHostsButtonComponent,
+    ThirdPartyNotificationsToggleComponent,
+    TranslatePipe,
+  ],
   template: `
-    <div class="overflow-anchor">
+    <div class="overflow-anchor" (focusout)="closeOnFocusOut($event)">
       <button
+        #trigger
         type="button"
         class="overflow-trigger"
         data-testid="overflow-menu"
         [class.active]="open()"
         [attr.aria-expanded]="open()"
-        aria-haspopup="menu"
+        [attr.aria-controls]="open() ? 'app-tools-panel' : null"
+        aria-haspopup="dialog"
         [title]="'workspace.moreTools' | t"
         [attr.aria-label]="'workspace.moreTools' | t"
         (click)="open.set(!open())"
       >
-        <app-icon name="more" [size]="15" />
+        <app-icon name="more" [size]="16" />
       </button>
 
       @if (open()) {
-        <!--
-          Opens over the topbar, so it opts out of the drag region it sits in. Closing on the
-          container covers every item without repeating it on each one.
-        -->
         <div
+          id="app-tools-panel"
           class="overflow-menu"
-          role="menu"
+          role="dialog"
+          [attr.aria-label]="'workspace.moreTools' | t"
           data-tauri-drag-region="false"
-          (click)="open.set(false)"
+          [appAnchoredMenu]="trigger"
+          (dismissed)="open.set(false)"
         >
-          @if (showInspector()) {
-            <button type="button" role="menuitem" (click)="inspectorToggled.emit()">
-              <span><app-icon name="panel-right-open" [size]="14" /></span>
-              <strong>{{
-                (inspectorOpen() ? 'inspector.collapse' : 'inspector.expand') | t
-              }}</strong>
-            </button>
+          <button type="button" data-testid="settings-open" (click)="close(trigger); settingsOpened.emit()">
+            <app-icon name="settings" [size]="15" />
+            {{ 'workspace.settings' | t }}
+          </button>
+          @if (localApp) {
+            <app-remote-hosts-button (opened)="close(trigger); remoteHostsOpened.emit()" />
           }
-          <button type="button" role="menuitem" (click)="sessionCenterOpened.emit()">
-            <span><app-icon name="history" [size]="14" /></span>
-            <strong>{{ 'terminal.sessionCenter' | t }}</strong>
-          </button>
-          <button type="button" role="menuitem" (click)="settingsOpened.emit()">
-            <span><app-icon name="settings" [size]="14" /></span>
-            <strong>{{ 'workspace.settings' | t }}</strong>
-          </button>
-          <button type="button" role="menuitem" (click)="remoteAccessOpened.emit()">
-            <span><app-icon name="devices" [size]="14" /></span>
-            <strong>{{ 'settings.tabRemote' | t }}</strong>
-          </button>
-          @if (fullscreenAvailable) {
-            <button
-              type="button"
-              role="menuitem"
-              data-testid="fullscreen-toggle"
-              (click)="toggleFullscreen()"
-            >
-              <span><app-icon [name]="fullscreen() ? 'minimize' : 'maximize'" [size]="14" /></span>
-              <strong>{{ (fullscreen() ? 'fullscreen.exit' : 'fullscreen.enter') | t }}</strong>
-            </button>
-          }
-          <!--
-            A native select, so it takes the row shape without borrowing the button rule, and it
-            brings its own icon — hence no chip of its own, only the indent that lines the label
-            up with the ones above. It is kept from the container's close-on-click: the tap that
-            opens the native picker would otherwise remove the menu, and the picker with it, before
-            a language could be chosen.
-          -->
-          <label class="menu-row" (click)="$event.stopPropagation()">
-            <strong>{{ 'language.label' | t }}</strong>
+          <app-remote-access-button (opened)="close(trigger); remoteAccessOpened.emit()" />
+          <app-third-party-notifications-toggle (failed)="operationFailed.emit($event)" />
+          <div class="language-row">
+            <span>{{ 'language.label' | t }}</span>
             <app-language-selector />
-          </label>
+          </div>
+
+          <div class="view-actions">
+            @if (upgradeCount() > 0) {
+              <button type="button" data-testid="model-updates-open" (click)="close(trigger); modelUpdatesOpened.emit()">
+                <app-icon name="refresh" [size]="15" />
+                {{ 'settings.newModels' | t: { count: upgradeCount() } }}
+              </button>
+            }
+            @if (showInspector()) {
+              <button type="button" (click)="close(trigger); inspectorToggled.emit()">
+                <app-icon [name]="inspectorOpen() ? 'panel-close' : 'panel-right-open'" [size]="15" />
+                {{ (inspectorOpen() ? 'inspector.collapse' : 'inspector.expand') | t }}
+              </button>
+            }
+            @if (phoneLayout() && fullscreenAvailable) {
+              <button type="button" data-testid="fullscreen-toggle" (click)="close(trigger); toggleFullscreen()">
+                <app-icon [name]="fullscreen() ? 'minimize' : 'maximize'" [size]="15" />
+                {{ (fullscreen() ? 'fullscreen.exit' : 'fullscreen.enter') | t }}
+              </button>
+            }
+          </div>
         </div>
       }
     </div>
   `,
   styles: `
-    .overflow-anchor {
-      position: relative;
+    :host {
+      display: inline-flex;
+      flex: none;
     }
 
-    /* Mirrors .window-tool in app.scss, at the touch size the phone breakpoint gives those. */
     .overflow-trigger {
       display: grid;
-      width: 32px;
-      height: 32px;
+      width: 30px;
+      height: 30px;
       place-items: center;
-      border: 0;
-      border-radius: 3px;
-      color: var(--text-muted);
-      background: transparent;
-      transition:
-        color 140ms ease,
-        background-color 140ms ease;
+      border-radius: var(--radius-field);
+      color: var(--text-secondary);
     }
 
-    .overflow-trigger:hover,
-    .overflow-trigger:focus-visible,
-    .overflow-trigger.active {
+    .overflow-trigger:is(:hover, :focus-visible, .active) {
       color: var(--text);
       background: var(--surface-2);
     }
 
-    /*
-      Fixed rather than absolute: the toolbar beside it scrolls sideways at this width, and a
-      scrolling ancestor clips an absolutely positioned descendant out of sight.
-    */
     .overflow-menu {
       position: fixed;
-      z-index: 20;
-      top: calc(var(--topbar-height) + 4px);
-      right: 8px;
-      width: 232px;
-      max-height: 80dvh;
+      inset: auto;
+      z-index: var(--z-popover);
+      display: flex;
+      width: 240px;
+      flex-direction: column;
+      gap: 2px;
       padding: 5px;
+      margin: 0;
+      overflow: auto;
       border: 1px solid var(--border-strong);
       border-radius: var(--radius-box);
+      color: var(--text-secondary);
       background: var(--surface-raised);
       box-shadow: 0 14px 35px rgb(0 0 0 / 40%);
-      overflow-y: auto;
-      animation: overflow-menu-enter 140ms ease-out;
     }
 
     .overflow-menu button,
-    .overflow-menu .menu-row {
-      display: grid;
+    .language-row {
+      display: flex;
       width: 100%;
+      min-height: 36px;
       align-items: center;
       gap: 8px;
-      padding: 7px;
-      border: 0;
+      padding: 0 8px;
       border-radius: var(--radius-field);
-      color: var(--text-secondary);
-      text-align: left;
-      background: transparent;
+      font-size: 12px;
+      text-align: start;
     }
 
-    .overflow-menu button {
-      grid-template-columns: 28px minmax(0, 1fr);
-    }
-
-    .overflow-menu button:hover {
+    .overflow-menu button:is(:hover, :focus-visible) {
+      color: var(--text);
       background: var(--surface-2);
     }
 
-    /* Set apart from the actions above it: it changes a preference rather than opening anything. */
-    .overflow-menu .menu-row {
-      grid-template-columns: minmax(0, 1fr) auto;
-      // Chip width plus its gap, so the label starts where the labels above it do.
-      padding-left: 43px;
+    .language-row {
+      justify-content: space-between;
+    }
+
+    .view-actions:not(:empty) {
+      padding-top: 4px;
       border-top: 1px solid var(--border);
-      margin-top: 3px;
-    }
-
-    .overflow-menu span {
-      display: grid;
-      width: 28px;
-      height: 28px;
-      place-items: center;
-      border-radius: var(--radius-selector);
-      background: var(--surface-2);
-    }
-
-    .overflow-menu strong {
-      font-size: 11px;
-      font-weight: 620;
-    }
-
-    @keyframes overflow-menu-enter {
-      from {
-        opacity: 0;
-        transform: translateY(-4px) scale(0.98);
-      }
-
-      to {
-        opacity: 1;
-        transform: translateY(0) scale(1);
-      }
     }
   `,
 })
@@ -211,15 +166,18 @@ export class TopbarOverflowMenuComponent {
   /** The inspector belongs to the terminal view; the other two fill the window on their own. */
   readonly showInspector = input(false);
   readonly inspectorOpen = input(false);
+  readonly phoneLayout = input(false);
+  readonly upgradeCount = input(0);
   readonly inspectorToggled = output<void>();
-  readonly sessionCenterOpened = output<void>();
   readonly settingsOpened = output<void>();
   readonly remoteAccessOpened = output<void>();
-  /** The browser refused full screen; carries the message the shell shows. */
-  readonly fullscreenFailed = output<string>();
+  readonly remoteHostsOpened = output<void>();
+  readonly modelUpdatesOpened = output<void>();
+  readonly operationFailed = output<string>();
 
   private readonly i18n = inject(I18nService);
   protected readonly open = signal(false);
+  protected readonly localApp = runtimeMode() !== 'remote';
   /**
    * A phone browser loses a strip of its height to the address bar and toolbar, which the terminal
    * needs. The desktop app is already a window of its own, and Safari on iPhone cannot take a page
@@ -240,26 +198,19 @@ export class TopbarOverflowMenuComponent {
       await togglePageFullscreen();
     } catch (error) {
       const reason = error instanceof Error ? error.message : String(error);
-      this.fullscreenFailed.emit(this.i18n.t('fullscreen.failed', { error: reason }));
+      this.operationFailed.emit(this.i18n.t('fullscreen.failed', { error: reason }));
     }
   }
 
-  /**
-   * Closes on a click outside the menu.
-   *
-   * Registered on the document rather than a backdrop so the menu also closes when the click goes
-   * to a terminal, which has no overlay to catch it. The new-terminal menu watches its own anchor
-   * the same way, so opening either one closes the other without the two being wired together.
-   */
-  @HostListener('document:pointerdown', ['$event'])
-  protected closeOnOutsideClick(event: PointerEvent): void {
-    if (this.open() && !(event.target as HTMLElement | null)?.closest('.overflow-anchor')) {
+  protected close(trigger: HTMLButtonElement): void {
+    trigger.focus({ preventScroll: true });
+    this.open.set(false);
+  }
+
+  protected closeOnFocusOut(event: FocusEvent): void {
+    const next = event.relatedTarget;
+    if (next instanceof Node && !(event.currentTarget as HTMLElement).contains(next)) {
       this.open.set(false);
     }
-  }
-
-  @HostListener('document:keydown.escape')
-  protected closeOnEscape(): void {
-    this.open.set(false);
   }
 }

@@ -5,389 +5,81 @@
   class="app-shell bg-base-100 text-base-content"
   [class.workspace-sidebar-collapsed]="!workspaceSidebarOpen()"
   [class.inspector-collapsed]="!inspectorOpen() || workspaceView() !== 'terminal'"
-  [class.workspace-maximized]="workspaceMaximized()"
+  [class.terminal-focus-mode]="terminalFocusMode()"
+  [class.native-traffic-lights]="windowControls.nativeChrome"
   [class.is-resizing]="resizingSidebar()"
   [style.--workspace-sidebar-width.px]="workspaceSidebarWidth()"
   [style.--inspector-width.px]="inspectorWidth()"
 >
-  <!--
-    The window is undecorated, so this bar is what the user drags. `deep` makes the whole
-    subtree draggable; Tauri exempts buttons, inputs, and anything with an interactive role on
-    its own, so every control here still receives its click.
-  -->
-  <header class="topbar navbar" data-tauri-drag-region="deep">
-    <div class="topbar-lead" [class.native-traffic-lights]="windowControls.nativeChrome">
-      <div class="app-brand">
-        <span class="brand-mark" aria-hidden="true">
-          <img src="termexo-mark.svg" alt="" />
-        </span>
-        <strong>Termexo</strong>
-        @if (previewMode) {
-          <small class="preview-badge" [title]="'preview.notice' | t">{{
-            'preview.label' | t
-          }}</small>
-        }
-      </div>
-      <!-- A first run has no workspace to name, and "loading" would sit there for good. -->
-      @if (state.activeWorkspace(); as workspace) {
-        <div class="workspace-title">
-          <strong>{{ workspace.name }}</strong>
-          <button
-            type="button"
-            class="workspace-path"
-            [disabled]="!canOpenDirectory"
-            [title]="('common.openInExplorer' | t) + ': ' + workspace.projectPath"
-            [attr.aria-label]="('common.openInExplorer' | t) + ': ' + workspace.projectPath"
-            (click)="openProjectDirectory(workspace.projectPath)"
-          >
-            {{ workspace.projectPath }}
-          </button>
-        </div>
-      }
-    </div>
-
-    <div class="toolbar" role="toolbar" [attr.aria-label]="'workspace.tools' | t">
-      <!--
-        Sits ahead of the view switch, and in its own group: it opens and closes a panel rather
-        than selecting a view, so grouping it with the tabs made it read as a third view.
-        Maximizing hides the panel outright, hence the disabled state instead of a silent no-op.
-      -->
-      <div class="toolbar-actions join">
-        <button
-          type="button"
-          class="tool-button btn btn-ghost btn-sm join-item"
-          data-testid="workspace-sidebar-toggle"
-          [class.active]="workspaceSidebarOpen() && !workspaceMaximized()"
-          [attr.aria-pressed]="workspaceSidebarOpen() && !workspaceMaximized()"
-          [disabled]="workspaceMaximized()"
-          [title]="
-            workspaceMaximized()
-              ? ('workspace.sidebarMaximized' | t)
-              : ((workspaceSidebarOpen() ? 'workspace.collapseSidebar' : 'workspace.expandSidebar')
-                | t)
-          "
-          (click)="toggleWorkspaceSidebar()"
-        >
-          <app-icon
-            [name]="workspaceSidebarOpen() ? 'panel-left-close' : 'panel-left-open'"
-            [size]="14"
-          />
-          <span>{{ 'workspace.section' | t }}</span>
-        </button>
-        <button
-          type="button"
-          class="tool-button btn btn-ghost btn-sm join-item"
-          data-testid="common-actions-open"
-          [title]="'commonActions.title' | t"
-          [attr.aria-label]="'commonActions.title' | t"
-          aria-haspopup="dialog"
-          [attr.aria-expanded]="commonActionsOpen()"
-          [disabled]="!state.activeWorkspace()"
-          (click)="commonActionsOpen.set(true)"
-        >
-          <app-icon name="command" [size]="14" /><span>{{ 'commonActions.title' | t }}</span>
-          @if (commonActions.reviews()[state.activeWorkspace()?.id ?? '']) {
-            <b>{{ 'commonActions.reviewPending' | t }}</b>
-          }
-        </button>
-      </div>
-
-      <div
-        class="workspace-view-switch"
-        role="tablist"
-        [attr.aria-label]="'workspace.viewSwitch' | t"
+  @let currentWorkspace = state.activeWorkspace();
+  @let hasWorkspace = !!currentWorkspace;
+  @let windowControlsInInspector =
+    inspectorOpen() && workspaceView() === 'terminal' && !terminalFocusMode() && !phoneLayout();
+  <ng-template #nativeWindowButtons>
+    <div class="window-controls">
+      <button
+        type="button"
+        class="window-control"
+        data-testid="window-minimize"
+        [title]="'window.minimize' | t"
+        [attr.aria-label]="'window.minimize' | t"
+        (click)="minimizeWindow()"
       >
-        <button
-          type="button"
-          role="tab"
-          class="tool-button"
-          [class.active]="workspaceView() === 'terminal' || workspaceView() === 'preview'"
-          [attr.aria-selected]="workspaceView() === 'terminal' || workspaceView() === 'preview'"
-          [attr.aria-label]="'terminal.groupTerminal' | t"
-          (click)="workspaceView.set('terminal')"
-        >
-          <app-icon name="terminal" [size]="13" />
-          <span>{{ 'terminal.groupTerminal' | t }}</span>
-        </button>
-        <button
-          type="button"
-          role="tab"
-          class="tool-button"
-          data-testid="task-board-toggle"
-          [class.active]="workspaceView() === 'tasks'"
-          [attr.aria-selected]="workspaceView() === 'tasks'"
-          [attr.aria-label]="'workspace.viewTasks' | t"
-          (click)="workspaceView.set('tasks')"
-        >
-          <app-icon name="layout" [size]="13" />
-          <span>{{ 'workspace.viewTasks' | t }}</span>
-          @if (activeTodoCount() > 0) {
-            <b>{{ activeTodoCount() }}</b>
-          }
-        </button>
-
-        <button
-          type="button"
-          role="tab"
-          class="tool-button"
-          data-testid="git-view-toggle"
-          [class.active]="workspaceView() === 'git'"
-          [attr.aria-selected]="workspaceView() === 'git'"
-          aria-label="Git"
-          [disabled]="!git.overview()?.available"
-          [title]="
-            previewMode
-              ? ('preview.desktopOnly' | t)
-              : git.overview()?.available
-                ? ('git.open' | t)
-                : git.error()
-                  ? ('git.overviewFailed' | t) + ': ' + git.error()
-                  : git.loading() || !git.overview()
-                    ? ('git.detecting' | t)
-                    : ('git.unavailable' | t)
-          "
-          (click)="workspaceView.set('git')"
-        >
-          <app-icon name="git-branch" [size]="13" />
-          <span>{{ 'git.button' | t }}</span>
-          @if ((git.overview()?.changes?.length ?? 0) > 0) {
-            <b>{{ git.overview()?.changes?.length }}</b>
-          }
-        </button>
-      </div>
-
-      <div class="toolbar-actions join">
-        <!-- Low-frequency next to the view switch, so a phone reaches it from the overflow menu. -->
-        @if (!phoneLayout()) {
-          <button
-            type="button"
-            class="tool-button btn btn-ghost btn-sm join-item"
-            data-testid="session-center-open"
-            [title]="'terminal.sessionCenterHint' | t"
-            (click)="openSessionCenter()"
-          >
-            <app-icon name="history" [size]="14" />
-            <span>{{ 'terminal.sessionCenter' | t }}</span>
-          </button>
-        }
-
-        @if (globalTerminalNotices().length > 0) {
-          <span class="tool-divider"></span>
-          <div class="global-notice-anchor">
-            <button
-              type="button"
-              class="tool-button global-notice-trigger btn btn-ghost btn-sm join-item"
-              [class.active]="globalNoticeOpen()"
-              [class.has-waiting]="hasAttentionNotices()"
-              [attr.aria-expanded]="globalNoticeOpen()"
-              aria-haspopup="dialog"
-              [attr.aria-label]="'notice.global' | t"
-              [title]="'notice.globalDescription' | t"
-              (click)="globalNoticeOpen.set(!globalNoticeOpen())"
-            >
-              <app-icon name="bell" [size]="14" />
-              <span>{{ globalNoticeSummary() }}</span>
-              <b>{{ globalTerminalNotices().length }}</b>
-            </button>
-
-            @if (globalNoticeOpen()) {
-              <section
-                class="global-notice-panel"
-                role="dialog"
-                aria-modal="false"
-                data-tauri-drag-region="false"
-                [attr.aria-label]="'notice.global' | t"
-              >
-                <header>
-                  <div>
-                    <strong>{{ 'notice.global' | t }}</strong>
-                    <small>{{ 'notice.allWorkspaces' | t }}</small>
-                  </div>
-                  <div class="global-notice-actions">
-                    <button
-                      type="button"
-                      class="btn btn-ghost btn-xs"
-                      [title]="'notice.clearAllHint' | t"
-                      (click)="clearAllTerminalNotices()"
-                    >
-                      {{ 'notice.clearAll' | t }}
-                    </button>
-                    <button
-                      type="button"
-                      class="btn btn-square btn-ghost btn-xs"
-                      [attr.aria-label]="'notice.closeGlobal' | t"
-                      [title]="'common.close' | t"
-                      (click)="globalNoticeOpen.set(false)"
-                    >
-                      <app-icon name="x" [size]="13" />
-                    </button>
-                  </div>
-                </header>
-                <div class="global-notice-list">
-                  @for (
-                    notice of globalTerminalNotices();
-                    track notice.terminalId + ':' + notice.status
-                  ) {
-                    <div class="global-notice-row">
-                      <button
-                        type="button"
-                        class="global-notice-item"
-                        [attr.data-status]="notice.status"
-                        (click)="openGlobalTerminalNotice(notice)"
-                      >
-                        <i aria-hidden="true"></i>
-                        <span>
-                          <strong>{{ notice.terminalName }}</strong>
-                          <small>{{ notice.workspaceName }}</small>
-                        </span>
-                        <em>{{ statusLabel(notice.status) }}</em>
-                      </button>
-                      <button
-                        type="button"
-                        class="global-notice-clear btn btn-square btn-ghost btn-xs"
-                        [attr.aria-label]="'notice.clear' | t"
-                        [title]="'notice.clearHint' | t"
-                        (click)="clearTerminalNotice(notice)"
-                      >
-                        <app-icon name="x" [size]="12" />
-                      </button>
-                    </div>
-                  }
-                </div>
-              </section>
-            }
-          </div>
-        }
-      </div>
+        <app-icon name="window-minimize" [size]="14" />
+      </button>
+      <button
+        type="button"
+        class="window-control"
+        data-testid="window-maximize-toggle"
+        [title]="(windowControls.maximized() ? 'window.restore' : 'window.maximize') | t"
+        [attr.aria-label]="
+          (windowControls.maximized() ? 'window.restore' : 'window.maximize') | t
+        "
+        (click)="toggleWindowMaximize()"
+      >
+        <app-icon
+          [name]="windowControls.maximized() ? 'window-restore' : 'square'"
+          [size]="13"
+        />
+      </button>
+      <button
+        type="button"
+        class="window-control window-close"
+        data-testid="window-close"
+        [title]="'window.close' | t"
+        [attr.aria-label]="'window.close' | t"
+        (click)="closeWindow()"
+      >
+        <app-icon name="x" [size]="15" />
+      </button>
     </div>
-
-    <div class="window-tools">
-      <!-- Remote mode only: the page is identical to the desktop one, so the link state needs saying. -->
-      @defer (when remoteMode) {
-        <app-remote-connection-badge />
-      }
-
-      @if (phoneLayout()) {
-        <!--
-          One menu instead of the cluster below. Every tool in it is occasional, and together they
-          took enough of a phone's width to push the toolbar into a sideways scroll — which left
-          the controls that are not occasional, new terminal among them, behind an invisible
-          gesture. Maximizing is left out entirely: it hides the panels that float over the
-          workspace here, and the workspace already spans the window. Its chunk is loaded only at
-          this width, which is what keeps it out of the desktop bundle.
-        -->
-        @defer (on immediate) {
-          <app-topbar-overflow-menu
-            [showInspector]="workspaceView() === 'terminal'"
-            [inspectorOpen]="inspectorOpen()"
-            (inspectorToggled)="toggleInspector()"
-            (sessionCenterOpened)="openSessionCenter()"
-            (settingsOpened)="openSettings()"
-            (remoteAccessOpened)="openSettings('remote')"
-            (fullscreenFailed)="reportFailure($event)"
-          />
-        }
-      } @else {
-        @if (!inspectorOpen() && workspaceView() === 'terminal' && !workspaceMaximized()) {
-          <button
-            type="button"
-            class="rail-reveal"
-            data-testid="inspector-reveal"
-            [title]="'inspector.expand' | t"
-            [attr.aria-label]="'inspector.expand' | t"
-            (click)="toggleInspector()"
-          >
-            <app-icon name="panel-right-open" [size]="15" />
-          </button>
-        }
-        @defer (on immediate) {
-          <app-language-selector />
-          @if (!remoteMode) {
-            <app-remote-hosts-button (opened)="remoteHostsOpen.set(true)" />
-          }
-          <app-remote-access-button (opened)="openSettings('remote')" />
-          <app-third-party-notifications-toggle (failed)="reportFailure($event)" />
-        }
-        @if (modelCatalog.upgrades().length > 0) {
-          <button
-            type="button"
-            class="tool-button"
-            data-testid="model-updates-open"
-            (click)="openSettings('models', modelCatalog.upgrades()[0].profileId)"
-          >
-            <app-icon name="refresh" [size]="14" />
-            <span>{{ 'settings.newModels' | t: { count: modelCatalog.upgrades().length } }}</span>
-          </button>
-        }
-        <button
-          type="button"
-          class="window-tool"
-          data-testid="settings-open"
-          [title]="'workspace.settings' | t"
-          [attr.aria-label]="'workspace.settings' | t"
-          (click)="openSettings()"
-        >
-          <app-icon name="settings" [size]="15" />
-        </button>
-        <button
-          type="button"
-          class="window-tool"
-          data-testid="workspace-maximize-toggle"
-          [title]="
-            workspaceMaximized() ? ('workspace.restoreShortcut' | t) : ('workspace.maximize' | t)
-          "
-          [attr.aria-label]="
-            workspaceMaximized() ? ('workspace.restore' | t) : ('workspace.maximize' | t)
-          "
-          [class.active]="workspaceMaximized()"
-          (click)="toggleWorkspaceMaximize()"
-        >
-          <app-icon [name]="workspaceMaximized() ? 'minimize' : 'maximize'" [size]="15" />
-        </button>
-      }
-
-      @if (windowControls.available) {
-        <div class="window-controls">
-          <button
-            type="button"
-            class="window-control"
-            data-testid="window-minimize"
-            [title]="'window.minimize' | t"
-            [attr.aria-label]="'window.minimize' | t"
-            (click)="minimizeWindow()"
-          >
-            <app-icon name="window-minimize" [size]="14" />
-          </button>
-          <button
-            type="button"
-            class="window-control"
-            data-testid="window-maximize-toggle"
-            [title]="(windowControls.maximized() ? 'window.restore' : 'window.maximize') | t"
-            [attr.aria-label]="
-              (windowControls.maximized() ? 'window.restore' : 'window.maximize') | t
-            "
-            (click)="toggleWindowMaximize()"
-          >
-            <app-icon
-              [name]="windowControls.maximized() ? 'window-restore' : 'square'"
-              [size]="13"
-            />
-          </button>
-          <button
-            type="button"
-            class="window-control window-close"
-            data-testid="window-close"
-            [title]="'window.close' | t"
-            [attr.aria-label]="'window.close' | t"
-            (click)="closeWindow()"
-          >
-            <app-icon name="x" [size]="15" />
-          </button>
-        </div>
+  </ng-template>
+  <ng-template #appBrand>
+    <div class="app-brand" title="Termexo">
+      <span class="brand-mark" aria-hidden="true">
+        <img src="termexo-mark.svg" alt="" />
+      </span>
+      @if (workspaceSidebarOpen()) {
+        <strong>Termexo</strong>
       }
     </div>
-  </header>
-
+  </ng-template>
+  <ng-template #appTools>
+    @defer (on immediate) {
+      <app-topbar-overflow-menu
+        [phoneLayout]="phoneLayout()"
+        [showInspector]="phoneLayout() && workspaceView() === 'terminal' && !terminalFocusMode()"
+        [inspectorOpen]="inspectorOpen()"
+        [upgradeCount]="modelCatalog.upgrades().length"
+        (inspectorToggled)="toggleInspector()"
+        (settingsOpened)="openSettings()"
+        (remoteHostsOpened)="remoteHostsOpen.set(true)"
+        (remoteAccessOpened)="openSettings('remote')"
+        (modelUpdatesOpened)="openSettings('models', modelCatalog.upgrades().at(0)?.profileId)"
+        (operationFailed)="reportFailure($event)"
+      />
+    }
+  </ng-template>
   <!--
     On a phone both side panels float over the workspace, so this catches the tap that dismisses
     them; on wider windows they take a column of their own and no scrim is rendered.
@@ -420,6 +112,7 @@
           state.reorderWorkspace($event.workspaceId, $event.targetWorkspaceId, $event.position)
         "
         (createRequested)="createWorkspaceOpen.set(true)"
+        (collapseRequested)="toggleWorkspaceSidebar()"
         (folderCreateRequested)="state.createWorkspaceFolder($event.name, $event.parentId)"
         (folderRenameRequested)="state.renameWorkspaceFolder($event.folderId, $event.name)"
         (folderDeleteRequested)="state.deleteWorkspaceFolder($event)"
@@ -430,7 +123,14 @@
         (folderMoveRequested)="
           state.moveWorkspaceFolder($event.folderId, $event.targetFolderId, $event.position)
         "
-      />
+      >
+        <div class="sidebar-brand" workspace-brand>
+          <ng-container *ngTemplateOutlet="appBrand" />
+        </div>
+        <ng-container workspace-tools>
+          <ng-container *ngTemplateOutlet="appTools" />
+        </ng-container>
+      </app-workspace-sidebar>
     }
     <!-- Dragging an edge needs a pointer; on a phone the panel floats and is either open or not. -->
     @if (!phoneLayout()) {
@@ -444,96 +144,146 @@
     }
   }
 
-  <section class="workspace-main" [class.auxiliary-view-active]="workspaceView() === 'tasks' || workspaceView() === 'git'">
-    <div
-      class="terminal-tabs"
-      [class.view-hidden]="(workspaceView() !== 'terminal' && workspaceView() !== 'preview') || !state.activeWorkspace()"
-    >
-      <div class="tab-bar">
-        <div
-          class="tab-strip tabs tabs-border"
-          role="tablist"
-          [attr.aria-label]="'terminal.tabs' | t"
-          (wheel)="scrollTabStrip($event)"
+  <header class="terminal-tabs" data-tauri-drag-region="deep" [hidden]="terminalFocusMode()">
+    @if (!workspaceSidebarOpen()) {
+      <div class="tab-row-brand">
+        <ng-container *ngTemplateOutlet="appBrand" />
+        @let label = currentWorkspace?.name || ('workspace.section' | t);
+        @let expandLabel = ('workspace.expandSidebar' | t) + (currentWorkspace ? ' · ' + label : '');
+        <button
+          type="button"
+          class="rail-reveal workspace-reveal"
+          data-testid="workspace-sidebar-toggle"
+          aria-controls="workspace-sidebar"
+          aria-expanded="false"
+          [title]="expandLabel"
+          [attr.aria-label]="expandLabel"
+          (click)="toggleWorkspaceSidebar()"
         >
-          @for (
-            terminal of state.activeWorkspace()?.terminals ?? [];
-            track terminal.id;
-            let index = $index
-          ) {
-            <div
-              class="tab-slot"
-              draggable="true"
-              [class.dragging]="terminal.id === draggedTerminalId()"
-              [class.drop-before]="tabDropIndex() === index"
-              [class.drop-after]="tabDropIndex() === index + 1"
-              (dragstart)="startTabDrag($event, terminal.id)"
-              (dragover)="trackTabDrag($event, index)"
-              (drop)="dropTab($event)"
-              (dragend)="endTabDrag()"
-            >
-              <button
-                [id]="'terminal-tab-' + terminal.id"
-                type="button"
-                role="tab"
-                class="tab"
-                [class.active]="workspaceView() === 'terminal' && terminal.id === activeTerminalId()"
-                [class.visible]="workspaceView() === 'terminal' && isTerminalVisible(terminal.id)"
-                [attr.data-tone]="statusTone(terminal.status)"
-                [attr.data-pulse]="statusMeta(terminal.status)?.pulse ?? false"
-                [attr.aria-selected]="workspaceView() === 'terminal' && terminal.id === activeTerminalId()"
-                [title]="terminalTabTitle(terminal)"
-                (click)="selectTerminal(terminal.id)"
-                (auxclick)="closeTerminalOnMiddleClick($event, terminal.id)"
+          <app-icon name="panel-left-open" [size]="15" />
+          <span>{{ label }}</span>
+        </button>
+        <ng-container *ngTemplateOutlet="appTools" />
+      </div>
+    }
+      <div class="tab-bar">
+        @if (hasWorkspace || workspaceTools().length) {
+          <div
+            class="tab-strip tabs tabs-border"
+            role="tablist"
+            [attr.aria-label]="'terminal.tabs' | t"
+            (wheel)="scrollTabStrip($event)"
+          >
+            @for (
+              terminal of state.activeWorkspace()?.terminals ?? [];
+              track terminal.id;
+              let index = $index
+            ) {
+              <div
+                class="tab-slot"
+                draggable="true"
+                [class.dragging]="terminal.id === draggedTerminalId()"
+                [class.drop-before]="tabDropIndex() === index"
+                [class.drop-after]="tabDropIndex() === index + 1"
+                (dragstart)="startTabDrag($event, terminal.id)"
+                (dragover)="trackTabDrag($event, index)"
+                (drop)="dropTab($event)"
+                (dragend)="endTabDrag()"
               >
-                @if (terminal.status === 'COMPLETED') {
-                  <app-icon class="tab-done" name="check" [size]="12" />
-                } @else {
-                  <i [attr.data-tone]="statusTone(terminal.status)"></i>
-                }
-                <app-icon [name]="agentIcons[terminal.agentType]" [size]="12" />
-                <span>{{ terminal.name }}</span>
-              </button>
-              <button
-                type="button"
-                class="tab-close"
-                [title]="'terminal.close' | t"
-                [attr.aria-label]="'terminal.close' | t"
-                (click)="requestCloseTerminal(terminal.id, $event)"
-              >
-                <app-icon name="x" [size]="11" />
-              </button>
-            </div>
-          }
-          @for (tab of preview.workspaceTabs(); track tab.id) {
-            <div class="tab-slot">
-              <button
-                [id]="'content-preview-tab-' + tab.id"
-                type="button"
-                role="tab"
-                class="tab"
-                data-testid="content-preview-tab"
-                [class.active]="workspaceView() === 'preview' && preview.activeTab()?.id === tab.id"
-                [attr.aria-selected]="workspaceView() === 'preview' && preview.activeTab()?.id === tab.id"
-                [attr.aria-controls]="'content-preview-panel-' + tab.id"
-                [title]="tab.file()?.path || tab.url() || tab.label"
-                (click)="preview.activate(tab.id)"
-                (auxclick)="$event.button === 1 && preview.close(tab.id)"
-              ><app-icon name="folder" [size]="12" /><span>{{ tab.title() }}</span></button>
-              <button type="button" class="tab-close" [attr.aria-label]="'关闭预览：' + tab.title()" (click)="preview.close(tab.id)">
-                <app-icon name="x" [size]="11" />
-              </button>
-            </div>
-          }
-        </div>
-        <!--
-          One menu for everything a workspace can open, so a plain shell and an Agent are picked
-          the same way instead of from two neighbouring buttons that both read as "new". It lives
-          on the tab strip because that is what it adds to; from the window's own bar it read as a
-          workspace-level action and left the new terminal behind whichever view was open.
-        -->
+                <button
+                  [id]="'terminal-tab-' + terminal.id"
+                  type="button"
+                  role="tab"
+                  class="tab"
+                  [class.active]="workspaceView() === 'terminal' && terminal.id === activeTerminalId()"
+                  [class.visible]="workspaceView() === 'terminal' && isTerminalVisible(terminal.id)"
+                  [attr.data-tone]="statusTone(terminal.status)"
+                  [attr.data-pulse]="statusMeta(terminal.status)?.pulse ?? false"
+                  [attr.aria-selected]="workspaceView() === 'terminal' && terminal.id === activeTerminalId()"
+                  [title]="terminalTabTitle(terminal)"
+                  (click)="selectTerminal(terminal.id)"
+                  (auxclick)="closeTerminalOnMiddleClick($event, terminal.id)"
+                >
+                  @if (terminal.status === 'COMPLETED') {
+                    <app-icon class="tab-done" name="check" [size]="12" />
+                  } @else {
+                    <i [attr.data-tone]="statusTone(terminal.status)"></i>
+                  }
+                  <app-icon [name]="agentIcons[terminal.agentType]" [size]="12" />
+                  <span class="tab-caption">
+                    <span>{{ terminal.name }}</span>
+                    @if (terminal.id === activeTerminalId() || statusTone(terminal.status) === 'attention' ||
+                         terminal.status === 'FAILED' || terminal.status === 'RATE_LIMITED') {
+                      <small>{{ statusLabel(terminal.status) }}</small>
+                    }
+                  </span>
+                </button>
+                <button
+                  type="button"
+                  class="tab-close"
+                  [title]="'terminal.close' | t"
+                  [attr.aria-label]="'terminal.close' | t"
+                  (click)="requestCloseTerminal(terminal.id, $event)"
+                >
+                  <app-icon name="x" [size]="11" />
+                </button>
+              </div>
+            }
+            @for (tab of preview.workspaceTabs(); track tab.id) {
+              <div class="tab-slot">
+                <button
+                  [id]="'content-preview-tab-' + tab.id"
+                  type="button"
+                  role="tab"
+                  class="tab"
+                  data-testid="content-preview-tab"
+                  [class.active]="workspaceView() === 'preview' && preview.activeTab()?.id === tab.id"
+                  [attr.aria-selected]="workspaceView() === 'preview' && preview.activeTab()?.id === tab.id"
+                  [attr.aria-controls]="'content-preview-panel-' + tab.id"
+                  [title]="tab.file()?.path || tab.url() || tab.label"
+                  (click)="preview.activate(tab.id)"
+                  (auxclick)="$event.button === 1 && preview.close(tab.id)"
+                ><app-icon name="folder" [size]="12" /><span>{{ tab.title() }}</span></button>
+                <button type="button" class="tab-close" [attr.aria-label]="'关闭预览：' + tab.title()" (click)="preview.close(tab.id)">
+                  <app-icon name="x" [size]="11" />
+                </button>
+              </div>
+            }
+            @for (tab of workspaceTools(); track tab) {
+              @let info = workspaceToolTabs[tab.tool];
+              @let label = info.label | t;
+              <div class="tab-slot workspace-tool-tab">
+                <button
+                  type="button"
+                  class="tab"
+                  role="tab"
+                  [id]="'workspace-tool-tab-' + tab.tool"
+                  [attr.aria-controls]="'workspace-tool-panel-' + tab.tool"
+                  [attr.aria-selected]="workspaceView() === tab.tool"
+                  [class.active]="workspaceView() === tab.tool"
+                  [title]="label"
+                  (click)="selectWorkspaceTool(tab.tool)"
+                  (auxclick)="$event.button === 1 && closeWorkspaceTool(tab.tool)"
+                >
+                  <app-icon [name]="info.icon" [size]="13" />
+                  <span>{{ label }}</span>
+                </button>
+                <button
+                  type="button"
+                  class="tab-close"
+                  [attr.aria-label]="'common.close' | t"
+                  [title]="'common.close' | t"
+                  (click)="closeWorkspaceTool(tab.tool)"
+                >
+                  <app-icon name="x" [size]="11" />
+                </button>
+              </div>
+            }
+          </div>
+        }
         <div class="menu-anchor">
           <button
+            #newTerminalButton
             type="button"
             class="add-tab"
             data-testid="new-terminal-menu"
@@ -542,19 +292,99 @@
             aria-haspopup="menu"
             [title]="'terminal.newMenuHint' | t"
             [attr.aria-label]="'terminal.newMenu' | t"
+            [attr.aria-controls]="agentMenuOpen() ? 'new-terminal-options' : null"
+            (keydown.arrowdown)="$event.preventDefault(); agentMenuOpen.set(true)"
             (click)="agentMenuOpen.set(!agentMenuOpen())"
           >
-            <app-icon name="plus" [size]="14" />
+            <app-icon name="plus" [size]="14" /><span>{{ 'terminal.newMenu' | t }}</span>
           </button>
           @if (agentMenuOpen()) {
-            <div class="agent-menu menu rounded-box bg-base-200 shadow-xl" role="menu">
-              <app-agent-launch-options [includePreview]="true" (optionSelected)="launchAgent($event)" (previewRequested)="openProjectPreview()" />
+            <div
+              id="new-terminal-options"
+              class="agent-menu"
+              [class.with-launch-options]="!!state.activeWorkspace()"
+              role="menu"
+              [attr.aria-label]="'terminal.newMenuHint' | t"
+              [appAnchoredMenu]="newTerminalButton"
+              (dismissed)="agentMenuOpen.set(false)"
+            >
+              @if (state.activeWorkspace()) {
+                <app-agent-launch-options
+                  [includePreview]="true"
+                  (optionSelected)="newTerminalButton.focus(); launchAgent($event)"
+                  (previewRequested)="newTerminalButton.focus(); openProjectPreview()"
+                />
+              }
+              <div class="workspace-menu" role="group" aria-labelledby="workspace-menu-heading">
+                <p id="workspace-menu-heading">{{ 'workspace.section' | t }}</p>
+                <button
+                  type="button"
+                  role="menuitem"
+                  data-testid="common-actions-open"
+                  [disabled]="!state.activeWorkspace()"
+                  (click)="chooseWorkspaceAction('common-actions')"
+                >
+                  <app-icon name="command" [size]="14" />
+                  <strong>{{ 'commonActions.title' | t }}</strong>
+                  @if (commonActions.reviews()[state.activeWorkspace()?.id ?? '']) {
+                    <small>{{ 'commonActions.reviewPending' | t }}</small>
+                  }
+                </button>
+                <button
+                  type="button"
+                  role="menuitem"
+                  data-testid="task-board-toggle"
+                  [attr.aria-current]="workspaceView() === 'tasks' ? 'page' : null"
+                  [disabled]="!state.activeWorkspace()"
+                  (click)="chooseWorkspaceAction('tasks')"
+                >
+                  <app-icon name="layout" [size]="14" />
+                  <strong>{{ 'workspace.viewTasks' | t }}</strong>
+                  @if (activeTodoCount() > 0) {
+                    <small>{{ activeTodoCount() }}</small>
+                  }
+                </button>
+                <button
+                  type="button"
+                  role="menuitem"
+                  data-testid="git-view-toggle"
+                  [attr.aria-current]="workspaceView() === 'git' ? 'page' : null"
+                  [disabled]="!git.overview()?.available"
+                  [title]="
+                    previewMode
+                      ? ('preview.desktopOnly' | t)
+                      : git.overview()?.available
+                        ? ('git.open' | t)
+                        : git.error()
+                          ? ('git.overviewFailed' | t) + ': ' + git.error()
+                          : git.loading() || !git.overview()
+                            ? ('git.detecting' | t)
+                            : ('git.unavailable' | t)
+                  "
+                  (click)="chooseWorkspaceAction('git')"
+                >
+                  <app-icon name="git-branch" [size]="14" />
+                  <strong>{{ 'git.button' | t }}</strong>
+                  @if ((git.overview()?.changes?.length ?? 0) > 0) {
+                    <small>{{ git.overview()?.changes?.length }}</small>
+                  }
+                </button>
+                <button
+                  type="button"
+                  role="menuitem"
+                  data-testid="session-center-open"
+                  (click)="chooseWorkspaceAction('sessions')"
+                >
+                  <app-icon name="history" [size]="14" />
+                  <strong>{{ 'terminal.sessionCenter' | t }}</strong>
+                </button>
+              </div>
             </div>
           }
         </div>
       </div>
 
-      @if (workspaceView() === 'terminal') {
+      @if (hasWorkspace && workspaceView() === 'terminal') {
       <app-terminal-toolbar
         [visibleCount]="visibleTerminalIds().length"
         [visibleLimit]="visibleTerminalLimit()"
@@ -573,8 +403,123 @@
         (gridDimensionChange)="adjustGridDimension($event.axis, $event.delta)"
         (gridSwapRequested)="swapGridDimensions()"
       />
+      @if (!phoneLayout() && !inspectorOpen() && !terminalFocusMode()) {
+        <button
+          type="button"
+          class="rail-reveal inspector-reveal"
+          data-testid="inspector-reveal"
+          aria-controls="agent-inspector"
+          aria-expanded="false"
+          [title]="'inspector.expand' | t"
+          [attr.aria-label]="'inspector.expand' | t"
+          (click)="toggleInspector()"
+        >
+          <app-icon name="panel-right-open" [size]="15" />
+          <span>{{ 'inspector.title' | t }}</span>
+        </button>
+      }
+      }
+    @if (globalTerminalNotices().length || remoteMode || (windowControls.available && !windowControlsInInspector)) {
+    <div class="window-tools">
+      @if (globalTerminalNotices().length > 0) {
+        <div class="global-notice-anchor">
+          <button
+            type="button"
+            class="tool-button global-notice-trigger btn btn-ghost btn-sm"
+            [class.active]="globalNoticeOpen()"
+            [class.has-waiting]="hasAttentionNotices()"
+            [attr.aria-expanded]="globalNoticeOpen()"
+            aria-haspopup="dialog"
+            [attr.aria-label]="'notice.global' | t"
+            [title]="'notice.globalDescription' | t"
+            (click)="globalNoticeOpen.set(!globalNoticeOpen())"
+          >
+            <app-icon name="bell" [size]="14" />
+            <span>{{ globalNoticeSummary() }}</span>
+            <b>{{ globalTerminalNotices().length }}</b>
+          </button>
+
+          @if (globalNoticeOpen()) {
+            <section
+              class="global-notice-panel"
+              role="dialog"
+              aria-modal="false"
+              data-tauri-drag-region="false"
+              [attr.aria-label]="'notice.global' | t"
+            >
+              <header>
+                <div>
+                  <strong>{{ 'notice.global' | t }}</strong>
+                  <small>{{ 'notice.allWorkspaces' | t }}</small>
+                </div>
+                <div class="global-notice-actions">
+                  <button
+                    type="button"
+                    class="btn btn-ghost btn-xs"
+                    [title]="'notice.clearAllHint' | t"
+                    (click)="clearAllTerminalNotices()"
+                  >
+                    {{ 'notice.clearAll' | t }}
+                  </button>
+                  <button
+                    type="button"
+                    class="btn btn-square btn-ghost btn-xs"
+                    [attr.aria-label]="'notice.closeGlobal' | t"
+                    [title]="'common.close' | t"
+                    (click)="globalNoticeOpen.set(false)"
+                  >
+                    <app-icon name="x" [size]="13" />
+                  </button>
+                </div>
+              </header>
+              <div class="global-notice-list">
+                @for (
+                  notice of globalTerminalNotices();
+                  track notice.terminalId + ':' + notice.status
+                ) {
+                  <div class="global-notice-row">
+                    <button
+                      type="button"
+                      class="global-notice-item"
+                      [attr.data-status]="notice.status"
+                      (click)="openGlobalTerminalNotice(notice)"
+                    >
+                      <i aria-hidden="true"></i>
+                      <span>
+                        <strong>{{ notice.terminalName }}</strong>
+                        <small>{{ notice.workspaceName }}</small>
+                      </span>
+                      <em>{{ statusLabel(notice.status) }}</em>
+                    </button>
+                    <button
+                      type="button"
+                      class="global-notice-clear btn btn-square btn-ghost btn-xs"
+                      [attr.aria-label]="'notice.clear' | t"
+                      [title]="'notice.clearHint' | t"
+                      (click)="clearTerminalNotice(notice)"
+                    >
+                      <app-icon name="x" [size]="12" />
+                    </button>
+                  </div>
+                }
+              </div>
+            </section>
+          }
+        </div>
+      }
+      <!-- Remote mode only: the page is identical to the desktop one, so the link state needs saying. -->
+      @defer (when remoteMode) {
+        <app-remote-connection-badge />
+      }
+
+      @if (windowControls.available && !terminalFocusMode() && !windowControlsInInspector) {
+        <ng-container *ngTemplateOutlet="nativeWindowButtons" />
       }
     </div>
+    }
+  </header>
+
+  <section class="workspace-main">
 
     @if (attentionBanner(); as banner) {
       <div
@@ -615,6 +560,91 @@
     }
 
     <section class="workbench-area" [class.board-active]="workspaceView() !== 'terminal'">
+      @for (tab of workspaceTools(); track tab) {
+        <section
+          class="workspace-tool-panel"
+          role="tabpanel"
+          [id]="'workspace-tool-panel-' + tab.tool"
+          [attr.aria-labelledby]="'workspace-tool-tab-' + tab.tool"
+          [hidden]="workspaceView() !== tab.tool"
+        >
+          @switch (tab.tool) {
+            @case ('tasks') {
+              @if (state.activeWorkspace(); as activeWorkspace) {
+                @defer (on immediate) {
+                  <app-todo-board
+                    [workspace]="activeWorkspace"
+                    [terminals]="activeWorkspace.terminals"
+                    [modelProfiles]="agents.modelProfiles()"
+                    [openCodeAvailable]="agents.openCodeInstallation()?.healthy ?? false"
+                    [grokAvailable]="agents.grokInstallation()?.healthy ?? false"
+                    [piAvailable]="agents.piInstallation()?.healthy ?? false"
+                    [busyTaskId]="busyTodoTaskId()"
+                    [awaitingTerminalIds]="agentStartup.awaitingTerminalIds()"
+                    (executionRequested)="executeTodoTask($event)"
+                    (stopRequested)="stopTodoTask($event)"
+                    (resumeRequested)="resumeTodoTask($event)"
+                    (backlogRequested)="returnTodoTaskToBacklog($event)"
+                    (continuationRequested)="continueTodoTask($event)"
+                    (amendRequested)="amendTodoTask($event)"
+                    (terminalRequested)="openTodoTerminal($event)"
+                    (terminalCloseRequested)="closeTodoTerminal($event)"
+                  />
+                }
+              }
+            }
+            @case ('git') {
+              @defer (on immediate) {
+                <app-git-workbench
+                  [overview]="git.overview()"
+                  [target]="gitTarget()"
+                  [terminalName]="state.activeTerminal()?.name ?? ''"
+                  [overviewError]="git.error()"
+                  [refreshing]="git.loading()"
+                  (refreshRequested)="git.refresh()"
+                />
+              }
+            }
+            @case ('common-actions') {
+              @if (state.activeWorkspace(); as workspace) {
+                @defer (on immediate) {
+                  <app-common-actions-dialog
+                    [workspace]="workspace"
+                    (recognitionRequested)="recognizeCommonActions($event)"
+                    (terminalRequested)="openCommonActionTerminal($event)"
+                    (agentRequested)="startCommonActionAgent()"
+                    (recognitionAgentRequested)="viewCommonActionAgent($event)"
+                  />
+                }
+              }
+            }
+            @case ('sessions') {
+              @defer (on immediate) {
+                <app-session-center-dialog
+                  [installation]="agents.installation()"
+                  [codexInstallation]="agents.codexInstallation()"
+                  [openCodeInstallation]="agents.openCodeInstallation()"
+                  [grokInstallation]="agents.grokInstallation()"
+                  [piInstallation]="agents.piInstallation()"
+                  [antigravityInstallation]="agents.antigravityInstallation()"
+                  [sessions]="agents.sessions()"
+                  [profiles]="agents.modelProfiles()"
+                  [mcpProfiles]="agents.mcpProfiles()"
+                  [accountProfiles]="agents.accountProfiles()"
+                  [projectPath]="state.activeWorkspace()?.projectPath ?? ''"
+                  [busy]="
+                    agents.busy() || launchingClaude() || launchingCodex() || launchingOpenCode() || launchingPi()
+                  "
+                  [error]="agents.error()"
+                  [sessionLaunchProfiles]="sessionLaunchProfiles"
+                  (refreshed)="refreshSessions($event)"
+                  (resumed)="resumeAgent($event)"
+                />
+              }
+            }
+          }
+        </section>
+      }
       @if (state.activeWorkspace(); as activeWorkspace) {
         @defer (when preview.open()) {
           @for (tab of preview.liveTabs(); track tab.id) {
@@ -635,41 +665,6 @@
                 (pointerdown)="startSidebarResize('preview', $event)"
               ></div>
             </div>
-          }
-        }
-        @defer (when workspaceView() === 'tasks') {
-          @if (workspaceView() === 'tasks') {
-            <app-todo-board
-              [workspace]="activeWorkspace"
-              [terminals]="activeWorkspace.terminals"
-              [modelProfiles]="agents.modelProfiles()"
-              [openCodeAvailable]="agents.openCodeInstallation()?.healthy ?? false"
-              [grokAvailable]="agents.grokInstallation()?.healthy ?? false"
-              [piAvailable]="agents.piInstallation()?.healthy ?? false"
-              [busyTaskId]="busyTodoTaskId()"
-              [awaitingTerminalIds]="agentStartup.awaitingTerminalIds()"
-              (executionRequested)="executeTodoTask($event)"
-              (stopRequested)="stopTodoTask($event)"
-              (resumeRequested)="resumeTodoTask($event)"
-              (backlogRequested)="returnTodoTaskToBacklog($event)"
-              (continuationRequested)="continueTodoTask($event)"
-              (amendRequested)="amendTodoTask($event)"
-              (terminalRequested)="openTodoTerminal($event)"
-              (terminalCloseRequested)="closeTodoTerminal($event)"
-            />
-          }
-        }
-        <!-- Mounted for every state: the view draws its own waiting and failed states. -->
-        @defer (when workspaceView() === 'git') {
-          @if (workspaceView() === 'git') {
-            <app-git-workbench
-              [overview]="git.overview()"
-              [target]="gitTarget()"
-              [terminalName]="state.activeTerminal()?.name ?? ''"
-              [overviewError]="git.error()"
-              [refreshing]="git.loading()"
-              (refreshRequested)="git.refresh()"
-            />
           }
         }
         @for (workspace of mountedWorkspaces(); track workspace.id) {
@@ -694,7 +689,9 @@
                 : ''
             "
             [visibleTerminalIds]="workspace.id === activeWorkspace.id ? visibleTerminalIds() : []"
-            [terminalMaximized]="workspace.id === activeWorkspace.id && terminalMaximized()"
+            [terminalFillsLayout]="workspace.id === activeWorkspace.id && terminalFillsLayout()"
+            [focusMode]="workspace.id === activeWorkspace.id && terminalFocusMode()"
+            [windowControlsTemplate]="windowControls.available ? nativeWindowButtons : null"
             [layoutRevision]="layoutRevision()"
             [terminalFontSize]="terminalFontSize()"
             [terminalFontName]="terminalFontName()"
@@ -704,7 +701,8 @@
             [gridRows]="gridRows()"
             (terminalSelected)="selectTerminal($event)"
             (terminalClosed)="requestCloseTerminal($event.terminalId, $event.event)"
-            (terminalMaximizeRequested)="toggleTerminalMaximize($event)"
+            (terminalFocusRequested)="toggleTerminalFocus($event)"
+            (terminalLayoutFillRequested)="toggleTerminalLayoutFill($event)"
             (launchRequested)="launchAgent($event)"
             (installRequested)="installAgent($event)"
             (terminalStatusChanged)="handleTerminalStatus($event)"
@@ -721,7 +719,7 @@
             (terminalOutput)="handleTerminalOutput($event)"
           />
         }
-      } @else {
+      } @else if (workspaceView() === 'terminal') {
         <!--
           A first run has no workspace and no longer invents one, so this is what opens instead.
           Deferred: once a workspace exists it is never rendered again.
@@ -773,6 +771,7 @@
     }
     @defer (on immediate) {
       <app-inspector-panel
+        id="agent-inspector"
         [workspace]="state.activeWorkspace()"
         [activeTerminal]="state.activeTerminal()"
         [events]="agents.events()"
@@ -786,7 +785,13 @@
         (openSettingsRequested)="openSettings($event)"
         (terminalSelected)="selectTerminal($event)"
         (collapseRequested)="toggleInspector()"
-      />
+      >
+        <ng-container inspector-window-controls>
+          @if (windowControls.available && windowControlsInInspector) {
+            <ng-container *ngTemplateOutlet="nativeWindowButtons" />
+          }
+        </ng-container>
+      </app-inspector-panel>
     }
   }
 </main>
@@ -937,30 +942,6 @@
   }
 }
 
-@if (sessionCenterOpen()) {
-  <app-session-center-dialog
-    [installation]="agents.installation()"
-    [codexInstallation]="agents.codexInstallation()"
-    [openCodeInstallation]="agents.openCodeInstallation()"
-    [grokInstallation]="agents.grokInstallation()"
-    [piInstallation]="agents.piInstallation()"
-    [antigravityInstallation]="agents.antigravityInstallation()"
-    [sessions]="agents.sessions()"
-    [profiles]="agents.modelProfiles()"
-    [mcpProfiles]="agents.mcpProfiles()"
-    [accountProfiles]="agents.accountProfiles()"
-    [projectPath]="state.activeWorkspace()?.projectPath ?? ''"
-    [busy]="
-      agents.busy() || launchingClaude() || launchingCodex() || launchingOpenCode() || launchingPi()
-    "
-    [error]="agents.error()"
-    [sessionLaunchProfiles]="sessionLaunchProfiles"
-    (refreshed)="refreshSessions($event)"
-    (resumed)="resumeAgent($event)"
-    (cancelled)="sessionCenterOpen.set(false)"
-  />
-}
-
 @defer (when remoteHostsOpen()) {
   @if (remoteHostsOpen()) {
     <app-remote-hosts-dialog (cancelled)="remoteHostsOpen.set(false)" />
@@ -1035,6 +1016,7 @@
       [initialTab]="settingsInitialTab()"
       [initialCliAgent]="settingsInitialCliAgent()"
       [initialModelProfileId]="settingsInitialModelProfileId()"
+      [switchAgent]="modelSwitchOpen() ? modelSwitchAgentType() : null"
       [networkTestResult]="networkTestResult()"
       [busy]="agents.busy() || profileSaving() || profileDeleting()"
       [saving]="profileSaving()"
@@ -1068,17 +1050,20 @@
   }
 }
 
-@if (modelSwitchOpen()) {
+@if (modelSwitchOpen() && !settingsOpen()) {
   <app-model-switch-dialog
-    [agentCount]="state.agentCountFor('claude')"
     [claudeCount]="state.claudeTerminalCount()"
     [codexCount]="state.codexTerminalCount()"
     [profiles]="agents.modelProfiles()"
     [busy]="launchingClaude() || launchingCodex()"
-    [singleTerminalName]="modelSwitchTerminalName()"
+    [singleTerminalName]="modelSwitchTerminal()?.name ?? ''"
     [lockedAgentType]="modelSwitchAgentType()"
-    [currentProfileId]="modelSwitchCurrentProfileId()"
-    (settingsRequested)="openSettings('models')"
+    [currentProfileId]="modelSwitchTerminal()?.profileId ?? ''"
+    [currentModel]="modelSwitchTerminal()?.model ?? ''"
+    [accountId]="modelSwitchTerminal()?.accountProfileId ?? ''"
+    [directory]="modelSwitchTerminal()?.workingDirectory ?? ''"
+    [preferredProfileId]="switchSettingsProfile()"
+    (settingsRequested)="openSwitchSettings($event.profileId, $event.choice)"
     (confirmed)="switchModels($event)"
     (cancelled)="closeModelSwitch()"
   />
@@ -1149,20 +1134,6 @@
 }
 
 
-@defer (when commonActionsOpen()) {
-  @if (commonActionsOpen()) {
-    @if (state.activeWorkspace(); as workspace) {
-      <app-common-actions-dialog
-        [workspace]="workspace"
-        (closed)="commonActionsOpen.set(false)"
-        (recognitionRequested)="recognizeCommonActions($event)"
-        (terminalRequested)="openCommonActionTerminal($event)"
-        (agentRequested)="startCommonActionAgent()"
-        (recognitionAgentRequested)="viewCommonActionAgent($event)"
-      />
-    }
-  }
-}
 
 }
 

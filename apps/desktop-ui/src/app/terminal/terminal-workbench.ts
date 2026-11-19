@@ -1,4 +1,4 @@
-import { Component, computed, input, output } from '@angular/core';
+import { Component, computed, input, output, type TemplateRef } from '@angular/core';
 
 import { AccountProfile, ManagedAgentType, terminalAccountName } from '../core/models/agent.models';
 import { terminalCommonAction, type CommonActionTerminalRequest } from '../core/models/common-action';
@@ -35,7 +35,9 @@ export class TerminalWorkbenchComponent {
   readonly activeTerminalId = input<string | null>(null);
   readonly activeGitBranch = input('');
   readonly visibleTerminalIds = input<string[]>([]);
-  readonly terminalMaximized = input(false);
+  readonly terminalFillsLayout = input(false);
+  readonly focusMode = input(false);
+  readonly windowControlsTemplate = input<TemplateRef<unknown> | null>(null);
   readonly layoutRevision = input(0);
   readonly terminalFontSize = input(12);
   readonly terminalFontName = input(DEFAULT_TERMINAL_FONT_NAME);
@@ -47,7 +49,8 @@ export class TerminalWorkbenchComponent {
 
   readonly terminalSelected = output<string>();
   readonly terminalClosed = output<TerminalCloseRequest>();
-  readonly terminalMaximizeRequested = output<string>();
+  readonly terminalFocusRequested = output<string>();
+  readonly terminalLayoutFillRequested = output<string>();
   /** Which of the empty state's launch options was picked; the host opens it. */
   readonly launchRequested = output<AgentType>();
   readonly installRequested = output<ManagedAgentType>();

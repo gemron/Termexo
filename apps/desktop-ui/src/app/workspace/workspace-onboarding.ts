@@ -1,3 +1,4 @@
+import { NgTemplateOutlet } from '@angular/common';
 import { Component, computed, inject, input, output } from '@angular/core';
 
 import { registerOnboardingTranslations } from '../core/i18n/onboarding.i18n';
@@ -9,17 +10,15 @@ import {
   type AgentType,
   type Workspace,
 } from '../core/models/workspace.models';
-import { AgentService } from '../core/services/agent.service';
+import { agentReadiness, AgentService } from '../core/services/agent.service';
 import { hasBackend, isTauriRuntime } from '../core/services/tauri-runtime';
 import { IconComponent } from '../shared/icon/icon';
 
 registerOnboardingTranslations();
 
-type Readiness = 'checking' | 'ready' | 'missing' | 'unhealthy' | 'error';
-
 @Component({
   selector: 'app-workspace-onboarding',
-  imports: [IconComponent, TranslatePipe],
+  imports: [IconComponent, NgTemplateOutlet, TranslatePipe],
   templateUrl: './workspace-onboarding.html',
   styleUrl: './workspace-onboarding.scss',
 })
@@ -46,16 +45,7 @@ export class WorkspaceOnboardingComponent {
       .map((type) => {
         const installation = installations[type];
         const detection = this.agents.detectionStates()[type];
-        const status: Readiness =
-          detection?.status === 'error'
-            ? 'error'
-            : detection?.status === 'checking' || !installation
-              ? 'checking'
-              : installation.healthy
-                ? 'ready'
-                : installation.installed
-                  ? 'unhealthy'
-                  : 'missing';
+        const status = agentReadiness(installation, detection);
         return {
           type,
           name: AGENT_LABELS[type],
@@ -72,8 +62,11 @@ export class WorkspaceOnboardingComponent {
       })
       .sort((left, right) => Number(right.status === 'ready') - Number(left.status === 'ready'));
   });
-  protected readonly readyCount = computed(
-    () => this.agentRows().filter((row) => row.status === 'ready').length,
+  protected readonly readyRows = computed(() =>
+    this.agentRows().filter((row) => row.status === 'ready'),
+  );
+  protected readonly otherRows = computed(() =>
+    this.agentRows().filter((row) => row.status !== 'ready'),
   );
   protected readonly checking = computed(() =>
     this.agentRows().some((row) => row.status === 'checking'),

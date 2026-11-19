@@ -2,8 +2,10 @@ import { Component, computed, inject, input, output } from '@angular/core';
 
 import { I18nService } from '../../core/i18n/i18n.service';
 import { AgentInstallation, ManagedAgentType } from '../../core/models/agent.models';
-import { AGENT_ICONS, AgentType } from '../../core/models/workspace.models';
-import { AgentService } from '../../core/services/agent.service';
+import { AGENT_ICONS, AGENT_LABELS, AgentType } from '../../core/models/workspace.models';
+import { agentReadiness, AgentService } from '../../core/services/agent.service';
+import { hasBackend } from '../../core/services/tauri-runtime';
+import { TranslatePipe } from '../../core/i18n/translate.pipe';
 import { IconComponent } from '../icon/icon';
 
 /**
@@ -25,16 +27,9 @@ interface AgentLaunchGroup {
   readonly options: AgentLaunchOption[];
 }
 
-/**
- * Everything a workspace can open, in one list.
- *
- * Shared by the tab strip's new-terminal menu and the empty workspace, so a workspace with no
- * terminals offers the same three Agents as one that already has tabs — its button used to open a
- * plain Shell and left starting an Agent to a menu the user had not found yet.
- */
 @Component({
   selector: 'app-agent-launch-options',
-  imports: [IconComponent],
+  imports: [IconComponent, TranslatePipe],
   template: `
     <div class="launch-options" [attr.data-variant]="variant()">
       @for (group of groups(); track group.title) {
@@ -51,15 +46,25 @@ interface AgentLaunchGroup {
             /></span>
             <div>
               <strong>{{ option.title }}</strong>
-              <small>{{ option.hint }}</small>
+              @if (option.hint) {
+                <small>{{ option.hint }}</small>
+              }
             </div>
           </button>
         }
       }
       @if (includePreview()) {
-        <button type="button" [attr.role]="variant() === 'menu' ? 'menuitem' : null" data-action="preview" (click)="previewRequested.emit()">
+        <button
+          type="button"
+          [attr.role]="variant() === 'menu' ? 'menuitem' : null"
+          data-action="preview"
+          (click)="previewRequested.emit()"
+        >
           <span data-tone="slate"><app-icon name="folder" [size]="14" /></span>
-          <div><strong>内容预览</strong><small>文件、网页、图片与文档</small></div>
+          <div>
+            <strong>{{ 'terminal.openPreview' | t }}</strong
+            ><small>{{ 'terminal.previewHint' | t }}</small>
+          </div>
         </button>
       }
     </div>
@@ -84,7 +89,7 @@ interface AgentLaunchGroup {
       grid-template-columns: 28px minmax(0, 1fr);
       align-items: center;
       gap: 8px;
-      padding: 7px;
+      padding: 8px;
       border: 0;
       border-radius: var(--radius-field);
       color: var(--text-secondary);
@@ -138,14 +143,16 @@ interface AgentLaunchGroup {
     }
 
     strong {
-      font-size: 11px;
+      overflow-wrap: anywhere;
+      font-size: 12px;
       font-weight: 620;
     }
 
     small {
+      overflow-wrap: anywhere;
       margin-top: 3px;
       color: var(--text-muted);
-      font: 9px/1.25 var(--mono);
+      font: 11px/1.35 var(--sans);
     }
 
     /* Separates the plain terminal from the Agents without spending a divider rule on it. */
@@ -169,89 +176,67 @@ interface AgentLaunchGroup {
 export class AgentLaunchOptionsComponent {
   private readonly agents = inject(AgentService);
   private readonly i18n = inject(I18nService);
+  private readonly preview = !hasBackend();
 
   readonly variant = input<AgentLaunchOptionsVariant>('menu');
   readonly includePreview = input(false);
   readonly previewRequested = output<void>();
   readonly optionSelected = output<AgentType>();
 
-  protected readonly groups = computed<AgentLaunchGroup[]>(() => [
-    {
-      title: this.i18n.t('terminal.groupAgent'),
-      options: [
-        {
-          type: 'claude',
-          title: 'Claude Code',
-          hint: this.installationLabel('claude', this.agents.installation()),
-          icon: AGENT_ICONS.claude,
-          tone: 'green',
-        },
-        {
-          type: 'codex',
-          title: 'Codex CLI',
-          hint: this.installationLabel('codex', this.agents.codexInstallation()),
-          icon: AGENT_ICONS.codex,
-          tone: 'blue',
-        },
-        {
-          type: 'opencode',
-          title: 'OpenCode',
-          hint: this.installationLabel('opencode', this.agents.openCodeInstallation()),
-          icon: AGENT_ICONS.opencode,
-          tone: 'amber',
-        },
-        {
-          type: 'pi',
-          title: 'Pi Agent',
-          hint: this.installationLabel('pi', this.agents.piInstallation()),
-          icon: AGENT_ICONS.pi,
-          tone: 'purple',
-        },
-        {
-          type: 'grok',
-          title: 'Grok Build',
-          hint: this.installationLabel('grok', this.agents.grokInstallation()),
-          icon: AGENT_ICONS.grok,
-          tone: 'blue',
-        },
-        {
-          type: 'antigravity',
-          title: 'Antigravity',
-          hint: this.installationLabel('antigravity', this.agents.antigravityInstallation()),
-          icon: AGENT_ICONS.antigravity,
-          tone: 'purple',
-        },
-      ],
-    },
-    {
-      title: this.i18n.t('terminal.groupTerminal'),
-      options: [
-        {
-          type: 'shell',
-          title: 'Shell',
-          hint: this.i18n.t('terminal.shellHint'),
-          icon: AGENT_ICONS.shell,
-          tone: 'slate',
-        },
-      ],
-    },
-  ]);
+  protected readonly groups = computed<AgentLaunchGroup[]>(() => {
+    const installations: Record<ManagedAgentType, AgentInstallation | null> = {
+      claude: this.agents.installation(),
+      codex: this.agents.codexInstallation(),
+      opencode: this.agents.openCodeInstallation(),
+      pi: this.agents.piInstallation(),
+      grok: this.agents.grokInstallation(),
+      antigravity: this.agents.antigravityInstallation(),
+    };
+    const tones: Record<ManagedAgentType, string> = {
+      claude: 'green',
+      codex: 'blue',
+      opencode: 'amber',
+      pi: 'purple',
+      grok: 'blue',
+      antigravity: 'purple',
+    };
+    const agents = (Object.keys(installations) as ManagedAgentType[])
+      .map((type) => {
+        const installation = installations[type];
+        const detection = this.agents.detectionStates()[type];
+        const status = agentReadiness(installation, detection);
+        const hint = this.preview ? '' : this.i18n.t('launcher.' + status);
+        return {
+          type,
+          title: AGENT_LABELS[type],
+          icon: AGENT_ICONS[type],
+          tone: tones[type],
+          ready: status === 'ready',
+          hint:
+            hint && status === 'ready' && installation?.version
+              ? hint + ' · ' + installation.version
+              : hint,
+        };
+      })
+      .sort((a, b) => Number(b.ready) - Number(a.ready));
 
-  /**
-   * What each Agent shows under its name: its version when the CLI is usable, and otherwise why it
-   * is not. One reading for all three, so a missing CLI is visible before the user picks it rather
-   * than after the launch dialog opens.
-   */
-  private installationLabel(
-    type: ManagedAgentType,
-    installation: AgentInstallation | null,
-  ): string {
-    const detection = this.agents.detectionStates()[type];
-    if (detection?.status === 'error') return detection.message;
-    if (detection?.status === 'checking' || !installation) return this.i18n.t('common.loading');
-    if (!installation.healthy) {
-      return this.i18n.t('common.notDetected');
-    }
-    return installation.version ?? this.i18n.t('common.connected');
-  }
+    return [
+      {
+        title: this.i18n.t(this.preview ? 'launcher.previewGroup' : 'terminal.groupAgent'),
+        options: agents,
+      },
+      {
+        title: this.i18n.t('terminal.groupTerminal'),
+        options: [
+          {
+            type: 'shell',
+            title: this.i18n.t('terminal.plainShell'),
+            hint: this.i18n.t('terminal.shellHint'),
+            icon: AGENT_ICONS.shell,
+            tone: 'slate',
+          },
+        ],
+      },
+    ];
+  });
 }

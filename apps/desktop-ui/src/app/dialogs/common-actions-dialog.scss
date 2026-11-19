@@ -1,8 +1,8 @@
 .dialog.common-actions {
-  width: min(1120px, calc(100vw - 32px));
-  max-width: 1120px;
-  height: min(900px, calc(100dvh - 40px));
-  max-height: calc(100dvh - 40px);
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  box-shadow: none;
   display: flex;
   flex-direction: column;
   padding: 0;
@@ -132,7 +132,6 @@ h3 { margin: 0; font-size: 13px; font-weight: 600; }
   .actions-grid { grid-template-columns: 1fr; }
 }
 @media (max-width: 600px) {
-  .dialog.common-actions { width: calc(100vw - 16px); max-height: calc(100dvh - 16px); height: calc(100dvh - 16px); }
   .heading span { display: none; }
   .actions-toolbar { padding: 12px 10px; gap: 12px; }
   .list-tabs { width: 100%; }

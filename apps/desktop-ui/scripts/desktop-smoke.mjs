@@ -52,8 +52,8 @@ try {
     throw new Error(`unexpected document title: ${await page.title()}`);
   }
   await page.getByText('Termexo', { exact: true }).first().waitFor();
-  const toolbar = page.getByRole('toolbar', { name: '工作区工具' });
-  await toolbar.waitFor();
+  const newMenu = page.getByTestId('new-terminal-menu');
+  await newMenu.waitFor();
   const [backendInstallation, codexInstallation, codexSessions] = await page.evaluate(() =>
     Promise.all([
       window.__TAURI_INTERNALS__.invoke('detect_claude'),
@@ -86,18 +86,21 @@ try {
     throw new Error('Codex resume launch command was not prepared correctly.');
   }
 
-  await toolbar.getByRole('button', { name: '恢复', exact: true }).click();
-  const sessionDialog = page.getByRole('dialog', { name: 'Agent 会话中心' });
+  await newMenu.click();
+  await page.getByTestId('session-center-open').click();
+  const sessionDialog = page.locator('#workspace-tool-panel-sessions');
   await sessionDialog.waitFor();
   const connectionStatuses = await sessionDialog.locator('.agent-health').allInnerTexts();
   if (connectionStatuses.some((status) => status.includes('未连接'))) {
     throw new Error('Session center did not receive all desktop Agent installation states.');
   }
-  await sessionDialog.locator('.session-footer').getByRole('button', { name: '关闭' }).click();
+  await page.locator('#workspace-tool-tab-sessions + .tab-close').click();
 
-  await page.getByRole('button', { name: '设置', exact: true }).click();
-  const settingsDialog = page.getByRole('dialog', { name: 'Agent 与开发环境设置' });
+  await page.getByTestId('overflow-menu').click();
+  await page.getByTestId('settings-open').click();
+  const settingsDialog = page.getByRole('dialog', { name: '设置', exact: true });
   await settingsDialog.waitFor();
+  await settingsDialog.getByRole('button', { name: '诊断', exact: true }).click();
   await settingsDialog.getByText('Windows Credential Manager', { exact: true }).waitFor();
   const storedAccountProfiles = await page.evaluate(() =>
     window.__TAURI_INTERNALS__.invoke('list_account_profiles'),

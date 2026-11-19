@@ -11,7 +11,7 @@
   display: grid;
   height: 100%;
   min-height: 0;
-  // Shares the shell's header row so this divider lines up with the tab strip beside it.
+  // Lines up with the tab strip beside it.
   grid-template-rows: var(--panel-header-height, 44px) minmax(0, 1fr);
 }
 
@@ -19,32 +19,20 @@
   display: flex;
   min-width: 0;
   align-items: center;
-  gap: 8px;
-  padding: 0 10px 0 14px;
+  gap: 6px;
+  padding: 0 4px 0 10px;
   border-bottom: 1px solid var(--border);
 
-  div,
-  strong,
-  small {
-    display: block;
-  }
-
-  div {
-    min-width: 0;
-    margin-right: auto;
-  }
-
   strong {
+    min-width: 0;
+    margin-inline-end: auto;
+    overflow: hidden;
     color: var(--text);
     font-size: 12px;
     font-weight: 650;
     letter-spacing: 0.01em;
-  }
-
-  small {
-    margin-top: 2px;
-    color: var(--text-muted);
-    font: 11px/1.2 var(--mono);
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
 }
 

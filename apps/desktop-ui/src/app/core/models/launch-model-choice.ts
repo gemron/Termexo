@@ -14,3 +14,14 @@ export function launchProfileId(choice: string): string | undefined {
 export function explicitCliModel(model: string): string | undefined {
   return /^[a-zA-Z0-9._:/[\]-]+$/.test(model) ? model : undefined;
 }
+
+/** A saved configuration can change after a terminal starts. Compare its model as well as its ID. */
+export function matchesRunningModel(
+  runningProfileId: string | undefined,
+  runningModel: string,
+  profileId: string,
+  model: string | undefined,
+): boolean {
+  if (runningProfileId !== profileId) return false;
+  return model ? runningModel === model : !explicitCliModel(runningModel);
+}

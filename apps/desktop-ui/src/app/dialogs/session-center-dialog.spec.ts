@@ -347,15 +347,13 @@ describe('SessionCenterDialogComponent', () => {
     expect(root.querySelector('.resume-options[data-agent="claude"]')).toBeFalsy();
   });
 
-  it('closes on Escape rather than letting the workbench handle the key', () => {
-    let cancelled = 0;
-    component.cancelled.subscribe(() => (cancelled += 1));
-
-    const event = new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true });
-    root.querySelector('.dialog-search input')!.dispatchEvent(event);
-    fixture.detectChanges();
-
-    expect(cancelled).toBe(1);
+  it('leaves Escape to the workbench when the session tab is focused', () => {
+    const reachedWorkbench = vi.fn();
+    root.addEventListener('keydown', reachedWorkbench);
+    root.querySelector('.dialog-search input')!.dispatchEvent(
+      new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true }),
+    );
+    expect(reachedWorkbench).toHaveBeenCalledOnce();
   });
 
   async function expandResumeConfig(): Promise<void> {

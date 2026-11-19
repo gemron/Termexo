@@ -12,7 +12,21 @@
   flex-direction: column;
 }
 
-/* Shares the shell's header row so this divider lines up with the tab strip beside it. */
+.sidebar-heading {
+  container: workspace-heading / inline-size;
+  display: flex;
+  min-height: var(--panel-header-height, 36px);
+  flex: none;
+  align-items: center;
+  gap: 8px;
+  padding: 0 8px 0 var(--native-window-inset, 8px);
+  border-bottom: 1px solid var(--border);
+
+  > button {
+    flex: none;
+  }
+}
+
 .sidebar-tools {
   display: grid;
   height: var(--panel-header-height, 44px);
@@ -85,15 +99,6 @@ nav {
   flex: 1;
   overflow: auto;
   padding: 7px 8px;
-}
-
-.section-label {
-  margin: 0;
-  padding: 6px 7px 8px;
-  color: var(--text-muted);
-  font-size: 11px;
-  font-weight: 650;
-  letter-spacing: 0.04em;
 }
 
 .tag-filters {

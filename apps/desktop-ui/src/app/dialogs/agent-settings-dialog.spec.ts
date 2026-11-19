@@ -56,6 +56,27 @@ describe('AgentSettingsDialogComponent', () => {
     root = fixture.nativeElement as HTMLElement;
   });
 
+  it('finds categories by familiar terms and keeps every category in the narrow-screen picker', async () => {
+    fixture.detectChanges();
+    await fixture.whenStable();
+    const search = root.querySelector<HTMLInputElement>('.settings-search input')!;
+    const setQuery = (value: string) => {
+      search.value = value;
+      search.dispatchEvent(new Event('input'));
+      fixture.detectChanges();
+    };
+    setQuery('密钥');
+    expect(root.querySelectorAll('.settings-navigation button')).toHaveLength(1);
+    search.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+    expect(component['tab']()).toBe('models');
+    setQuery('xyzxyzxyz');
+    expect(root.querySelector('.settings-navigation [role="status"]')).toBeTruthy();
+    expect(root.querySelectorAll('.settings-category-select option')).toHaveLength(10);
+    search.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+    fixture.detectChanges();
+    expect(root.querySelectorAll('.settings-navigation button')).toHaveLength(10);
+  });
+
   it('does not infer the host credential store from a browser user agent', async () => {
     const userAgent = vi
       .spyOn(navigator, 'userAgent', 'get')
@@ -141,7 +162,7 @@ describe('AgentSettingsDialogComponent', () => {
     fixture.detectChanges();
     expect(saved).toEqual([]);
     expect(agents.modelProfiles()[0].claudeModel).toBe(original.claudeModel);
-    clickButton('保存 Profile');
+    clickButton('保存模型配置');
     expect(saved[0]).toMatchObject({
       id: original.id,
       isDefault: true,
@@ -158,18 +179,14 @@ describe('AgentSettingsDialogComponent', () => {
     fixture.detectChanges();
     await fixture.whenStable();
 
-    clickButton('模型 Profile');
+    clickButton('模型配置');
     await fixture.whenStable();
     fixture.detectChanges();
-    const inputs = root.querySelectorAll<HTMLInputElement>(
-      '.profile-editor input:not([type="checkbox"])',
-    );
-
-    // Name, Claude model + endpoint, Codex model + endpoint, then the shared API key.
-    expect(inputs[0].value).toBe('Team Claude');
-    expect(inputs[1].value).toBe('claude-sonnet-4-6');
-    expect(inputs[2].value).toBe('https://api.example.test');
-    expect(inputs[5].placeholder).toContain('已安全保存');
+    expect(root.querySelector<HTMLDetailsElement>('.model-advanced')?.open).toBe(false);
+    expect(labeledInput('名称').value).toBe('Team Claude');
+    expect(labeledInput('模型 ID（可修改） · Claude Code').value).toBe('claude-sonnet-4-6');
+    expect(labeledInput('Anthropic 兼容 Endpoint').value).toBe('https://api.example.test');
+    expect(root.querySelector<HTMLInputElement>('input[type=password]')?.placeholder).toContain('已安全保存');
   });
 
   it('reuses the generated id when a new profile is saved more than once', async () => {
@@ -177,8 +194,8 @@ describe('AgentSettingsDialogComponent', () => {
     fixture.detectChanges();
     await fixture.whenStable();
 
-    clickButton('模型 Profile');
-    clickButton('新建 Profile');
+    clickButton('模型配置');
+    clickButton('添加模型配置');
     await fixture.whenStable();
     expect(component['modelId']()).toBe('');
     component['selectTab']('diagnostics');
@@ -186,13 +203,12 @@ describe('AgentSettingsDialogComponent', () => {
     fixture.detectChanges();
     await fixture.whenStable();
     expect(component['modelId']()).toBe('');
-    setEditorInputValue(0, 'New Profile');
-    setEditorInputValue(1, 'sonnet');
+    setLabeledInputValue('名称', 'New Profile');
 
     const savedIds: string[] = [];
     component.modelSaved.subscribe((profile) => savedIds.push(profile.id));
-    clickButton('保存 Profile');
-    clickButton('保存 Profile');
+    clickButton('保存模型配置');
+    clickButton('保存模型配置');
 
     expect(savedIds).toHaveLength(2);
     expect(savedIds[0]).toBeTruthy();
@@ -205,8 +221,8 @@ describe('AgentSettingsDialogComponent', () => {
     fixture.detectChanges();
     await fixture.whenStable();
 
-    clickButton('模型 Profile');
-    clickButton('新建 Profile');
+    clickButton('模型配置');
+    clickButton('添加模型配置');
     const provider = root.querySelector<HTMLSelectElement>('.profile-editor select');
     expect(provider).toBeTruthy();
     provider!.value = 'DeepSeek';
@@ -214,20 +230,16 @@ describe('AgentSettingsDialogComponent', () => {
     await fixture.whenStable();
     fixture.detectChanges();
 
-    // Name, then Claude model + endpoint, then Codex model + endpoint, then the shared key.
-    const inputs = root.querySelectorAll<HTMLInputElement>(
-      '.profile-editor input:not([type="checkbox"])',
-    );
-    expect(inputs[0].value).toBe('DeepSeek 深度求索');
-    expect(inputs[1].value).toBe('deepseek-v4-pro[1m]');
-    expect(inputs[2].value).toBe('https://api.deepseek.com/anthropic');
-    expect(inputs[3].value).toBe('deepseek-v4');
-    expect(inputs[4].value).toBe('https://api.deepseek.com/v1');
-    setEditorInputValue(5, 'test-deepseek-key');
+    expect(labeledInput('名称').value).toBe('DeepSeek 深度求索');
+    expect(labeledInput('模型 ID（可修改） · Claude Code').value).toBe('deepseek-v4-pro[1m]');
+    expect(labeledInput('Anthropic 兼容 Endpoint').value).toBe('https://api.deepseek.com/anthropic');
+    expect(labeledInput('模型 ID（可修改） · Codex CLI').value).toBe('deepseek-v4');
+    expect(labeledInput('OpenAI 兼容 Endpoint').value).toBe('https://api.deepseek.com/v1');
+    setLabeledInputValue('API 密钥（必填）', 'test-deepseek-key');
 
     const saved: ModelProfileInput[] = [];
     component.modelSaved.subscribe((profile) => saved.push(profile));
-    clickButton('保存 Profile');
+    clickButton('保存模型配置');
     expect(saved[0]).toEqual(
       expect.objectContaining({
         provider: 'DeepSeek',
@@ -239,6 +251,24 @@ describe('AgentSettingsDialogComponent', () => {
         codexBaseUrl: 'https://api.deepseek.com/v1',
       }),
     );
+  });
+
+  it('requires the new provider’s key when editing a profile with a saved credential', async () => {
+    fixture.componentRef.setInput('initialTab', 'models');
+    fixture.componentRef.setInput('modelProfiles', [CUSTOM_PROFILE]);
+    fixture.detectChanges();
+    await fixture.whenStable();
+    component['selectProvider']('DeepSeek');
+    expect(component['canSaveModel']()).toBe(false);
+    const saved = vi.fn();
+    component.modelSaved.subscribe(saved);
+    component['saveModel']();
+    expect(saved).not.toHaveBeenCalled();
+    component['apiKey'] = 'new-provider-key';
+    component['saveModel']();
+    expect(saved).toHaveBeenCalledWith(expect.objectContaining({
+      apiKey: 'new-provider-key', provider: 'DeepSeek', clearCredential: false,
+    }));
   });
 
   it('opens a requested third-party profile and requires its missing API key', async () => {
@@ -264,15 +294,15 @@ describe('AgentSettingsDialogComponent', () => {
 
     expect(root.querySelector('.credential-warning')?.textContent).toContain('尚无可用 API Key');
     const saveButton = Array.from(root.querySelectorAll<HTMLButtonElement>('button')).find(
-      (candidate) => candidate.textContent?.includes('保存 Profile'),
+      (candidate) => candidate.textContent?.includes('保存模型配置'),
     );
     expect(saveButton?.disabled).toBe(true);
 
-    setEditorInputValue(5, 'test-minimax-key');
+    setLabeledInputValue('API 密钥（必填）', 'test-minimax-key');
     expect(saveButton?.disabled).toBe(false);
     const saved: ModelProfileInput[] = [];
     component.modelSaved.subscribe((profile) => saved.push(profile));
-    clickButton('保存 Profile');
+    clickButton('保存模型配置');
 
     expect(saved).toEqual([
       expect.objectContaining({ id: minimax.id, apiKey: 'test-minimax-key' }),
@@ -655,16 +685,6 @@ describe('AgentSettingsDialogComponent', () => {
     );
     expect(button).toBeTruthy();
     button!.click();
-    fixture.detectChanges();
-  }
-
-  function setEditorInputValue(index: number, value: string): void {
-    const input = root.querySelectorAll<HTMLInputElement>(
-      '.profile-editor input:not([type="checkbox"])',
-    )[index];
-    expect(input).toBeTruthy();
-    input!.value = value;
-    input!.dispatchEvent(new Event('input'));
     fixture.detectChanges();
   }
 
