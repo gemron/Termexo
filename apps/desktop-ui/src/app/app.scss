@@ -669,32 +669,33 @@ app-inspector-panel {
   min-width: 0;
   height: 100%;
   flex: 1;
+
+  > .menu-anchor {
+    flex: none;
+  }
 }
 
 .tab-strip {
   display: flex;
   min-width: 0;
   height: 100%;
-  // Sized by its tabs rather than by the row, so the add button follows the last tab instead of
-  // waiting at the far end of an empty strip. It still shrinks and scrolls once the tabs fill it.
+  // Fit the displayed tabs without moving the New button to the far end of the row.
   flex: 0 1 auto;
-  // DaisyUI's `.tabs` wraps; a second row of tabs would eat into the terminals below it, so the
-  // strip scrolls sideways instead.
   flex-wrap: nowrap;
-  overflow: auto hidden;
-  scrollbar-color: var(--surface-2) var(--surface-0);
-  scrollbar-width: thin;
+  overflow: clip;
 
   /* Holds the tab and its close button, which cannot nest inside the tab's own button. */
   .tab-slot {
     position: relative;
     display: flex;
-    // Below this a name is worn down to two characters; the strip scrolls rather than shrink
-    // further, and the wheel and Ctrl+Tab both reach whatever is off-screen.
-    min-width: 124px;
+    min-width: min(var(--tab-min-width), 100%);
     max-width: 190px;
     flex: 0 1 auto;
     border-right: 1px solid var(--border);
+
+    &[hidden] {
+      display: none;
+    }
 
     &.dragging {
       opacity: 0.45;
@@ -736,12 +737,6 @@ app-inspector-panel {
     font-size: 10px;
     font-weight: 560;
 
-    &.active {
-      color: var(--text);
-      background: var(--surface-raised);
-      box-shadow: inset 0 -2px 0 var(--accent);
-    }
-
     &.visible:not(.active) {
       color: var(--text-secondary);
       background: var(--surface-1);
@@ -779,6 +774,16 @@ app-inspector-panel {
 
     &:hover {
       color: var(--text-secondary);
+    }
+
+    &.active {
+      color: var(--text);
+      background: color-mix(in srgb, var(--accent) 22%, var(--surface-raised));
+      box-shadow:
+        inset 0 -3px 0 var(--accent),
+        inset 0 0 0 1px color-mix(in srgb, var(--accent) 44%, transparent);
+      font-weight: 700;
+      animation: none;
     }
 
     i {
@@ -851,6 +856,77 @@ app-inspector-panel {
   .tab-slot:focus-within .tab-close,
   .tab-slot:has(.tab.active) .tab-close {
     opacity: 1;
+  }
+}
+
+.tab-overflow {
+  display: flex;
+  width: var(--tab-overflow-width);
+  flex: none;
+  align-items: center;
+}
+
+.tab-overflow-trigger {
+  display: grid;
+  width: 100%;
+  height: 30px;
+  place-items: center;
+  border-radius: var(--radius-field);
+  color: var(--text-secondary);
+
+  &:is(:hover, :focus-visible, [aria-expanded='true']) {
+    color: var(--text);
+    background: var(--surface-2);
+  }
+}
+
+.tab-overflow-menu {
+  position: fixed;
+  z-index: var(--z-popover);
+  inset: auto;
+  display: grid;
+  width: 260px;
+  gap: 2px;
+  margin: 0;
+  padding: 5px;
+  overflow: auto;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-box);
+  background: var(--surface-raised);
+  box-shadow: 0 14px 35px rgb(0 0 0 / 40%);
+}
+
+.tab-overflow-item {
+  display: flex;
+  min-width: 0;
+  min-height: 32px;
+  align-items: center;
+  gap: 7px;
+  padding: 0 8px;
+  border-radius: var(--radius-field);
+  color: var(--text);
+  font-size: 12px;
+  text-align: start;
+
+  app-icon {
+    flex: none;
+    color: var(--text-secondary);
+  }
+
+  span {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  small {
+    flex: none;
+    margin-inline-start: auto;
+    color: var(--text-muted);
+  }
+
+  &:is(:hover, :focus-visible) {
+    background: var(--surface-2);
   }
 }
 
@@ -1076,17 +1152,6 @@ app-inspector-panel {
   .window-tools .tool-button > span {
     display: none;
   }
-
-  /* The popover behind each trigger still spells these out, so the labels go before the tabs do. */
-  .popover-trigger b {
-    display: none;
-  }
-}
-
-@media (max-width: 860px) {
-  .visible-count {
-    display: none;
-  }
 }
 
 @media (max-width: 640px) {
@@ -1132,6 +1197,42 @@ app-inspector-panel {
   .tab-close {
     min-width: 32px;
     min-height: 32px;
+  }
+}
+
+@container terminal-tabs (max-width: 365px) {
+  .tab-row-brand {
+    gap: 4px;
+    padding-inline-end: 0;
+  }
+
+  .workspace-reveal {
+    max-width: 64px;
+    padding-inline: 3px;
+  }
+
+  .tab-bar .add-tab {
+    margin-inline: 3px;
+
+    > span {
+      display: none;
+    }
+  }
+
+  .tab-strip .tab {
+    gap: 3px;
+    padding-inline: 4px 25px;
+
+    > i,
+    .tab-caption > small {
+      display: none;
+    }
+  }
+
+  .tab-strip .tab-close {
+    right: 1px;
+    min-width: 24px;
+    min-height: 26px;
   }
 }
 

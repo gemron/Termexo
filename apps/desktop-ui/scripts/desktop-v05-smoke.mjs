@@ -113,6 +113,7 @@ try {
     throw new Error(`V0.5 Tauri command verification failed: ${JSON.stringify(result)}`);
   }
 
+  await page.getByTestId('terminal-tools-toggle').click();
   await page
     .locator('button[title="打开提示词资产库"], button[title="Open prompt library"]')
     .click();
@@ -120,6 +121,7 @@ try {
   await promptDialog.waitFor();
   await promptDialog.locator('header > button').click();
 
+  await page.getByTestId('terminal-tools-toggle').click();
   await page.locator('button[title="打开会话交接"], button[title="Open session handoff"]').click();
   const handoffDialog = page.locator('.handoff-dialog');
   await handoffDialog.waitFor();

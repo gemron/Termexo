@@ -258,7 +258,7 @@ try {
     );
   }
 
-  await page.getByRole('button', { name: '终端外观' }).click();
+  await page.getByTestId('terminal-tools-toggle').click();
   const fontSizeOutput = page.locator('.font-size-controls output');
   const initialFontSize = Number(await fontSizeOutput.textContent());
   await page.getByRole('button', { name: '增大终端字体' }).click();

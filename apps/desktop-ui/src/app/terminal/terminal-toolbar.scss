@@ -1,14 +1,96 @@
-/* Never shrinks: what it gives up as the window narrows is decided by the media queries below. */
 :host {
   display: flex;
-  flex: 0 0 auto;
+  flex: none;
+  align-items: center;
+  padding-inline-end: 4px;
+}
+
+.terminal-tools-trigger {
+  display: inline-flex;
+  width: 42px;
+  height: 30px;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  padding: 0;
+  border: 1px solid color-mix(in srgb, var(--text) 16%, transparent);
+  border-radius: var(--radius-field);
+  color: var(--text-secondary);
+  background: var(--surface-2);
+  transition:
+    color 140ms ease,
+    background-color 140ms ease,
+    border-color 140ms ease;
+
+  &:hover {
+    border-color: color-mix(in srgb, var(--accent) 36%, transparent);
+    color: var(--text);
+    background: var(--surface-raised);
+  }
+
+  &:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 1px;
+  }
+
+  &[aria-expanded='true'] {
+    border-color: color-mix(in srgb, var(--accent) 55%, transparent);
+    color: var(--accent);
+    background: var(--primary-soft);
+  }
+}
+
+.terminal-tools-chevron {
+  transition: transform 140ms ease;
+}
+
+.terminal-tools-trigger[aria-expanded='true'] .terminal-tools-chevron {
+  transform: rotate(180deg);
+}
+
+@container terminal-tabs (max-width: 365px) {
+  .terminal-tools-trigger {
+    width: 32px;
+  }
+
+  .terminal-tools-chevron {
+    display: none;
+  }
+}
+
+.terminal-tools-panel {
+  position: fixed;
+  z-index: var(--z-popover);
+  inset: auto;
+  display: grid;
+  width: 292px;
+  gap: 8px;
+  margin: 0;
+  padding: 8px;
+  overflow: auto;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-box);
+  color: var(--text);
+  background: var(--surface-raised);
+  box-shadow: 0 14px 35px rgb(0 0 0 / 40%);
+}
+
+.terminal-tools-actions,
+.terminal-appearance {
+  display: flex;
   align-items: center;
   gap: 4px;
-  padding: 0 7px 0 4px;
-  border-left: 1px solid var(--border);
+  flex-wrap: wrap;
+}
+
+.terminal-appearance,
+.layout-controls {
+  padding-top: 7px;
+  border-top: 1px solid var(--border);
 }
 
 .visible-count {
+  margin-inline-start: auto;
   padding: 3px 5px;
   border-radius: var(--radius-selector);
   color: var(--text-muted);
@@ -37,51 +119,6 @@
   }
 }
 
-.popover-anchor {
-  position: relative;
-  display: flex;
-}
-
-.popover-trigger {
-  display: flex;
-  height: 25px;
-  align-items: center;
-  gap: 4px;
-  padding: 0 6px;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-field);
-  color: var(--text-muted);
-  background: var(--surface-inset);
-  font: 9px/1 var(--sans);
-
-  &:hover,
-  &.active {
-    border-color: var(--color-primary);
-    color: var(--text);
-  }
-
-  b {
-    color: var(--text);
-    font: 500 10px/1 var(--mono);
-  }
-}
-
-/* Anchored to its trigger and above the terminals it overlaps. */
-.toolbar-popover {
-  position: absolute;
-  z-index: 40;
-  top: calc(100% + 5px);
-  right: 0;
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  padding: 7px;
-  border: 1px solid var(--border-strong);
-  border-radius: 8px;
-  background: var(--surface-1);
-  box-shadow: 0 14px 35px rgb(0 0 0 / 40%);
-}
-
 .font-size-controls {
   display: flex;
   height: 25px;
@@ -107,55 +144,39 @@
 }
 
 .layout-controls {
-  display: flex;
-  align-items: center;
-  gap: 2px;
-
-  button {
-    display: grid;
-    width: 25px;
-    height: 25px;
-    place-items: center;
-    border: 0;
-    border-radius: 3px;
-    color: var(--text-muted);
-    background: transparent;
-
-    &:hover,
-    &.active {
-      color: var(--text);
-      background: var(--surface-2);
-    }
-  }
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 3px;
 }
 
-/* Shows how many cells the current grid has and how many of them hold a terminal. */
-.grid-preview {
-  display: grid;
-  width: 22px;
-  height: 18px;
-  grid-template-columns: repeat(var(--preview-columns), minmax(0, 1fr));
-  grid-template-rows: repeat(var(--preview-rows), minmax(0, 1fr));
-  gap: 1px;
-  padding: 2px;
-  border: 1px solid var(--border-strong);
-  border-radius: var(--radius-selector);
-  background: var(--surface-inset);
+.layout-choice {
+  display: flex;
+  min-height: 30px;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 7px;
+  border: 0;
+  border-radius: var(--radius-field);
+  color: var(--text-secondary);
+  background: transparent;
+  font-size: 11px;
+  text-align: start;
 
-  i {
-    min-width: 1px;
-    min-height: 1px;
-    border-radius: 1px;
+  &:is(:hover, :focus-visible, [aria-pressed='true']) {
+    color: var(--text);
     background: var(--surface-2);
+  }
 
-    &.occupied {
-      background: var(--accent);
-      box-shadow: 0 0 3px color-mix(in srgb, var(--accent) 45%, transparent);
-    }
+  &[aria-pressed='true'] {
+    color: var(--accent);
   }
 }
 
 .grid-dimensions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px;
   color: var(--text-muted);
 
   .dimension-stepper {
@@ -220,20 +241,5 @@
   &:disabled {
     cursor: default;
     opacity: 0.28;
-  }
-}
-
-/* Every label here is repeated in a tooltip or in the popover behind its trigger, so the toolbar
-   gives up its text before the tab strip gives up a tab. */
-@container terminal-tabs (max-width: 1100px) {
-  .tool-button > span,
-  .popover-trigger b {
-    display: none;
-  }
-}
-
-@container terminal-tabs (max-width: 820px) {
-  .visible-count {
-    display: none;
   }
 }

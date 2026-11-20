@@ -166,36 +166,42 @@ button:disabled {
   display: grid;
   min-width: 0;
   min-height: 0;
-  grid-template-rows: auto minmax(0, 1fr);
+  grid-template-rows: minmax(0, 1fr);
   border-right: 1px solid var(--border);
   background: var(--surface-1);
 }
 
-.changes-panel,
-.graph-panel {
+.changes-panel {
   display: grid;
   min-height: 0;
   grid-template-rows: auto auto minmax(0, 1fr);
 }
 .graph-panel {
-  grid-template-rows: minmax(0, 1fr);
+  --commit-columns: min(var(--commit-graph-width), clamp(72px, 25%, 300px)) minmax(0, 1fr) minmax(84px, 15%) minmax(120px, 18%) 88px;
+  display: grid;
+  grid-row: 3;
+  min-width: 0;
+  min-height: 0;
+  grid-template-rows: auto minmax(0, 1fr);
 }
 .git-sidebar[hidden],
-.changes-panel[hidden],
+.git-content[hidden],
 .graph-panel[hidden] {
   display: none;
 }
 .sidebar-tabs {
   display: flex;
   gap: 4px;
-  padding: 7px;
+  padding: 5px 10px;
   border-bottom: 1px solid var(--border);
+  background: var(--surface-1);
 }
 .sidebar-tabs button {
   display: flex;
-  flex: 1 1 0;
+  flex: 0 1 auto;
   min-width: 0;
-  min-height: 32px;
+  min-height: 30px;
+  padding: 0 10px;
   align-items: center;
   justify-content: center;
   gap: 7px;
@@ -218,7 +224,25 @@ button:disabled {
   background: var(--surface-inset);
   font: 600 10px/1 var(--mono);
 }
-.sidebar-tabs .sidebar-close { display: none; flex: 0 0 28px; }
+.baseline-strip {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.sidebar-close {
+  display: none;
+  width: 28px;
+  height: 28px;
+  flex: none;
+  margin-inline-end: 4px;
+  border-radius: var(--radius-field);
+  color: var(--text-muted);
+
+  &:is(:hover, :focus-visible) {
+    color: var(--text);
+    background: var(--surface-2);
+  }
+}
 
 .baseline-note {
   margin: 0;
@@ -407,29 +431,79 @@ button:disabled {
 .change-file.nested {
   padding-left: 22px;
 }
-.commit-copy .oid {
-  cursor: copy;
-  padding: 0;
-  border: 0;
-  border-radius: 3px;
-  background: transparent;
+.history-toolbar {
+  display: flex;
+  align-items: center;
+  padding: 6px 10px;
+  border-bottom: 1px solid var(--border);
+}
 
-  &:hover {
-    text-decoration: underline;
+.history-branch {
+  display: flex;
+  max-width: 100%;
+  min-width: 0;
+  align-items: center;
+  gap: 7px;
+  color: var(--text-secondary);
+  font-size: 12px;
+
+  app-icon,
+  span {
+    flex: none;
+  }
+
+  select {
+    max-width: 320px;
+    min-width: 0;
+    height: 29px;
+    padding: 0 5px;
+    border: 1px solid var(--border-strong);
+    border-radius: var(--radius-field);
+    color: var(--text);
+    background: var(--surface-1);
   }
 }
 
+.commit-list {
+  padding: 0;
+}
+
+.commit-columns,
 .commit-row {
   display: grid;
   min-width: 0;
-  min-height: 48px;
-  grid-template-columns: auto minmax(0, 1fr);
-  align-items: stretch;
-  border-radius: 4px;
+  grid-template-columns: var(--commit-columns);
+  align-items: center;
+  gap: 8px;
+  padding-inline: 8px 10px;
 }
-.commit-row:hover {
+
+.commit-columns {
+  position: sticky;
+  z-index: 1;
+  top: 0;
+  min-height: 29px;
+  border-bottom: 1px solid var(--border);
+  color: var(--text-muted);
+  background: var(--surface-1);
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.commit-row {
+  height: 48px;
+  background: var(--surface-0);
+  box-shadow: inset 0 -1px 0 color-mix(in srgb, var(--border) 60%, transparent);
+}
+
+.commit-row.in-session {
+  background: color-mix(in srgb, var(--accent) 8%, var(--surface-0));
+}
+
+.commit-row:is(:hover, :focus-within) {
   background: var(--surface-2);
 }
+
 .change-file,
 .commit-row,
 .refresh-button,
@@ -444,66 +518,125 @@ button:disabled {
 .diff-line:not(.blank):hover {
   filter: brightness(1.18);
 }
-.commit-row.in-session {
-  background: color-mix(in srgb, var(--accent) 6%, transparent);
-}
-.commit-graph {
-  height: 48px;
-  min-width: 16px;
-  overflow: visible;
-}
-.commit-graph line {
-  stroke: color-mix(in srgb, var(--accent) 42%, var(--border));
-  stroke-width: 1.2;
-}
-.commit-graph circle {
-  fill: var(--surface-1);
-  stroke: var(--text-muted);
-  stroke-width: 1.5;
-}
-.in-session .commit-graph circle {
-  fill: var(--accent);
-  stroke: var(--accent);
-}
-.commit-copy {
+
+.commit-rails {
   min-width: 0;
-  align-self: center;
-  padding: 5px 6px;
+  height: 100%;
+  overflow: hidden;
 }
+
+.commit-graph {
+  display: block;
+
+  path {
+    fill: none;
+    stroke-width: 1.7;
+  }
+
+  circle {
+    fill: var(--surface-0);
+    stroke-width: 1.9;
+  }
+}
+
+.in-session .commit-graph circle {
+  fill: var(--commit-color);
+}
+
+.commit-copy {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 7px;
+}
+
+.commit-copy strong,
+.commit-author,
+.commit-time,
+.decorations em,
+.commit-mobile-meta {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .commit-copy strong {
-  display: block;
-  overflow: hidden;
   font-size: 12px;
-  font-weight: 580;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  font-weight: 600;
 }
-.commit-copy > span {
-  display: block;
-  margin-top: 3px;
-  overflow: hidden;
+
+.commit-author,
+.commit-time,
+.commit-mobile-meta {
   color: var(--text-muted);
-  font-size: 10px;
+  font-size: 11px;
+}
+
+.commit-hash {
+  max-width: 100%;
+  justify-self: start;
+  padding: 2px 5px;
+  overflow: hidden;
   text-overflow: ellipsis;
-  white-space: nowrap;
+  border-radius: var(--radius-field);
+  color: var(--text-secondary);
+  background: var(--surface-inset);
+  font: 11px/1.35 var(--mono);
+  cursor: copy;
+
+  &:is(:hover, :focus-visible) {
+    color: var(--accent);
+  }
 }
-.commit-copy code {
-  margin-right: 5px;
-  color: color-mix(in srgb, var(--accent) 68%, var(--text));
+
+.commit-mobile-meta {
+  display: none;
 }
+
 .decorations {
   display: flex;
+  max-width: 48%;
+  flex: 0 1 auto;
   gap: 3px;
-  margin-top: 4px;
   overflow: hidden;
 }
+
 .decorations em {
   padding: 2px 4px;
-  border-radius: 3px;
+  border: 1px solid color-mix(in srgb, var(--accent) 20%, var(--border));
+  border-radius: var(--radius-field);
   color: var(--accent);
-  background: color-mix(in srgb, var(--accent) 10%, transparent);
+  background: color-mix(in srgb, var(--accent) 9%, var(--surface-1));
   font: normal 9px/1 var(--mono);
-  white-space: nowrap;
+}
+
+@container git-workbench (max-width: 620px) {
+  .graph-panel {
+    --commit-columns: min(var(--commit-graph-width), 26%) minmax(0, 1fr) 68px;
+  }
+
+  .commit-columns :nth-child(3),
+  .commit-columns :nth-child(4),
+  .commit-author,
+  .commit-time {
+    display: none;
+  }
+
+  .commit-copy {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 2px 6px;
+  }
+
+  .commit-mobile-meta {
+    display: block;
+    grid-column: 1 / -1;
+  }
+
+  .decorations {
+    max-width: 90px;
+  }
 }
 
 .diff-panel {
@@ -878,11 +1011,11 @@ button:focus-visible,
     inset: 0 auto 0 0;
     width: min(100%, 320px);
     grid-template-columns: minmax(0, 1fr);
-    grid-template-rows: auto minmax(0, 1fr);
+    grid-template-rows: minmax(0, 1fr);
     border-right: 1px solid var(--border);
     box-shadow: 10px 0 30px rgb(0 0 0 / 25%);
   }
-  .sidebar-tabs .sidebar-close { display: grid; place-items: center; }
+  .sidebar-close { display: grid; place-items: center; }
   .branch-chip {
     max-width: 140px;
   }

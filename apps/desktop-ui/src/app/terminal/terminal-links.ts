@@ -27,11 +27,11 @@ export interface TerminalLink {
 /** Only the two schemes a browser should be handed; anything else is left as plain text. */
 const URL_PATTERN = /https?:\/\/[^\s<>"'`]+/gi;
 
-/** A drive-letter path in quotes, which is the only form that may contain spaces. */
-const QUOTED_ABSOLUTE_PATH_PATTERN = /"([A-Za-z]:[\\/][^"\r\n]+)"/g;
+/** Terminal output may quote or use inline code around a path with spaces. */
+const QUOTED_PATH_PATTERN = /(["'`])((?:[A-Za-z]:[\\/]|\.{1,2}[\\/])[^\r\n]+?)\1/g;
 
 /** Characters Windows forbids in a path, plus `:`, which only the drive and the suffix may use. */
-const PATH_BODY = String.raw`[^\s<>"'|?*:]`;
+const PATH_BODY = String.raw`[^\s<>"'\u0060|?*:]`;
 
 /**
  * A drive-letter path, guarded against the scheme of an address it is no part of.
@@ -52,8 +52,8 @@ const ABSOLUTE_PATH_PATTERN = new RegExp(
  * such file exists.
  */
 const RELATIVE_PATH_PATTERN = new RegExp(
-  String.raw`(?:\.{1,2}[\\/])?[\w.@~+-]+(?:[\\/][\w.@~+-]+)+(?::\d+){0,2}`,
-  'g',
+  String.raw`(?:\.{1,2}[\\/])?[\p{L}\p{M}\p{N}_.@~+-]+(?:[\\/][\p{L}\p{M}\p{N}_.@~+-]+)+(?::\d+){0,2}`,
+  'gu',
 );
 
 /** Trailing characters that end a sentence rather than an address. */
@@ -81,10 +81,10 @@ export function detectTerminalLinks(line: string): TerminalLink[] {
     }
   }
 
-  for (const match of line.matchAll(QUOTED_ABSOLUTE_PATH_PATTERN)) {
+  for (const match of line.matchAll(QUOTED_PATH_PATTERN)) {
     // The quotes delimit the path rather than belong to it, so the range covers them and the
     // text does not.
-    addPath(links, claim, match.index, match[0].length, match[1]);
+    addPath(links, claim, match.index, match[0].length, match[2]);
   }
 
   for (const pattern of [ABSOLUTE_PATH_PATTERN, RELATIVE_PATH_PATTERN]) {
@@ -165,6 +165,27 @@ export interface TerminalLineText {
 }
 
 /**
+ * Some programs wrap paths with a real newline. Offer the adjoining text as a fallback only
+ * when the first fragment reaches the row edge or ends at an obvious split point in the path.
+ * The host checks the original path first and opens the longer candidate only if it exists.
+ */
+export function continueTerminalPath(
+  link: TerminalLink,
+  line: TerminalLineText,
+  following: string,
+  columns: number,
+): TerminalLink | undefined {
+  if (link.kind !== 'path' || link.line !== undefined || line.text.slice(link.end).trim()) return;
+  const last = line.positions[link.end - 1];
+  if (!last || (last.x < columns - 2 && !/[\\/_-]$/.test(link.text))) return;
+  const tail = following.trimStart();
+  if (!/^[\p{L}\p{M}\p{N}._~+\\/-]/u.test(tail) || /^(?:[a-z]:|[\\/]{2}|[a-z][\w+.-]*:\/\/)/i.test(tail)) return;
+  return detectTerminalLinks(line.text.slice(0, link.end) + tail).find(
+    (candidate) => candidate.kind === 'path' && candidate.start === link.start && candidate.text.length > link.text.length,
+  );
+}
+
+/**
  * Joins the rows of a wrapped line into the text the agent wrote, remembering where each
  * character came from.
  *
@@ -176,9 +197,15 @@ export interface TerminalLineText {
 export function readLogicalLine(rows: readonly TerminalRow[]): TerminalLineText {
   let text = '';
   const positions: { x: number; y: number }[] = [];
-  for (const { row, cells } of rows) {
+  for (const [index, { row, cells }] of rows.entries()) {
+    let end = cells.length;
+    if (index < rows.length - 1) {
+      // When a wide glyph wraps, xterm leaves an unwritten cell at the end of the
+      // previous row. It is padding, while a space actually printed by the app is text.
+      while (end > 0 && cells[end - 1].width > 0 && cells[end - 1].chars === '') end -= 1;
+    }
     let column = 1;
-    for (const cell of cells) {
+    for (const cell of cells.slice(0, end)) {
       if (cell.width === 0) {
         // The second column of a full-width character, which carries no characters of its own.
         continue;

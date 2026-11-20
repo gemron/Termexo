@@ -48,6 +48,7 @@ import {
   workbenchShortcut,
 } from './terminal-key-sequences';
 import {
+  continueTerminalPath,
   detectTerminalLinks,
   readLogicalLine,
   TerminalCell,
@@ -1116,6 +1117,14 @@ export class TerminalPanelComponent implements AfterViewInit {
    * open neither.
    */
   private linksOnLine(bufferLineNumber: number): ILink[] | undefined {
+    const { text, positions } = this.terminalLine(bufferLineNumber);
+    const links = detectTerminalLinks(text)
+      .map((link) => this.toTerminalLink(link, positions))
+      .filter((link) => link.range.start.y <= bufferLineNumber && link.range.end.y >= bufferLineNumber);
+    return links.length ? links : undefined;
+  }
+
+  private terminalLine(bufferLineNumber: number): TerminalLineText {
     const buffer = this.terminal.buffer.active;
     // A buffer position is numbered from one while the buffer itself is indexed from zero, and
     // reading a row by its position lands on the row below it.
@@ -1142,17 +1151,7 @@ export class TerminalPanelComponent implements AfterViewInit {
       rows.push({ row, cells });
     }
 
-    const { text, positions } = readLogicalLine(rows);
-    if (!text.trim()) {
-      return undefined;
-    }
-
-    const links = detectTerminalLinks(text)
-      .map((link) => this.toTerminalLink(link, positions))
-      .filter(
-        (link) => link.range.start.y <= bufferLineNumber && link.range.end.y >= bufferLineNumber,
-      );
-    return links.length > 0 ? links : undefined;
+    return readLogicalLine(rows);
   }
 
   private toTerminalLink(link: TerminalLink, positions: TerminalLineText['positions']): ILink {
@@ -1176,14 +1175,27 @@ export class TerminalPanelComponent implements AfterViewInit {
           this.hoveredLink = undefined;
         }
       },
-      activate: (event: MouseEvent, text: string) => {
-        // Read from the click itself: a plain click on a link is left to selection.
-        if (event.ctrlKey) {
-          void this.openLink(link.kind, text, link.line, link.column);
-        }
+      activate: (event: MouseEvent) => {
+        if (event.ctrlKey) this.activateLink(link, terminalLink.range.start);
       },
     };
     return terminalLink;
+  }
+
+  private activateLink(link: TerminalLink, start: { x: number; y: number }): void {
+    // The link provider may have run before the rest of the path arrived in the buffer.
+    // Only refresh the same match, so reused screen cells cannot redirect an earlier link.
+    const line = this.terminalLine(start.y);
+    const current = detectTerminalLinks(line.text).find((candidate) => {
+      const position = line.positions[candidate.start];
+      return position.x === start.x && position.y === start.y
+        && candidate.kind === link.kind && candidate.text.startsWith(link.text);
+    });
+    const lastRow = line.positions.at(-1)?.y;
+    const following = lastRow === undefined ? '' :
+      this.terminal.buffer.active.getLine(lastRow)?.translateToString(true) ?? '';
+    const continuation = current && continueTerminalPath(current, line, following, this.terminal.cols);
+    void this.openLink(current ?? link, continuation);
   }
 
   /**
@@ -1197,10 +1209,8 @@ export class TerminalPanelComponent implements AfterViewInit {
   private readonly projectPreview = inject(ProjectPreviewService);
 
   private async openLink(
-    kind: TerminalLink['kind'],
-    text: string,
-    line = 1,
-    column = 1,
+    { kind, text, line = 1, column = 1 }: TerminalLink,
+    continuation?: TerminalLink,
   ): Promise<void> {
     try {
       await (kind === 'url'
@@ -1211,6 +1221,8 @@ export class TerminalPanelComponent implements AfterViewInit {
             this.session().workingDirectory,
             line,
             column,
+            undefined,
+            continuation && { path: continuation.text, line: continuation.line, column: continuation.column },
           ));
     } catch (error) {
       this.zone.run(() =>

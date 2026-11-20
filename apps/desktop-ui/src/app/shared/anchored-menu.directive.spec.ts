@@ -8,7 +8,7 @@ import { AnchoredMenuDirective } from './anchored-menu.directive';
   template: `
     <button #anchor>More</button>
     @if (open) {
-      <ul [appAnchoredMenu]="anchor" (dismissed)="open = false" role="menu">
+      <ul [appAnchoredMenu]="anchor" [appAnchoredMenuAlign]="align" (dismissed)="open = false" role="menu">
         <li><button>First</button></li>
         <li><button>Second</button></li>
       </ul>
@@ -17,6 +17,7 @@ import { AnchoredMenuDirective } from './anchored-menu.directive';
 })
 class MenuHost {
   open = true;
+  align: 'start' | 'end' = 'end';
 }
 
 describe('AnchoredMenuDirective', () => {
@@ -25,7 +26,7 @@ describe('AnchoredMenuDirective', () => {
     vi.unstubAllGlobals();
   });
 
-  async function render(left: number, top: number) {
+  async function render(left: number, top: number, align: 'start' | 'end' = 'end') {
     vi.stubGlobal('innerWidth', 400);
     vi.stubGlobal('innerHeight', 300);
     vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(function (
@@ -36,6 +37,7 @@ describe('AnchoredMenuDirective', () => {
         : new DOMRect(left, top, 30, 30);
     });
     const fixture = TestBed.createComponent(MenuHost);
+    fixture.componentInstance.align = align;
     fixture.detectChanges();
     await fixture.whenStable();
     const root = fixture.nativeElement as HTMLElement;
@@ -52,6 +54,18 @@ describe('AnchoredMenuDirective', () => {
     expect(menu.style.left).toBe('8px');
     expect(menu.style.top).toBe('44px');
     expect(menu.getAttribute('popover')).toBe('manual');
+  });
+
+  it('aligns a start-anchored menu with the trigger when it fits', async () => {
+    const { menu } = await render(130, 10, 'start');
+    expect(menu.style.left).toBe('130px');
+    expect(menu.style.top).toBe('44px');
+  });
+
+  it('keeps a start-anchored menu below the trigger at the right viewport edge', async () => {
+    const { menu } = await render(365, 10, 'start');
+    expect(menu.style.left).toBe('212px');
+    expect(menu.style.top).toBe('44px');
   });
 
   it('opens above a bottom-edge trigger and clamps to the right viewport margin', async () => {

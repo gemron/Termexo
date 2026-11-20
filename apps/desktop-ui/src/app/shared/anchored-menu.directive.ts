@@ -21,6 +21,7 @@ import {
 })
 export class AnchoredMenuDirective implements AfterViewInit, OnDestroy {
   readonly appAnchoredMenu = input.required<HTMLElement>();
+  readonly appAnchoredMenuAlign = input<'start' | 'end'>('end');
   readonly dismissed = output<void>();
   private readonly element = inject<ElementRef<HTMLElement>>(ElementRef).nativeElement;
   private readonly document = this.element.ownerDocument;
@@ -80,7 +81,8 @@ export class AnchoredMenuDirective implements AfterViewInit, OnDestroy {
     this.element.style.maxHeight = `${Math.max(above, below)}px`;
     const menu = this.element.getBoundingClientRect();
     const opensBelow = below >= menu.height || below >= above;
-    const left = Math.max(margin, Math.min(anchor.right - menu.width, width - menu.width - margin));
+    const alignedLeft = this.appAnchoredMenuAlign() === 'start' ? anchor.left : anchor.right - menu.width;
+    const left = Math.max(margin, Math.min(alignedLeft, width - menu.width - margin));
     const top = opensBelow ? anchor.bottom + gap : anchor.top - gap - menu.height;
     this.element.style.left = `${left}px`;
     this.element.style.top = `${Math.max(margin, Math.min(top, height - menu.height - margin))}px`;

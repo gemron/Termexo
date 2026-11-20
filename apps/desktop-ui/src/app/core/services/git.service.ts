@@ -3,6 +3,7 @@ import { computed, Injectable, signal } from '@angular/core';
 import type {
   DiffLayout,
   RepositoryDiff,
+  RepositoryHistory,
   RepositoryOverview,
   RepositoryTarget,
 } from '../models/git.models';
@@ -143,6 +144,13 @@ export class GitService {
         void this.refresh();
       }
     }
+  }
+
+  async loadHistory(target: RepositoryTarget, branch: string | null): Promise<RepositoryHistory> {
+    if (!hasBackend()) throw new Error('Git 提交图需要连接桌面应用。');
+    return invoke<RepositoryHistory>('get_repository_history', {
+      request: { target, branch, commitLimit: COMMIT_LIMIT },
+    });
   }
 
   async loadDiff(target: RepositoryTarget, path: string): Promise<RepositoryDiff> {

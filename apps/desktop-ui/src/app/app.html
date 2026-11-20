@@ -166,13 +166,14 @@
         <ng-container *ngTemplateOutlet="appTools" />
       </div>
     }
-      <div class="tab-bar">
+      <div #tabBar class="tab-bar" [style.--tab-min-width.px]="tabMinWidth" [style.--tab-overflow-width.px]="tabOverflowWidth">
+        @let overflow = tabVisibility().overflow;
+        @let visibleTabs = tabVisibility().visible;
         @if (hasWorkspace || workspaceTools().length) {
           <div
             class="tab-strip tabs tabs-border"
             role="tablist"
             [attr.aria-label]="'terminal.tabs' | t"
-            (wheel)="scrollTabStrip($event)"
           >
             @for (
               terminal of state.activeWorkspace()?.terminals ?? [];
@@ -181,6 +182,7 @@
             ) {
               <div
                 class="tab-slot"
+                [hidden]="!visibleTabs.has(workbenchTabId('terminal', terminal.id))"
                 draggable="true"
                 [class.dragging]="terminal.id === draggedTerminalId()"
                 [class.drop-before]="tabDropIndex() === index"
@@ -191,7 +193,7 @@
                 (dragend)="endTabDrag()"
               >
                 <button
-                  [id]="'terminal-tab-' + terminal.id"
+                  [id]="workbenchTabId('terminal', terminal.id)"
                   type="button"
                   role="tab"
                   class="tab"
@@ -230,9 +232,9 @@
               </div>
             }
             @for (tab of preview.workspaceTabs(); track tab.id) {
-              <div class="tab-slot">
+              <div class="tab-slot" [hidden]="!visibleTabs.has(workbenchTabId('preview', tab.id))">
                 <button
-                  [id]="'content-preview-tab-' + tab.id"
+                  [id]="workbenchTabId('preview', tab.id)"
                   type="button"
                   role="tab"
                   class="tab"
@@ -252,12 +254,12 @@
             @for (tab of workspaceTools(); track tab) {
               @let info = workspaceToolTabs[tab.tool];
               @let label = info.label | t;
-              <div class="tab-slot workspace-tool-tab">
+              <div class="tab-slot workspace-tool-tab" [hidden]="!visibleTabs.has(workbenchTabId(tab.tool, tab.tool))">
                 <button
                   type="button"
                   class="tab"
                   role="tab"
-                  [id]="'workspace-tool-tab-' + tab.tool"
+                  [id]="workbenchTabId(tab.tool, tab.tool)"
                   [attr.aria-controls]="'workspace-tool-panel-' + tab.tool"
                   [attr.aria-selected]="workspaceView() === tab.tool"
                   [class.active]="workspaceView() === tab.tool"
@@ -281,7 +283,53 @@
             }
           </div>
         }
-        <div class="menu-anchor">
+        @if (overflow.length) {
+          <div class="tab-overflow">
+            <button
+              #tabMenuTrigger
+              type="button"
+              class="tab-overflow-trigger"
+              data-testid="tab-overflow-toggle"
+              aria-haspopup="menu"
+              [attr.aria-expanded]="tabMenuOpen()"
+              [attr.aria-controls]="tabMenuOpen() ? 'workbench-overflow-tabs' : null"
+              [attr.aria-label]="'terminal.moreTabs' | t: { count: overflow.length }"
+              [title]="'terminal.moreTabs' | t: { count: overflow.length }"
+              (click)="tabMenuOpen.set(!tabMenuOpen())"
+              (keydown.arrowdown)="$event.preventDefault(); tabMenuOpen.set(true)"
+            >
+              <app-icon name="chevron-down" [size]="15" />
+            </button>
+            @if (tabMenuOpen()) {
+              <div
+                id="workbench-overflow-tabs"
+                class="tab-overflow-menu"
+                role="menu"
+                data-tauri-drag-region="false"
+                [attr.aria-label]="'terminal.moreTabs' | t: { count: overflow.length }"
+                [appAnchoredMenu]="tabMenuTrigger"
+                (dismissed)="tabMenuOpen.set(false)"
+              >
+                @for (tab of overflow; track workbenchTabId(tab.view, tab.id)) {
+                  <button type="button" role="menuitem" class="tab-overflow-item" (click)="selectOverflowTab(tab)">
+                    @if (tab.view === 'terminal') {
+                      <app-icon [name]="agentIcons[tab.terminal.agentType]" [size]="14" />
+                      <span [title]="tab.terminal.name">{{ tab.terminal.name }}</span>
+                      <small>{{ statusLabel(tab.terminal.status) }}</small>
+                    } @else if (tab.view === 'preview') {
+                      <app-icon name="folder" [size]="14" />
+                      <span [title]="tab.preview.title()">{{ tab.preview.title() }}</span>
+                    } @else {
+                      <app-icon [name]="workspaceToolTabs[tab.view].icon" [size]="14" />
+                      <span>{{ workspaceToolTabs[tab.view].label | t }}</span>
+                    }
+                  </button>
+                }
+              </div>
+            }
+          </div>
+        }
+        <div #newTabAnchor class="menu-anchor">
           <button
             #newTerminalButton
             type="button"

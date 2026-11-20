@@ -1,51 +1,60 @@
-<span
-  class="visible-count"
-  [title]="
-    'terminal.visibleCount'
-      | t: { visible: visibleCount(), total: terminalCount(), limit: visibleLimit() }
-  "
+<button
+  #trigger
+  type="button"
+  class="terminal-tools-trigger"
+  data-testid="terminal-tools-toggle"
+  aria-haspopup="dialog"
+  [attr.aria-expanded]="open()"
+  [attr.aria-controls]="open() ? 'terminal-tools-panel' : null"
+  [attr.aria-label]="'terminal.tools' | t"
+  [title]="'terminal.tools' | t"
+  (click)="open.set(!open())"
 >
-  {{ visibleCount() }}/{{ terminalCount() }}
-</span>
+  <app-icon name="sliders" [size]="15" />
+  <app-icon class="terminal-tools-chevron" name="chevron-down" [size]="11" />
+</button>
 
-<div class="join" role="group" [attr.aria-label]="'prompt.tools' | t">
-  <button
-    type="button"
-    class="tool-button btn btn-ghost btn-xs join-item"
-    [title]="'prompt.open' | t"
-    (click)="promptLibraryRequested.emit()"
+@if (open()) {
+  <div
+    id="terminal-tools-panel"
+    class="terminal-tools-panel"
+    role="dialog"
+    data-tauri-drag-region="false"
+    [attr.aria-label]="'terminal.tools' | t"
+    [appAnchoredMenu]="trigger"
+    appAnchoredMenuAlign="start"
+    (dismissed)="open.set(false)"
   >
-    <app-icon name="history" [size]="13" />
-    <span>{{ 'prompt.button' | t }}</span>
-  </button>
-  <button
-    type="button"
-    class="tool-button btn btn-ghost btn-xs join-item"
-    [title]="'handoff.open' | t"
-    (click)="handoffRequested.emit()"
-  >
-    <app-icon name="merge" [size]="13" />
-    <span>{{ 'handoff.button' | t }}</span>
-  </button>
-</div>
-
-<div class="popover-anchor">
-  <button
-    type="button"
-    class="popover-trigger"
-    aria-haspopup="dialog"
-    [class.active]="popover() === 'appearance'"
-    [attr.aria-expanded]="popover() === 'appearance'"
-    [title]="'terminal.appearance' | t"
-    [attr.aria-label]="'terminal.appearance' | t"
-    (click)="togglePopover('appearance')"
-  >
-    <span aria-hidden="true">Aa</span>
-    <b>{{ fontSize() }}</b>
-  </button>
-
-  @if (popover() === 'appearance') {
-    <div class="toolbar-popover" role="dialog" [attr.aria-label]="'terminal.appearance' | t">
+    <div class="terminal-tools-actions" role="group" [attr.aria-label]="'prompt.tools' | t">
+      <button
+        type="button"
+        class="tool-button"
+        [title]="'prompt.open' | t"
+        (click)="close(trigger); promptLibraryRequested.emit()"
+      >
+        <app-icon name="history" [size]="13" />
+        <span>{{ 'prompt.button' | t }}</span>
+      </button>
+      <button
+        type="button"
+        class="tool-button"
+        [title]="'handoff.open' | t"
+        (click)="close(trigger); handoffRequested.emit()"
+      >
+        <app-icon name="merge" [size]="13" />
+        <span>{{ 'handoff.button' | t }}</span>
+      </button>
+      <span
+        class="visible-count"
+        [title]="
+          'terminal.visibleCount'
+            | t: { visible: visibleCount(), total: terminalCount(), limit: visibleLimit() }
+        "
+      >
+        {{ visibleCount() }}/{{ terminalCount() }}
+      </span>
+    </div>
+    <div class="terminal-appearance" role="group" [attr.aria-label]="'terminal.appearance' | t">
       <div class="font-size-controls" role="group" [attr.aria-label]="'terminal.fontSize' | t">
         <span aria-hidden="true">Aa</span>
         <button
@@ -73,146 +82,113 @@
 
       <app-terminal-font-picker [value]="fontName()" (fontChange)="fontChange.emit($event)" />
     </div>
-  }
-</div>
-
-<!--
-  A phone draws one terminal whatever the workspace stores, so the split controls would only
-  offer a choice that cannot take effect.
--->
-@if (!compact()) {
-  <div class="layout-controls join" [attr.aria-label]="'terminal.layout' | t">
-    <button
-      type="button"
-      class="btn btn-square btn-ghost btn-xs join-item"
-      [title]="'terminal.layoutSingle' | t"
-      [class.active]="layout() === 'single'"
-      (click)="layoutChange.emit('single')"
-    >
-      <app-icon name="square" [size]="13" />
-    </button>
-    <button
-      type="button"
-      class="btn btn-square btn-ghost btn-xs join-item"
-      [title]="'terminal.layoutColumns' | t"
-      [class.active]="layout() === 'columns'"
-      (click)="layoutChange.emit('columns')"
-    >
-      <app-icon name="columns" [size]="13" />
-    </button>
-    <button
-      type="button"
-      class="btn btn-square btn-ghost btn-xs join-item"
-      [title]="'terminal.layoutRows' | t"
-      [class.active]="layout() === 'rows'"
-      (click)="layoutChange.emit('rows')"
-    >
-      <app-icon name="rows" [size]="13" />
-    </button>
-    <button
-      type="button"
-      class="btn btn-square btn-ghost btn-xs join-item"
-      [title]="'terminal.layoutGrid' | t"
-      [class.active]="layout() === 'grid'"
-      (click)="layoutChange.emit('grid')"
-    >
-      <app-icon name="grid" [size]="13" />
-    </button>
-  </div>
-}
-
-@if (layout() === 'grid') {
-  <div class="popover-anchor">
-    <button
-      type="button"
-      class="popover-trigger"
-      aria-haspopup="dialog"
-      [class.active]="popover() === 'grid'"
-      [attr.aria-expanded]="popover() === 'grid'"
-      [attr.aria-label]="'terminal.gridSettings' | t"
-      [title]="'terminal.gridSize' | t: { columns: gridColumns(), rows: gridRows() }"
-      (click)="togglePopover('grid')"
-    >
-      <span
-        class="grid-preview"
-        aria-hidden="true"
-        [style.--preview-columns]="gridColumns()"
-        [style.--preview-rows]="gridRows()"
-      >
-        @for (_ of gridCells(); track $index) {
-          <i [class.occupied]="$index < visibleCount()"></i>
-        }
-      </span>
-      <b>{{ gridColumns() }}×{{ gridRows() }}</b>
-    </button>
-
-    @if (popover() === 'grid') {
-      <div
-        class="toolbar-popover grid-dimensions"
-        role="dialog"
-        [attr.aria-label]="'terminal.gridCustom' | t"
-      >
-        <div class="dimension-stepper" role="group" [attr.aria-label]="'terminal.gridColumns' | t">
-          <span class="dimension-axis">{{ 'terminal.gridColumns' | t }}</span>
-          <button
-            type="button"
-            [attr.aria-label]="'terminal.gridDecreaseColumns' | t"
-            [title]="'terminal.gridDecreaseColumns' | t"
-            [disabled]="gridColumns() <= minGridDimension"
-            (click)="gridDimensionChange.emit({ axis: 'columns', delta: -1 })"
-          >
-            −
-          </button>
-          <output [attr.aria-label]="'terminal.gridCurrentColumns' | t">{{ gridColumns() }}</output>
-          <button
-            type="button"
-            [attr.aria-label]="'terminal.gridIncreaseColumns' | t"
-            [title]="'terminal.gridIncreaseColumns' | t"
-            [disabled]="gridColumns() >= maxGridDimension"
-            (click)="gridDimensionChange.emit({ axis: 'columns', delta: 1 })"
-          >
-            +
-          </button>
-        </div>
-
+    @if (!compact()) {
+      <div class="layout-controls" role="group" [attr.aria-label]="'terminal.layout' | t">
         <button
           type="button"
-          class="dimension-swap"
-          [attr.aria-label]="'terminal.gridSwap' | t"
-          [title]="'terminal.gridSwap' | t"
-          [disabled]="gridColumns() === gridRows()"
-          (click)="gridSwapRequested.emit()"
+          class="layout-choice"
+          [title]="'terminal.layoutSingle' | t"
+          [attr.aria-pressed]="layout() === 'single'"
+          (click)="layoutChange.emit('single')"
         >
-          <app-icon name="arrow-swap" [size]="13" />
+          <app-icon name="square" [size]="13" />
+          <span>{{ 'terminal.layoutSingle' | t }}</span>
         </button>
-
-        <div class="dimension-stepper" role="group" [attr.aria-label]="'terminal.gridRows' | t">
-          <span class="dimension-axis">{{ 'terminal.gridRows' | t }}</span>
-          <button
-            type="button"
-            [attr.aria-label]="'terminal.gridDecreaseRows' | t"
-            [title]="'terminal.gridDecreaseRows' | t"
-            [disabled]="gridRows() <= minGridDimension"
-            (click)="gridDimensionChange.emit({ axis: 'rows', delta: -1 })"
-          >
-            −
-          </button>
-          <output [attr.aria-label]="'terminal.gridCurrentRows' | t">{{ gridRows() }}</output>
-          <button
-            type="button"
-            [attr.aria-label]="'terminal.gridIncreaseRows' | t"
-            [title]="'terminal.gridIncreaseRows' | t"
-            [disabled]="gridRows() >= maxGridDimension"
-            (click)="gridDimensionChange.emit({ axis: 'rows', delta: 1 })"
-          >
-            +
-          </button>
-        </div>
-
-        <span class="grid-capacity" [title]="'terminal.gridCapacity' | t">
-          {{ 'terminal.gridCells' | t: { count: gridCapacity() } }}
-        </span>
+        <button
+          type="button"
+          class="layout-choice"
+          [title]="'terminal.layoutColumns' | t"
+          [attr.aria-pressed]="layout() === 'columns'"
+          (click)="layoutChange.emit('columns')"
+        >
+          <app-icon name="columns" [size]="13" />
+          <span>{{ 'terminal.layoutColumns' | t }}</span>
+        </button>
+        <button
+          type="button"
+          class="layout-choice"
+          [title]="'terminal.layoutRows' | t"
+          [attr.aria-pressed]="layout() === 'rows'"
+          (click)="layoutChange.emit('rows')"
+        >
+          <app-icon name="rows" [size]="13" />
+          <span>{{ 'terminal.layoutRows' | t }}</span>
+        </button>
+        <button
+          type="button"
+          class="layout-choice"
+          [title]="'terminal.layoutGrid' | t"
+          [attr.aria-pressed]="layout() === 'grid'"
+          (click)="layoutChange.emit('grid')"
+        >
+          <app-icon name="grid" [size]="13" />
+          <span>{{ 'terminal.layoutGrid' | t }}</span>
+        </button>
       </div>
+      @if (layout() === 'grid') {
+        <div class="grid-dimensions" role="group" [attr.aria-label]="'terminal.gridCustom' | t">
+          <div class="dimension-stepper" role="group" [attr.aria-label]="'terminal.gridColumns' | t">
+            <span class="dimension-axis">{{ 'terminal.gridColumns' | t }}</span>
+            <button
+              type="button"
+              [attr.aria-label]="'terminal.gridDecreaseColumns' | t"
+              [title]="'terminal.gridDecreaseColumns' | t"
+              [disabled]="gridColumns() <= minGridDimension"
+              (click)="gridDimensionChange.emit({ axis: 'columns', delta: -1 })"
+            >
+              −
+            </button>
+            <output [attr.aria-label]="'terminal.gridCurrentColumns' | t">{{ gridColumns() }}</output>
+            <button
+              type="button"
+              [attr.aria-label]="'terminal.gridIncreaseColumns' | t"
+              [title]="'terminal.gridIncreaseColumns' | t"
+              [disabled]="gridColumns() >= maxGridDimension"
+              (click)="gridDimensionChange.emit({ axis: 'columns', delta: 1 })"
+            >
+              +
+            </button>
+          </div>
+
+          <button
+            type="button"
+            class="dimension-swap"
+            [attr.aria-label]="'terminal.gridSwap' | t"
+            [title]="'terminal.gridSwap' | t"
+            [disabled]="gridColumns() === gridRows()"
+            (click)="gridSwapRequested.emit()"
+          >
+            <app-icon name="arrow-swap" [size]="13" />
+          </button>
+
+          <div class="dimension-stepper" role="group" [attr.aria-label]="'terminal.gridRows' | t">
+            <span class="dimension-axis">{{ 'terminal.gridRows' | t }}</span>
+            <button
+              type="button"
+              [attr.aria-label]="'terminal.gridDecreaseRows' | t"
+              [title]="'terminal.gridDecreaseRows' | t"
+              [disabled]="gridRows() <= minGridDimension"
+              (click)="gridDimensionChange.emit({ axis: 'rows', delta: -1 })"
+            >
+              −
+            </button>
+            <output [attr.aria-label]="'terminal.gridCurrentRows' | t">{{ gridRows() }}</output>
+            <button
+              type="button"
+              [attr.aria-label]="'terminal.gridIncreaseRows' | t"
+              [title]="'terminal.gridIncreaseRows' | t"
+              [disabled]="gridRows() >= maxGridDimension"
+              (click)="gridDimensionChange.emit({ axis: 'rows', delta: 1 })"
+            >
+              +
+            </button>
+          </div>
+
+          <span class="grid-capacity" [title]="'terminal.gridCapacity' | t">
+            {{ 'terminal.gridCells' | t: { count: gridCapacity() } }}
+          </span>
+        </div>
+      }
     }
   </div>
 }

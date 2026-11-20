@@ -73,6 +73,7 @@ try {
       const gridStyle = grid ? getComputedStyle(grid) : null;
       const tabHeader = document.querySelector('.app-shell > .terminal-tabs');
       const toolbar = tabHeader && getComputedStyle(tabHeader).display !== 'none' ? tabHeader : null;
+      const tabStrip = toolbar?.querySelector('.tab-strip');
 
       return {
         viewport: { width: innerWidth, height: innerHeight },
@@ -107,6 +108,10 @@ try {
           .flatMap((panel) => [...panel.querySelectorAll('header button')])
           .map(toRect),
         toolbarClipped: toolbar ? toolbar.scrollWidth - toolbar.clientWidth : 0,
+        hasTabScrollbar: tabStrip ? /auto|scroll/.test(getComputedStyle(tabStrip).overflowX) : false,
+        hiddenTabs: tabStrip?.querySelectorAll('.tab-slot[hidden]').length ?? 0,
+        overflowTrigger: Boolean(toolbar?.querySelector('[data-testid="tab-overflow-toggle"]')),
+        activeTabInRow: Boolean(tabStrip?.querySelector('.tab-slot:not([hidden]) .tab.active')),
       };
     });
 
@@ -173,7 +178,13 @@ try {
         `${label}: terminal header controls are off screen: ${JSON.stringify(snapshot.headerControls)}`,
       );
     }
-    // The scrollable tab strip leaves room for the menu trigger and terminal controls.
+    if (snapshot.hasTabScrollbar || snapshot.overflowTrigger !== (snapshot.hiddenTabs > 0)) {
+      throw new Error(label + ': overflowing tabs should be in a menu');
+    }
+    if (!expected.focusMode && !snapshot.activeTabInRow) {
+      throw new Error(label + ': the active terminal tab was pushed into the menu');
+    }
+    // Leave room for the New button and terminal controls.
     if (snapshot.toolbarClipped > 1) {
       throw new Error(
         `${label}: ${snapshot.toolbarClipped}px of the terminal toolbar is hidden behind a scroll`,

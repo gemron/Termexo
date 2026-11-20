@@ -5,7 +5,9 @@ use crate::database::WorkspaceDatabase;
 use std::path::Path;
 
 use crate::git::watch::RepositoryWatcher;
-use crate::git::{RepositoryDiff, RepositoryManager, RepositoryOverview, RepositoryTarget};
+use crate::git::{
+    RepositoryDiff, RepositoryHistory, RepositoryManager, RepositoryOverview, RepositoryTarget,
+};
 
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -56,6 +58,28 @@ pub fn get_repository_overview(
         overview.watched = watcher.watch(Path::new(&overview.root), &terminal_id);
     }
     Ok(overview)
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RepositoryHistoryRequest {
+    target: RepositoryTargetRequest,
+    branch: Option<String>,
+    commit_limit: Option<usize>,
+}
+
+#[tauri::command(async)]
+pub fn get_repository_history(
+    request: RepositoryHistoryRequest,
+    repositories: State<'_, RepositoryManager>,
+    database: State<'_, WorkspaceDatabase>,
+) -> Result<RepositoryHistory, String> {
+    repositories.history(
+        &request.target.into(),
+        &database,
+        request.branch.as_deref(),
+        request.commit_limit,
+    )
 }
 
 #[tauri::command(async)]

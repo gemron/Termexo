@@ -231,6 +231,7 @@ pub fn run() {
             commands::config::discover_system_proxy,
             commands::fonts::list_system_fonts,
             commands::git::get_repository_overview,
+            commands::git::get_repository_history,
             commands::git::get_repository_diff,
             commands::network_export::export_network_profiles,
             commands::network_export::write_network_profile_export,

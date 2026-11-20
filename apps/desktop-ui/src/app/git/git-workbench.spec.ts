@@ -57,10 +57,12 @@ describe('buildCommitGraph', () => {
       commit('side-parent', []),
     ]);
 
-    expect(rows[0].lane).toBe(0);
-    expect(rows[0].parentLanes).toEqual([0, 1]);
+    expect(rows[0].nodeX).toBe(8);
+    expect(rows[0].edges.map((edge) => edge.path)).toEqual(['M8 24 V48', 'M8 24 C8 36 24 36 24 48']);
+    expect(rows[0].edges[0].color).not.toBe(rows[0].edges[1].color);
     expect(rows[1].lanes).toBe(2);
-    expect(rows[2].lane).toBe(0);
+    expect(rows[1].edges).toContainEqual(expect.objectContaining({ path: 'M24 0 C24 24 8 24 8 48' }));
+    expect(rows[2].nodeX).toBe(8);
   });
 
   it('collapses duplicate lanes when merge parents converge', () => {
@@ -71,7 +73,7 @@ describe('buildCommitGraph', () => {
       commit('root', []),
     ]);
 
-    expect(rows[2].parentLanes).toEqual([0]);
+    expect(rows[2].edges).toContainEqual(expect.objectContaining({ path: 'M24 24 C24 36 8 36 8 48' }));
     expect(rows[3].lanes).toBe(1);
   });
 });
@@ -106,6 +108,10 @@ describe('GitWorkbenchComponent states', () => {
   });
 
   async function showRepository(overview = OVERVIEW) {
+    vi.spyOn(git, 'loadHistory').mockResolvedValue({
+      branches: [{ reference: 'refs/heads/main', name: 'main' }],
+      commits: overview.commits,
+    });
     const diff = vi.spyOn(git, 'loadDiff').mockImplementation(async (_target, path) => ({
       path, oldText: 'old content', newText: 'updated content', binary: false, truncated: false,
     }));
@@ -119,10 +125,17 @@ describe('GitWorkbenchComponent states', () => {
     return diff;
   }
 
+  function waitForCommits(count: number) {
+    return vi.waitFor(() => {
+      fixture.detectChanges();
+      expect(root.querySelectorAll('.commit-row')).toHaveLength(count);
+    });
+  }
+
   it('gives changes and history separate views while preserving the current diff', async () => {
     await showRepository({ ...OVERVIEW, commits: [commit('abc123', [])] });
     const tabs = root.querySelectorAll<HTMLButtonElement>('.sidebar-tabs button');
-    const changes = root.querySelector<HTMLElement>('.changes-panel')!;
+    const changes = root.querySelector<HTMLElement>('.git-content')!;
     const history = root.querySelector<HTMLElement>('.graph-panel')!;
     expect(changes.hidden).toBe(false);
     expect(history.hidden).toBe(true);
@@ -135,6 +148,29 @@ describe('GitWorkbenchComponent states', () => {
     tabs[0].click();
     fixture.detectChanges();
     expect(root.querySelectorAll('.change-file')).toHaveLength(2);
+    expect(git.selectedPath()).toBe(OVERVIEW.changes[0].path);
+  });
+
+  it('loads the selected branch and keeps the current diff selection', async () => {
+    await showRepository();
+    const branches = [
+      { reference: 'refs/heads/main', name: 'main' },
+      { reference: 'refs/remotes/origin/feature', name: 'origin/feature' },
+    ];
+    vi.mocked(git.loadHistory).mockImplementation(async (_target, branch) => ({
+      branches,
+      commits: branch ? [commit('feature work', [])] : [commit('main work', []), commit('feature work', [])],
+    }));
+    root.querySelectorAll<HTMLButtonElement>('.sidebar-tabs button')[1].click();
+    fixture.detectChanges();
+    await waitForCommits(2);
+    const select = root.querySelector<HTMLSelectElement>('[data-testid="git-history-branch"]')!;
+    select.value = 'refs/remotes/origin/feature';
+    select.dispatchEvent(new Event('change'));
+    fixture.detectChanges();
+    await waitForCommits(1);
+    expect(git.loadHistory).toHaveBeenLastCalledWith(expect.anything(), 'refs/remotes/origin/feature');
+    expect(root.querySelector('.commit-copy strong')?.textContent).toBe('feature work');
     expect(git.selectedPath()).toBe(OVERVIEW.changes[0].path);
   });
 
@@ -203,6 +239,7 @@ describe('GitWorkbenchComponent states', () => {
     expect(root.querySelector('.copy-feedback')?.textContent).toContain('Copied');
     root.querySelectorAll<HTMLButtonElement>('.sidebar-tabs button')[1].click();
     fixture.detectChanges();
+    await waitForCommits(1);
     root.querySelector<HTMLButtonElement>('.oid')!.click();
     await fixture.whenStable();
     expect(clipboardWrite).toHaveBeenCalledWith('full-commit-hash');

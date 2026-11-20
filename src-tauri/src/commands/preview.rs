@@ -1,4 +1,4 @@
-use std::io::Read;
+use std::io::{ErrorKind, Read};
 use std::path::{Path, PathBuf};
 
 use base64::{engine::general_purpose::STANDARD, Engine};
@@ -36,6 +36,7 @@ pub struct ProjectPreview {
     mime: &'static str,
     content: String,
     message: Option<String>,
+    used_continuation: bool,
 }
 
 fn display_path(path: &Path) -> String {
@@ -63,19 +64,23 @@ fn project_root(database: &WorkspaceDatabase, workspace_id: &str) -> Result<Path
 }
 
 /// Canonical paths reject traversal and links leading outside this project. This module never writes.
-fn project_path(root: &Path, path: &str) -> Result<PathBuf, String> {
-    let candidate = Path::new(path);
-    let resolved = if candidate.is_absolute() {
-        candidate.to_path_buf()
-    } else {
-        root.join(candidate)
-    }
-    .canonicalize()
-    .map_err(|_| "文件或目录不存在，或无法读取。")?;
+fn project_path(
+    root: &Path,
+    path: &str,
+    continued_path: Option<&str>,
+) -> Result<(PathBuf, bool), String> {
+    let exact = root.join(path).canonicalize();
+    let (resolved, used_continuation) = match (exact, continued_path) {
+        (Err(error), Some(continued)) if error.kind() == ErrorKind::NotFound => {
+            (root.join(continued).canonicalize(), true)
+        }
+        (resolved, _) => (resolved, false),
+    };
+    let resolved = resolved.map_err(|_| "文件或目录不存在，或无法读取。")?;
     if !resolved.starts_with(root) {
         return Err("只读预览仅支持当前项目目录内的文件。".into());
     }
-    Ok(resolved)
+    Ok((resolved, used_continuation))
 }
 
 #[tauri::command(async)]
@@ -89,7 +94,7 @@ pub fn list_project_directory(
 }
 
 fn list_directory(root: &Path, path: &str) -> Result<ProjectDirectory, String> {
-    let directory = project_path(root, path)?;
+    let (directory, _) = project_path(root, path, None)?;
     let iterator = std::fs::read_dir(&directory).map_err(|_| "无法读取此文件夹。")?;
     let mut entries = Vec::new();
     let mut truncated = false;
@@ -126,14 +131,19 @@ fn list_directory(root: &Path, path: &str) -> Result<ProjectDirectory, String> {
 pub fn read_project_preview(
     workspace_id: String,
     path: String,
+    continued_path: Option<String>,
     database: State<'_, WorkspaceDatabase>,
 ) -> Result<ProjectPreview, String> {
     let root = project_root(&database, &workspace_id)?;
-    read_preview(&root, &path)
+    read_preview(&root, &path, continued_path.as_deref())
 }
 
-fn read_preview(root: &Path, path: &str) -> Result<ProjectPreview, String> {
-    let resolved = project_path(root, path)?;
+fn read_preview(
+    root: &Path,
+    path: &str,
+    continued_path: Option<&str>,
+) -> Result<ProjectPreview, String> {
+    let (resolved, used_continuation) = project_path(root, path, continued_path)?;
     if resolved.is_dir() {
         return Ok(ProjectPreview {
             path: display_path(&resolved),
@@ -141,6 +151,7 @@ fn read_preview(root: &Path, path: &str) -> Result<ProjectPreview, String> {
             mime: "",
             content: String::new(),
             message: None,
+            used_continuation,
         });
     }
     if !resolved.is_file() {
@@ -174,6 +185,7 @@ fn read_preview(root: &Path, path: &str) -> Result<ProjectPreview, String> {
         mime,
         content: String::new(),
         message: None,
+        used_continuation,
     };
     if kind == "unsupported" {
         preview.message = Some("此格式暂不支持内置预览，请使用外部应用打开。".into());
@@ -226,28 +238,40 @@ mod tests {
         std::fs::create_dir_all(&root).unwrap();
         let root = root.canonicalize().unwrap();
         std::fs::write(root.join("代码 空格.ts"), "first\r\nsecond 中文\r\n").unwrap();
-        let preview = read_preview(&root, "代码 空格.ts").unwrap();
+        let preview = read_preview(&root, "代码 空格.ts", None).unwrap();
         assert_eq!(preview.kind, "text");
         assert_eq!(preview.content, "first\nsecond 中文\n");
         assert!(preview.path.ends_with("代码 空格.ts"));
-        assert!(project_path(&root, "..").is_err());
-        assert!(read_preview(&root, "missing").is_err());
+        assert!(!preview.used_continuation);
+        let truncated = display_path(&root.join("代码"));
+        let continued = display_path(&root.join("代码 空格.ts"));
+        let preview = read_preview(&root, &truncated, Some(&continued)).unwrap();
+        assert!(preview.used_continuation);
+        assert!(preview.path.ends_with("代码 空格.ts"));
+        assert!(
+            !read_preview(&root, "代码 空格.ts", Some("missing"))
+                .unwrap()
+                .used_continuation
+        );
+        assert!(read_preview(&root, "missing", Some("..")).is_err());
+        assert!(project_path(&root, "..", None).is_err());
+        assert!(read_preview(&root, "missing", None).is_err());
         std::fs::write(root.join("binary"), [0, 1, 2]).unwrap();
-        assert!(read_preview(&root, "binary").is_err());
+        assert!(read_preview(&root, "binary", None).is_err());
         std::fs::write(
             root.join("large.txt"),
             vec![b'a'; MAX_TEXT_BYTES as usize + 1],
         )
         .unwrap();
-        assert!(read_preview(&root, "large.txt").is_err());
+        assert!(read_preview(&root, "large.txt", None).is_err());
         std::fs::write(root.join("example.docx"), b"not a document").unwrap();
         assert_eq!(
-            read_preview(&root, "example.docx").unwrap().kind,
+            read_preview(&root, "example.docx", None).unwrap().kind,
             "unsupported"
         );
         std::fs::write(root.join("example.png"), [137, 80, 78, 71]).unwrap();
         assert_eq!(
-            read_preview(&root, "example.png").unwrap().content,
+            read_preview(&root, "example.png", None).unwrap().content,
             "iVBORw=="
         );
         assert_eq!(list_directory(&root, "").unwrap().entries.len(), 5);

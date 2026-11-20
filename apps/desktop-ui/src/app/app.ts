@@ -2,7 +2,7 @@ import { NgTemplateOutlet } from '@angular/common';
 import './core/i18n/workspace-tools.i18n';
 import { RemoteReadOnlyViewComponent } from './remote/remote-read-only-view';
 import { ProjectPreviewPanelComponent } from './preview/project-preview-panel';
-import { ProjectPreviewService } from './core/services/project-preview.service';
+import { ProjectPreviewService, type ProjectPreviewSession } from './core/services/project-preview.service';
 import { CommonActionsDialogComponent } from './dialogs/common-actions-dialog';
 import { CommonActionsService } from './core/services/common-actions.service';
 import { terminalCommonAction, type CommonActionTerminalRequest } from './core/models/common-action';
@@ -12,12 +12,14 @@ import {
   Component,
   computed,
   effect,
+  ElementRef,
   HostListener,
   inject,
   Injector,
   linkedSignal,
   signal,
   untracked,
+  viewChild,
 } from '@angular/core';
 
 import {
@@ -185,6 +187,10 @@ import { GitWorkbenchComponent } from './git/git-workbench';
 type SidebarResizeTarget = 'workspace' | 'inspector' | 'preview';
 type WorkspaceTool = 'common-actions' | 'tasks' | 'git' | 'sessions';
 type WorkspaceView = 'terminal' | 'preview' | WorkspaceTool;
+type WorkbenchTab =
+  | { view: 'terminal'; id: string; terminal: TerminalSession }
+  | { view: 'preview'; id: string; preview: ProjectPreviewSession }
+  | { view: WorkspaceTool; id: WorkspaceTool };
 
 const WORKSPACE_TOOL_TABS = {
   'common-actions': { label: 'commonActions.title', icon: 'command' },
@@ -408,6 +414,47 @@ export class App {
     return this.openedWorkspaceTools().filter((tab) => tab.workspaceId === workspaceId);
   });
   protected readonly workspaceToolTabs = WORKSPACE_TOOL_TABS;
+  protected readonly tabMinWidth = 124;
+  protected readonly tabOverflowWidth = 32;
+  private readonly tabBar = viewChild<ElementRef<HTMLElement>>('tabBar');
+  private readonly newTabAnchor = viewChild<ElementRef<HTMLElement>>('newTabAnchor');
+  private readonly tabAvailableWidth = signal<number | null>(null);
+  private readonly workbenchTabs = computed<WorkbenchTab[]>(() => [
+    ...(this.state.activeWorkspace()?.terminals ?? []).map((terminal) => ({
+      view: 'terminal' as const, id: terminal.id, terminal,
+    })),
+    ...this.preview.workspaceTabs().map((preview) => ({
+      view: 'preview' as const, id: preview.id, preview,
+    })),
+    ...this.workspaceTools().map(({ tool }) => ({ view: tool, id: tool })),
+  ]);
+  private readonly activeWorkbenchTabIndex = computed(() => {
+    const view = this.workspaceView();
+    const id = view === 'terminal' ? this.activeTerminalId()
+      : view === 'preview' ? this.preview.activeTab()?.id : view;
+    return this.workbenchTabs().findIndex((tab) => tab.view === view && tab.id === id);
+  });
+  protected readonly tabVisibility = computed(() => {
+    const tabs = this.workbenchTabs();
+    const width = this.tabAvailableWidth();
+    const count = width === null || tabs.length * this.tabMinWidth <= width
+      ? tabs.length
+      : Math.max(1, Math.floor((width - this.tabOverflowWidth) / this.tabMinWidth));
+    const shown = tabs.slice(0, count);
+    const activeIndex = this.activeWorkbenchTabIndex();
+    if (activeIndex >= count) shown[count - 1] = tabs[activeIndex];
+    const visible = new Set(shown.map((tab) => this.workbenchTabId(tab.view, tab.id)));
+    return {
+      visible,
+      overflow: tabs.filter((tab) => !visible.has(this.workbenchTabId(tab.view, tab.id))),
+    };
+  });
+  protected readonly tabMenuOpen = linkedSignal({
+    source: computed(() => this.tabVisibility().overflow.length && !this.terminalFocusMode()
+      ? this.workspaceTabScope()
+      : null),
+    computation: () => false,
+  });
   protected readonly busyTodoTaskId = signal<string | null>(null);
   protected readonly editingWorkspaceId = signal<string | null>(null);
   protected readonly claudeLaunchOpen = signal(false);
@@ -671,6 +718,31 @@ export class App {
   });
 
   constructor() {
+    effect((onCleanup) => {
+      const bar = this.tabBar()?.nativeElement;
+      const newTab = this.newTabAnchor()?.nativeElement;
+      if (!bar || !newTab) return;
+      let previousWidth: number | null = null;
+      const measure = () => {
+        const barWidth = bar.getBoundingClientRect().width;
+        if (!barWidth) return;
+        const width = Math.max(0, barWidth - newTab.getBoundingClientRect().width);
+        if (width === previousWidth) return;
+        previousWidth = width;
+        this.tabAvailableWidth.set(width);
+        this.tabMenuOpen.set(false);
+      };
+      measure();
+      if (typeof ResizeObserver === 'undefined') {
+        window.addEventListener('resize', measure);
+        onCleanup(() => window.removeEventListener('resize', measure));
+        return;
+      }
+      const observer = new ResizeObserver(measure);
+      observer.observe(bar);
+      observer.observe(newTab);
+      onCleanup(() => observer.disconnect());
+    });
     effect(() => {
       const pending = this.returnToCommonActionReview();
       if (!pending) return;
@@ -1697,7 +1769,6 @@ export class App {
       this.preferredTerminalIds.update((items) => ({ ...items, [workspace.id]: preferredIds }));
     }
     this.state.selectTerminal(terminalId);
-    this.scrollTabIntoView(terminalId);
   }
 
   protected handleTerminalInput(event: { terminalId: string; data: string }): void {
@@ -2111,11 +2182,7 @@ export class App {
 
   private moveActiveTerminal(direction: -1 | 1): boolean {
     const terminalId = this.activeTerminalId();
-    if (!terminalId || !this.state.moveTerminal(terminalId, direction)) {
-      return false;
-    }
-    this.scrollTabIntoView(terminalId, 'smooth');
-    return true;
+    return terminalId !== null && this.state.moveTerminal(terminalId, direction);
   }
 
   /** Starts a tab drag, carrying the terminal id for drop targets outside this strip. */
@@ -2159,21 +2226,6 @@ export class App {
     this.tabDropIndex.set(null);
   }
 
-  /**
-   * Scrolls the tab strip with an ordinary wheel.
-   *
-   * A trackpad or mouse only produces `deltaY` here, which a horizontal strip would ignore, so a
-   * vertical wheel is redirected sideways. Shift+wheel already scrolls horizontally on its own.
-   */
-  protected scrollTabStrip(event: WheelEvent): void {
-    const strip = event.currentTarget as HTMLElement;
-    if (event.shiftKey || event.deltaY === 0 || strip.scrollWidth <= strip.clientWidth) {
-      return;
-    }
-    event.preventDefault();
-    strip.scrollLeft += event.deltaY;
-  }
-
   /** Closes a terminal on a middle click, as browsers and editors do for their own tabs. */
   protected closeTerminalOnMiddleClick(event: MouseEvent, terminalId: string): void {
     if (event.button !== MIDDLE_MOUSE_BUTTON) {
@@ -2210,12 +2262,26 @@ export class App {
     return this.visibleTerminalIds().includes(terminalId);
   }
 
-  private scrollTabIntoView(terminalId: string, behavior: ScrollBehavior = 'auto'): void {
-    window.requestAnimationFrame(() => {
-      document
-        .getElementById(`terminal-tab-${terminalId}`)
-        ?.scrollIntoView({ block: 'nearest', inline: 'nearest', behavior });
-    });
+  protected workbenchTabId(view: WorkspaceView, id: string): string {
+    if (view === 'terminal') return 'terminal-tab-' + id;
+    if (view === 'preview') return 'content-preview-tab-' + id;
+    return 'workspace-tool-tab-' + id;
+  }
+
+  protected selectOverflowTab(tab: WorkbenchTab): void {
+    this.tabMenuOpen.set(false);
+    this.activateWorkbenchTab(tab);
+    if (tab.view === 'terminal' || tab.view === 'preview') {
+      window.requestAnimationFrame(() => {
+        document.getElementById(this.workbenchTabId(tab.view, tab.id))?.focus({ preventScroll: true });
+      });
+    }
+  }
+
+  private activateWorkbenchTab(tab: WorkbenchTab): void {
+    if (tab.view === 'terminal') this.selectTerminal(tab.id);
+    else if (tab.view === 'preview') this.preview.activate(tab.id);
+    else this.selectWorkspaceTool(tab.view);
   }
 
   protected visibleTerminalLimit(): number {
@@ -2413,9 +2479,7 @@ export class App {
     this.workspaceView.set(tool);
     window.requestAnimationFrame(() => {
       if (this.workspaceView() !== tool) return;
-      const tab = document.getElementById('workspace-tool-tab-' + tool);
-      tab?.scrollIntoView?.({ block: 'nearest', inline: 'nearest' });
-      tab?.focus({ preventScroll: true });
+      document.getElementById(this.workbenchTabId(tool, tool))?.focus({ preventScroll: true });
     });
   }
 
@@ -2468,17 +2532,9 @@ export class App {
       return;
     }
 
-    const tabs = [
-      ...(this.state.activeWorkspace()?.terminals ?? []).map((terminal) => ({
-        view: 'terminal' as const, id: terminal.id,
-      })),
-      ...this.preview.workspaceTabs().map((tab) => ({ view: 'preview' as const, id: tab.id })),
-      ...this.workspaceTools().map((tab) => ({ view: tab.tool, id: tab.tool })),
-    ];
+    const tabs = this.workbenchTabs();
     if (!tabs.length) return;
-    const activeId = view === 'terminal' ? this.activeTerminalId()
-      : view === 'preview' ? this.preview.activeTab()?.id : view;
-    const activeIndex = tabs.findIndex((tab) => tab.view === view && tab.id === activeId);
+    const activeIndex = this.activeWorkbenchTabIndex();
     const selected = shortcut.action === 'selectTab'
       ? tabs[shortcut.index]
       : activeIndex < 0
@@ -2486,9 +2542,7 @@ export class App {
         : tabs[(activeIndex + shortcut.delta + tabs.length) % tabs.length];
     if (!selected) return;
     event.preventDefault();
-    if (selected.view === 'terminal') this.selectTerminal(selected.id);
-    else if (selected.view === 'preview') this.preview.activate(selected.id);
-    else this.selectWorkspaceTool(selected.view);
+    this.activateWorkbenchTab(selected);
   }
 
   private restoreMaximizedView(event: KeyboardEvent): void {

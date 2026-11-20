@@ -10,8 +10,10 @@ import {
   HostListener,
   inject,
   input,
+  linkedSignal,
   output,
   signal,
+  untracked,
   viewChild,
 } from '@angular/core';
 
@@ -25,6 +27,7 @@ import {
   RepositoryChange,
   RepositoryCommit,
   RepositoryDiff,
+  RepositoryHistory,
   RepositoryOverview,
   RepositoryTarget,
   repositoryChangeStatus,
@@ -44,13 +47,21 @@ import { IconComponent } from '../shared/icon/icon';
 const CHANGE_SCROLL_HEADROOM = 0.3;
 const CLIPBOARD_FEEDBACK_MS = 1500;
 const COMPACT_GIT_WIDTH = 680;
+const GRAPH_LANE_WIDTH = 16;
+const GRAPH_CENTER = 24;
+const GRAPH_COLORS = ['var(--accent)', '#829fea', '#e28ab4', '#e4b56d', '#6bbad0', '#b19aeb'];
+
+interface CommitGraphEdge {
+  path: string;
+  color: string;
+}
 
 interface CommitGraphRow {
   commit: RepositoryCommit;
-  lane: number;
   lanes: number;
-  laneIndexes: number[];
-  parentLanes: number[];
+  nodeX: number;
+  color: string;
+  edges: CommitGraphEdge[];
 }
 
 @Component({
@@ -155,7 +166,31 @@ export class GitWorkbenchComponent {
       .map(([dir, changes]) => ({ dir, changes, collapsed: collapsed.has(dir) }));
   });
 
-  protected readonly graphRows = computed(() => buildCommitGraph(this.overview()?.commits ?? []));
+  private readonly historyScope = computed(() => {
+    const overview = this.overview();
+    const target = this.target();
+    return overview?.available && target
+      ? `${overview.root}:${target.workspaceId}:${target.terminalId}:${target.runtimeRevision}`
+      : null;
+  });
+  private readonly historyHead = computed(() => this.overview()?.head);
+  private readonly historyRefresh = signal(0);
+  protected readonly historyBranch = linkedSignal({
+    source: this.historyScope,
+    computation: (): string | null => null,
+  });
+  private readonly history = signal<{ scope: string; data: RepositoryHistory } | null>(null);
+  protected readonly historyLoading = signal(false);
+  protected readonly historyError = signal('');
+  private readonly currentHistory = computed(() => {
+    const history = this.history();
+    return history && history.scope === this.historyScope() ? history.data : null;
+  });
+  protected readonly historyBranches = computed(() => this.currentHistory()?.branches ?? []);
+  protected readonly graphRows = computed(() => buildCommitGraph(this.currentHistory()?.commits ?? []));
+  protected readonly graphWidth = computed(
+    () => Math.max(1, ...this.graphRows().map((row) => row.lanes)) * GRAPH_LANE_WIDTH,
+  );
 
   private readonly diffViewport = viewChild<ElementRef<HTMLElement>>('diffViewport');
   protected readonly changeBlocks = computed(() => changeBlockStarts(this.rows()));
@@ -210,6 +245,28 @@ export class GitWorkbenchComponent {
       this.loadedDiffKey = diffKey;
       void this.loadDiff(path, target);
     });
+    effect((onCleanup) => {
+      const scope = this.historyScope();
+      const target = untracked(this.target);
+      if (!scope || !target || this.sidebarTab() !== 'history') return;
+      const branch = this.historyBranch();
+      this.historyHead();
+      this.historyRefresh();
+      this.historyLoading.set(true);
+      this.historyError.set('');
+      let cancelled = false;
+      onCleanup(() => { cancelled = true; });
+      void this.git.loadHistory(target, branch)
+        .then((data) => {
+          if (!cancelled) this.history.set({ scope, data });
+        })
+        .catch((error: unknown) => {
+          if (!cancelled) this.historyError.set(error instanceof Error ? error.message : String(error));
+        })
+        .finally(() => {
+          if (!cancelled) this.historyLoading.set(false);
+        });
+    });
     effect(() => {
       if (!this.refreshing()) {
         this.manualRefreshing.set(false);
@@ -252,7 +309,7 @@ export class GitWorkbenchComponent {
   /** Alt with an arrow key, which nothing in the diff consumes. */
   @HostListener('keydown', ['$event'])
   protected onKeyDown(event: KeyboardEvent): void {
-    if (!event.altKey || event.ctrlKey || event.metaKey) return;
+    if (this.sidebarTab() !== 'changes' || !event.altKey || event.ctrlKey || event.metaKey) return;
     if (event.key === 'ArrowDown') {
       this.stepToChange(1);
     } else if (event.key === 'ArrowUp') {
@@ -352,7 +409,12 @@ export class GitWorkbenchComponent {
     this.git.setDiffLayout(layout);
   }
 
+  protected selectHistoryBranch(event: Event): void {
+    this.historyBranch.set((event.target as HTMLSelectElement).value || null);
+  }
+
   protected refresh(): void {
+    if (this.sidebarTab() === 'history') this.historyRefresh.update((version) => version + 1);
     this.manualRefreshing.set(true);
     this.refreshRequested.emit();
     const path = this.selectedPath();
@@ -397,42 +459,56 @@ export class GitWorkbenchComponent {
   }
 }
 
+function graphColumn(lane: number): number {
+  return lane * GRAPH_LANE_WIDTH + GRAPH_LANE_WIDTH / 2;
+}
+
+function graphEdge(fromLane: number, y1: number, toLane: number, y2: number, color: string): CommitGraphEdge {
+  const x1 = graphColumn(fromLane);
+  const x2 = graphColumn(toLane);
+  const mid = (y1 + y2) / 2;
+  const path = fromLane === toLane
+    ? `M${x1} ${y1} V${y2}`
+    : `M${x1} ${y1} C${x1} ${mid} ${x2} ${mid} ${x2} ${y2}`;
+  return { path, color };
+}
+
 export function buildCommitGraph(commits: readonly RepositoryCommit[]): CommitGraphRow[] {
-  const lanes: string[] = [];
+  const lanes: { oid: string; color: string }[] = [];
+  let colorIndex = 0;
+  const nextColor = () => GRAPH_COLORS[colorIndex++ % GRAPH_COLORS.length];
+
   return commits.map((commit) => {
-    let lane = lanes.indexOf(commit.oid);
-    if (lane < 0) {
-      lanes.push(commit.oid);
-      lane = lanes.length - 1;
+    let lane = lanes.findIndex((entry) => entry.oid === commit.oid);
+    const continuing = lane >= 0;
+    if (!continuing) {
+      lane = lanes.length;
+      lanes.push({ oid: commit.oid, color: nextColor() });
     }
-    const laneCount = Math.max(lanes.length, 1);
-    if (commit.parentOids.length > 0) {
-      const firstParentLane = lanes.indexOf(commit.parentOids[0]);
-      if (firstParentLane >= 0 && firstParentLane !== lane) {
-        lanes.splice(lane, 1);
-      } else {
-        lanes[lane] = commit.parentOids[0];
-      }
-      for (const parent of commit.parentOids.slice(1).reverse()) {
-        const existing = lanes.indexOf(parent);
-        if (existing < 0) lanes.splice(lane + 1, 0, parent);
-      }
-    } else {
-      lanes.splice(lane, 1);
+    const before = lanes.slice();
+    const color = before[lane].color;
+    const [firstParent, ...otherParents] = commit.parentOids;
+    lanes.splice(lane, 1);
+    if (firstParent && !lanes.some((entry) => entry.oid === firstParent)) {
+      lanes.splice(lane, 0, { oid: firstParent, color });
     }
-    const parentLanes = commit.parentOids.map((parent) => {
-      const index = lanes.indexOf(parent);
-      return index < 0 ? lane : index;
+    let insertAt = lane + 1;
+    for (const parent of otherParents) {
+      if (!lanes.some((entry) => entry.oid === parent)) {
+        lanes.splice(insertAt++, 0, { oid: parent, color: nextColor() });
+      }
+    }
+
+    const edges = before.flatMap((entry, index) => {
+      if (index === lane) return [];
+      const next = lanes.indexOf(entry);
+      return [graphEdge(index, 0, next, GRAPH_CENTER * 2, entry.color)];
     });
-    return {
-      commit,
-      lane,
-      lanes: Math.max(laneCount, lanes.length, 1),
-      laneIndexes: Array.from(
-        { length: Math.max(laneCount, lanes.length, 1) },
-        (_, index) => index,
-      ),
-      parentLanes,
-    };
+    if (continuing) edges.push(graphEdge(lane, 0, lane, GRAPH_CENTER, color));
+    for (const parent of commit.parentOids) {
+      const next = lanes.findIndex((entry) => entry.oid === parent);
+      edges.push(graphEdge(lane, GRAPH_CENTER, next, GRAPH_CENTER * 2, lanes[next].color));
+    }
+    return { commit, lanes: Math.max(before.length, lanes.length), nodeX: graphColumn(lane), color, edges };
   });
 }

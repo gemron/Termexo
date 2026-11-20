@@ -51,6 +51,7 @@ try {
   const promptButton = page.locator(
     'button[title="打开提示词资产库"], button[title="Open prompt library"]',
   );
+  await page.getByTestId('terminal-tools-toggle').click();
   await promptButton.click();
   const promptDialog = page.locator('.prompt-library');
   await promptDialog.waitFor();
@@ -72,6 +73,7 @@ try {
   const handoffButton = page.locator(
     'button[title="打开会话交接"], button[title="Open session handoff"]',
   );
+  await page.getByTestId('terminal-tools-toggle').click();
   await handoffButton.click();
   const handoffDialog = page.locator('.handoff-dialog');
   await handoffDialog.waitFor();

@@ -37,32 +37,37 @@
 
   @if (overview(); as repository) {
     @if (repository.available) {
-    @if (repository.historyRewritten) {
-      <div class="git-warning">
-        <app-icon name="triangle-alert" [size]="13" />{{ repository.diagnostic }}
-      </div>
-    }
+    <div class="git-view-header">
+      @if (repository.historyRewritten) {
+        <div class="git-warning">
+          <app-icon name="triangle-alert" [size]="13" />{{ repository.diagnostic }}
+        </div>
+      }
 
-    <div class="git-content" [class.focused]="focusDiff()">
+      <nav class="sidebar-tabs" role="group" [attr.aria-label]="'git.ui.views' | t">
+        <button type="button" [class.active]="sidebarTab() === 'changes'"
+          [attr.aria-pressed]="sidebarTab() === 'changes'" (click)="sidebarTab.set('changes')">
+          {{ 'git.sessionChanges' | t }}<span>{{ repository.changes.length }}</span>
+        </button>
+        <button type="button" [class.active]="sidebarTab() === 'history'"
+          [attr.aria-pressed]="sidebarTab() === 'history'" (click)="sidebarTab.set('history')">
+          {{ 'git.graph' | t }}
+        </button>
+      </nav>
+    </div>
+
+    <div class="git-content" [class.focused]="focusDiff()" [hidden]="sidebarTab() !== 'changes'">
       <aside class="git-sidebar" [hidden]="focusDiff()">
-        <nav class="sidebar-tabs" role="group" [attr.aria-label]="'git.ui.views' | t">
-          <button type="button" [class.active]="sidebarTab() === 'changes'"
-            [attr.aria-pressed]="sidebarTab() === 'changes'" (click)="sidebarTab.set('changes')">
-            {{ 'git.sessionChanges' | t }}<span>{{ repository.changes.length }}</span>
-          </button>
-          <button type="button" [class.active]="sidebarTab() === 'history'"
-            [attr.aria-pressed]="sidebarTab() === 'history'" (click)="sidebarTab.set('history')">
-            {{ 'git.graph' | t }}<span>{{ repository.commits.length }}</span>
-          </button>
-          <button type="button" class="sidebar-close" [title]="'git.ui.focusDiff' | t"
-            [attr.aria-label]="'git.ui.focusDiff' | t" (click)="toggleFocusDiff()">
-            <app-icon name="x" [size]="13" />
-          </button>
-        </nav>
-        <section class="changes-panel" [hidden]="sidebarTab() !== 'changes'">
-          <p class="baseline-note">
-            {{ (repository.baselineCaptured ? 'git.baselineCaptured' : 'git.noBaseline') | t }}
-          </p>
+        <section class="changes-panel">
+          <div class="baseline-strip">
+            <p class="baseline-note">
+              {{ (repository.baselineCaptured ? 'git.baselineCaptured' : 'git.noBaseline') | t }}
+            </p>
+            <button type="button" class="sidebar-close" [title]="'git.ui.focusDiff' | t"
+              [attr.aria-label]="'git.ui.focusDiff' | t" (click)="toggleFocusDiff()">
+              <app-icon name="x" [size]="13" />
+            </button>
+          </div>
           <div class="change-tools">
             <label class="file-filter">
               <app-icon name="search" [size]="12" />
@@ -172,54 +177,6 @@
           </div>
         </section>
 
-        <section class="graph-panel" [hidden]="sidebarTab() !== 'history'">
-          <div class="commit-list">
-            @for (row of graphRows(); track row.commit.oid) {
-              <article class="commit-row" [class.in-session]="row.commit.inSession">
-                <svg
-                  class="commit-graph"
-                  [attr.viewBox]="'0 0 ' + row.lanes * 16 + ' 48'"
-                  [style.width.px]="row.lanes * 16"
-                  aria-hidden="true"
-                >
-                  @for (lane of row.laneIndexes; track lane) {
-                    <line [attr.x1]="lane * 16 + 8" y1="0" [attr.x2]="lane * 16 + 8" y2="48" />
-                  }
-                  @for (parentLane of row.parentLanes; track $index) {
-                    <line
-                      [attr.x1]="row.lane * 16 + 8"
-                      y1="24"
-                      [attr.x2]="parentLane * 16 + 8"
-                      y2="48"
-                    />
-                  }
-                  <circle [attr.cx]="row.lane * 16 + 8" cy="24" r="4" />
-                </svg>
-                <div class="commit-copy">
-                  <strong [title]="row.commit.summary">{{ row.commit.summary }}</strong>
-                  <span>
-                    <button type="button"
-                      class="oid"
-                      [title]="'git.copyHash' | t"
-                      [attr.aria-label]="('git.copyHash' | t) + ': ' + row.commit.shortOid"
-                      (click)="copyOid(row.commit.oid)"
-                      ><code>{{ copiedValue() === row.commit.oid ? '✓' : row.commit.shortOid }}</code></button>
-                    {{ row.commit.author }} · {{ commitTime(row.commit) }}
-                  </span>
-                  @if (row.commit.decorations.length > 0) {
-                    <div class="decorations">
-                      @for (decoration of row.commit.decorations; track decoration) {
-                        <em>{{ decoration }}</em>
-                      }
-                    </div>
-                  }
-                </div>
-              </article>
-            } @empty {
-              <div class="empty-state compact">{{ 'git.noCommits' | t }}</div>
-            }
-          </div>
-        </section>
       </aside>
 
       <section class="diff-panel">
@@ -450,6 +407,78 @@
         </footer>
       </section>
     </div>
+    <section class="graph-panel" [hidden]="sidebarTab() !== 'history'" [style.--commit-graph-width.px]="graphWidth()">
+      <div class="history-toolbar">
+        <label class="history-branch">
+          <app-icon name="git-branch" [size]="14" />
+          <span>{{ 'git.ui.branchFilter' | t }}</span>
+          <select data-testid="git-history-branch" (change)="selectHistoryBranch($event)">
+            <option value="" [selected]="historyBranch() === null">{{ 'git.ui.allBranches' | t }}</option>
+            @for (branch of historyBranches(); track branch.reference) {
+              <option [value]="branch.reference" [selected]="historyBranch() === branch.reference">
+                {{ branch.name }}
+              </option>
+            }
+          </select>
+        </label>
+      </div>
+      <div class="commit-list" [attr.aria-busy]="historyLoading()">
+        @if (historyLoading()) {
+          <div class="empty-state compact" role="status">{{ 'common.loading' | t }}</div>
+        } @else if (historyError()) {
+          <div class="empty-state compact error" role="alert">
+            <strong>{{ 'git.ui.loadHistoryFailed' | t }}</strong>
+            <span>{{ historyError() }}</span>
+            <button type="button" class="retry-button" (click)="refresh()">{{ 'common.retry' | t }}</button>
+          </div>
+        } @else if (graphRows().length) {
+          <div class="commit-columns" aria-hidden="true">
+            <span></span>
+            <span>{{ 'git.ui.commitSummary' | t }}</span>
+            <span>{{ 'git.ui.commitAuthor' | t }}</span>
+            <span>{{ 'git.ui.commitDate' | t }}</span>
+            <span>{{ 'git.ui.commitHash' | t }}</span>
+          </div>
+          @for (row of graphRows(); track row.commit.oid) {
+            <article class="commit-row" [class.in-session]="row.commit.inSession">
+              <div class="commit-rails" aria-hidden="true">
+                <svg class="commit-graph" [attr.width]="graphWidth()" height="48">
+                  @for (edge of row.edges; track $index) {
+                    <path [attr.d]="edge.path" [attr.stroke]="edge.color" />
+                  }
+                  <circle
+                    [attr.cx]="row.nodeX" cy="24"
+                    [attr.r]="row.commit.parentOids.length > 1 ? 4.6 : 3.6"
+                    [attr.stroke]="row.color" [style.--commit-color]="row.color"
+                  />
+                </svg>
+              </div>
+              <div class="commit-copy">
+                <strong [title]="row.commit.summary">{{ row.commit.summary }}</strong>
+                @if (row.commit.decorations.length) {
+                  <div class="decorations">
+                    @for (decoration of row.commit.decorations; track decoration) {
+                      <em [title]="decoration">{{ decoration }}</em>
+                    }
+                  </div>
+                }
+                <span class="commit-mobile-meta">{{ row.commit.author }} · {{ commitTime(row.commit) }}</span>
+              </div>
+              <span class="commit-author" [title]="row.commit.author">{{ row.commit.author }}</span>
+              <time class="commit-time">{{ commitTime(row.commit) }}</time>
+              <button type="button"
+                class="commit-hash oid"
+                [title]="'git.copyHash' | t"
+                [attr.aria-label]="('git.copyHash' | t) + ': ' + row.commit.shortOid"
+                (click)="copyOid(row.commit.oid)"
+              ><code>{{ copiedValue() === row.commit.oid ? '✓' : row.commit.shortOid }}</code></button>
+            </article>
+          }
+        } @else {
+          <div class="empty-state compact">{{ 'git.noCommits' | t }}</div>
+        }
+      </div>
+    </section>
     } @else {
       <div class="empty-state">
         <app-icon name="git-branch" [size]="26" />

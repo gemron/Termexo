@@ -27,6 +27,18 @@ export interface PreviewLocation {
   column: number;
 }
 
+interface PreviewPathContinuation {
+  path: string;
+  line?: number;
+  column?: number;
+}
+
+function resolvePreviewPath(path: string, workingDirectory?: string): string {
+  return workingDirectory && !/^(?:[a-z]:[\\/]|\\\\|\/)/i.test(path)
+    ? `${workingDirectory.replace(/[\\/]$/, '')}/${path}`
+    : path;
+}
+
 export function previewUrl(value: string): string {
   const url = new URL(value);
   if (!['http:', 'https:'].includes(url.protocol) || url.username || url.password)
@@ -135,6 +147,7 @@ export class ProjectPreviewSession {
     workingDirectory?: string,
     line = 1,
     column = 1,
+    continuation?: PreviewPathContinuation,
   ): Promise<void> {
     this.root(workspaceId);
     const generation = ++this.generation;
@@ -147,17 +160,22 @@ export class ProjectPreviewSession {
     this.error.set('');
     this.url.set('');
     this.file.set(null);
-    const absolute = /^(?:[a-z]:[\\/]|\\\\|\/)/i.test(path);
-    const resolved =
-      !absolute && workingDirectory ? `${workingDirectory.replace(/[\\/]$/, '')}/${path}` : path;
+    const resolved = resolvePreviewPath(path, workingDirectory);
     this.failedPath.set(resolved);
     this.location.set({ line: Math.max(1, line), column: Math.max(1, column) });
     try {
       if (!hasBackend()) throw new Error('项目文件读取需要连接桌面应用。');
       const file = await invoke<
-        Omit<ProjectPreview, 'kind'> & { kind: ProjectPreview['kind'] | 'directory' }
-      >('read_project_preview', { workspaceId, path: resolved });
+        Omit<ProjectPreview, 'kind'> & { kind: ProjectPreview['kind'] | 'directory'; usedContinuation?: boolean }
+      >('read_project_preview', {
+        workspaceId,
+        path: resolved,
+        ...(continuation && { continuedPath: resolvePreviewPath(continuation.path, workingDirectory) }),
+      });
       if (generation !== this.generation) return;
+      if (file.usedContinuation && continuation) {
+        this.location.set({ line: continuation.line ?? 1, column: continuation.column ?? 1 });
+      }
       if (file.kind === 'directory') {
         await this.browse(workspaceId, file.path);
         return;
@@ -310,9 +328,10 @@ export class ProjectPreviewService {
     line = 1,
     column = 1,
     tabId?: string,
+    continuation?: PreviewPathContinuation,
   ): Promise<ProjectPreviewSession> {
     const tab = this.target(workspaceId, tabId);
-    await tab.openFile(workspaceId, path, workingDirectory, line, column);
+    await tab.openFile(workspaceId, path, workingDirectory, line, column, continuation);
     return tab;
   }
 

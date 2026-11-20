@@ -41,6 +41,16 @@ export interface RepositoryOverview {
   watched: boolean;
 }
 
+export interface RepositoryBranch {
+  reference: string;
+  name: string;
+}
+
+export interface RepositoryHistory {
+  branches: RepositoryBranch[];
+  commits: RepositoryCommit[];
+}
+
 export interface RepositoryDiff {
   path: string;
   oldText: string;

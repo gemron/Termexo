@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { detectTerminalLinks, readLogicalLine, TerminalCell } from './terminal-links';
+import { continueTerminalPath, detectTerminalLinks, readLogicalLine, TerminalCell } from './terminal-links';
 
 describe('detectTerminalLinks', () => {
   it('finds an address and hands over exactly what it covers', () => {
@@ -73,6 +73,14 @@ describe('detectTerminalLinks', () => {
     expect(detectTerminalLinks('D:\\repo\\src\\main.rs:9')[0].text).toBe('D:\\repo\\src\\main.rs');
   });
 
+  it('keeps Unicode path segments and a file name quoted as inline code', () => {
+    const [relative, absolute] = detectTerminalLinks(
+      '打开 输出目录/安装结果.txt 和 `D:/build/install report.zip`',
+    );
+    expect(relative.text).toBe('输出目录/安装结果.txt');
+    expect(absolute.text).toBe('D:/build/install report.zip');
+  });
+
   it('refuses a bare word, which without a separator names no path', () => {
     expect(detectTerminalLinks('running tests now')).toEqual([]);
     expect(detectTerminalLinks('README')).toEqual([]);
@@ -107,6 +115,27 @@ function cells(text: string): TerminalCell[] {
       : [{ chars: char, width: 1 }],
   );
 }
+
+describe('continueTerminalPath', () => {
+  it('finds the rest of a Windows filename on the next independently wrapped row', () => {
+    const prefix = 'D:/devlop/inv3d/install/Output/inv3d-0.0.1-SNAPSHOT-';
+    const line = readLogicalLine([{ row: 1, cells: cells(prefix + '  ') }]);
+    const [link] = detectTerminalLinks(line.text);
+    const continued = continueTerminalPath(link, line, '  x64-setup.exe:9:4', 95);
+    expect(continued).toMatchObject({ text: prefix + 'x64-setup.exe', line: 9, column: 4 });
+    expect(continueTerminalPath(link, line, 'D:/another/file.exe', 95)).toBeUndefined();
+    expect(continueTerminalPath(link, line, 'https://example.com/test', 95)).toBeUndefined();
+  });
+
+  it('only extends a path at a plausible split', () => {
+    const line = readLogicalLine([{ row: 1, cells: cells('D:/output/very-long') }]);
+    const full = readLogicalLine([{ row: 1, cells: cells('D:/output/file') }]);
+    expect(continueTerminalPath(detectTerminalLinks(line.text)[0], line, 'name.zip', 19)?.text)
+      .toBe('D:/output/very-longname.zip');
+    expect(continueTerminalPath(detectTerminalLinks(full.text)[0], full, 'another message', 80))
+      .toBeUndefined();
+  });
+});
 
 describe('readLogicalLine', () => {
   it('reports the column each character sits in', () => {
@@ -143,6 +172,24 @@ describe('readLogicalLine', () => {
     expect(text).toBe('abcd');
     expect(positions[2]).toEqual({ x: 1, y: 4 });
     expect(positions[3]).toEqual({ x: 2, y: 4 });
+  });
+
+  it('keeps an absolute path together when a wide character wraps past one unused column', () => {
+    const { text, positions } = readLogicalLine([
+      { row: 3, cells: [...cells('D:/build/setup-'), { chars: '', width: 1 }] },
+      { row: 4, cells: cells('安装包.exe') },
+    ]);
+    const [link] = detectTerminalLinks(text);
+    expect(link.text).toBe('D:/build/setup-安装包.exe');
+    expect(positions[link.end - 1].y).toBe(4);
+  });
+
+  it('keeps a space actually printed at the wrap boundary', () => {
+    const { text } = readLogicalLine([
+      { row: 3, cells: cells('"D:/build/install ') },
+      { row: 4, cells: cells('report.zip"') },
+    ]);
+    expect(detectTerminalLinks(text)[0].text).toBe('D:/build/install report.zip');
   });
 
   it('reads an empty cell as the blank it draws, so words stay apart', () => {

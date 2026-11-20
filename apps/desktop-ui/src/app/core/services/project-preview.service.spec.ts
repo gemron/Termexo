@@ -41,6 +41,25 @@ describe('ProjectPreviewService', () => {
     expect(service.location()).toEqual({ line: 12, column: 3 });
   });
 
+  it('sends the continued path to the host and uses its position when the host resolves it', async () => {
+    invoke.mockResolvedValue({
+      path: 'D:/项目/Output/install-x64.exe',
+      kind: 'unsupported',
+      mime: 'application/octet-stream',
+      content: '',
+      usedContinuation: true,
+    });
+    await service.openFile('w', 'Output/install-', 'D:/项目', 1, 1, undefined, {
+      path: 'Output/install-x64.exe', line: 12, column: 7,
+    });
+    expect(invoke).toHaveBeenCalledExactlyOnceWith('read_project_preview', {
+      workspaceId: 'w', path: 'D:/项目/Output/install-', continuedPath: 'D:/项目/Output/install-x64.exe',
+    }, undefined);
+    expect(service.file()?.path).toBe('D:/项目/Output/install-x64.exe');
+    expect(service.location()).toEqual({ line: 12, column: 7 });
+    expect(service.failedPath()).toBe('');
+  });
+
   it('rejects unknown workspaces before any host read', async () => {
     await expect(service.openFile('missing', 'file.txt')).rejects.toThrow('项目不存在');
     expect(invoke).not.toHaveBeenCalled();

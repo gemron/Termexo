@@ -103,6 +103,20 @@ pub struct RepositoryCommit {
     pub in_session: bool,
 }
 
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RepositoryBranch {
+    pub reference: String,
+    pub name: String,
+}
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RepositoryHistory {
+    pub branches: Vec<RepositoryBranch>,
+    pub commits: Vec<RepositoryCommit>,
+}
+
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct RepositoryDiff {
@@ -307,7 +321,8 @@ impl RepositoryManager {
             }
             _ => Vec::new(),
         };
-        let commits = collect_commits(root, MAX_COMMIT_LIMIT, &session_oids)?;
+        let commits =
+            collect_commits(root, MAX_COMMIT_LIMIT, &session_oids, &[]).unwrap_or_default();
         let value = HeadDerived {
             history_rewritten,
             committed_changes,
@@ -412,6 +427,42 @@ impl RepositoryManager {
             commits: derived.commits.into_iter().take(limit).collect(),
             watched: false,
         })
+    }
+
+    pub fn history(
+        &self,
+        target: &RepositoryTarget,
+        database: &WorkspaceDatabase,
+        branch: Option<&str>,
+        commit_limit: Option<usize>,
+    ) -> Result<RepositoryHistory, String> {
+        let (directory, baseline) = self.resolve_target(target, database)?;
+        let root = self
+            .cached_repository_root(&directory)?
+            .ok_or_else(|| "当前终端目录不是 Git 工作树。".to_owned())?;
+        let head = current_head(&root)?;
+        let baseline = baseline.as_ref().filter(|item| {
+            item.root == root || (item.repository_missing_at_start && root.starts_with(&item.root))
+        });
+        let baseline_head = baseline.and_then(|item| item.head.as_deref());
+        let history_rewritten = matches!(
+            (baseline_head, head.as_deref()),
+            (Some(base), Some(current)) if base != current && !is_ancestor(&root, base, current)
+        );
+        let session_oids = if baseline.is_some() && !history_rewritten {
+            commits_since(&root, baseline_head, head.as_deref())?
+        } else {
+            HashSet::new()
+        };
+        collect_history(
+            &root,
+            head.as_deref(),
+            branch,
+            commit_limit
+                .unwrap_or(DEFAULT_COMMIT_LIMIT)
+                .clamp(1, MAX_COMMIT_LIMIT),
+            &session_oids,
+        )
     }
 
     pub fn diff(
@@ -958,24 +1009,75 @@ fn commits_since(
         .collect())
 }
 
+fn collect_history(
+    root: &Path,
+    head: Option<&str>,
+    branch: Option<&str>,
+    limit: usize,
+    session_oids: &HashSet<String>,
+) -> Result<RepositoryHistory, String> {
+    let output = run_git(
+        root,
+        &[
+            "for-each-ref",
+            "--sort=refname",
+            "--format=%(refname)%00%(symref)",
+            "refs/heads/",
+            "refs/remotes/",
+        ],
+    )?;
+    let branches: Vec<_> = String::from_utf8_lossy(&output)
+        .lines()
+        .filter_map(|line| {
+            let (reference, symbolic_target) = line.split_once('\0')?;
+            if !symbolic_target.is_empty() {
+                return None;
+            }
+            let name = reference
+                .strip_prefix("refs/heads/")
+                .or_else(|| reference.strip_prefix("refs/remotes/"))?;
+            Some(RepositoryBranch {
+                reference: reference.to_owned(),
+                name: name.to_owned(),
+            })
+        })
+        .collect();
+
+    let commits = if let Some(reference) = branch {
+        // Use exactly the full ref advertised by Git, so option-like values and revision syntax
+        // cannot change the command or select a different object.
+        let branch = branches
+            .iter()
+            .find(|branch| branch.reference == reference)
+            .ok_or_else(|| "该分支已不存在，请选择其他分支。".to_owned())?;
+        collect_commits(root, limit, session_oids, &[&branch.reference])?
+    } else if branches.is_empty() && head.is_none() {
+        Vec::new()
+    } else {
+        let mut revisions = vec!["--branches", "--remotes"];
+        revisions.extend(head);
+        collect_commits(root, limit, session_oids, &revisions)?
+    };
+    Ok(RepositoryHistory { branches, commits })
+}
+
 fn collect_commits(
     root: &Path,
     limit: usize,
     session_oids: &HashSet<String>,
+    revisions: &[&str],
 ) -> Result<Vec<RepositoryCommit>, String> {
     let max_count = format!("--max-count={limit}");
-    let output = match run_git(
-        root,
-        &[
-            "log",
-            "--topo-order",
-            &max_count,
-            "--pretty=format:%H%x1f%h%x1f%P%x1f%D%x1f%an%x1f%at%x1f%s%x1e",
-        ],
-    ) {
-        Ok(output) => output,
-        Err(_) => return Ok(Vec::new()),
-    };
+    let mut arguments = vec![
+        "log",
+        "--topo-order",
+        "--decorate=short",
+        &max_count,
+        "--pretty=format:%H%x1f%h%x1f%P%x1f%D%x1f%an%x1f%at%x1f%s%x1e",
+    ];
+    arguments.extend_from_slice(revisions);
+    arguments.push("--");
+    let output = run_git(root, &arguments)?;
     let text = String::from_utf8_lossy(&output);
     Ok(text
         .split('\u{1e}')
@@ -1428,6 +1530,85 @@ mod tests {
         assert!(manager.baselines.lock().unwrap().is_empty());
         let changes = collect_worktree_changes(&root, &HashSet::new()).unwrap();
         assert!(changes.iter().any(|change| change.path == "existing.txt"));
+        fs::remove_dir_all(&root).ok();
+    }
+
+    #[test]
+    fn reads_local_and_remote_branch_history_without_switching_head() {
+        let root = temporary_repository();
+        fs::create_dir_all(&root).unwrap();
+        if run_git(&root, &["init", "-b", "main"]).is_err() {
+            fs::remove_dir_all(&root).ok();
+            return;
+        }
+        run_git(&root, &["config", "user.name", "Termexo Test"]).unwrap();
+        run_git(&root, &["config", "user.email", "termexo@example.invalid"]).unwrap();
+        let commit = |summary| {
+            run_git(
+                &root,
+                &[
+                    "-c",
+                    "commit.gpgsign=false",
+                    "commit",
+                    "--allow-empty",
+                    "-m",
+                    summary,
+                ],
+            )
+            .unwrap();
+        };
+        commit("common");
+        run_git(&root, &["checkout", "-b", "feature"]).unwrap();
+        commit("feature commit");
+        run_git(
+            &root,
+            &["update-ref", "refs/remotes/origin/feature", "HEAD"],
+        )
+        .unwrap();
+        run_git(
+            &root,
+            &[
+                "symbolic-ref",
+                "refs/remotes/origin/HEAD",
+                "refs/remotes/origin/feature",
+            ],
+        )
+        .unwrap();
+        run_git(&root, &["checkout", "main"]).unwrap();
+        commit("main commit");
+        let head = current_head(&root).unwrap();
+        let session_oids = HashSet::from([head.clone().unwrap()]);
+
+        let all = collect_history(&root, head.as_deref(), None, 50, &session_oids).unwrap();
+        assert_eq!(all.commits.len(), 3);
+        assert_eq!(
+            all.branches
+                .iter()
+                .map(|branch| branch.name.as_str())
+                .collect::<Vec<_>>(),
+            ["feature", "main", "origin/feature"]
+        );
+        assert!(all
+            .commits
+            .iter()
+            .any(|commit| commit.in_session && commit.summary == "main commit"));
+        for reference in ["refs/heads/feature", "refs/remotes/origin/feature"] {
+            let history =
+                collect_history(&root, head.as_deref(), Some(reference), 50, &session_oids)
+                    .unwrap();
+            assert_eq!(
+                history
+                    .commits
+                    .iter()
+                    .map(|commit| commit.summary.as_str())
+                    .collect::<Vec<_>>(),
+                ["feature commit", "common"]
+            );
+        }
+        assert!(
+            collect_history(&root, head.as_deref(), Some("--help"), 50, &session_oids).is_err()
+        );
+        assert_eq!(current_head(&root).unwrap(), head);
         fs::remove_dir_all(&root).ok();
     }
 
