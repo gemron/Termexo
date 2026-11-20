@@ -11,7 +11,7 @@
 </p>
 
 <p align="center">
-  <img alt="Version 0.14.0" src="https://img.shields.io/badge/version-0.14.0-58c7a0">
+  <img alt="Version 0.15.0" src="https://img.shields.io/badge/version-0.15.0-58c7a0">
   <img alt="Windows" src="https://img.shields.io/badge/platform-Windows-0078D4?logo=windows">
   <img alt="macOS" src="https://img.shields.io/badge/platform-macOS-222222?logo=apple">
   <img alt="Linux" src="https://img.shields.io/badge/platform-Linux-FCC624?logo=linux&logoColor=black">
@@ -74,7 +74,7 @@
 
 ## 在 Windows、macOS 或 Linux 上开始使用
 
-1. **[下载 v0.14.0](https://github.com/gemron/Termexo/releases/tag/v0.14.0)**：Windows 选择 EXE/MSI；Mac 按芯片选择 Apple Silicon（`aarch64`）或 Intel（`x64`）的 DMG；Linux x64 可选择 Debian 安装包，无需 Rust 或编译工具。
+1. **[下载 v0.15.0](https://github.com/gemron/Termexo/releases/tag/v0.15.0)**：Windows 选择 EXE/MSI；Mac 按芯片选择 Apple Silicon（`aarch64`）或 Intel（`x64`）的 DMG；Linux x64 可选择 Debian 安装包，无需 Rust 或编译工具。
 2. 打开 Termexo，为本机项目目录创建工作区。
 3. 在工作区中新建终端，选择已安装的 Agent；若尚未安装，可在设置中查看检测结果并安装 CLI。
 4. 运行一个任务，查看终端标签和右侧面板的状态；手机访问可在本地流程跑通后按需启用。
@@ -139,7 +139,7 @@ MCP 是 AI 与 Termexo 之间的连接。**你用日常语言提出要求，不�
 
 ## 最新版本
 
-**[v0.14.0](https://github.com/gemron/Termexo/releases/tag/v0.14.0)** 标签过多时可从下拉菜单切换，终端工具集中在一个按钮。长文件路径可跨行打开，Git 提交图可按分支查看。
+**[v0.15.0](https://github.com/gemron/Termexo/releases/tag/v0.15.0)** 新增应用更新页、后台下载安装和中国大陆加速。等待输入与异常提醒留在工作区顶部，窄窗口仍可看到当前标签。
 [完整更新记录](CHANGELOG.cn.md)。
 
 如果 Termexo 帮到了你，欢迎 **给仓库点一个 Star**，帮助更多开发者发现它。
@@ -458,7 +458,8 @@ flowchart LR
 | V0.11.0 | 内容预览标签、常用操作、第三方通知、macOS 构建和自动发布 | 已发布 |
 | V0.12.1 | 移除内置工作流引擎与运行时，减小包体积 | 已发布 |
 | V0.13.0 | 简化模型设置、工作台标签与终端布局操作，新增远程主机 | 已发布 |
-| V0.14.0 | 标签下拉、终端工具菜单、跨行文件路径及 Git 分支提交图 | 当前版本 |
+| V0.14.0 | 标签下拉、终端工具菜单、跨行文件路径及 Git 分支提交图 | 已发布 |
+| V0.15.0 | 应用升级、中国大陆加速、通知布局与窄窗口改进 | 当前版本 |
 | V1.0 | 稳定性、安全加固与恢复体验 | 规划中 |
 
 进行中的工作见 [Issues](https://github.com/gemron/Termexo/issues)，实际交付内容见

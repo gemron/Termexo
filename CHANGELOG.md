@@ -2,6 +2,14 @@
 
 Release notes for every Termexo version, newest first. The current release is summarised in [README.md](README.md).
 
+## V0.15.0
+
+- **Open the update page from a reminder.** Select **View update** to see the installed version and release notes in **Settings → App updates**. The More tools menu keeps a badge after the reminder closes.
+- **Download first and install when ready.** Keep working while Termexo downloads and verifies the package. Windows offers **Close and install** when ready. macOS and Debian-based Linux can open the platform installer.
+- **Faster downloads in mainland China.** Choose Automatic, Mainland China acceleration, or Official sources. Automatic prefers the China mirror in Simplified Chinese. Termexo tries the official sources if the mirror is out of date or the download or verification fails.
+- **Waiting and error reminders stay above the workbench.** A compact banner leaves terminals and the task board usable. The notices list opens below the bell and closes with Escape or an outside click.
+- **The active tab stays visible in narrow windows.** Compact notice and connection indicators leave room for the active tab, New and terminal tools.
+
 ## V0.14.0
 
 - **Find tabs when the row fills up.** Extra tabs move into the dropdown beside **New**. Pick one to bring it back into the row. A stronger background, bold text and a bright bottom edge mark the selected tab.
