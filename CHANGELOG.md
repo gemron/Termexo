@@ -2,6 +2,12 @@
 
 Release notes for every Termexo version, newest first. The current release is summarised in [README.md](README.md).
 
+## V0.16.0
+
+- **Multi-account isolation for OpenCode, Pi, and Grok Build.** Manage isolated accounts for OpenCode (`XDG_DATA_HOME`), Pi Agent (`PI_CODING_AGENT_DIR`), and Grok Build (`GROK_HOME`) in **Settings → Accounts**, pick an account at launch, scan sessions per account, and switch accounts from a terminal's account chip.
+- **Fetch available models from provider APIs.** Click **Fetch models from API** in **Settings → Models** to query OpenAI- or Anthropic-compatible `/v1/models` endpoints using either an inline API key or a saved keyring credential over the active workspace proxy, then pick models directly from the dropdown.
+- **More reliable multi-account sign-in and switching.** Windows login terminals now exit with the CLI exit code so sign-in confirmation completes reliably; system and reconnecting login terminals no longer inherit model keys or hooks; exited terminals can switch accounts cleanly; background status refreshes update in place without reordering lists, and deleting a default account restores the system default and removes its managed folder.
+
 ## V0.15.0
 
 - **Open the update page from a reminder.** Select **View update** to see the installed version and release notes in **Settings → App updates**. The More tools menu keeps a badge after the reminder closes.
