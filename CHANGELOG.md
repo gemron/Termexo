@@ -2,6 +2,13 @@
 
 Release notes for every Termexo version, newest first. The current release is summarised in [README.md](README.md).
 
+## V0.14.0
+
+- **Find tabs when the row fills up.** Extra tabs move into the dropdown beside **New**. Pick one to bring it back into the row. A stronger background, bold text and a bright bottom edge mark the selected tab.
+- **Open terminal tools from one button.** Select the sliders icon to open a panel below it with terminal counts, prompts, handoffs, font settings and split layouts.
+- **Open the full file path from terminal output.** Ctrl-click a path that wraps onto another line. Termexo checks the continued path inside the project when the first fragment cannot be found.
+- **Browse Git commits by branch.** Open **Commit graph** in the Git tab and choose a local or locally tracked remote branch. Colored lines show branches and merges. Each row shows the commit message, author, date and hash.
+
 ## V0.13.0
 
 - **Simpler model settings.** Choose a provider, account and model when launching an Agent. Switch Claude Code and Codex models from the terminal header and review the choice before restarting the session.
