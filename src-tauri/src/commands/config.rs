@@ -423,12 +423,9 @@ pub fn delete_account_profile(
     database
         .delete_account_profile(&profile_id)
         .map_err(|error| error.to_string())?;
-    #[cfg(target_os = "macos")]
     if let Ok(data_directory) = crate::platform::app_data_dir(&app) {
         account::forget_managed_account(&profile, &data_directory);
     }
-    #[cfg(not(target_os = "macos"))]
-    let _ = &app;
     Ok(())
 }
 

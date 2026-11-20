@@ -5,6 +5,7 @@ import { I18nService } from '../i18n/i18n.service';
 import { accountLoginOption } from '../models/account-login';
 import { nameSystemAccountQuotas } from '../models/system-account-quota';
 import {
+  AccountAgentType,
   AccountLoginRequest,
   AccountProfile,
   AccountProfileInput,
@@ -21,6 +22,7 @@ import {
   CliOperationRequest,
   CliOperationResult,
   CodexLaunchRequest,
+  FetchProviderModelsRequest,
   GrokLaunchRequest,
   PiLaunchRequest,
   ImportSummary,
@@ -33,6 +35,7 @@ import {
   NetworkProfileInput,
   NetworkTestResult,
   OpenCodeLaunchRequest,
+  ProviderApiModel,
   ProviderQuota,
   SystemProxyDiscovery,
 } from '../models/agent.models';
@@ -136,18 +139,25 @@ export class AgentService {
    * The backend seeds its two system accounts with Chinese names, so they are named here, in the
    * language the interface is showing, from the agent they belong to.
    */
-  readonly accountProfiles = computed(() =>
-    this.accountProfileItems().map((profile) =>
+  readonly accountProfiles = computed(() => {
+    const systemNames: Record<AccountAgentType, string> = {
+      claude: 'Claude',
+      codex: 'ChatGPT',
+      opencode: 'OpenCode',
+      pi: 'Pi',
+      grok: 'Grok',
+    };
+    return this.accountProfileItems().map((profile) =>
       profile.isSystem
         ? {
             ...profile,
             name: this.i18n.t('agent.systemAccount', {
-              name: profile.agentType === 'codex' ? 'ChatGPT' : 'Claude',
+              name: systemNames[profile.agentType] ?? profile.agentType,
             }),
           }
         : profile,
-    ),
-  );
+    );
+  });
   readonly providerQuotas = computed(() =>
     nameSystemAccountQuotas(this.providerQuotaItems(), this.accountProfiles()),
   );
@@ -443,10 +453,18 @@ export class AgentService {
       if (!profile) throw new Error(this.i18n.t('account.notFound'));
       return {
         command: accountLoginOption(profile.agentType, profile.loginMethod).command,
-        executablePath: profile.agentType === 'codex' ? 'codex' : 'claude',
+        executablePath: profile.agentType,
       };
     }
     return invoke<AgentLaunchSpec>('prepare_account_login', { request });
+  }
+
+  /** Queries a provider's `/v1/models` endpoint using an inline or saved API key. */
+  async fetchProviderModels(request: FetchProviderModelsRequest): Promise<ProviderApiModel[]> {
+    if (!hasBackend()) {
+      return [];
+    }
+    return invoke<ProviderApiModel[]>('fetch_provider_models', { request });
   }
 
   async previewCliOperation(request: CliOperationRequest): Promise<CliOperationPlan> {
@@ -695,7 +713,11 @@ export class AgentService {
       return;
     }
     const profile = await invoke<AccountProfile>('refresh_account_profile', { profileId });
-    this.upsertAccountProfile(profile);
+    this.accountProfileItems.update((items) =>
+      items.some((item) => item.id === profile.id)
+        ? items.map((item) => (item.id === profile.id ? profile : item))
+        : items,
+    );
   }
 
   /**
@@ -717,10 +739,21 @@ export class AgentService {
   }
 
   async deleteAccountProfile(profileId: string): Promise<void> {
+    const existing = this.accountProfileItems().find((item) => item.id === profileId);
     if (hasBackend()) {
       await invoke('delete_account_profile', { profileId });
     }
-    this.accountProfileItems.update((items) => items.filter((item) => item.id !== profileId));
+    this.accountProfileItems.update((items) => {
+      const remaining = items.filter((item) => item.id !== profileId);
+      if (!existing?.isDefault) {
+        return remaining;
+      }
+      return remaining.map((item) =>
+        item.agentType === existing.agentType && item.isSystem
+          ? { ...item, isDefault: true }
+          : item,
+      );
+    });
   }
 
   private installationFor(agentType: ManagedAgentType): AgentInstallation | null {
@@ -807,6 +840,34 @@ export class AgentService {
         id: 'codex-system',
         name: this.i18n.t('agent.systemAccount', { name: 'ChatGPT' }),
         agentType: 'codex',
+        isDefault: true,
+        isSystem: true,
+        authenticated: true,
+        diagnostic: this.i18n.t('agent.browserAccount'),
+      },
+      {
+        id: 'opencode-system',
+        name: this.i18n.t('agent.systemAccount', { name: 'OpenCode' }),
+        agentType: 'opencode',
+        isDefault: true,
+        isSystem: true,
+        authenticated: true,
+        diagnostic: this.i18n.t('agent.browserAccount'),
+      },
+      {
+        id: 'pi-system',
+        name: this.i18n.t('agent.systemAccount', { name: 'Pi' }),
+        agentType: 'pi',
+        loginMethod: 'interactive',
+        isDefault: true,
+        isSystem: true,
+        authenticated: true,
+        diagnostic: this.i18n.t('agent.browserAccount'),
+      },
+      {
+        id: 'grok-system',
+        name: this.i18n.t('agent.systemAccount', { name: 'Grok' }),
+        agentType: 'grok',
         isDefault: true,
         isSystem: true,
         authenticated: true,
@@ -956,32 +1017,37 @@ export class AgentService {
   }
 
   private upsertModelProfile(profile: ModelProfile): void {
-    this.modelProfileItems.update((items) => [
-      ...items
-        .filter((item) => item.id !== profile.id)
-        .map((item) => (profile.isDefault ? { ...item, isDefault: false } : item)),
-      profile,
-    ]);
+    this.modelProfileItems.update((items) => {
+      const normalized = items.map((item) =>
+        profile.isDefault && item.id !== profile.id ? { ...item, isDefault: false } : item,
+      );
+      return normalized.some((item) => item.id === profile.id)
+        ? normalized.map((item) => (item.id === profile.id ? profile : item))
+        : [...normalized, profile];
+    });
   }
 
   private upsertMcpProfile(profile: McpProfile): void {
-    this.mcpProfileItems.update((items) => [
-      ...items.filter((item) => item.id !== profile.id),
-      profile,
-    ]);
+    this.mcpProfileItems.update((items) =>
+      items.some((item) => item.id === profile.id)
+        ? items.map((item) => (item.id === profile.id ? profile : item))
+        : [...items, profile],
+    );
   }
 
   private upsertNetworkProfile(profile: NetworkProfile): void {
-    this.networkProfileItems.update((items) => [
-      ...items.filter((item) => item.id !== profile.id),
-      profile,
-    ]);
+    this.networkProfileItems.update((items) =>
+      items.some((item) => item.id === profile.id)
+        ? items.map((item) => (item.id === profile.id ? profile : item))
+        : [...items, profile],
+    );
   }
 
   private upsertAccountProfile(profile: AccountProfile): void {
-    this.accountProfileItems.update((items) => [
-      ...items.filter((item) => item.id !== profile.id),
-      profile,
-    ]);
+    this.accountProfileItems.update((items) =>
+      items.some((item) => item.id === profile.id)
+        ? items.map((item) => (item.id === profile.id ? profile : item))
+        : [...items, profile],
+    );
   }
 }

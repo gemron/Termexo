@@ -61,7 +61,7 @@ export class AccountLoginFeedbackService {
   /** Old credentials alone do not prove that a new attempt succeeded. */
   confirm(id: string, authenticated: boolean, successfulExit = false): boolean {
     const entry = this.get(id);
-    if (!entry || !authenticated || ['rejected', 'closed', 'restarting'].includes(entry.phase)) return false;
+    if (!entry || !authenticated || ['success', 'rejected', 'closed', 'restarting'].includes(entry.phase)) return false;
     if (entry.previouslyAuthenticated && !entry.successObserved && !successfulExit) return false;
     this.setPhase(id, 'success');
     return true;

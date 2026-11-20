@@ -34,6 +34,13 @@ impl GrokBuildAdapter {
         Self::default()
     }
 
+    pub fn with_home(home: PathBuf) -> Self {
+        Self {
+            executable_override: None,
+            home_override: Some(home),
+        }
+    }
+
     #[cfg(test)]
     fn with_paths(executable: PathBuf, home: PathBuf) -> Self {
         Self {

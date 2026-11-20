@@ -42,6 +42,13 @@ impl PiAdapter {
         Self::default()
     }
 
+    pub fn with_agent_dir(agent_dir: PathBuf) -> Self {
+        Self {
+            executable_override: None,
+            agent_dir_override: Some(agent_dir),
+        }
+    }
+
     fn find_executable(&self) -> Option<PathBuf> {
         if let Some(path) = &self.executable_override {
             return crate::platform::is_executable_file(path).then(|| path.clone());

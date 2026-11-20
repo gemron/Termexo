@@ -23,6 +23,8 @@ import {
 } from '@angular/core';
 
 import {
+  ACCOUNT_AGENT_TYPES,
+  type AccountAgentType,
   type AccountProfile,
   AccountProfileInput,
   type AgentEvent,
@@ -31,6 +33,7 @@ import {
   chronologicalAgentEvents,
   ClaudeBackgroundSession,
   compatibleNativeSessionId,
+  isAccountAgentType,
   type ManagedAgentType,
   McpProfileInput,
   ModelProfileInput,
@@ -490,9 +493,10 @@ export class App {
   );
   protected readonly switchSettingsProfile = signal('');
   protected readonly accountSwitchOpen = signal(false);
+  protected readonly switchingAccount = signal(false);
   /** Terminal the account switch applies to; accounts are always switched one terminal at a time. */
   protected readonly accountSwitchTerminalId = signal<string | null>(null);
-  protected readonly accountSwitchAgentType = signal<AgentProtocol | null>(null);
+  protected readonly accountSwitchAgentType = signal<AccountAgentType | null>(null);
   protected readonly accountSwitchTerminal = computed(() => {
     const terminalId = this.accountSwitchTerminalId();
     if (!terminalId) {
@@ -503,7 +507,7 @@ export class App {
   /** Resolved the same way the terminal's own chip is labelled, so both name one account. */
   protected readonly accountSwitchCurrentId = computed(() => {
     const terminal = this.accountSwitchTerminal();
-    if (!terminal || (terminal.agentType !== 'claude' && terminal.agentType !== 'codex')) {
+    if (!terminal || !isAccountAgentType(terminal.agentType)) {
       return '';
     }
     return (
@@ -1225,6 +1229,7 @@ export class App {
       return;
     }
     this.selectedTerminalDirectory.set(workingDirectory);
+    this.refreshAccountsFor('opencode');
     this.openCodeLaunchOpen.set(true);
   }
 
@@ -1253,6 +1258,7 @@ export class App {
         terminalId,
         workspaceId: workspace.id,
         model: value.model,
+        accountProfileId: value.accountProfileId,
         autoConfirm: value.autoConfirm,
       });
       const terminal = this.state.createTerminal({
@@ -1261,6 +1267,7 @@ export class App {
         name: value.name || undefined,
         command: launch.command,
         model: value.model ?? OPENCODE_DEFAULT_MODEL,
+        accountProfileId: value.accountProfileId,
         workingDirectory,
         autoConfirm: value.autoConfirm,
       });
@@ -1288,6 +1295,7 @@ export class App {
     const workingDirectory = this.state.activeWorkspace()?.projectPath;
     if (!workingDirectory) return;
     this.selectedTerminalDirectory.set(workingDirectory);
+    this.refreshAccountsFor('grok');
     this.grokLaunchOpen.set(true);
   }
 
@@ -1313,6 +1321,7 @@ export class App {
         terminalId,
         workspaceId: workspace.id,
         model: value.model,
+        accountProfileId: value.accountProfileId,
         newSessionId,
         continueLast: value.continueLast,
         autoConfirm: value.autoConfirm,
@@ -1324,6 +1333,7 @@ export class App {
         command: launch.command,
         model: value.model || 'Grok Build',
         nativeSessionId: newSessionId,
+        accountProfileId: value.accountProfileId,
         workingDirectory,
         autoConfirm: value.autoConfirm,
       });
@@ -1350,6 +1360,7 @@ export class App {
     const workingDirectory = this.state.activeWorkspace()?.projectPath;
     if (!workingDirectory) return;
     this.selectedTerminalDirectory.set(workingDirectory);
+    this.refreshAccountsFor('pi');
     this.piLaunchOpen.set(true);
   }
 
@@ -1371,6 +1382,7 @@ export class App {
         terminalId,
         workspaceId: workspace.id,
         model: value.model,
+        accountProfileId: value.accountProfileId,
         continueLast: value.continueLast,
       });
       const terminal = this.state.createTerminal({
@@ -1379,6 +1391,7 @@ export class App {
         name: value.name || undefined,
         command: launch.command,
         model: value.model || 'Pi Agent',
+        accountProfileId: value.accountProfileId,
         workingDirectory,
       });
       this.piLaunchOpen.set(false);
@@ -1593,6 +1606,7 @@ export class App {
                   workspaceId: workspace.id,
                   sessionId: value.session.nativeSessionId,
                   model: value.model,
+                  accountProfileId: value.accountProfileId ?? value.session.accountProfileId,
                 })
               : agentType === 'grok'
                 ? await this.agents.prepareGrokLaunch({
@@ -1600,6 +1614,7 @@ export class App {
                     workspaceId: workspace.id,
                     sessionId: value.session.nativeSessionId,
                     model: value.model,
+                    accountProfileId: value.accountProfileId ?? value.session.accountProfileId,
                     autoConfirm: value.autoConfirm,
                   })
                 : await this.agents.prepareOpenCodeLaunch({
@@ -1607,6 +1622,7 @@ export class App {
                     workspaceId: workspace.id,
                     sessionId: value.session.nativeSessionId,
                     model: value.model,
+                    accountProfileId: value.accountProfileId ?? value.session.accountProfileId,
                     autoConfirm: value.autoConfirm,
                   });
       const terminal = this.state.createTerminal({
@@ -1633,10 +1649,9 @@ export class App {
         workingDirectory: value.session.projectPath ?? workspace.projectPath,
         profileId: value.profileId,
         mcpProfileId: agentType === 'claude' ? value.mcpProfileId : undefined,
-        accountProfileId:
-          agentType === 'opencode' || agentType === 'grok' || agentType === 'pi'
-            ? undefined
-            : value.accountProfileId,
+        accountProfileId: isAccountAgentType(agentType)
+          ? (value.accountProfileId ?? value.session.accountProfileId)
+          : undefined,
         autoConfirm: value.autoConfirm,
       });
       if (terminal) {
@@ -2904,12 +2919,13 @@ export class App {
     this.modelSwitchOpen.set(true);
   }
 
-  /** Opens the account switcher; only the two hosted Agents run on an account of their own. */
+  /** Opens the account switcher for any Agent that supports isolated account directories. */
   protected openAccountSwitch(terminalId: string): void {
     const terminal = this.state.activeWorkspace()?.terminals.find((item) => item.id === terminalId);
-    if (!terminal || (terminal.agentType !== 'claude' && terminal.agentType !== 'codex')) {
+    if (!terminal || !isAccountAgentType(terminal.agentType)) {
       return;
     }
+    this.refreshAccountsFor(terminal.agentType);
     this.accountSwitchTerminalId.set(terminalId);
     this.accountSwitchAgentType.set(terminal.agentType);
     this.accountSwitchOpen.set(true);
@@ -2932,12 +2948,25 @@ export class App {
    */
   protected async switchAccount(accountProfileId: string): Promise<void> {
     const terminal = this.accountSwitchTerminal();
-    if (!terminal || (terminal.agentType !== 'claude' && terminal.agentType !== 'codex')) {
+    if (!terminal || !isAccountAgentType(terminal.agentType)) {
       this.closeAccountSwitch();
       return;
     }
-    const isClaude = terminal.agentType === 'claude';
-    if (isClaude ? this.launchingClaude() : this.launchingCodex()) {
+    if (this.switchingAccount()) {
+      return;
+    }
+    const agentType = terminal.agentType;
+    const agentLaunching =
+      agentType === 'claude'
+        ? this.launchingClaude
+        : agentType === 'codex'
+          ? this.launchingCodex
+          : agentType === 'opencode'
+            ? this.launchingOpenCode
+            : agentType === 'pi'
+              ? this.launchingPi
+              : this.launchingGrok;
+    if (agentLaunching()) {
       return;
     }
     // The dialog disables the current account; this also stops a stale event from restarting a
@@ -2949,27 +2978,68 @@ export class App {
 
     const workspaceId = this.state.activeWorkspace()?.id;
     const original = { ...terminal };
-    (isClaude ? this.launchingClaude : this.launchingCodex).set(true);
+    this.switchingAccount.set(true);
+    agentLaunching.set(true);
     try {
-      const launch = isClaude
-        ? await this.agents.prepareLaunch({
-            terminalId: original.id,
-            workspaceId,
-            model: original.profileId === CLI_NATIVE_PROFILE_ID ? explicitCliModel(original.model) : undefined,
-            profileId: original.profileId,
-            mcpProfileId: original.mcpProfileId,
-            accountProfileId,
-            autoConfirm: original.autoConfirm,
-          })
-        : await this.agents.prepareCodexLaunch({
-            terminalId: original.id,
-            workspaceId,
-            model: original.profileId === CLI_NATIVE_PROFILE_ID ? explicitCliModel(original.model) : undefined,
-            profileId: original.profileId,
-            accountProfileId,
-            autoConfirm: original.autoConfirm,
-          });
-      await this.terminalGateway.close(original.id, true);
+      const explicitNonProfileModel = (model: string, placeholder: string): string | undefined =>
+        model && model !== placeholder ? model : undefined;
+      const launch =
+        agentType === 'claude'
+          ? await this.agents.prepareLaunch({
+              terminalId: original.id,
+              workspaceId,
+              model:
+                original.profileId === CLI_NATIVE_PROFILE_ID
+                  ? explicitCliModel(original.model)
+                  : undefined,
+              profileId: original.profileId,
+              mcpProfileId: original.mcpProfileId,
+              accountProfileId,
+              autoConfirm: original.autoConfirm,
+            })
+          : agentType === 'codex'
+            ? await this.agents.prepareCodexLaunch({
+                terminalId: original.id,
+                workspaceId,
+                model:
+                  original.profileId === CLI_NATIVE_PROFILE_ID
+                    ? explicitCliModel(original.model)
+                    : undefined,
+                profileId: original.profileId,
+                accountProfileId,
+                autoConfirm: original.autoConfirm,
+              })
+            : agentType === 'opencode'
+              ? await this.agents.prepareOpenCodeLaunch({
+                  terminalId: original.id,
+                  workspaceId,
+                  model: explicitNonProfileModel(original.model, OPENCODE_DEFAULT_MODEL),
+                  accountProfileId,
+                  autoConfirm: original.autoConfirm,
+                })
+              : agentType === 'pi'
+                ? await this.agents.preparePiLaunch({
+                    terminalId: original.id,
+                    workspaceId,
+                    model: explicitNonProfileModel(original.model, 'Pi Agent'),
+                    accountProfileId,
+                  })
+                : await this.agents.prepareGrokLaunch({
+                    terminalId: original.id,
+                    workspaceId,
+                    model: explicitNonProfileModel(original.model, 'Grok Build'),
+                    accountProfileId,
+                    autoConfirm: original.autoConfirm,
+                  });
+      try {
+        await this.terminalGateway.close(original.id, true);
+      } catch (error) {
+        // An exited or crashed terminal has no live PTY left, yet switching it to another
+        // account should still start fresh under the newly chosen account.
+        if (this.errorMessage(error) !== `terminal ${original.id} was not found`) {
+          throw error;
+        }
+      }
       if (
         !this.state.restartTerminalWithProfile(original.id, launch.command, {
           model: original.model,
@@ -2978,9 +3048,19 @@ export class App {
           accountProfileId,
         })
       ) {
+        const agentName =
+          agentType === 'claude'
+            ? 'Claude'
+            : agentType === 'codex'
+              ? 'Codex'
+              : agentType === 'opencode'
+                ? 'OpenCode'
+                : agentType === 'pi'
+                  ? 'Pi'
+                  : 'Grok';
         throw new Error(
           this.i18n.t('restore.terminalMissing', {
-            agent: isClaude ? 'Claude' : 'Codex',
+            agent: agentName,
             name: original.name,
           }),
         );
@@ -2993,7 +3073,8 @@ export class App {
     } catch (error) {
       this.showToast(this.errorMessage(error), 'attention');
     } finally {
-      (isClaude ? this.launchingClaude : this.launchingCodex).set(false);
+      agentLaunching.set(false);
+      this.switchingAccount.set(false);
     }
   }
 
@@ -3205,8 +3286,9 @@ export class App {
     this.settingsInitialModelProfileId.set(modelProfileId);
     // Settings is where sign-in states are read and where login is started from, so the list is
     // brought up to date on the way in rather than showing whatever was cached at startup.
-    this.refreshAccountsFor('claude');
-    this.refreshAccountsFor('codex');
+    for (const agentType of ACCOUNT_AGENT_TYPES) {
+      this.refreshAccountsFor(agentType);
+    }
     this.settingsOpen.set(true);
   }
 
@@ -3321,15 +3403,20 @@ export class App {
     try {
       await this.agents.refreshAccountProfile(profileId);
       // A replaced/closed terminal must never update its successor's feedback.
-      if (!this.loginFeedback.get(terminalId)) return;
+      const feedback = this.loginFeedback.get(terminalId);
+      if (!feedback) return;
+      if (feedback.phase === 'success') return;
       const profile = this.agents.accountProfiles().find((item) => item.id === profileId);
       if (successfulExit && this.loginFeedback.confirm(terminalId, !!profile?.authenticated, true)) {
         this.showToast(this.i18n.t('account.loginSucceeded', { name: profile!.name }), 'success');
-      } else if (this.loginFeedback.get(terminalId)?.phase !== 'rejected') {
+      } else if (feedback.phase !== 'rejected') {
         this.loginFeedback.setPhase(terminalId, 'closed');
       }
     } catch {
-      if (this.loginFeedback.get(terminalId)?.phase !== 'rejected') this.loginFeedback.setPhase(terminalId, 'closed');
+      const phase = this.loginFeedback.get(terminalId)?.phase;
+      if (phase && phase !== 'rejected' && phase !== 'success') {
+        this.loginFeedback.setPhase(terminalId, 'closed');
+      }
     }
   }
 

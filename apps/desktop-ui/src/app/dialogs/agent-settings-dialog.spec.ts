@@ -681,6 +681,82 @@ describe('AgentSettingsDialogComponent', () => {
     expect(component['accountDirty']()).toBe(true);
   });
 
+  it('supports OpenCode, Pi, and Grok login methods in the account editor', async () => {
+    fixture.detectChanges();
+    await fixture.whenStable();
+    component['selectTab']('accounts');
+    component['newAccount']();
+    fixture.detectChanges();
+    await fixture.whenStable();
+
+    const methods = (): string[] =>
+      Array.from(
+        root.querySelector<HTMLSelectElement>('[data-testid="account-login-method"]')!.options,
+        (option) => option.value,
+      );
+
+    const selectAgent = async (value: string) => {
+      const cliSelect = Array.from(root.querySelectorAll<HTMLLabelElement>('label'))
+        .find((label) =>
+          label.querySelector('span')?.textContent?.includes('CLI 类型') ||
+          label.querySelector('span')?.textContent?.includes('CLI type'),
+        )
+        ?.querySelector<HTMLSelectElement>('select');
+      expect(cliSelect).toBeTruthy();
+      cliSelect!.value = value;
+      cliSelect!.dispatchEvent(new Event('change'));
+      fixture.detectChanges();
+      await fixture.whenStable();
+    };
+
+    await selectAgent('opencode');
+    expect(methods()).toEqual(['browser']);
+
+    await selectAgent('pi');
+    expect(methods()).toEqual(['interactive']);
+
+    await selectAgent('grok');
+    expect(methods()).toEqual(['browser', 'device-code']);
+  });
+
+  it('fetches available models from the provider API and shows them in the model pickers', async () => {
+    const agents = TestBed.inject(AgentService);
+    const fetchSpy = vi
+      .spyOn(agents, 'fetchProviderModels')
+      .mockImplementation(async (request) =>
+        request.protocol === 'anthropic'
+          ? [{ id: 'deepseek-chat-api', name: 'DeepSeek Chat (API)' }]
+          : [{ id: 'deepseek-reasoner-api', name: 'DeepSeek Reasoner (API)' }],
+      );
+
+    fixture.detectChanges();
+    await fixture.whenStable();
+    component['selectTab']('models');
+    component['newModel']();
+    component['selectProvider']('DeepSeek');
+    component['apiKey'] = 'sk-test-key';
+    fixture.detectChanges();
+    await fixture.whenStable();
+
+    const fetchButton = root.querySelector<HTMLButtonElement>('[data-testid="fetch-provider-models"]')!;
+    expect(fetchButton.disabled).toBe(false);
+    fetchButton.click();
+    await fixture.whenStable();
+    fixture.detectChanges();
+
+    expect(fetchSpy).toHaveBeenCalledTimes(2);
+    const claudeOptions = Array.from(
+      root.querySelector<HTMLSelectElement>('[data-testid="claude-model-choice"]')!.options,
+      (option) => option.value,
+    );
+    const codexOptions = Array.from(
+      root.querySelector<HTMLSelectElement>('[data-testid="codex-model-choice"]')!.options,
+      (option) => option.value,
+    );
+    expect(claudeOptions).toContain('deepseek-chat-api');
+    expect(codexOptions).toContain('deepseek-reasoner-api');
+  });
+
   function clickButton(label: string): void {
     const button = Array.from(root.querySelectorAll<HTMLButtonElement>('button')).find(
       (candidate) => candidate.textContent?.trim().includes(label),

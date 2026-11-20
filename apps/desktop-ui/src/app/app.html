@@ -974,6 +974,7 @@
   @if (openCodeLaunchOpen()) {
     <app-opencode-launch-dialog
       [installation]="agents.openCodeInstallation()"
+      [accountProfiles]="agents.accountProfiles()"
       [workingDirectory]="selectedTerminalDirectory() ?? ''"
       [launching]="launchingOpenCode()"
       (launched)="launchOpenCode($event)"
@@ -988,6 +989,7 @@
   @if (grokLaunchOpen()) {
     <app-grok-launch-dialog
       [installation]="agents.grokInstallation()"
+      [accountProfiles]="agents.accountProfiles()"
       [workingDirectory]="selectedTerminalDirectory() ?? ''"
       [launching]="launchingGrok()"
       (launched)="launchGrok($event)"
@@ -1008,6 +1010,7 @@
   @if (piLaunchOpen()) {
     <app-pi-launch-dialog
       [installation]="agents.piInstallation()"
+      [accountProfiles]="agents.accountProfiles()"
       [workingDirectory]="selectedTerminalDirectory() ?? ''"
       [launching]="launchingPi()"
       (launched)="launchPi($event)"
@@ -1117,14 +1120,14 @@
   />
 }
 
-@if (accountSwitchOpen() && accountSwitchAgentType(); as agentType) {
+@if (accountSwitchOpen() && !settingsOpen() && accountSwitchAgentType(); as agentType) {
   <app-account-switch-dialog
     [accounts]="agents.accountProfiles()"
     [agentType]="agentType"
     [terminalName]="accountSwitchTerminal()?.name ?? ''"
     [terminalModel]="accountSwitchTerminal()?.model ?? ''"
     [currentAccountProfileId]="accountSwitchCurrentId()"
-    [busy]="launchingClaude() || launchingCodex()"
+    [busy]="switchingAccount() || launchingClaude() || launchingCodex() || launchingOpenCode() || launchingPi() || launchingGrok()"
     (settingsRequested)="openSettings('accounts')"
     (confirmed)="switchAccount($event)"
     (cancelled)="closeAccountSwitch()"

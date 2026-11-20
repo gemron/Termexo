@@ -2,7 +2,7 @@ import { Component, computed, inject, input, output, signal } from '@angular/cor
 
 import { I18nService } from '../core/i18n/i18n.service';
 import { TranslatePipe } from '../core/i18n/translate.pipe';
-import { AccountProfile, AgentProtocol } from '../core/models/agent.models';
+import { AccountAgentType, AccountProfile } from '../core/models/agent.models';
 import { ModalFocusDirective } from '../shared/modal-focus.directive';
 import { IconComponent } from '../shared/icon/icon';
 
@@ -130,7 +130,7 @@ import { IconComponent } from '../shared/icon/icon';
 export class AccountSwitchDialogComponent {
   private readonly i18n = inject(I18nService);
   readonly accounts = input<AccountProfile[]>([]);
-  readonly agentType = input.required<AgentProtocol>();
+  readonly agentType = input.required<AccountAgentType>();
   readonly terminalName = input('');
   /** Named in the plan block, because switching the account leaves the model alone. */
   readonly terminalModel = input('');

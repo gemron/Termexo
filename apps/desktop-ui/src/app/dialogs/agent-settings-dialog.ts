@@ -14,6 +14,7 @@ import {
 import { FormsModule } from '@angular/forms';
 
 import { I18nService } from '../core/i18n/i18n.service';
+import { AgentService } from '../core/services/agent.service';
 import { ModelCatalogService } from '../core/services/model-catalog.service';
 import type { ModelUpgrade } from '../core/models/model-catalog';
 import { TranslatePipe } from '../core/i18n/translate.pipe';
@@ -43,6 +44,7 @@ import {
   NetworkTestResult,
   ManagedAgentType,
   PROVIDER_PRESETS,
+  type ProviderApiModel,
 } from '../core/models/agent.models';
 import { createId } from '../core/models/identifiers';
 import { AppUpdatePanelComponent } from './app-update-panel';
@@ -375,7 +377,7 @@ const DEFAULT_ALERT_THRESHOLD = 80;
                         }
                       </strong>
                       <small>
-                        {{ profile.agentType === 'claude' ? 'Claude Code' : 'ChatGPT / Codex' }}
+                        {{ accountAgentLabel(profile.agentType) }}
                         ·
                         {{
                           profile.authenticated
@@ -396,9 +398,7 @@ const DEFAULT_ALERT_THRESHOLD = 80;
                         <strong>{{ 'settings.accountIsolation' | t }}</strong>
                         <span>{{ 'settings.accountIsolationHelp' | t }}</span>
                       </div>
-                      <span class="scope-chip">{{
-                        accountAgentType === 'claude' ? 'CLAUDE' : 'CHATGPT'
-                      }}</span>
+                      <span class="scope-chip">{{ accountAgentBadge(accountAgentType) }}</span>
                     </div>
 
                     <div class="two-columns">
@@ -415,6 +415,9 @@ const DEFAULT_ALERT_THRESHOLD = 80;
                         >
                           <option value="claude">Claude Code</option>
                           <option value="codex">ChatGPT / Codex</option>
+                          <option value="opencode">OpenCode</option>
+                          <option value="pi">Pi Agent</option>
+                          <option value="grok">Grok Build</option>
                         </select>
                       </label>
                     </div>
@@ -466,7 +469,7 @@ const DEFAULT_ALERT_THRESHOLD = 80;
                       <span>{{ 'settings.defaultAccount' | t }}</span>
                     </label>
 
-                    @if (accountId() && copySourceCandidates().length > 0) {
+                    @if (accountId() && accountAgentType !== 'opencode' && copySourceCandidates().length > 0) {
                       <div class="account-copy">
                         <label>
                           <span>{{ 'settings.copyConfig' | t }}</span>
@@ -497,6 +500,7 @@ const DEFAULT_ALERT_THRESHOLD = 80;
                     <p class="workspace-binding">
                       {{ 'settings.accountSafety' | t }}
                     </p>
+                    <small class="field-hint">{{ 'settings.antigravitySingleAccountNote' | t }}</small>
                   </div>
                   <div class="editor-actions account-actions">
                     @if (accountDirty()) {
@@ -645,11 +649,22 @@ const DEFAULT_ALERT_THRESHOLD = 80;
                             <option [value]="claudeModel">
                               {{ claudeModel || ('settings.catalogPick' | t) }}
                             </option>
+                            @if (fetchedClaudeModels().length) {
+                              <optgroup [label]="'settings.apiModels' | t">
+                                @for (model of fetchedClaudeModels(); track model.id) {
+                                  @if (model.id !== claudeModel) {
+                                    <option [value]="model.id">
+                                      {{ model.name === model.id ? model.id : model.name + ' · ' + model.id }}
+                                    </option>
+                                  }
+                                }
+                              </optgroup>
+                            }
                             @for (
                               model of catalog.choices(modelProvider, 'claude');
                               track model.id
                             ) {
-                              @if (model.id !== claudeModel) {
+                              @if (model.id !== claudeModel && !hasFetchedClaudeModel(model.id)) {
                                 <option [value]="model.id">
                                   {{ model.name }} · {{ model.id }}
                                 </option>
@@ -675,11 +690,22 @@ const DEFAULT_ALERT_THRESHOLD = 80;
                             @if (modelProvider === 'OpenAI' && codexModel && !codexBaseUrl.trim()) {
                               <option value="">{{ 'launch.cliDefaultModel' | t }}</option>
                             }
+                            @if (fetchedCodexModels().length) {
+                              <optgroup [label]="'settings.apiModels' | t">
+                                @for (model of fetchedCodexModels(); track model.id) {
+                                  @if (model.id !== codexModel) {
+                                    <option [value]="model.id">
+                                      {{ model.name === model.id ? model.id : model.name + ' · ' + model.id }}
+                                    </option>
+                                  }
+                                }
+                              </optgroup>
+                            }
                             @for (
                               model of catalog.choices(modelProvider, 'codex');
                               track model.id
                             ) {
-                              @if (model.id !== codexModel) {
+                              @if (model.id !== codexModel && !hasFetchedCodexModel(model.id)) {
                                 <option [value]="model.id">
                                   {{ model.name }} · {{ model.id }}
                                 </option>
@@ -702,6 +728,28 @@ const DEFAULT_ALERT_THRESHOLD = 80;
                         [(ngModel)]="apiKey"
                       />
                     </label>
+                    <div class="model-catalog-tools">
+                      <button
+                        type="button"
+                        class="secondary"
+                        data-testid="fetch-provider-models"
+                        [disabled]="busy() || fetchingProviderModels() || !canFetchProviderModels()"
+                        (click)="fetchProviderModels()"
+                      >
+                        <app-icon name="refresh" [size]="13" />
+                        {{
+                          (fetchingProviderModels()
+                            ? 'settings.fetchingApiModels'
+                            : 'settings.fetchApiModels'
+                          ) | t
+                        }}
+                      </button>
+                      @if (providerModelsMessage()) {
+                        <small role="status">{{ providerModelsMessage() }}</small>
+                      } @else if (providerModelsError()) {
+                        <small class="error-hint" role="alert">{{ providerModelsError() }}</small>
+                      }
+                    </div>
                     @if (hasCredential() && !hasUsableModelKey()) {
                       <p class="field-hint">{{ 'settings.providerKeyChange' | t }}</p>
                     }
@@ -1276,6 +1324,7 @@ const DEFAULT_ALERT_THRESHOLD = 80;
 })
 export class AgentSettingsDialogComponent {
   private readonly i18n = inject(I18nService);
+  private readonly agents = inject(AgentService);
   protected readonly credentialStorage = computed(() => {
     // A remote browser's OS does not identify the desktop that stores the credentials.
     if (!isTauriRuntime()) return this.i18n.t('settings.hostCredentialStorage');
@@ -1408,6 +1457,12 @@ export class AgentSettingsDialogComponent {
   protected readonly tab = signal<SettingsTab>('diagnostics');
   protected readonly modelId = signal('claude-default');
   protected readonly hasCredential = signal(false);
+  protected readonly fetchedClaudeModels = signal<ProviderApiModel[]>([]);
+  protected readonly fetchedCodexModels = signal<ProviderApiModel[]>([]);
+  protected readonly fetchingProviderModels = signal(false);
+  protected readonly providerModelsMessage = signal('');
+  protected readonly providerModelsError = signal('');
+  private providerModelsFetchSeq = 0;
   protected readonly mcpId = signal('');
   protected readonly networkId = signal('');
   protected readonly accountId = signal('');
@@ -1530,6 +1585,36 @@ export class AgentSettingsDialogComponent {
 
   protected selectedAccount(): AccountProfile | undefined {
     return this.accountProfiles().find((profile) => profile.id === this.accountId());
+  }
+
+  protected accountAgentLabel(agentType: AccountAgentType): string {
+    switch (agentType) {
+      case 'claude':
+        return 'Claude Code';
+      case 'codex':
+        return 'ChatGPT / Codex';
+      case 'opencode':
+        return 'OpenCode';
+      case 'pi':
+        return 'Pi Agent';
+      case 'grok':
+        return 'Grok Build';
+    }
+  }
+
+  protected accountAgentBadge(agentType: AccountAgentType): string {
+    switch (agentType) {
+      case 'claude':
+        return 'CLAUDE';
+      case 'codex':
+        return 'CHATGPT';
+      case 'opencode':
+        return 'OPENCODE';
+      case 'pi':
+        return 'PI';
+      case 'grok':
+        return 'GROK';
+    }
   }
 
   protected accountLoginMethods() {
@@ -1809,6 +1894,7 @@ export class AgentSettingsDialogComponent {
 
   protected editModel(profile: ModelProfile): void {
     this.rememberModelDraft();
+    this.clearFetchedProviderModels();
     this.modelId.set(profile.id);
     this.modelName = profile.name;
     this.modelProvider = profile.provider;
@@ -1831,6 +1917,7 @@ export class AgentSettingsDialogComponent {
 
   protected newModel(): void {
     this.rememberModelDraft();
+    this.clearFetchedProviderModels();
     this.modelId.set('');
     this.selectProvider(this.switchAgent() === 'codex' ? 'OpenAI' : 'Anthropic');
     this.apiKey = '';
@@ -1884,6 +1971,7 @@ export class AgentSettingsDialogComponent {
     if (this.modelProvider !== provider) {
       this.apiKey = '';
       this.clearCredential = false;
+      this.clearFetchedProviderModels();
     }
     this.modelProvider = provider;
     const preset = findProviderPreset(provider);
@@ -1897,6 +1985,107 @@ export class AgentSettingsDialogComponent {
     this.codexBaseUrl = preset.codexBaseUrl;
     this.claudeEnabled = Boolean(preset.claudeModel) || preset.provider === CUSTOM_PROVIDER;
     this.codexEnabled = Boolean(preset.codexModel) || preset.provider === CUSTOM_PROVIDER || preset.provider === 'OpenAI';
+  }
+
+  protected canFetchProviderModels(): boolean {
+    if (!this.claudeEnabled && !this.codexEnabled) return false;
+    if (this.clearCredential) return false;
+    return Boolean(this.apiKey.trim()) || this.hasUsableModelKey();
+  }
+
+  protected hasFetchedClaudeModel(id: string): boolean {
+    return this.fetchedClaudeModels().some((model) => model.id === id);
+  }
+
+  protected hasFetchedCodexModel(id: string): boolean {
+    return this.fetchedCodexModels().some((model) => model.id === id);
+  }
+
+  protected clearFetchedProviderModels(): void {
+    this.providerModelsFetchSeq += 1;
+    this.fetchedClaudeModels.set([]);
+    this.fetchedCodexModels.set([]);
+    this.fetchingProviderModels.set(false);
+    this.providerModelsMessage.set('');
+    this.providerModelsError.set('');
+  }
+
+  protected async fetchProviderModels(): Promise<void> {
+    if (this.fetchingProviderModels() || !this.canFetchProviderModels()) {
+      return;
+    }
+    const seq = ++this.providerModelsFetchSeq;
+    this.fetchingProviderModels.set(true);
+    this.providerModelsMessage.set('');
+    this.providerModelsError.set('');
+
+    const apiKey = this.apiKey.trim() || undefined;
+    const profileId = !apiKey && this.hasUsableModelKey() ? this.modelId() || undefined : undefined;
+    const workspaceId = this.activeWorkspaceId() || undefined;
+
+    const tasks: Promise<{ agent: 'claude' | 'codex'; models: ProviderApiModel[] }>[] = [];
+    if (this.claudeEnabled) {
+      tasks.push(
+        this.agents
+          .fetchProviderModels({
+            protocol: 'anthropic',
+            baseUrl: this.claudeBaseUrl.trim() || undefined,
+            apiKey,
+            profileId,
+            workspaceId,
+          })
+          .then((models) => ({ agent: 'claude' as const, models })),
+      );
+    }
+    if (this.codexEnabled) {
+      tasks.push(
+        this.agents
+          .fetchProviderModels({
+            protocol: 'openai',
+            baseUrl: this.codexBaseUrl.trim() || undefined,
+            apiKey,
+            profileId,
+            workspaceId,
+          })
+          .then((models) => ({ agent: 'codex' as const, models })),
+      );
+    }
+
+    try {
+      const results = await Promise.allSettled(tasks);
+      if (seq !== this.providerModelsFetchSeq) return;
+      let total = 0;
+      const errors: string[] = [];
+      for (const result of results) {
+        if (result.status === 'fulfilled') {
+          const { agent, models } = result.value;
+          if (agent === 'claude') {
+            this.fetchedClaudeModels.set(models);
+          } else {
+            this.fetchedCodexModels.set(models);
+          }
+          total = Math.max(total, models.length);
+        } else {
+          const message =
+            result.reason instanceof Error ? result.reason.message : String(result.reason);
+          errors.push(message);
+        }
+      }
+      if (total > 0) {
+        this.providerModelsMessage.set(
+          this.i18n.t('settings.apiModelsLoaded', { count: total }),
+        );
+      }
+      if (errors.length > 0 && total === 0) {
+        this.providerModelsError.set(errors[0]);
+      } else if (total === 0) {
+        this.providerModelsError.set(this.i18n.t('settings.apiModelsEmpty'));
+      }
+    } finally {
+      if (seq === this.providerModelsFetchSeq) {
+        this.fetchingProviderModels.set(false);
+      }
+    }
   }
 
   protected presetDocsUrl(): string {

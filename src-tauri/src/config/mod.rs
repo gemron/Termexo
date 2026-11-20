@@ -234,6 +234,7 @@ pub enum AccountLoginMethod {
     Console,
     Sso,
     DeviceCode,
+    Interactive,
 }
 
 impl AccountLoginMethod {
@@ -243,6 +244,7 @@ impl AccountLoginMethod {
             Self::Console => "console",
             Self::Sso => "sso",
             Self::DeviceCode => "device-code",
+            Self::Interactive => "interactive",
         }
     }
 }
@@ -407,12 +409,11 @@ impl LaunchEnvironmentStore {
         Ok(())
     }
 
-    pub fn take(&self, terminal_id: &str) -> Result<HashMap<String, String>, ConfigError> {
+    pub fn take(&self, terminal_id: &str) -> Result<Option<HashMap<String, String>>, ConfigError> {
         Ok(self
             .values
             .lock()
             .map_err(|_| ConfigError::LockPoisoned)?
-            .remove(terminal_id)
-            .unwrap_or_default())
+            .remove(terminal_id))
     }
 }

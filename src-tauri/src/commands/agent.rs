@@ -68,10 +68,30 @@ pub async fn scan_pi_sessions(
     project_path: Option<String>,
     database: State<'_, WorkspaceDatabase>,
 ) -> Result<Vec<AgentSession>, String> {
+    let profiles = database
+        .list_account_profiles()
+        .map_err(|error| error.to_string())?
+        .into_iter()
+        .filter(|profile| profile.agent_type == "pi")
+        .collect::<Vec<_>>();
     let sessions = tauri::async_runtime::spawn_blocking(move || {
-        PiAdapter::new()
-            .list_sessions(project_path.as_deref())
-            .map_err(|error| error.to_string())
+        let mut sessions = Vec::new();
+        for profile in profiles {
+            account::prepare_managed_directory(&profile)?;
+            let mut profile_sessions = match profile.config_dir.as_deref() {
+                Some(config_dir) => PiAdapter::with_agent_dir(config_dir.into())
+                    .list_sessions(project_path.as_deref()),
+                None => PiAdapter::new().list_sessions(project_path.as_deref()),
+            }
+            .map_err(|error| error.to_string())?;
+            for session in &mut profile_sessions {
+                session.account_profile_id = Some(profile.id.clone());
+                session.id = format!("pi:{}:{}", profile.id, session.native_session_id);
+            }
+            sessions.extend(profile_sessions);
+        }
+        sessions.sort_by(|left, right| right.last_used_at.cmp(&left.last_used_at));
+        Ok::<_, String>(sessions)
     })
     .await
     .map_err(|error| error.to_string())??;
@@ -164,15 +184,45 @@ pub async fn scan_opencode_sessions(
     project_path: Option<String>,
     database: State<'_, WorkspaceDatabase>,
 ) -> Result<Vec<AgentSession>, String> {
+    let profiles = database
+        .list_account_profiles()
+        .map_err(|error| error.to_string())?
+        .into_iter()
+        .filter(|profile| profile.agent_type == "opencode")
+        .collect::<Vec<_>>();
     let sessions = tauri::async_runtime::spawn_blocking(move || {
-        let adapter = OpenCodeAdapter::new();
-        let installation = adapter.detect().map_err(|error| error.to_string())?;
+        let base_adapter = OpenCodeAdapter::new();
+        let installation = base_adapter.detect().map_err(|error| error.to_string())?;
         if !installation.installed {
             return Ok(Vec::new());
         }
-        adapter
-            .list_sessions(project_path.as_deref())
-            .map_err(|error| error.to_string())
+        let mut sessions = Vec::new();
+        for profile in profiles {
+            account::prepare_managed_directory(&profile)?;
+            if let Some(config_dir) = profile.config_dir.as_deref() {
+                if !PathBuf::from(config_dir)
+                    .join("opencode")
+                    .join("opencode.db")
+                    .is_file()
+                {
+                    continue;
+                }
+            }
+            let adapter = match profile.config_dir.as_deref() {
+                Some(config_dir) => OpenCodeAdapter::with_data_home(config_dir.into()),
+                None => OpenCodeAdapter::new(),
+            };
+            let mut profile_sessions = adapter
+                .list_sessions(project_path.as_deref())
+                .map_err(|error| error.to_string())?;
+            for session in &mut profile_sessions {
+                session.account_profile_id = Some(profile.id.clone());
+                session.id = format!("opencode:{}:{}", profile.id, session.native_session_id);
+            }
+            sessions.extend(profile_sessions);
+        }
+        sessions.sort_by(|left, right| right.last_used_at.cmp(&left.last_used_at));
+        Ok::<_, String>(sessions)
     })
     .await
     .map_err(|error| error.to_string())??;
@@ -187,10 +237,30 @@ pub async fn scan_grok_sessions(
     project_path: Option<String>,
     database: State<'_, WorkspaceDatabase>,
 ) -> Result<Vec<AgentSession>, String> {
+    let profiles = database
+        .list_account_profiles()
+        .map_err(|error| error.to_string())?
+        .into_iter()
+        .filter(|profile| profile.agent_type == "grok")
+        .collect::<Vec<_>>();
     let sessions = tauri::async_runtime::spawn_blocking(move || {
-        GrokBuildAdapter::new()
-            .list_sessions(project_path.as_deref())
-            .map_err(|error| error.to_string())
+        let mut sessions = Vec::new();
+        for profile in profiles {
+            account::prepare_managed_directory(&profile)?;
+            let mut profile_sessions = match profile.config_dir.as_deref() {
+                Some(config_dir) => GrokBuildAdapter::with_home(config_dir.into())
+                    .list_sessions(project_path.as_deref()),
+                None => GrokBuildAdapter::new().list_sessions(project_path.as_deref()),
+            }
+            .map_err(|error| error.to_string())?;
+            for session in &mut profile_sessions {
+                session.account_profile_id = Some(profile.id.clone());
+                session.id = format!("grok:{}:{}", profile.id, session.native_session_id);
+            }
+            sessions.extend(profile_sessions);
+        }
+        sessions.sort_by(|left, right| right.last_used_at.cmp(&left.last_used_at));
+        Ok::<_, String>(sessions)
     })
     .await
     .map_err(|error| error.to_string())??;
@@ -298,6 +368,8 @@ pub struct PrepareOpenCodeLaunchRequest {
     pub session_id: Option<String>,
     pub model: Option<String>,
     #[serde(default)]
+    pub account_profile_id: Option<String>,
+    #[serde(default)]
     pub continue_last: bool,
     #[serde(default)]
     pub auto_confirm: bool,
@@ -311,6 +383,8 @@ pub struct PreparePiLaunchRequest {
     pub session_id: Option<String>,
     pub model: Option<String>,
     #[serde(default)]
+    pub account_profile_id: Option<String>,
+    #[serde(default)]
     pub continue_last: bool,
 }
 
@@ -322,6 +396,8 @@ pub struct PrepareGrokLaunchRequest {
     pub session_id: Option<String>,
     pub new_session_id: Option<String>,
     pub model: Option<String>,
+    #[serde(default)]
+    pub account_profile_id: Option<String>,
     #[serde(default)]
     pub continue_last: bool,
     #[serde(default)]
@@ -658,6 +734,7 @@ pub fn prepare_opencode_launch(
         &request.terminal_id,
         request.workspace_id.as_deref(),
         request.session_id.as_deref(),
+        request.account_profile_id.as_deref(),
         &OpenCodeAdapter::new(),
     )?;
     log_proxy_environment(&environment);
@@ -685,7 +762,18 @@ pub fn prepare_pi_launch(
     let extension_path = hooks
         .prepare_pi_runtime(&request.terminal_id)
         .map_err(|error| error.to_string())?;
-    let launch = PiAdapter::new()
+    let mut environment =
+        account_profile_environment(&database, request.account_profile_id.as_deref(), "pi")?;
+    environment.extend(network_environment(
+        &database,
+        &credentials,
+        request.workspace_id.as_deref(),
+    )?);
+    let adapter = match environment.get("PI_CODING_AGENT_DIR") {
+        Some(agent_dir) => PiAdapter::with_agent_dir(agent_dir.into()),
+        None => PiAdapter::new(),
+    };
+    let launch = adapter
         .build_launch_command(&PiLaunchOptions {
             session_id: request.session_id,
             model: request.model,
@@ -693,8 +781,6 @@ pub fn prepare_pi_launch(
             extension_path: Some(extension_path),
         })
         .map_err(|error| error.to_string())?;
-    let environment =
-        network_environment(&database, &credentials, request.workspace_id.as_deref())?;
     launch_environment
         .put(request.terminal_id, environment)
         .map_err(|error| error.to_string())?;
@@ -710,7 +796,12 @@ pub fn prepare_grok_launch(
     hooks: State<'_, HookEventStore>,
 ) -> Result<AgentLaunchSpec, String> {
     let mut environment =
-        network_environment(&database, &credentials, request.workspace_id.as_deref())?;
+        account_profile_environment(&database, request.account_profile_id.as_deref(), "grok")?;
+    environment.extend(network_environment(
+        &database,
+        &credentials,
+        request.workspace_id.as_deref(),
+    )?);
     environment.extend(
         hooks
             .prepare_grok_runtime(&request.terminal_id)
@@ -1028,9 +1119,11 @@ fn opencode_launch_environment(
     terminal_id: &str,
     workspace_id: Option<&str>,
     session_id: Option<&str>,
+    account_profile_id: Option<&str>,
     adapter: &OpenCodeAdapter,
 ) -> Result<HashMap<String, String>, String> {
-    let mut environment = network_environment(database, credentials, workspace_id)?;
+    let mut environment = account_profile_environment(database, account_profile_id, "opencode")?;
+    environment.extend(network_environment(database, credentials, workspace_id)?);
     // The CLI talks to its private server over loopback. Exclude it even when the selected
     // profile omitted NO_PROXY, while keeping every bypass the user already configured.
     let existing = environment
@@ -1125,6 +1218,22 @@ pub(crate) fn relaunch_environment(
     )
 }
 
+/// Rebuilds only account and network isolation for a reconnecting account-login terminal.
+///
+/// Login terminals must never inherit model-profile API keys or agent runtime hooks, because
+/// those can steer the CLI away from interactive sign-in or pollute a system account's login.
+pub(crate) fn account_login_relaunch_environment(
+    database: &WorkspaceDatabase,
+    credentials: &CredentialStore,
+    agent_type: &str,
+    account_profile_id: Option<&str>,
+    workspace_id: Option<&str>,
+) -> Result<HashMap<String, String>, String> {
+    let mut environment = account_profile_environment(database, account_profile_id, agent_type)?;
+    environment.extend(network_environment(database, credentials, workspace_id)?);
+    Ok(environment)
+}
+
 fn relaunch_environment_with_opencode_adapter(
     database: &WorkspaceDatabase,
     credentials: &CredentialStore,
@@ -1149,16 +1258,30 @@ fn relaunch_environment_with_opencode_adapter(
             request.terminal_id,
             request.workspace_id,
             request.native_session_id,
+            request.account_profile_id,
             opencode,
         ),
         "pi" => {
             hooks
                 .prepare_pi_runtime(request.terminal_id)
                 .map_err(|error| error.to_string())?;
-            network_environment(database, credentials, request.workspace_id)
+            let mut environment =
+                account_profile_environment(database, request.account_profile_id, "pi")?;
+            environment.extend(network_environment(
+                database,
+                credentials,
+                request.workspace_id,
+            )?);
+            Ok(environment)
         }
         "grok" => {
-            let mut environment = network_environment(database, credentials, request.workspace_id)?;
+            let mut environment =
+                account_profile_environment(database, request.account_profile_id, "grok")?;
+            environment.extend(network_environment(
+                database,
+                credentials,
+                request.workspace_id,
+            )?);
             environment.extend(
                 hooks
                     .prepare_grok_runtime(request.terminal_id)
@@ -1886,8 +2009,8 @@ mod tests {
                 hooks.codex_hook_environment("worker").into_iter().collect(),
             )
             .unwrap();
-        assert!(!stash.take("worker").unwrap().is_empty());
-        assert!(stash.take("worker").unwrap().is_empty());
+        assert!(!stash.take("worker").unwrap().unwrap().is_empty());
+        assert!(stash.take("worker").unwrap().is_none());
         let environment = relaunch_environment(
             &database,
             &CredentialStore,

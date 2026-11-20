@@ -7,7 +7,10 @@ use std::process::{Command, Output};
 
 use serde_json::{Map, Value};
 
-use crate::agent::{AgentAdapter, AgentInstallation, ClaudeCodeAdapter, CodexCliAdapter};
+use crate::agent::{
+    AgentAdapter, AgentInstallation, ClaudeCodeAdapter, CodexCliAdapter, GrokBuildAdapter,
+    OpenCodeAdapter, PiAdapter,
+};
 use crate::config::{AccountLoginMethod, AccountProfile};
 
 /// Claude's per-home global config: identity, first-run state and caches.
@@ -34,12 +37,18 @@ const CLAUDE_PORTABLE_ENTRIES: &[&str] = &[
     "commands",
 ];
 const CODEX_PORTABLE_ENTRIES: &[&str] = &["config.toml", "AGENTS.md", "skills", "plugins", "rules"];
+const PI_PORTABLE_ENTRIES: &[&str] = &["settings.json", "models-store.json"];
+const GROK_PORTABLE_ENTRIES: &[&str] = &["config.toml", "hooks", "installed-plugins"];
+const OPENCODE_PORTABLE_ENTRIES: &[&str] = &[];
 
 /// Names copied under a portable directory are still filtered, so a plugin cache cannot smuggle
 /// a token across.
 const NEVER_COPY: &[&str] = &[
     CLAUDE_CREDENTIALS_FILE,
     "auth.json",
+    "auth.json.lock",
+    "active_sessions.json",
+    "active_sessions.lock",
     CLAUDE_GLOBAL_CONFIG_FILE,
     "installation_id",
     "cap_sid",
@@ -49,7 +58,10 @@ pub fn validate_agent_type(agent_type: &str) -> Result<&str, String> {
     match agent_type.trim() {
         "claude" => Ok("claude"),
         "codex" => Ok("codex"),
-        _ => Err("账号类型必须是 Claude 或 ChatGPT/Codex。".into()),
+        "opencode" => Ok("opencode"),
+        "pi" => Ok("pi"),
+        "grok" => Ok("grok"),
+        _ => Err("账号类型必须是 Claude、ChatGPT/Codex、OpenCode、Pi 或 Grok。".into()),
     }
 }
 
@@ -93,12 +105,11 @@ fn claude_keychain_service(config_dir: &str) -> String {
     format!("Claude Code-credentials-{suffix}")
 }
 
-/// Removes what a deleted managed account leaves behind on macOS: its config directory and, for
+/// Removes what a deleted managed account leaves behind: its config directory and, on macOS for
 /// Claude, the sign-in Claude Code keeps in the Keychain rather than in that directory.
 ///
 /// Only a directory inside Termexo's own `accounts` folder is touched, so a profile pointing at
-/// someone's real `~/.claude` is never deleted. Best effort: the profile is already gone.
-#[cfg(target_os = "macos")]
+/// someone's real home directory is never deleted. Best effort: the profile is already gone.
 pub fn forget_managed_account(profile: &AccountProfile, data_directory: &Path) {
     let Some(config_dir) = profile.config_dir.as_deref() else {
         return;
@@ -112,6 +123,7 @@ pub fn forget_managed_account(profile: &AccountProfile, data_directory: &Path) {
     if !inside_accounts {
         return;
     }
+    #[cfg(target_os = "macos")]
     if profile.agent_type == "claude" {
         let removed = Command::new("security")
             .args([
@@ -144,6 +156,16 @@ pub fn prepare_managed_directory(profile: &AccountProfile) -> Result<(), String>
             if let Err(error) = ensure_claude_onboarding_complete(directory) {
                 tracing::warn!(target: "termexo::account", "{error}");
             }
+        }
+        "opencode" => {
+            // OpenCode stores auth.json and opencode.db under $XDG_DATA_HOME/opencode.
+            let nested = directory.join("opencode");
+            fs::create_dir_all(&nested).map_err(|error| {
+                format!(
+                    "无法创建 OpenCode 账号数据目录 {}：{error}",
+                    nested.to_string_lossy()
+                )
+            })?;
         }
         _ => {}
     }
@@ -232,10 +254,13 @@ fn ensure_codex_file_credentials(directory: &Path) -> Result<(), String> {
 pub fn environment(profile: &AccountProfile) -> HashMap<String, String> {
     let mut environment = HashMap::new();
     if let Some(config_dir) = profile.config_dir.as_deref() {
-        let key = if profile.agent_type == "claude" {
-            "CLAUDE_CONFIG_DIR"
-        } else {
-            "CODEX_HOME"
+        let key = match profile.agent_type.as_str() {
+            "claude" => "CLAUDE_CONFIG_DIR",
+            "codex" => "CODEX_HOME",
+            "opencode" => "XDG_DATA_HOME",
+            "pi" => "PI_CODING_AGENT_DIR",
+            "grok" => "GROK_HOME",
+            _ => return environment,
         };
         environment.insert(key.into(), config_dir.into());
     }
@@ -258,41 +283,200 @@ pub fn refresh_status(mut profile: AccountProfile) -> AccountProfile {
         profile.diagnostic = installation.diagnostic;
         return profile;
     };
-    let args: &[&str] = if profile.agent_type == "claude" {
-        &["auth", "status", "--json"]
-    } else {
-        &["login", "status"]
-    };
-    match run_cli(executable, args, &environment(&profile)) {
-        Ok(output) if profile.agent_type == "claude" => {
-            let value = serde_json::from_slice::<Value>(&output.stdout).unwrap_or(Value::Null);
-            profile.authenticated = value
-                .get("loggedIn")
-                .and_then(Value::as_bool)
-                .unwrap_or(output.status.success());
-            profile.diagnostic = value
-                .get("authMethod")
-                .and_then(Value::as_str)
-                .filter(|method| !method.is_empty() && *method != "none")
-                .map(|method| format!("已登录 · {method}"))
-                .unwrap_or_else(|| "尚未登录".into());
-        }
-        Ok(output) => {
-            profile.authenticated = output.status.success();
-            let detail = output_text(&output);
-            profile.diagnostic = if profile.authenticated {
-                if detail.is_empty() {
-                    "已登录 ChatGPT".into()
-                } else {
-                    detail
+    match profile.agent_type.as_str() {
+        "claude" => {
+            match run_cli(
+                executable,
+                &["auth", "status", "--json"],
+                &environment(&profile),
+            ) {
+                Ok(output) => {
+                    let value =
+                        serde_json::from_slice::<Value>(&output.stdout).unwrap_or(Value::Null);
+                    profile.authenticated = value
+                        .get("loggedIn")
+                        .and_then(Value::as_bool)
+                        .unwrap_or(output.status.success());
+                    profile.diagnostic = value
+                        .get("authMethod")
+                        .and_then(Value::as_str)
+                        .filter(|method| !method.is_empty() && *method != "none")
+                        .map(|method| format!("已登录 · {method}"))
+                        .unwrap_or_else(|| "尚未登录".into());
                 }
-            } else {
-                "尚未登录".into()
-            };
+                Err(error) => profile.diagnostic = format!("登录状态检测失败：{error}"),
+            }
         }
-        Err(error) => profile.diagnostic = format!("登录状态检测失败：{error}"),
+        "codex" => match run_cli(executable, &["login", "status"], &environment(&profile)) {
+            Ok(output) => {
+                profile.authenticated = output.status.success();
+                let detail = output_text(&output);
+                profile.diagnostic = if profile.authenticated {
+                    if detail.is_empty() {
+                        "已登录 ChatGPT".into()
+                    } else {
+                        detail
+                    }
+                } else {
+                    "尚未登录".into()
+                };
+            }
+            Err(error) => profile.diagnostic = format!("登录状态检测失败：{error}"),
+        },
+        "opencode" => {
+            refresh_opencode_status(&mut profile, executable);
+        }
+        "pi" => {
+            refresh_pi_status(&mut profile);
+        }
+        "grok" => {
+            refresh_grok_status(&mut profile);
+        }
+        _ => {
+            profile.diagnostic = "不支持的账号类型".into();
+        }
     }
     profile
+}
+
+fn refresh_opencode_status(profile: &mut AccountProfile, executable: &str) {
+    let standalone = OpenCodeAdapter::new()
+        .plugin_api_version()
+        .is_ok_and(|major| major >= 2);
+    let args: &[&str] = if standalone {
+        &["auth", "list", "--format", "json", "--standalone"]
+    } else {
+        &["auth", "list", "--format", "json"]
+    };
+    if let Ok(output) = run_cli(executable, args, &environment(profile)) {
+        if output.status.success() {
+            if let Ok(Value::Array(items)) = serde_json::from_slice::<Value>(&output.stdout) {
+                if !items.is_empty() {
+                    let labels: Vec<String> = items
+                        .iter()
+                        .filter_map(|item| {
+                            item.get("provider")
+                                .or_else(|| item.get("name"))
+                                .or_else(|| item.get("id"))
+                                .and_then(Value::as_str)
+                                .map(str::trim)
+                                .filter(|value| !value.is_empty())
+                                .map(str::to_owned)
+                        })
+                        .take(3)
+                        .collect();
+                    profile.authenticated = true;
+                    profile.diagnostic = if labels.is_empty() {
+                        "已登录 OpenCode".into()
+                    } else {
+                        format!("已登录 · {}", labels.join(", "))
+                    };
+                    return;
+                }
+                profile.authenticated = false;
+                profile.diagnostic = "尚未登录".into();
+                return;
+            }
+        }
+    }
+    // Fallback to OpenCode's auth.json directly when an older CLI does not support `--format json`.
+    if let Ok(dir) = resolve_config_dir(profile) {
+        let auth_path = dir.join("opencode").join("auth.json");
+        let (authenticated, diagnostic) = read_provider_auth_json(&auth_path, "OpenCode");
+        profile.authenticated = authenticated;
+        profile.diagnostic = diagnostic;
+    } else {
+        profile.authenticated = false;
+        profile.diagnostic = "尚未登录".into();
+    }
+}
+
+fn refresh_pi_status(profile: &mut AccountProfile) {
+    match resolve_config_dir(profile) {
+        Ok(dir) => {
+            let (authenticated, diagnostic) = read_provider_auth_json(&dir.join("auth.json"), "Pi");
+            profile.authenticated = authenticated;
+            profile.diagnostic = diagnostic;
+        }
+        Err(error) => {
+            profile.authenticated = false;
+            profile.diagnostic = error;
+        }
+    }
+}
+
+fn refresh_grok_status(profile: &mut AccountProfile) {
+    let dir = match resolve_config_dir(profile) {
+        Ok(dir) => dir,
+        Err(error) => {
+            profile.authenticated = false;
+            profile.diagnostic = error;
+            return;
+        }
+    };
+    let path = dir.join("auth.json");
+    let Ok(bytes) = fs::read(&path) else {
+        profile.authenticated = false;
+        profile.diagnostic = "尚未登录".into();
+        return;
+    };
+    let Ok(Value::Object(entries)) = serde_json::from_slice::<Value>(&bytes) else {
+        profile.authenticated = false;
+        profile.diagnostic = "尚未登录".into();
+        return;
+    };
+    let signed_in = entries.values().any(|value| {
+        value.as_object().is_some_and(|object| {
+            ["key", "access_token", "token", "api_key"]
+                .iter()
+                .any(|field| {
+                    object
+                        .get(*field)
+                        .and_then(Value::as_str)
+                        .is_some_and(|secret| !secret.trim().is_empty())
+                })
+        })
+    });
+    profile.authenticated = signed_in;
+    profile.diagnostic = if signed_in {
+        "已登录 Grok".into()
+    } else {
+        "尚未登录".into()
+    };
+}
+
+fn read_provider_auth_json(path: &Path, label: &str) -> (bool, String) {
+    let Ok(bytes) = fs::read(path) else {
+        return (false, "尚未登录".into());
+    };
+    let Ok(Value::Object(entries)) = serde_json::from_slice::<Value>(&bytes) else {
+        return (false, "尚未登录".into());
+    };
+    let providers: Vec<String> = entries
+        .iter()
+        .filter(|(_, value)| match value {
+            Value::Object(map) => !map.is_empty(),
+            Value::String(secret) => !secret.trim().is_empty(),
+            _ => false,
+        })
+        .map(|(provider, _)| provider.clone())
+        .collect();
+    if providers.is_empty() {
+        (false, "尚未登录".into())
+    } else {
+        let preview = providers.iter().take(3).cloned().collect::<Vec<_>>().join(", ");
+        let suffix = if providers.len() > 3 {
+            format!(" 等 {} 项", providers.len())
+        } else {
+            String::new()
+        };
+        let detail = if preview.is_empty() {
+            format!("已登录 {label}")
+        } else {
+            format!("已登录 · {preview}{suffix}")
+        };
+        (true, detail)
+    }
 }
 
 /// Where an account's CLI actually keeps its files: its managed directory, or the CLI's own
@@ -303,13 +487,28 @@ pub fn resolve_config_dir(profile: &AccountProfile) -> Result<PathBuf, String> {
     }
     let home = crate::platform::home_dir()
         .ok_or_else(|| "无法定位用户主目录，系统账号的配置位置未知。".to_owned())?;
-    let default_dir = if profile.agent_type == "claude" {
-        PathBuf::from(home).join(".claude")
-    } else {
-        match std::env::var_os("CODEX_HOME") {
-            Some(codex_home) => PathBuf::from(codex_home),
-            None => PathBuf::from(home).join(".codex"),
-        }
+    let default_dir = match profile.agent_type.as_str() {
+        "claude" => match std::env::var_os("CLAUDE_CONFIG_DIR") {
+            Some(dir) if !dir.is_empty() => PathBuf::from(dir),
+            _ => home.join(".claude"),
+        },
+        "codex" => match std::env::var_os("CODEX_HOME") {
+            Some(codex_home) if !codex_home.is_empty() => PathBuf::from(codex_home),
+            _ => home.join(".codex"),
+        },
+        "opencode" => match std::env::var_os("XDG_DATA_HOME") {
+            Some(data_home) if !data_home.is_empty() => PathBuf::from(data_home),
+            _ => home.join(".local").join("share"),
+        },
+        "pi" => match std::env::var_os("PI_CODING_AGENT_DIR") {
+            Some(dir) if !dir.is_empty() => PathBuf::from(dir),
+            _ => home.join(".pi").join("agent"),
+        },
+        "grok" => match std::env::var_os("GROK_HOME") {
+            Some(dir) if !dir.is_empty() => PathBuf::from(dir),
+            _ => home.join(".grok"),
+        },
+        other => return Err(format!("不支持的账号类型：{other}")),
     };
     Ok(default_dir)
 }
@@ -339,10 +538,13 @@ pub fn copy_configuration(
     let target_dir = resolve_config_dir(target)?;
     fs::create_dir_all(&target_dir).map_err(|error| format!("无法创建目标账号目录：{error}"))?;
 
-    let entries = if source.agent_type == "claude" {
-        CLAUDE_PORTABLE_ENTRIES
-    } else {
-        CODEX_PORTABLE_ENTRIES
+    let entries = match source.agent_type.as_str() {
+        "claude" => CLAUDE_PORTABLE_ENTRIES,
+        "codex" => CODEX_PORTABLE_ENTRIES,
+        "pi" => PI_PORTABLE_ENTRIES,
+        "grok" => GROK_PORTABLE_ENTRIES,
+        "opencode" => OPENCODE_PORTABLE_ENTRIES,
+        _ => return Err("不支持的账号类型。".into()),
     };
     let mut copied = Vec::new();
     for entry in entries {
@@ -402,11 +604,15 @@ pub fn login_spec(profile: &AccountProfile) -> Result<(String, String), String> 
     let executable = installation
         .executable_path
         .ok_or_else(|| installation.diagnostic.clone())?;
-    let command = close_when_done(login_command(
-        &profile.agent_type,
-        profile.login_method,
-        &executable,
-    )?);
+    let mut command = login_command(&profile.agent_type, profile.login_method, &executable)?;
+    if profile.agent_type == "opencode"
+        && OpenCodeAdapter::new()
+            .plugin_api_version()
+            .is_ok_and(|major| major >= 2)
+    {
+        command.push_str(" --standalone");
+    }
+    let command = close_when_done(command);
     Ok((command, executable))
 }
 
@@ -421,6 +627,10 @@ fn login_arguments(agent_type: &str, method: AccountLoginMethod) -> Result<&'sta
         ("claude", AccountLoginMethod::Sso) => Ok("auth login --sso"),
         ("codex", AccountLoginMethod::Browser) => Ok("login"),
         ("codex", AccountLoginMethod::DeviceCode) => Ok("login --device-auth"),
+        ("opencode", AccountLoginMethod::Browser) => Ok("auth login"),
+        ("grok", AccountLoginMethod::Browser) => Ok("login"),
+        ("grok", AccountLoginMethod::DeviceCode) => Ok("login --device-auth"),
+        ("pi", AccountLoginMethod::Interactive) => Ok(""),
         _ => Err(format!(
             "{agent_type} 不支持 {} 登录方式。",
             method.as_str()
@@ -429,13 +639,16 @@ fn login_arguments(agent_type: &str, method: AccountLoginMethod) -> Result<&'sta
 }
 
 /// Ends the shell when the login CLI does, so the terminal's exit is the moment the account is
-/// read back. PowerShell is started with the command as its argument and needs no help; a Unix
-/// shell has the command typed into it and would otherwise sit at its prompt, leaving the tab
-/// "running" and the account never re-read. `exit` with no status passes the CLI's on.
+/// read back. Both Unix shells (where the command is typed) and PowerShell (which Termexo launches
+/// with `-NoExit -Command` so normal agent sessions stay inspectable after exit) would otherwise
+/// drop back to a prompt, leaving the login tab "running" and preventing exit-triggered account
+/// confirmation. Passing the CLI's exit status preserves failure reporting.
 fn close_when_done(command: String) -> String {
     #[cfg(unix)]
     return format!("{command}; exit");
-    #[cfg(not(unix))]
+    #[cfg(windows)]
+    return format!("{command}; if ($null -ne $LASTEXITCODE) {{ exit $LASTEXITCODE }} else {{ exit 0 }}");
+    #[cfg(not(any(unix, windows)))]
     return command;
 }
 
@@ -445,18 +658,31 @@ fn login_command(
     executable: &str,
 ) -> Result<String, String> {
     let arguments = login_arguments(agent_type, method)?;
-    Ok(format!("{} {arguments}", shell_invoke(executable)))
+    if arguments.is_empty() {
+        Ok(shell_invoke(executable))
+    } else {
+        Ok(format!("{} {arguments}", shell_invoke(executable)))
+    }
 }
 
 fn detect(agent_type: &str) -> Result<AgentInstallation, String> {
-    if agent_type == "claude" {
-        ClaudeCodeAdapter::new()
+    match agent_type {
+        "claude" => ClaudeCodeAdapter::new()
             .detect()
-            .map_err(|error| error.to_string())
-    } else {
-        CodexCliAdapter::new()
+            .map_err(|error| error.to_string()),
+        "codex" => CodexCliAdapter::new()
             .detect()
-            .map_err(|error| error.to_string())
+            .map_err(|error| error.to_string()),
+        "opencode" => OpenCodeAdapter::new()
+            .detect()
+            .map_err(|error| error.to_string()),
+        "pi" => PiAdapter::new()
+            .detect()
+            .map_err(|error| error.to_string()),
+        "grok" => GrokBuildAdapter::new()
+            .detect()
+            .map_err(|error| error.to_string()),
+        other => Err(format!("不支持的账号类型：{other}")),
     }
 }
 
@@ -842,5 +1068,114 @@ mod tests {
 
         assert!(copy_configuration(&claude, &claude).is_err());
         assert!(copy_configuration(&claude, &codex).is_err());
+    }
+
+    #[test]
+    fn maps_opencode_pi_and_grok_to_their_isolated_env_vars() {
+        let base = AccountProfile {
+            id: "isolated".into(),
+            name: "Isolated".into(),
+            agent_type: "opencode".into(),
+            login_method: AccountLoginMethod::Browser,
+            config_dir: Some("C:\\profiles\\isolated".into()),
+            is_default: false,
+            is_system: false,
+            authenticated: false,
+            diagnostic: String::new(),
+        };
+        assert_eq!(
+            environment(&base).get("XDG_DATA_HOME").map(String::as_str),
+            Some("C:\\profiles\\isolated")
+        );
+        let pi = AccountProfile {
+            agent_type: "pi".into(),
+            login_method: AccountLoginMethod::Interactive,
+            ..base.clone()
+        };
+        assert_eq!(
+            environment(&pi)
+                .get("PI_CODING_AGENT_DIR")
+                .map(String::as_str),
+            Some("C:\\profiles\\isolated")
+        );
+        let grok = AccountProfile {
+            agent_type: "grok".into(),
+            ..base
+        };
+        assert_eq!(
+            environment(&grok).get("GROK_HOME").map(String::as_str),
+            Some("C:\\profiles\\isolated")
+        );
+    }
+
+    #[test]
+    fn builds_login_commands_for_opencode_pi_and_grok() {
+        assert!(login_command("opencode", AccountLoginMethod::Browser, "opencode")
+            .unwrap()
+            .contains("auth login"));
+        assert!(login_command("grok", AccountLoginMethod::Browser, "grok")
+            .unwrap()
+            .contains("login"));
+        assert!(login_command("grok", AccountLoginMethod::DeviceCode, "grok")
+            .unwrap()
+            .contains("login --device-auth"));
+        assert!(!login_command("pi", AccountLoginMethod::Interactive, "pi")
+            .unwrap()
+            .contains("login"));
+        assert!(validate_login_method("pi", AccountLoginMethod::Browser).is_err());
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn windows_login_shell_exits_with_cli_exit_code() {
+        let wrapped = close_when_done("& 'C:/claude.exe' auth login".into());
+        assert!(wrapped.contains("exit $LASTEXITCODE"));
+    }
+
+    #[test]
+    fn reads_grok_and_pi_auth_json_status() {
+        let root = temp_directory("multi-auth");
+        fs::create_dir_all(&root).unwrap();
+        let mut pi = AccountProfile {
+            id: "pi-1".into(),
+            name: "Pi 1".into(),
+            agent_type: "pi".into(),
+            login_method: AccountLoginMethod::Interactive,
+            config_dir: Some(root.to_string_lossy().into_owned()),
+            is_default: false,
+            is_system: false,
+            authenticated: false,
+            diagnostic: String::new(),
+        };
+        refresh_pi_status(&mut pi);
+        assert!(!pi.authenticated);
+        fs::write(
+            root.join("auth.json"),
+            r#"{"anthropic":{"access":"secret-token"}}"#,
+        )
+        .unwrap();
+        refresh_pi_status(&mut pi);
+        assert!(pi.authenticated);
+        assert!(pi.diagnostic.contains("anthropic"));
+
+        let mut grok = AccountProfile {
+            id: "grok-1".into(),
+            name: "Grok 1".into(),
+            agent_type: "grok".into(),
+            login_method: AccountLoginMethod::Browser,
+            config_dir: Some(root.to_string_lossy().into_owned()),
+            is_default: false,
+            is_system: false,
+            authenticated: false,
+            diagnostic: String::new(),
+        };
+        fs::write(
+            root.join("auth.json"),
+            r#"{"https://auth.x.ai":{"key":"tok","user_id":"u1"}}"#,
+        )
+        .unwrap();
+        refresh_grok_status(&mut grok);
+        assert!(grok.authenticated);
+        fs::remove_dir_all(&root).ok();
     }
 }

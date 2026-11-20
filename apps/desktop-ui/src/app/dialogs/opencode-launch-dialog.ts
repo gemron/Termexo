@@ -1,21 +1,27 @@
 import { Component, computed, inject, input, output, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 
-import { type AgentInstallation } from '../core/models/agent.models';
+import {
+  type AccountProfile,
+  type AgentInstallation,
+  resolveAccountProfileId,
+} from '../core/models/agent.models';
 import { AGENT_ICONS } from '../core/models/workspace.models';
 import { I18nService } from '../core/i18n/i18n.service';
 import { TranslatePipe } from '../core/i18n/translate.pipe';
+import { IconComponent } from '../shared/icon/icon';
 import { LaunchDialogShellComponent } from './launch-dialog-shell';
 
 export interface OpenCodeLaunchDialogValue {
   name: string;
   model?: string;
+  accountProfileId?: string;
   autoConfirm?: boolean;
 }
 
 @Component({
   selector: 'app-opencode-launch-dialog',
-  imports: [FormsModule, LaunchDialogShellComponent, TranslatePipe],
+  imports: [FormsModule, IconComponent, LaunchDialogShellComponent, TranslatePipe],
   template: `
     <app-launch-dialog-shell
       [icon]="agentIcon"
@@ -54,6 +60,33 @@ export interface OpenCodeLaunchDialogValue {
           />
           <small>{{ 'launch.openCodeModelHelp' | t }}</small>
         </label>
+        @if (openCodeAccounts().length) {
+          <label class="wide">
+            <span>{{ 'launch.loginAccount' | t }}</span>
+            <select
+              class="select select-bordered select-sm"
+              [ngModel]="resolvedAccountProfileId()"
+              (ngModelChange)="accountProfileId.set($event)"
+            >
+              @for (profile of openCodeAccounts(); track profile.id) {
+                <option [value]="profile.id">
+                  {{ profile.name }} ·
+                  {{
+                    profile.authenticated
+                      ? ('common.authenticated' | t)
+                      : ('common.unauthenticated' | t)
+                  }}
+                </option>
+              }
+            </select>
+            @if (selectedAccount() && !selectedAccount()?.authenticated) {
+              <p class="account-blocker">
+                <app-icon name="triangle-alert" [size]="13" />
+                <span>{{ 'launch.accountNotAuthenticated' | t }}</span>
+              </p>
+            }
+          </label>
+        }
         <label class="wide checkbox-control auto-confirm-control">
           <input
             type="checkbox"
@@ -79,6 +112,7 @@ export class OpenCodeLaunchDialogComponent {
   protected readonly agentIcon = AGENT_ICONS.opencode;
 
   readonly installation = input<AgentInstallation | null>(null);
+  readonly accountProfiles = input<AccountProfile[]>([]);
   readonly workingDirectory = input('');
   readonly launching = input(false);
   readonly launched = output<OpenCodeLaunchDialogValue>();
@@ -88,7 +122,22 @@ export class OpenCodeLaunchDialogComponent {
 
   protected readonly name = signal('');
   protected readonly model = signal('');
+  protected readonly accountProfileId = signal('');
   protected readonly autoConfirm = signal(false);
+  protected readonly openCodeAccounts = computed(() =>
+    this.accountProfiles().filter((profile) => profile.agentType === 'opencode'),
+  );
+  protected readonly resolvedAccountProfileId = computed(
+    () =>
+      resolveAccountProfileId(
+        this.accountProfiles(),
+        'opencode',
+        this.accountProfileId() || undefined,
+      ) ?? '',
+  );
+  protected readonly selectedAccount = computed(() =>
+    this.openCodeAccounts().find((profile) => profile.id === this.resolvedAccountProfileId()),
+  );
   protected readonly canLaunch = computed(() => Boolean(this.installation()?.healthy));
   protected readonly blockedReason = computed(() => {
     if (this.canLaunch()) {
@@ -104,6 +153,7 @@ export class OpenCodeLaunchDialogComponent {
     this.launched.emit({
       name: this.name().trim(),
       model: this.model().trim() || undefined,
+      accountProfileId: this.resolvedAccountProfileId() || undefined,
       autoConfirm: this.autoConfirm(),
     });
   }

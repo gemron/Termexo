@@ -605,6 +605,18 @@ const EN: TranslationTable = {
   'account.method.deviceCode': 'ChatGPT (device code)',
   'account.method.deviceCodeHelp':
     'Enter the code shown in the terminal in a browser, including on another device.',
+  'account.method.opencodeBrowser': 'OpenCode (CLI auth)',
+  'account.method.opencodeBrowserHelp':
+    'Run opencode auth login in an isolated XDG_DATA_HOME directory to connect providers.',
+  'account.method.piInteractive': 'Pi interactive (/login)',
+  'account.method.piInteractiveHelp':
+    'Open Pi in an isolated PI_CODING_AGENT_DIR, run /login inside the terminal, then exit to finish.',
+  'account.method.grokBrowser': 'Grok (browser)',
+  'account.method.grokBrowserHelp':
+    'Open the browser and sign in to Grok Build under an isolated GROK_HOME.',
+  'account.method.grokDeviceCode': 'Grok (device code)',
+  'account.method.grokDeviceCodeHelp':
+    'Sign in to Grok Build with a device code in a browser, including on another device.',
   'account.loginOpened': 'Opened the official {name} login flow',
   'account.loginSucceeded': '{name} is signed in',
   'account.loginIncomplete': '{name} is still not signed in: {detail}',
@@ -900,7 +912,9 @@ const EN: TranslationTable = {
     'Termexo automatically creates a separate configuration folder and isolates credentials.',
   'settings.defaultAccount': 'Use as the default login account for this CLI',
   'settings.accountSafety':
-    'Login opens the official CLI flow in a new terminal. Deleting a profile does not remove its credential folder.',
+    'Login opens the official CLI flow in a new terminal. System account folders are never removed.',
+  'settings.antigravitySingleAccountNote':
+    'Antigravity CLI (agy) stores its Google sign-in in a single OS keyring entry and cannot run isolated accounts concurrently.',
   'settings.refreshStatus': 'Refresh status',
   'settings.copyConfig': 'Copy configuration from',
   'settings.copyConfigPick': 'Pick an account…',
@@ -915,6 +929,11 @@ const EN: TranslationTable = {
   'settings.keyRequired': 'API Key must be re-entered',
   'settings.newProfile': 'New profile',
   'settings.modelCatalog': 'Available models',
+  'settings.apiModels': 'Fetched from provider API',
+  'settings.fetchApiModels': 'Fetch models from API',
+  'settings.fetchingApiModels': 'Fetching models…',
+  'settings.apiModelsLoaded': 'Fetched {count} models from provider API',
+  'settings.apiModelsEmpty': 'Provider API returned no available models.',
   'settings.catalogRefresh': 'Check for new models',
   'settings.catalogChecking': 'Checking…',
   'settings.catalogHelp':
@@ -1556,6 +1575,18 @@ const ZH_CN: TranslationTable = {
   'account.method.codexBrowserHelp': '打开浏览器，使用 ChatGPT 账号授权 Codex。',
   'account.method.deviceCode': 'ChatGPT（设备码）',
   'account.method.deviceCodeHelp': '在浏览器中输入终端显示的设备码，也可使用另一台设备完成授权。',
+  'account.method.opencodeBrowser': 'OpenCode（CLI 登录）',
+  'account.method.opencodeBrowserHelp':
+    '在独立的 XDG_DATA_HOME 目录中运行 opencode auth login 连接账号或供应商。',
+  'account.method.piInteractive': 'Pi 终端内登录（/login）',
+  'account.method.piInteractiveHelp':
+    '在独立的 PI_CODING_AGENT_DIR 中打开 Pi，在终端内输入 /login 完成登录并退出即可生效。',
+  'account.method.grokBrowser': 'Grok（浏览器）',
+  'account.method.grokBrowserHelp':
+    '在独立的 GROK_HOME 目录中打开浏览器完成 Grok Build 账号授权。',
+  'account.method.grokDeviceCode': 'Grok（设备码）',
+  'account.method.grokDeviceCodeHelp':
+    '使用设备码在浏览器中完成 Grok Build 授权，支持跨设备登录。',
   'account.loginOpened': '已打开 {name} 官方登录流程',
   'account.loginSucceeded': '{name} 已登录',
   'account.loginIncomplete': '{name} 仍未登录：{detail}',
@@ -1823,7 +1854,9 @@ const ZH_CN: TranslationTable = {
   'settings.loginAfterSaveHelp': 'Termexo 会自动创建独立配置目录并隔离凭据。',
   'settings.defaultAccount': '设为此 CLI 的默认登录账号',
   'settings.accountSafety':
-    '登录会在新终端中打开官方 CLI 流程。删除 Profile 不会删除磁盘凭据目录。',
+    '登录会在新终端中打开官方 CLI 流程。删除隔离账号不会影响本机系统账号目录。',
+  'settings.antigravitySingleAccountNote':
+    '说明：Antigravity CLI（agy）仅使用单一操作系统凭据库条目，暂不支持多账号并发隔离。',
   'settings.refreshStatus': '刷新状态',
   'settings.copyConfig': '从其它账号复制配置',
   'settings.copyConfigPick': '选择账号…',
@@ -1838,6 +1871,11 @@ const ZH_CN: TranslationTable = {
   'settings.keyRequired': '需要重新输入 API Key',
   'settings.newProfile': '添加模型配置',
   'settings.modelCatalog': '可用模型',
+  'settings.apiModels': '来自供应商 API',
+  'settings.fetchApiModels': '从 API 拉取可用模型',
+  'settings.fetchingApiModels': '正在拉取模型列表…',
+  'settings.apiModelsLoaded': '已从 API 拉取 {count} 个可用模型',
+  'settings.apiModelsEmpty': '供应商 API 未返回可用模型。',
   'settings.catalogRefresh': '检查新模型',
   'settings.catalogChecking': '正在检查…',
   'settings.catalogHelp':

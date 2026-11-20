@@ -38,6 +38,8 @@ describe('account login feedback', () => {
     service.observeOutput('terminal-a', 'Login successful');
     expect(service.confirm('terminal-a', false)).toBe(false);
     expect(service.confirm('terminal-a', true)).toBe(true);
+    // A subsequent terminal exit after polling already confirmed must not double-confirm.
+    expect(service.confirm('terminal-a', true, true)).toBe(false);
   });
 
   it('ignores late output and refreshes from a replaced attempt', () => {

@@ -49,6 +49,7 @@ pub enum OpenCodeError {
 #[derive(Debug, Default)]
 pub struct OpenCodeAdapter {
     executable_override: Option<PathBuf>,
+    data_home_override: Option<PathBuf>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -66,10 +67,18 @@ impl OpenCodeAdapter {
         Self::default()
     }
 
+    pub fn with_data_home(data_home: PathBuf) -> Self {
+        Self {
+            executable_override: None,
+            data_home_override: Some(data_home),
+        }
+    }
+
     #[cfg(test)]
     pub(crate) fn with_executable(executable: PathBuf) -> Self {
         Self {
             executable_override: Some(executable),
+            data_home_override: None,
         }
     }
 
@@ -136,6 +145,9 @@ impl OpenCodeAdapter {
         if let Some(directory) = directory {
             command.current_dir(directory);
         }
+        if let Some(data_home) = self.data_home_override.as_ref() {
+            command.env("XDG_DATA_HOME", data_home);
+        }
         command.arg(PURE_MODE_FLAG).args(arguments);
         let output = run_with_timeout(&mut command, timeout)
             .map_err(|error| OpenCodeError::CommandFailed(error.to_string()))?;
@@ -147,6 +159,9 @@ impl OpenCodeAdapter {
             let mut fallback = query_command(&executable);
             if let Some(directory) = directory {
                 fallback.current_dir(directory);
+            }
+            if let Some(data_home) = self.data_home_override.as_ref() {
+                fallback.env("XDG_DATA_HOME", data_home);
             }
             fallback.args(arguments);
             return run_with_timeout(&mut fallback, timeout)
@@ -230,10 +245,14 @@ impl AgentAdapter for OpenCodeAdapter {
     }
 
     fn list_sessions(&self, project_path: Option<&str>) -> Result<Vec<AgentSession>, Self::Error> {
-        let output = self.run(
-            &["session", "list", "--format", "json"],
-            SESSION_LIST_TIMEOUT,
-        )?;
+        let args: &[&str] = if self.data_home_override.is_some()
+            && self.supports_private_server().unwrap_or(false)
+        {
+            &["session", "list", "--format", "json", STANDALONE_FLAG]
+        } else {
+            &["session", "list", "--format", "json"]
+        };
+        let output = self.run(args, SESSION_LIST_TIMEOUT)?;
         if !output.status.success() {
             return Err(OpenCodeError::SessionCommand(
                 String::from_utf8_lossy(&output.stderr).trim().to_owned(),

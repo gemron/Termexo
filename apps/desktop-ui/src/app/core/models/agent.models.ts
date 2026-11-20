@@ -31,7 +31,19 @@ export const MANAGED_AGENT_INSTALLERS: Record<ManagedAgentType, readonly CliInst
   pi: ['npm'],
   antigravity: ['script'],
 };
-export type AccountAgentType = 'claude' | 'codex';
+export type AccountAgentType = 'claude' | 'codex' | 'opencode' | 'pi' | 'grok';
+
+export const ACCOUNT_AGENT_TYPES: readonly AccountAgentType[] = [
+  'claude',
+  'codex',
+  'opencode',
+  'pi',
+  'grok',
+];
+
+export function isAccountAgentType(agent: string): agent is AccountAgentType {
+  return (ACCOUNT_AGENT_TYPES as readonly string[]).includes(agent);
+}
 
 /** One model the Antigravity CLI offers, as it reports them itself. */
 export interface AntigravityModel {
@@ -269,6 +281,7 @@ export interface OpenCodeLaunchRequest {
   workspaceId?: string;
   sessionId?: string;
   model?: string;
+  accountProfileId?: string;
   continueLast?: boolean;
   autoConfirm?: boolean;
 }
@@ -278,6 +291,7 @@ export interface PiLaunchRequest {
   workspaceId?: string;
   sessionId?: string;
   model?: string;
+  accountProfileId?: string;
   continueLast?: boolean;
 }
 
@@ -287,8 +301,22 @@ export interface GrokLaunchRequest {
   sessionId?: string;
   newSessionId?: string;
   model?: string;
+  accountProfileId?: string;
   continueLast?: boolean;
   autoConfirm?: boolean;
+}
+
+export interface FetchProviderModelsRequest {
+  protocol: 'anthropic' | 'openai';
+  baseUrl?: string;
+  apiKey?: string;
+  profileId?: string;
+  workspaceId?: string;
+}
+
+export interface ProviderApiModel {
+  id: string;
+  name: string;
 }
 
 export interface AccountLoginRequest {
@@ -317,7 +345,7 @@ export interface AccountProfileInput {
   isDefault: boolean;
 }
 
-export type AgentProtocol = AccountAgentType;
+export type AgentProtocol = 'claude' | 'codex';
 
 /**
  * One provider's credentials plus the endpoint each agent reaches it through.
@@ -419,7 +447,7 @@ export function needsCredential(profile: ModelProfile, agent: AgentProtocol): bo
  */
 export function resolveAccountProfileId(
   profiles: readonly AccountProfile[],
-  agent: AgentProtocol,
+  agent: AccountAgentType,
   preferred?: string,
 ): string | undefined {
   const candidates = profiles.filter((profile) => profile.agentType === agent);
@@ -442,7 +470,7 @@ export function terminalAccountName(
   agentType: AgentType,
   accountProfileId?: string,
 ): string {
-  if (agentType !== 'claude' && agentType !== 'codex') {
+  if (!isAccountAgentType(agentType)) {
     return '';
   }
   const resolved = resolveAccountProfileId(profiles, agentType, accountProfileId);

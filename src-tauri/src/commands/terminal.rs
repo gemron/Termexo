@@ -3,7 +3,9 @@ use std::collections::{HashMap, HashSet};
 use tauri::{AppHandle, Manager, State};
 
 use crate::agent::OpenCodeAdapter;
-use crate::commands::agent::{network_environment, relaunch_environment, RelaunchRequest};
+use crate::commands::agent::{
+    account_login_relaunch_environment, network_environment, relaunch_environment, RelaunchRequest,
+};
 use crate::config::{CredentialStore, LaunchEnvironmentStore};
 use crate::database::WorkspaceDatabase;
 use crate::git::watch::RepositoryWatcher;
@@ -117,6 +119,7 @@ pub fn create_terminal(
                     workspace_id: request.workspace_id.clone(),
                     session_id: request.native_session_id.clone(),
                     model: None,
+                    account_profile_id: request.account_profile_id.clone(),
                     auto_confirm: false,
                     continue_last: false,
                 },
@@ -132,29 +135,45 @@ pub fn create_terminal(
         }
     }
 
-    let mut environment = launch_environment
+    let mut environment = match launch_environment
         .take(&request.terminal_id)
-        .map_err(|error| error.to_string())?;
-    // Empty means this terminal is reconnecting rather than starting for the first time: the
-    // stash is single-use and in-memory. Without rebuilding, the CLI would start against its
-    // default home and read as a different account than the one the terminal was created with.
-    if environment.is_empty() {
-        if let Some(agent_type) = request.agent_type.as_deref() {
-            environment = relaunch_environment(
-                &database,
-                &credentials,
-                &hooks,
-                &RelaunchRequest {
-                    terminal_id: &request.terminal_id,
-                    agent_type,
-                    native_session_id: request.native_session_id.as_deref(),
-                    account_profile_id: request.account_profile_id.as_deref(),
-                    model_profile_id: request.profile_id.as_deref(),
-                    workspace_id: request.workspace_id.as_deref(),
-                },
-            )?;
+        .map_err(|error| error.to_string())?
+    {
+        Some(environment) => environment,
+        None => {
+            // None means this terminal is reconnecting rather than starting from a fresh
+            // prepare_*_launch stash (which may legitimately be empty for a system account with
+            // no proxy). Rebuild the environment without polluting account-login terminals with
+            // model API keys or hooks.
+            if let Some(agent_type) = request.agent_type.as_deref() {
+                if request.account_login {
+                    account_login_relaunch_environment(
+                        &database,
+                        &credentials,
+                        agent_type,
+                        request.account_profile_id.as_deref(),
+                        request.workspace_id.as_deref(),
+                    )?
+                } else {
+                    relaunch_environment(
+                        &database,
+                        &credentials,
+                        &hooks,
+                        &RelaunchRequest {
+                            terminal_id: &request.terminal_id,
+                            agent_type,
+                            native_session_id: request.native_session_id.as_deref(),
+                            account_profile_id: request.account_profile_id.as_deref(),
+                            model_profile_id: request.profile_id.as_deref(),
+                            workspace_id: request.workspace_id.as_deref(),
+                        },
+                    )?
+                }
+            } else {
+                HashMap::new()
+            }
         }
-    }
+    };
     // Unified default network injection: every PTY spawn applies the effective profile, so
     // shell terminals (UI new, MCP terminal_create, remote) get the same proxy as agent tasks.
     // prepare_*_launch already carries it; only missing keys are filled, never overwriting.

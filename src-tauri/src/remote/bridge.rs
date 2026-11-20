@@ -61,6 +61,7 @@ pub const REMOTE_ALLOWED: &[&str] = &[
     "scan_antigravity_sessions",
     "list_antigravity_models",
     "read_model_catalog",
+    "fetch_provider_models",
     "read_antigravity_status_feed",
     "prepare_antigravity_launch",
     "scan_claude_sessions",

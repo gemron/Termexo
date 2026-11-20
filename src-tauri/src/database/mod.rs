@@ -1,7 +1,7 @@
 use std::path::{Path, PathBuf};
 use std::sync::Mutex;
 
-use rusqlite::{params, Connection};
+use rusqlite::{params, Connection, OptionalExtension};
 use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value};
 use thiserror::Error;
@@ -242,6 +242,7 @@ impl WorkspaceDatabase {
         connection.execute_batch(NETWORK_MIGRATION)?;
         connection.execute_batch(ACCOUNT_MIGRATION)?;
         run_account_login_migration(&connection)?;
+        run_multi_agent_accounts_migration(&connection)?;
         run_api_protocol_migration(&connection)?;
         run_provider_profile_migration(&connection)?;
         connection.execute_batch(V05_ASSETS_MIGRATION)?;
@@ -1169,10 +1170,24 @@ impl WorkspaceDatabase {
             .connection
             .lock()
             .map_err(|_| DatabaseError::LockPoisoned)?;
+        let deleted_default_agent: Option<String> = connection
+            .query_row(
+                "SELECT agent_type FROM account_profiles WHERE id = ?1 AND is_system = 0 AND is_default = 1",
+                [profile_id],
+                |row| row.get(0),
+            )
+            .optional()?;
         connection.execute(
             "DELETE FROM account_profiles WHERE id = ?1 AND is_system = 0",
             [profile_id],
         )?;
+        // Restoring the system account as default avoids leaving an agent with no default account.
+        if let Some(agent_type) = deleted_default_agent {
+            connection.execute(
+                "UPDATE account_profiles SET is_default = 1 WHERE agent_type = ?1 AND is_system = 1",
+                [agent_type],
+            )?;
+        }
         Ok(())
     }
 }
@@ -1327,6 +1342,65 @@ fn run_account_login_migration(connection: &Connection) -> Result<(), DatabaseEr
         .collect::<Result<Vec<_>, _>>()?;
     if !names.iter().any(|name| name == "login_method") {
         connection.execute_batch(ACCOUNT_LOGIN_MIGRATION)?;
+    }
+    Ok(())
+}
+
+/// Widens `account_profiles` CHECK constraints to support OpenCode, Pi, and Grok accounts and
+/// seeds their system accounts idempotently.
+fn run_multi_agent_accounts_migration(connection: &Connection) -> Result<(), DatabaseError> {
+    let table_sql: String = connection
+        .query_row(
+            "SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'account_profiles'",
+            [],
+            |row| row.get(0),
+        )
+        .unwrap_or_default();
+    if !table_sql.contains("'opencode'") || !table_sql.contains("'interactive'") {
+        connection.execute_batch(
+            "BEGIN TRANSACTION;
+            CREATE TABLE account_profiles_v2 (
+                id TEXT PRIMARY KEY,
+                name TEXT NOT NULL,
+                agent_type TEXT NOT NULL CHECK (agent_type IN ('claude', 'codex', 'opencode', 'pi', 'grok')),
+                config_dir TEXT,
+                is_default INTEGER NOT NULL DEFAULT 0,
+                is_system INTEGER NOT NULL DEFAULT 0,
+                login_method TEXT NOT NULL DEFAULT 'browser'
+                    CHECK (login_method IN ('browser', 'console', 'sso', 'device-code', 'interactive')),
+                created_at INTEGER NOT NULL,
+                updated_at INTEGER NOT NULL
+            );
+            INSERT INTO account_profiles_v2 (
+                id, name, agent_type, config_dir, is_default, is_system, login_method, created_at, updated_at
+            )
+            SELECT id, name, agent_type, config_dir, is_default, is_system, login_method, created_at, updated_at
+            FROM account_profiles;
+            DROP TABLE account_profiles;
+            ALTER TABLE account_profiles_v2 RENAME TO account_profiles;
+            CREATE INDEX IF NOT EXISTS idx_account_profiles_agent
+                ON account_profiles(agent_type, is_default DESC, name);
+            COMMIT;",
+        )?;
+    }
+    let now = unix_timestamp_millis();
+    for (id, name, agent_type, login_method) in [
+        ("opencode-system", "系统 OpenCode 账号", "opencode", "browser"),
+        ("pi-system", "系统 Pi 账号", "pi", "interactive"),
+        ("grok-system", "系统 Grok 账号", "grok", "browser"),
+    ] {
+        let has_default: i64 = connection.query_row(
+            "SELECT COUNT(*) FROM account_profiles WHERE agent_type = ?1 AND is_default = 1",
+            [agent_type],
+            |row| row.get(0),
+        )?;
+        let is_default = i64::from(has_default == 0);
+        connection.execute(
+            "INSERT OR IGNORE INTO account_profiles (
+                 id, name, agent_type, config_dir, is_default, is_system, login_method, created_at, updated_at
+             ) VALUES (?1, ?2, ?3, NULL, ?4, 1, ?5, ?6, ?6)",
+            params![id, name, agent_type, is_default, login_method, now],
+        )?;
     }
     Ok(())
 }
@@ -2287,6 +2361,43 @@ mod tests {
                 .login_method,
             crate::config::AccountLoginMethod::DeviceCode
         );
+    }
+
+    #[test]
+    fn migrates_multi_agent_accounts_and_restores_system_default_on_delete() {
+        let database = WorkspaceDatabase::open(PathBuf::from(":memory:")).unwrap();
+        let profiles = database.list_account_profiles().unwrap();
+        for expected_id in [
+            "claude-system",
+            "codex-system",
+            "opencode-system",
+            "pi-system",
+            "grok-system",
+        ] {
+            assert!(
+                profiles.iter().any(|p| p.id == expected_id && p.is_system && p.is_default),
+                "missing seeded system account {expected_id}"
+            );
+        }
+
+        let work_grok = AccountProfile {
+            id: "grok-work".into(),
+            name: "Grok Work".into(),
+            agent_type: "grok".into(),
+            login_method: crate::config::AccountLoginMethod::DeviceCode,
+            config_dir: Some("C:/isolated/grok-work".into()),
+            is_default: true,
+            is_system: false,
+            authenticated: false,
+            diagnostic: String::new(),
+        };
+        database.save_account_profile(&work_grok).unwrap();
+        assert!(!database.find_account_profile("grok-system").unwrap().unwrap().is_default);
+        assert!(database.find_account_profile("grok-work").unwrap().unwrap().is_default);
+
+        database.delete_account_profile("grok-work").unwrap();
+        assert!(database.find_account_profile("grok-work").unwrap().is_none());
+        assert!(database.find_account_profile("grok-system").unwrap().unwrap().is_default);
     }
 
     fn test_network_profile(id: &str, scope: &str, workspace_id: Option<&str>) -> NetworkProfile {
