@@ -148,6 +148,7 @@ pub fn run() {
             let hooks = HookEventStore::new(&app_data_dir)?;
             app.manage(database);
             app.manage(CredentialStore);
+            app.manage(commands::update::UpdateStore::default());
             app.manage(CliOperationManager::default());
             app.manage(LaunchEnvironmentStore::default());
             app.manage(hooks);
@@ -252,7 +253,8 @@ pub fn run() {
             commands::notification::set_taskbar_attention,
             commands::update::check_for_update,
             commands::update::open_release_page,
-            commands::update::update_via_npm,
+            commands::update::download_update,
+            commands::update::install_downloaded_update,
             commands::hooks::prepare_claude_runtime,
             commands::hooks::sync_agent_events,
             commands::hooks::list_agent_events,

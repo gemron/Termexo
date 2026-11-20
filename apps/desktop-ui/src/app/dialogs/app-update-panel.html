@@ -1,0 +1,121 @@
+<section class="update-panel" aria-labelledby="update-heading">
+  @let result = updates.result();
+  @let currentVersion = result?.currentVersion || installedVersion();
+  <header class="update-heading">
+    <div>
+      <h2 id="update-heading">{{ 'update.section' | t }}</h2>
+      @if (currentVersion) {
+        <p>{{ 'update.currentVersion' | t: { version: currentVersion } }}</p>
+      }
+    </div>
+    <button
+      type="button"
+      class="btn btn-outline btn-sm"
+      [disabled]="!updates.desktop || busy()"
+      (click)="check()"
+    >
+      <app-icon name="refresh" [size]="14" />
+      {{ (updates.checking() ? 'update.checking' : 'update.check') | t }}
+    </button>
+  </header>
+
+  @if (!updates.desktop) {
+    <p class="muted">{{ 'update.desktopOnly' | t }}</p>
+  }
+  @if (updates.error(); as failure) {
+    <p class="feedback error" role="alert">
+      <strong>{{ 'update.failed' | t }}</strong>
+      <span>{{ failure }}</span>
+    </p>
+  }
+  @if (result?.updateAvailable && result) {
+    <div class="release-card">
+      <div class="release-title">
+        <app-icon name="download" [size]="18" />
+        <strong>{{ 'update.available' | t: { version: result.latestVersion } }}</strong>
+      </div>
+      @if (updates.downloading()) {
+        <div class="download-state" role="status">
+          @if (updates.progress(); as progress) {
+            @if (progress.verifying) {
+              <span>{{ 'update.verifying' | t }}</span>
+            } @else {
+              <span>{{ 'update.downloadingFrom' | t: { source: ('update.source.' + progress.source) | t } }}</span>
+              @if (percent() !== null) {
+                <span>{{ percent() }}%</span>
+              }
+            }
+          } @else {
+            <span>{{ 'update.preparing' | t }}</span>
+          }
+        </div>
+        <progress
+          [attr.value]="percent()"
+          max="100"
+          [attr.aria-label]="'update.downloadProgress' | t"
+        ></progress>
+      } @else if (updates.ready()) {
+        <p class="feedback" role="status">
+          {{ (updates.installerOpened() ? 'update.installerOpened' : 'update.ready') | t }}
+        </p>
+        @if (result.installMethod === 'restart') {
+          <p class="muted">{{ 'update.restartHint' | t }}</p>
+        }
+      } @else if (result.installMethod === 'manual' && result.installedViaNpm) {
+        <p class="muted">{{ 'update.npmManual' | t }}</p>
+      }
+      @if (updates.operationError(); as failure) {
+        <p class="feedback error" role="alert">{{ failure }}</p>
+      }
+      <div class="release-actions">
+        @if (updates.desktop && result.installMethod !== 'manual') {
+          @if (updates.ready()) {
+            <button class="btn btn-primary btn-sm" type="button" [disabled]="busy()" (click)="updates.install()">
+              {{
+                (updates.installing()
+                  ? 'update.installing'
+                  : result.installMethod === 'restart' ? 'update.installAndRestart' : 'update.openInstaller')
+                  | t
+              }}
+            </button>
+          } @else {
+            <button class="btn btn-primary btn-sm" type="button" [disabled]="busy()" (click)="updates.download()">
+              {{ (updates.operationError() ? 'update.retryDownload' : 'update.downloadUpdate') | t }}
+            </button>
+          }
+        }
+        <button class="btn btn-ghost btn-sm" type="button" (click)="updates.openReleasePage()">
+          {{ 'update.download' | t }}
+        </button>
+      </div>
+      @if (notes()) {
+        <details>
+          <summary>{{ 'update.releaseNotes' | t }}</summary>
+          <div class="release-notes" [innerHTML]="notes()"></div>
+        </details>
+      }
+    </div>
+  } @else if (result && !updates.error()) {
+    <p class="feedback" role="status">{{ 'update.upToDate' | t }}</p>
+  }
+
+  <label class="update-source">
+    <span>{{ 'update.source.label' | t }}</span>
+    <select class="select select-sm" [disabled]="!updates.desktop || busy()" [value]="updates.source()" (change)="setSource($event)">
+      <option value="auto" [selected]="updates.source() === 'auto'">{{ 'update.source.auto' | t }}</option>
+      <option value="china" [selected]="updates.source() === 'china'">{{ 'update.source.china' | t }}</option>
+      <option value="official" [selected]="updates.source() === 'official'">{{ 'update.source.official' | t }}</option>
+    </select>
+  </label>
+  <p class="muted">{{ 'update.source.help' | t }}</p>
+  <label class="auto-check">
+    <input
+      type="checkbox"
+      class="checkbox checkbox-sm"
+      [disabled]="!updates.desktop"
+      [checked]="updates.autoCheckEnabled()"
+      (change)="updates.setAutoCheckEnabled($any($event.target).checked)"
+    />
+    <span>{{ 'update.autoCheck' | t }}</span>
+  </label>
+</section>

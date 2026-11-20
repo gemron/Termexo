@@ -15,6 +15,7 @@
     "vendor/darwin-arm64/Termexo.app.tar.gz",
     "vendor/darwin-x64/Termexo.app.tar.gz",
     "vendor/linux-x64/Termexo.tar.gz",
+    "installers/",
     "README.md"
   ],
   "os": [

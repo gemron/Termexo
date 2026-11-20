@@ -48,7 +48,7 @@
   transform: rotate(180deg);
 }
 
-@container terminal-tabs (max-width: 365px) {
+@container terminal-tabs (max-width: 480px) {
   .terminal-tools-trigger {
     width: 32px;
   }

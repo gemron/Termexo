@@ -801,39 +801,34 @@ try {
   }
   await page.getByTestId('routine-run-button').filter({ hasText: routineTitle }).waitFor();
 
-  // The board view hides the tab strip, and its grid row collapses to zero height. The waiting
-  // banner has to keep its own row instead of sliding up under the topbar.
-  await page.evaluate(() => {
-    const app = globalThis.ng?.getComponent(document.querySelector('app-root'));
-    const terminal = app?.state?.activeWorkspace?.()?.terminals?.[0];
-    if (terminal) app.state.updateTerminalStatus(terminal.id, 'WAITING_APPROVAL');
-  });
-  await page.locator('.attention-banner').waitFor();
-  await page.waitForTimeout(180);
-  const attentionLayout = await page.evaluate(() => {
-    const bounds = (selector) => document.querySelector(selector)?.getBoundingClientRect() ?? null;
-    const tabRow = bounds('.terminal-tabs');
-    const banner = bounds('.attention-banner');
-    const workbench = bounds('.workbench-area');
-    const text = document.querySelector('.attention-banner-text');
-    return {
-      clearsTopbar: Boolean(tabRow && banner && banner.top >= tabRow.bottom),
-      clearsWorkbench: Boolean(workbench && banner && banner.bottom <= workbench.top),
-      containsText: Boolean(
-        text &&
-        banner &&
-        text.getBoundingClientRect().top >= banner.top &&
-        text.getBoundingClientRect().bottom <= banner.bottom,
-      ),
-      bannerHeight: banner ? Math.round(banner.height) : 0,
-    };
-  });
-  if (
-    !attentionLayout.clearsTopbar ||
-    !attentionLayout.clearsWorkbench ||
-    !attentionLayout.containsText
-  ) {
-    throw new Error(`waiting banner is clipped on the board: ${JSON.stringify(attentionLayout)}`);
+  // Automatic reminders need a content-sized row on the board, including when several statuses
+  // share the same notification UI.
+  const attentionLayout = [];
+  for (const status of ['WAITING_INPUT', 'FAILED', 'WAITING_APPROVAL']) {
+    await page.evaluate((nextStatus) => {
+      const app = globalThis.ng?.getComponent(document.querySelector('app-root'));
+      const terminal = app?.state?.activeWorkspace?.()?.terminals?.[0];
+      if (!terminal) throw new Error('no terminal for attention banner smoke');
+      app.state.updateTerminalStatus(terminal.id, nextStatus);
+    }, status);
+    await page.locator('.attention-banner[data-status="' + status + '"]').waitFor();
+    const layout = await page.evaluate(() => {
+      const bounds = (selector) => document.querySelector(selector)?.getBoundingClientRect() ?? null;
+      const tabRow = bounds('.terminal-tabs');
+      const banner = bounds('.attention-banner');
+      const workbench = bounds('.workbench-area');
+      const text = bounds('.attention-banner-text');
+      return {
+        clearsTopbar: Boolean(tabRow && banner && banner.top >= tabRow.bottom),
+        clearsWorkbench: Boolean(workbench && banner && banner.bottom <= workbench.top),
+        containsText: Boolean(text && banner && text.top >= banner.top && text.bottom <= banner.bottom),
+        bannerHeight: banner ? Math.round(banner.height) : 0,
+      };
+    });
+    if (!layout.clearsTopbar || !layout.clearsWorkbench || !layout.containsText || layout.bannerHeight > 72) {
+      throw new Error(status + ' banner overlaps the board: ' + JSON.stringify(layout));
+    }
+    attentionLayout.push({ status, ...layout });
   }
 
   const screenshot = join(tmpdir(), 'termexo-todo-board.png');

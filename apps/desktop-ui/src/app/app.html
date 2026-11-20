@@ -71,6 +71,8 @@
         [showInspector]="phoneLayout() && workspaceView() === 'terminal' && !terminalFocusMode()"
         [inspectorOpen]="inspectorOpen()"
         [upgradeCount]="modelCatalog.upgrades().length"
+        [appUpdateAvailable]="updates.result()?.updateAvailable === true"
+        (appUpdateOpened)="openUpdates()"
         (inspectorToggled)="toggleInspector()"
         (settingsOpened)="openSettings()"
         (remoteHostsOpened)="remoteHostsOpen.set(true)"
@@ -472,13 +474,15 @@
       @if (globalTerminalNotices().length > 0) {
         <div class="global-notice-anchor">
           <button
+            #noticeTrigger
             type="button"
             class="tool-button global-notice-trigger btn btn-ghost btn-sm"
             [class.active]="globalNoticeOpen()"
             [class.has-waiting]="hasAttentionNotices()"
             [attr.aria-expanded]="globalNoticeOpen()"
+            [attr.aria-controls]="globalNoticeOpen() ? 'global-notice-panel' : null"
             aria-haspopup="dialog"
-            [attr.aria-label]="'notice.global' | t"
+            [attr.aria-label]="('notice.global' | t) + ' (' + globalTerminalNotices().length + ')'"
             [title]="'notice.globalDescription' | t"
             (click)="globalNoticeOpen.set(!globalNoticeOpen())"
           >
@@ -489,11 +493,14 @@
 
           @if (globalNoticeOpen()) {
             <section
+              id="global-notice-panel"
               class="global-notice-panel"
               role="dialog"
               aria-modal="false"
               data-tauri-drag-region="false"
               [attr.aria-label]="'notice.global' | t"
+              [appAnchoredMenu]="noticeTrigger"
+              (dismissed)="globalNoticeOpen.set(false)"
             >
               <header>
                 <div>
@@ -514,7 +521,8 @@
                     class="btn btn-square btn-ghost btn-xs"
                     [attr.aria-label]="'notice.closeGlobal' | t"
                     [title]="'common.close' | t"
-                    (click)="globalNoticeOpen.set(false)"
+                    autofocus
+                    (click)="noticeTrigger.focus({ preventScroll: true }); globalNoticeOpen.set(false)"
                   >
                     <app-icon name="x" [size]="13" />
                   </button>
@@ -1062,22 +1070,14 @@
       [activeWorkspaceId]="state.activeWorkspace()?.id ?? ''"
       [activeWorkspaceName]="state.activeWorkspace()?.name ?? ('common.currentWorkspace' | t)"
       [initialTab]="settingsInitialTab()"
+      [installedVersion]="appVersion()"
       [initialCliAgent]="settingsInitialCliAgent()"
       [initialModelProfileId]="settingsInitialModelProfileId()"
       [switchAgent]="modelSwitchOpen() ? modelSwitchAgentType() : null"
       [networkTestResult]="networkTestResult()"
       [busy]="agents.busy() || profileSaving() || profileDeleting()"
       [saving]="profileSaving()"
-      [updateResult]="updates.result()"
-      [updateChecking]="updates.checking()"
-      [updateInstalling]="updateInstalling()"
-      [updateError]="updates.error()"
-      [autoCheckUpdates]="updates.autoCheckEnabled()"
       (detectRequested)="detectAgentInstallations()"
-      (updateCheckRequested)="checkForUpdate()"
-      (updateDownloadRequested)="openReleasePage()"
-      (updateNpmRequested)="installUpdateViaNpm()"
-      (autoCheckChanged)="updates.setAutoCheckEnabled($event)"
       (modelSaved)="saveModelProfile($event)"
       (deleteModelRequested)="deleteModelProfile($event)"
       (mcpSaved)="saveMcpProfile($event)"
@@ -1168,7 +1168,14 @@
           }
         }
       </span>
-      <span>{{ message }}</span>
+      <div>
+        <span>{{ message }}</span>
+        @if (toastAction(); as action) {
+          <button class="app-toast-action btn btn-ghost btn-xs" type="button" (click)="runToastAction()">
+            {{ action.label }}
+          </button>
+        }
+      </div>
       <button
         type="button"
         class="app-toast-close"

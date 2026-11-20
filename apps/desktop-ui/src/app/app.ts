@@ -571,12 +571,12 @@ export class App {
   protected readonly launchingCodex = signal(false);
   protected readonly launchingOpenCode = signal(false);
   protected readonly launchingGrok = signal(false);
-  protected readonly updateInstalling = signal(false);
   /** Stable reference so the session center input does not change every check. */
   protected readonly sessionLaunchProfiles = (nativeSessionId: string) =>
     this.state.findSessionLaunchProfiles(nativeSessionId);
   protected readonly selectedTerminalDirectory = signal<string | null>(null);
   protected readonly toastMessage = signal<string | null>(null);
+  protected readonly toastAction = signal<{ label: string; run: () => void } | null>(null);
   protected readonly toastTone = signal<ToastTone>('success');
   /** A running terminal waits for confirmation near the close action's click position. */
   protected readonly pendingTerminalClose = signal<string | null>(null);
@@ -588,7 +588,6 @@ export class App {
   protected readonly closingTerminal = signal(false);
   /** IDs successive toasts, so a fresh message replaces the running auto-dismiss timer. */
   private toastTimer: number | null = null;
-  protected readonly globalNoticeOpen = signal(false);
   protected readonly dismissedNoticeKeys = signal<ReadonlySet<string>>(new Set());
   protected readonly workspacePendingDeletion = signal<Workspace | null>(null);
   protected readonly deletingWorkspace = signal(false);
@@ -653,6 +652,10 @@ export class App {
   protected readonly globalTerminalNotices = computed(() =>
     collectGlobalTerminalNotices(this.state.workspaces()),
   );
+  protected readonly globalNoticeOpen = linkedSignal({
+    source: computed(() => this.globalTerminalNotices().length > 0 && !this.terminalFocusMode()),
+    computation: () => false,
+  });
   protected readonly hasAttentionNotices = computed(() =>
     this.globalTerminalNotices().some(isAttentionNotice),
   );
@@ -2864,51 +2867,8 @@ export class App {
     }
   }
 
-  /** Manual check from the settings panel, which reports both outcomes as a toast. */
-  protected async checkForUpdate(): Promise<void> {
-    try {
-      const result = await this.updates.check();
-      if (!result) {
-        return;
-      }
-      this.showToast(
-        result.updateAvailable
-          ? this.i18n.t('update.available', { version: result.latestVersion })
-          : this.i18n.t('update.upToDate'),
-        result.updateAvailable ? 'attention' : 'success',
-      );
-    } catch (error) {
-      this.showToast(`${this.i18n.t('update.failed')}: ${this.errorMessage(error)}`, 'attention');
-    }
-  }
-
-  /**
-   * Installs the newest npm build. The app closes so npm can overwrite the executable Windows
-   * currently has locked, then the new build starts on its own.
-   */
-  protected async installUpdateViaNpm(): Promise<void> {
-    if (this.updateInstalling()) {
-      return;
-    }
-    this.updateInstalling.set(true);
-    this.showToast(this.i18n.t('update.installStarting'), 'attention');
-    try {
-      await this.updates.updateViaNpm();
-    } catch (error) {
-      this.updateInstalling.set(false);
-      this.showToast(
-        `${this.i18n.t('update.installFailed')}: ${this.errorMessage(error)}`,
-        'attention',
-      );
-    }
-  }
-
-  protected async openReleasePage(): Promise<void> {
-    try {
-      await this.updates.openReleasePage();
-    } catch (error) {
-      this.showToast(this.errorMessage(error), 'attention');
-    }
+  protected openUpdates(): void {
+    this.openSettings('updates');
   }
 
   protected saveWorkspaceAppearance(value: WorkspaceAppearanceValue): void {
@@ -3593,13 +3553,18 @@ export class App {
    * tone also drives how long the message stays on screen — errors do not auto-dismiss so the user
    * can read the diagnosis before the action retries.
    */
-  private showToast(message: string, tone: ToastTone = 'success'): void {
+  private showToast(
+    message: string,
+    tone: ToastTone = 'success',
+    action?: { label: string; run: () => void },
+  ): void {
     if (this.toastTimer !== null) {
       window.clearTimeout(this.toastTimer);
       this.toastTimer = null;
     }
     this.toastTone.set(tone);
     this.toastMessage.set(message);
+    this.toastAction.set(action ?? null);
     if (tone === 'error') {
       // Errors wait for explicit dismissal. The `CloseToastRequested` output on the region clears
       // the message; nothing else auto-fires.
@@ -3607,8 +3572,9 @@ export class App {
     }
     this.toastTimer = window.setTimeout(() => {
       this.toastMessage.set(null);
+      this.toastAction.set(null);
       this.toastTimer = null;
-    }, 2_400);
+    }, action ? 9_000 : 2_400);
   }
 
   protected closeToast(): void {
@@ -3617,6 +3583,13 @@ export class App {
       this.toastTimer = null;
     }
     this.toastMessage.set(null);
+    this.toastAction.set(null);
+  }
+
+  protected runToastAction(): void {
+    const action = this.toastAction();
+    this.closeToast();
+    action?.run();
   }
 
   private errorMessage(error: unknown): string {
@@ -4271,7 +4244,10 @@ export class App {
    */
   private announceUpdate(result: UpdateCheck): void {
     const title = this.i18n.t('update.available', { version: result.latestVersion });
-    this.showToast(title, 'attention');
+    this.showToast(title, 'attention', {
+      label: this.i18n.t('update.view'),
+      run: () => this.openUpdates(),
+    });
     void this.desktopNotifications
       .notifyMessage(
         title,

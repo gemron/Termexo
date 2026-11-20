@@ -8,14 +8,8 @@
   --attention-accent: var(--color-warning);
   --attention-accent-content: var(--color-warning-content);
 
-  // Row 2 of .workspace-main is the only one sized to its content. Pinning it matters because
-  // the task board view hides the tab strip, and grid auto-placement would otherwise slide the
-  // banner up into the collapsed tab row, where the bar above clips it. Must move with the
-  // other pinned rows if the shell's row layout changes — landing on the workbench row makes
-  // the banner take the terminal's whole height.
-  grid-row: 2;
-  // This is an in-flow row, not an overlay. A panel-level stacking context covered the
-  // tab strip's open dropdowns even when their own menu z-index was higher.
+  grid-area: attention;
+  min-width: 0;
   display: flex;
   flex: 0 0 auto;
   align-items: center;

@@ -25,7 +25,7 @@ const STATE_LABELS: Readonly<Record<string, string>> = {
 @Component({
   selector: 'app-remote-connection-badge',
   template: `
-    <span class="remote-badge" [attr.data-state]="connection.state()" [title]="tooltip()">
+    <span class="remote-badge" role="status" [attr.data-state]="connection.state()" [title]="tooltip()">
       <i aria-hidden="true"></i>
       <span>{{ label() }}</span>
     </span>

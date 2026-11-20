@@ -51,3 +51,24 @@
     background: var(--error-soft);
   }
 }
+
+@container terminal-tabs (max-width: 560px) {
+  :host {
+    margin-right: 0;
+  }
+
+  .remote-badge {
+    width: 12px;
+    height: 12px;
+    justify-content: center;
+    padding: 0;
+
+    > span {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      overflow: hidden;
+      clip-path: inset(50%);
+    }
+  }
+}

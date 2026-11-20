@@ -29,6 +29,16 @@ Linux 保留 `.deb` 中 `usr/bin` 与 `usr/lib/Termexo` 的相对结构，首次
 GTK 3、WebKitGTK 4.1 和 Secret Service 依赖由发行版包管理器提供，详见 [Linux 说明](linux.md)。
 Linux 构建记录与两个压缩包的校验和参与联合发布验证，npm 包中的 Linux 归档也会与构建产物逐字节比对。
 
+## 应用内更新
+
+设置中的「应用更新」可以检查新版本、查看发布说明和后台下载安装包。Windows 在用户选择
+「退出并安装」后才关闭应用。macOS 和 Linux 可打开对应安装包，按系统提示安装。
+
+选择「中国大陆加速」会优先使用 npmmirror 下载同版本的 npm 归档。稳定版发布任务会把
+NSIS、MSI、两种 macOS DMG 和 Linux DEB 与原生载荷一同放入 npm 归档，并在 npm 官方
+元数据中发布安装包的 SHA-256。应用只从官方源读取校验信息，校验 npm 归档的 SHA-512
+和安装包的 SHA-256，镜像暂未同步或校验失败时会尝试官方源。
+
 ## npm 首次配置
 
 在 npm 包 `termexo` 的 **Settings → Trusted Publisher** 添加：

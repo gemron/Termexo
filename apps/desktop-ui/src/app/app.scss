@@ -125,6 +125,10 @@ app-inspector-panel {
   // the status bar's unwrappable text — so the whole column grew past a phone viewport and the
   // terminal's close and maximise buttons ended up outside it, with no way to scroll to them.
   grid-template-columns: minmax(0, 1fr);
+  grid-template-areas:
+    'attention'
+    'workbench'
+    'status';
   grid-template-rows: auto minmax(0, 1fr) var(--statusbar-height);
   background: var(--surface-0);
 }
@@ -238,6 +242,26 @@ app-inspector-panel {
   .inspector-reveal > span {
     display: none;
   }
+
+  .global-notice-trigger {
+    position: relative;
+    width: 32px;
+    align-items: end;
+    padding: 0 4px 4px;
+
+    > span {
+      display: none;
+    }
+
+    > b {
+      position: absolute;
+      inset-block-start: 1px;
+      inset-inline-end: 1px;
+      min-width: 14px;
+      height: 14px;
+      padding-inline: 2px;
+    }
+  }
 }
 
 .window-tools {
@@ -313,23 +337,25 @@ app-inspector-panel {
 }
 
 .global-notice-panel {
-  position: absolute;
+  position: fixed;
   z-index: var(--z-popover);
-  top: calc(100% + 4px);
-  right: 8px;
-  width: min(370px, calc(100vw - 24px));
+  inset: auto;
+  display: flex;
+  flex-direction: column;
+  width: 370px;
+  margin: 0;
+  padding: 0;
   overflow: hidden;
   border: 1px solid var(--border-strong);
   border-radius: var(--radius-box);
   color: var(--text);
   background: var(--surface-raised);
   box-shadow: 0 18px 48px rgb(0 0 0 / 46%);
-  transform-origin: top right;
-  animation: menu-enter 140ms ease-out;
 
   > header {
     display: flex;
     min-height: 50px;
+    flex: none;
     align-items: center;
     justify-content: space-between;
     gap: 12px;
@@ -374,7 +400,8 @@ app-inspector-panel {
 
 .global-notice-list {
   display: grid;
-  max-height: min(360px, calc(100vh - 110px));
+  min-height: 0;
+  max-height: 360px;
   gap: 3px;
   overflow: auto;
   padding: 6px;
@@ -407,6 +434,12 @@ app-inspector-panel {
   &:hover .global-notice-clear,
   .global-notice-clear:focus-visible {
     opacity: 1;
+  }
+
+  @media (hover: none) {
+    .global-notice-clear {
+      opacity: 1;
+    }
   }
 }
 
@@ -952,8 +985,7 @@ app-inspector-panel {
 }
 
 .workbench-area {
-  // Pinned so the optional attention row can collapse when absent.
-  grid-row: 2;
+  grid-area: workbench;
   min-width: 0;
   min-height: 0;
   padding: 5px;
@@ -990,7 +1022,7 @@ app-inspector-panel {
 }
 
 .statusbar {
-  grid-row: 3;
+  grid-area: status;
   // A flex container refuses to shrink below its content unless told to, and this one sits in the
   // grid column every other row shares.
   min-width: 0;
@@ -1029,18 +1061,6 @@ app-inspector-panel {
       border-radius: 50%;
       background: var(--accent);
     }
-  }
-}
-
-@keyframes menu-enter {
-  from {
-    opacity: 0;
-    transform: translateY(-4px) scale(0.98);
-  }
-
-  to {
-    opacity: 1;
-    transform: translateY(0) scale(1);
   }
 }
 
@@ -1111,6 +1131,13 @@ app-inspector-panel {
       background: var(--color-info);
     }
   }
+}
+
+.app-toast-action {
+  display: flex;
+  margin-top: 4px;
+  padding-inline: 0;
+  color: var(--accent);
 }
 
 .app-toast-icon {
@@ -1200,7 +1227,26 @@ app-inspector-panel {
   }
 }
 
+@media (max-width: 365px) {
+  .terminal-tabs {
+    gap: 3px;
+  }
+}
+
 @container terminal-tabs (max-width: 365px) {
+  .terminal-tabs:has(.global-notice-trigger) {
+    .workspace-reveal {
+      max-width: 45px;
+    }
+
+    .tab-strip .tab > app-icon {
+      // The icon component sets its display inline.
+      display: none !important;
+    }
+  }
+}
+
+@container terminal-tabs (max-width: 480px) {
   .tab-row-brand {
     gap: 4px;
     padding-inline-end: 0;

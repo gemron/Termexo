@@ -341,6 +341,65 @@ try {
     }),
   );
 
+  // Notifications share the narrow tab row with the active tab and terminal controls.
+  await page.setViewportSize({ width: 320, height: 512 });
+  const noticeFixture = await page.evaluate(() => {
+    const app = globalThis.ng.getComponent(document.querySelector('app-root'));
+    const { id, status } = app.state.activeTerminal();
+    app.state.updateTerminalStatus(id, 'WAITING_INPUT');
+    return { id, status };
+  });
+  const noticeTrigger = page.locator('.global-notice-trigger');
+  const noticePanel = page.locator('.global-notice-panel');
+  const waitForVisibleActiveTab = () => page.waitForFunction(() => {
+    const caption = document.querySelector('.tab.active .tab-caption');
+    const toolbar = document.querySelector('.terminal-tabs');
+    return caption?.getBoundingClientRect().width >= 12 && toolbar.scrollWidth <= toolbar.clientWidth;
+  });
+
+  await waitForVisibleActiveTab();
+  await noticeTrigger.click();
+  await noticePanel.waitFor();
+  const panelBounds = await noticePanel.boundingBox();
+  const triggerBounds = await noticeTrigger.boundingBox();
+  if (
+    !panelBounds ||
+    !triggerBounds ||
+    panelBounds.x < 7 ||
+    panelBounds.x + panelBounds.width > 313 ||
+    panelBounds.y < triggerBounds.y + triggerBounds.height ||
+    panelBounds.y + panelBounds.height > 505
+  ) {
+    throw new Error('notice panel is outside the narrow viewport or overlapping its trigger');
+  }
+  await page.keyboard.press('Escape');
+  await noticePanel.waitFor({ state: 'hidden' });
+  if (!(await noticeTrigger.evaluate((button) => button === document.activeElement))) {
+    throw new Error('Escape should restore focus to the notices button');
+  }
+
+  await noticeTrigger.click();
+  await noticePanel.waitFor();
+  await page.mouse.click(20, 490);
+  await noticePanel.waitFor({ state: 'hidden' });
+
+  // Render the remote indicators in the local preview to measure the space they take.
+  await page.evaluate((id) => {
+    const app = globalThis.ng.getComponent(document.querySelector('app-root'));
+    app.remoteMode = true;
+    app.state.updateTerminalStatus(id, 'FAILED');
+  }, noticeFixture.id);
+  await page.locator('app-remote-connection-badge .remote-badge').waitFor();
+  await waitForVisibleActiveTab();
+  await page.setViewportSize({ width: 390, height: 512 });
+  await waitForVisibleActiveTab();
+  await page.evaluate(({ id, status }) => {
+    const app = globalThis.ng.getComponent(document.querySelector('app-root'));
+    app.state.updateTerminalStatus(id, status);
+  }, noticeFixture);
+  await page.reload({ waitUntil: 'networkidle' });
+  await page.locator('.terminal-panel').first().waitFor();
+
   // Keep the workbench itself above 720px after both sidebars take their columns.
   await page.setViewportSize({ width: 1440, height: 480 });
   const sidebarsReopened = await page.evaluate(() => {

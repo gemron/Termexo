@@ -36,7 +36,8 @@ export class AnchoredMenuDirective implements AfterViewInit, OnDestroy {
     // The template also lives outside the board's scroll containers for older WebView2 builds.
     this.element.showPopover?.();
     this.position();
-    this.items()[0]?.focus({ preventScroll: true });
+    const initialFocus = this.element.querySelector<HTMLElement>('[autofocus]') ?? this.items()[0];
+    initialFocus?.focus({ preventScroll: true });
     this.document.addEventListener('scroll', this.onScroll, true);
     this.observeAnchor();
   }

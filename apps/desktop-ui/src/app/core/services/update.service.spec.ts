@@ -1,7 +1,8 @@
 import { TestBed } from '@angular/core/testing';
 import { vi } from 'vitest';
+import type { Channel } from '@tauri-apps/api/core';
 
-import { PERIODIC_CHECK_INTERVAL_MS, UpdateService } from './update.service';
+import { PERIODIC_CHECK_INTERVAL_MS, UpdateProgress, UpdateService } from './update.service';
 
 describe('UpdateService', () => {
   beforeEach(() => {
@@ -42,9 +43,10 @@ describe('UpdateService', () => {
   });
 
   it('schedules periodic checks only in the desktop runtime', () => {
+    const service = TestBed.inject(UpdateService);
     const setInterval = vi.spyOn(globalThis, 'setInterval');
     // Browser preview has no packaged version, so a timer there would only waste requests.
-    TestBed.inject(UpdateService).startPeriodicChecks(() => undefined);
+    service.startPeriodicChecks(() => undefined);
 
     expect(setInterval).not.toHaveBeenCalled();
     setInterval.mockRestore();
@@ -71,6 +73,45 @@ describe('UpdateService', () => {
     // Idempotent: a second stop must not throw when no timer is pending.
     expect(() => service.stopPeriodicChecks()).not.toThrow();
     clearInterval.mockRestore();
+  });
+
+  it('downloads the checked version, reports progress and waits for explicit installation', async () => {
+    const available = {
+      currentVersion: '0.14.0',
+      latestVersion: '0.15.0',
+      updateAvailable: true,
+      releaseUrl: 'https://github.com/gemron/Termexo/releases/tag/v0.15.0',
+      installedViaNpm: false,
+      installMethod: 'restart',
+    };
+    const invoke = vi.fn(async (command: string, options: Record<string, unknown>) => {
+      if (command === 'check_for_update') return available;
+      if (command === 'download_update') {
+        const channel = options['progress'] as Channel<UpdateProgress>;
+        channel.onmessage({ source: 'chinaMirror', received: 5, total: 10, verifying: false });
+        return;
+      }
+      if (command === 'install_downloaded_update') return 'restart';
+      throw new Error(command);
+    });
+    vi.stubGlobal('__TAURI_INTERNALS__', { invoke, transformCallback: () => 1 });
+    try {
+      const service = TestBed.inject(UpdateService);
+      service.setSource('china');
+      await service.check();
+      await service.install();
+      expect(invoke).toHaveBeenCalledTimes(1);
+      await service.download();
+      expect(service.progress()).toMatchObject({ source: 'chinaMirror', received: 5 });
+      expect(service.ready()).toBe(true);
+      expect(invoke.mock.calls.map(([command]) => command)).toEqual(['check_for_update', 'download_update']);
+      expect(invoke.mock.calls[1][1]).toMatchObject({ version: '0.15.0', preferChina: true });
+      await service.install();
+      expect(invoke.mock.calls[2]).toEqual(['install_downloaded_update', { version: '0.15.0' }, undefined]);
+      expect(window.localStorage.getItem('termexo.updateSource')).toBe('china');
+    } finally {
+      vi.unstubAllGlobals();
+    }
   });
 
   describe('periodic scheduling with a fake clock', () => {
@@ -112,6 +153,7 @@ describe('UpdateService', () => {
         updateAvailable: true,
         releaseUrl: 'https://github.com/gemron/Termexo/releases/tag/v0.4.0',
         installedViaNpm: false,
+        installMethod: 'restart' as const,
       };
       vi.spyOn(service, 'check').mockImplementation(async () => {
         (service as unknown as { resultValue: { set: (v: unknown) => void } }).resultValue.set(

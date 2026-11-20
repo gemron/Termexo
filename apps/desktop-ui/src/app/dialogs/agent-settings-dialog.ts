@@ -45,7 +45,7 @@ import {
   PROVIDER_PRESETS,
 } from '../core/models/agent.models';
 import { createId } from '../core/models/identifiers';
-import { UpdateCheck } from '../core/services/update.service';
+import { AppUpdatePanelComponent } from './app-update-panel';
 import { ModalFocusDirective } from '../shared/modal-focus.directive';
 import { IconComponent } from '../shared/icon/icon';
 import { RemoteAccessPanelComponent } from './remote-access-panel';
@@ -60,6 +60,7 @@ import { isTauriRuntime } from '../core/services/tauri-runtime';
 
 export type SettingsTab =
   | 'diagnostics'
+  | 'updates'
   | 'cli'
   | 'accounts'
   | 'models'
@@ -116,6 +117,7 @@ const DEFAULT_ALERT_THRESHOLD = 80;
     McpServerPanelComponent,
     ProjectLinksComponent,
     AgentInstallPanelComponent,
+    AppUpdatePanelComponent,
     TranslatePipe,
   ],
   template: `
@@ -345,76 +347,10 @@ const DEFAULT_ALERT_THRESHOLD = 80;
                   <app-icon name="refresh" [size]="13" />{{ 'settings.detectBoth' | t }}
                 </button>
 
-                <div class="update-panel">
-                  <div class="update-header">
-                    <strong>{{ 'update.section' | t }}</strong>
-                    <code>{{ updateResult()?.currentVersion ?? '' }}</code>
-                  </div>
-                  @if (updateError(); as failure) {
-                    <small class="update-error">{{ 'update.failed' | t }}: {{ failure }}</small>
-                  } @else if (updateResult(); as result) {
-                    @if (result.updateAvailable) {
-                      <small class="update-available">{{
-                        'update.availableBody'
-                          | t: { current: result.currentVersion, latest: result.latestVersion }
-                      }}</small>
-                    } @else {
-                      <small>{{ 'update.upToDate' | t }}</small>
-                    }
-                  }
-                  <div class="update-actions">
-                    <button
-                      type="button"
-                      class="secondary inline-command btn btn-outline btn-sm"
-                      [disabled]="updateChecking()"
-                      (click)="updateCheckRequested.emit()"
-                    >
-                      <app-icon name="refresh" [size]="13" />{{
-                        (updateChecking() ? 'update.checking' : 'update.check') | t
-                      }}
-                    </button>
-                    @if (updateResult(); as result) {
-                      @if (result.updateAvailable) {
-                        <!-- An npm build can replace itself; an installed one goes to the page. -->
-                        @if (result.installedViaNpm) {
-                          <button
-                            type="button"
-                            class="primary btn btn-primary btn-sm"
-                            [disabled]="updateInstalling()"
-                            (click)="updateNpmRequested.emit()"
-                          >
-                            @if (updateInstalling()) {
-                              <span class="cli-spinner" aria-hidden="true"></span>
-                            }
-                            {{ (updateInstalling() ? 'update.installing' : 'update.install') | t }}
-                          </button>
-                        }
-                        <button
-                          type="button"
-                          class="secondary inline-command btn btn-outline btn-sm"
-                          (click)="updateDownloadRequested.emit()"
-                        >
-                          {{ 'update.download' | t }}
-                        </button>
-                      }
-                    }
-                  </div>
-                  @if (updateResult()?.updateAvailable && updateResult()?.installedViaNpm) {
-                    <small class="update-npm-note">{{ 'update.installHint' | t }}</small>
-                  }
-                  <label class="checkbox-control update-auto">
-                    <input
-                      type="checkbox"
-                      [checked]="autoCheckUpdates()"
-                      (change)="autoCheckChanged.emit($any($event.target).checked)"
-                    />
-                    <span>
-                      <strong>{{ 'update.autoCheck' | t }}</strong>
-                      <small>{{ 'update.autoCheckHelp' | t }}</small>
-                    </span>
-                  </label>
-                </div>
               </section>
+            }
+            @case ('updates') {
+              <app-update-panel [installedVersion]="installedVersion()" />
             }
             @case ('cli') {
               <app-agent-install-panel
@@ -1366,6 +1302,7 @@ export class AgentSettingsDialogComponent {
   readonly activeWorkspaceId = input('');
   readonly activeWorkspaceName = input('');
   readonly initialTab = input<SettingsTab>('diagnostics');
+  readonly installedVersion = input('');
   /** The agent the CLI tab opens on, when something sent the user here to install it. */
   readonly initialCliAgent = input<ManagedAgentType | ''>('');
   readonly initialModelProfileId = input('');
@@ -1374,17 +1311,8 @@ export class AgentSettingsDialogComponent {
   readonly busy = input(false);
   /** A profile save is in flight; its result lands in this dialog, so it cannot close meanwhile. */
   readonly saving = input(false);
-  readonly updateResult = input<UpdateCheck | null>(null);
-  readonly updateChecking = input(false);
-  readonly updateInstalling = input(false);
-  readonly updateError = input<string | null>(null);
-  readonly autoCheckUpdates = input(true);
   readonly cancelled = output<void>();
   readonly detectRequested = output<void>();
-  readonly updateCheckRequested = output<void>();
-  readonly updateDownloadRequested = output<void>();
-  readonly updateNpmRequested = output<void>();
-  readonly autoCheckChanged = output<boolean>();
   readonly modelSaved = output<ModelProfileInput>();
   readonly deleteModelRequested = output<string>();
   readonly mcpSaved = output<McpProfileInput>();
@@ -1437,6 +1365,7 @@ export class AgentSettingsDialogComponent {
     {
       section: 'settings.sectionTools',
       tabs: [
+        { id: 'updates', label: 'update.section', icon: 'download', keywords: 'update.check' },
         { id: 'diagnostics', label: 'settings.tabDiagnostics', icon: 'activity', keywords: 'settings.tabDiagnostics' },
         { id: 'storage', label: 'settings.tabStorage', icon: 'boxes', keywords: 'settings.tabStorage' },
         { id: 'mcp', label: 'settings.tabMcp', icon: 'link', keywords: 'settings.tabMcp' },

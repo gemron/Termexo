@@ -180,7 +180,8 @@ pub const REMOTE_DENIED: &[&str] = &[
     "open_support_email",
     "open_terminal_path",
     "open_directory",
-    "update_via_npm",
+    "download_update",
+    "install_downloaded_update",
     // Describes the desktop window's own WebView2, which says nothing about the browser a
     // remote client is being drawn in and would have it offer an install for another machine.
     "get_webview_status",
@@ -504,7 +505,8 @@ mod tests {
         assert!(is_remote_command_allowed("list_workspaces"));
         assert!(!is_remote_command_allowed("plugin:dialog|open"));
         assert!(!is_remote_command_allowed("plugin:list_workspaces"));
-        assert!(!is_remote_command_allowed("update_via_npm"));
+        assert!(!is_remote_command_allowed("download_update"));
+        assert!(!is_remote_command_allowed("install_downloaded_update"));
         assert!(!is_remote_command_allowed("unknown_command"));
     }
 

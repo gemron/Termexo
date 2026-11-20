@@ -1,7 +1,9 @@
-import { Injectable, OnDestroy, signal } from '@angular/core';
+import { Injectable, OnDestroy, computed, inject, signal } from '@angular/core';
+import { Channel } from '@tauri-apps/api/core';
 
 import { invoke } from './backend-bridge';
-import { hasBackend, isTauriRuntime } from './tauri-runtime';
+import { isTauriRuntime } from './tauri-runtime';
+import { I18nService } from '../i18n/i18n.service';
 
 export interface UpdateCheck {
   currentVersion: string;
@@ -10,10 +12,21 @@ export interface UpdateCheck {
   releaseNotes?: string;
   releaseUrl: string;
   publishedAt?: string;
-  /** True when this build runs from a global npm install and can update itself. */
   installedViaNpm: boolean;
+  installMethod: InstallMethod;
 }
 
+export type InstallMethod = 'restart' | 'openInstaller' | 'manual';
+export type UpdateSourcePreference = 'auto' | 'china' | 'official';
+
+export interface UpdateProgress {
+  source: 'github' | 'chinaMirror' | 'npmRegistry';
+  received: number;
+  total: number | null;
+  verifying: boolean;
+}
+
+const UPDATE_SOURCE_STORAGE_KEY = 'termexo.updateSource';
 const AUTO_CHECK_STORAGE_KEY = 'termexo.autoCheckUpdates';
 /** Dismissing a version keeps it hidden until a newer one ships. */
 const DISMISSED_STORAGE_KEY = 'termexo.dismissedUpdateVersion';
@@ -35,8 +48,22 @@ function readAutoCheckEnabled(): boolean {
   }
 }
 
+function readSource(): UpdateSourcePreference {
+  try {
+    const value = window.localStorage.getItem(UPDATE_SOURCE_STORAGE_KEY);
+    if (value === 'china' || value === 'official') return value;
+  } catch {
+    // Auto stays usable when storage is unavailable.
+  }
+  return 'auto';
+}
+
 @Injectable({ providedIn: 'root' })
 export class UpdateService implements OnDestroy {
+  private readonly i18n = inject(I18nService);
+  private readonly sourceValue = signal(readSource());
+  private readonly downloadedVersion = signal<string | null>(null);
+  private checkInFlight?: Promise<UpdateCheck>;
   private readonly autoCheckValue = signal(readAutoCheckEnabled());
   private readonly checkingValue = signal(false);
   private readonly resultValue = signal<UpdateCheck | null>(null);
@@ -48,6 +75,29 @@ export class UpdateService implements OnDestroy {
   readonly checking = this.checkingValue.asReadonly();
   readonly result = this.resultValue.asReadonly();
   readonly error = this.errorValue.asReadonly();
+  readonly source = this.sourceValue.asReadonly();
+  readonly desktop = isTauriRuntime();
+  readonly downloading = signal(false);
+  readonly installing = signal(false);
+  readonly progress = signal<UpdateProgress | null>(null);
+  readonly operationError = signal<string | null>(null);
+  readonly installerOpened = signal(false);
+  readonly ready = computed(() =>
+    this.downloadedVersion() !== null && this.downloadedVersion() === this.resultValue()?.latestVersion,
+  );
+  private readonly preferChina = computed(() =>
+    this.sourceValue() === 'china' ||
+    (this.sourceValue() === 'auto' && this.i18n.locale() === 'zh-CN'),
+  );
+
+  setSource(source: UpdateSourcePreference): void {
+    this.sourceValue.set(source);
+    try {
+      window.localStorage.setItem(UPDATE_SOURCE_STORAGE_KEY, source);
+    } catch {
+      // The choice still applies during this session.
+    }
+  }
 
   setAutoCheckEnabled(enabled: boolean): void {
     this.autoCheckValue.set(enabled);
@@ -86,7 +136,7 @@ export class UpdateService implements OnDestroy {
   startPeriodicChecks(onUpdate: (result: UpdateCheck) => void): void {
     // Remembered so re-enabling the preference can resume without the caller registering again.
     this.periodicHandler = onUpdate;
-    if (!hasBackend() || !this.autoCheckValue() || this.timer !== undefined) {
+    if (!isTauriRuntime() || !this.autoCheckValue() || this.timer !== undefined) {
       return;
     }
     this.timer = setInterval(() => {
@@ -112,24 +162,26 @@ export class UpdateService implements OnDestroy {
   }
 
   async check(): Promise<UpdateCheck | null> {
-    if (!hasBackend()) {
-      // Browser preview has no packaged version to compare against.
-      return null;
-    }
-    if (this.checkingValue()) {
-      return this.resultValue();
-    }
+    if (!isTauriRuntime() || this.downloading() || this.installing()) return null;
+    if (this.checkInFlight) return this.checkInFlight;
 
     this.checkingValue.set(true);
     this.errorValue.set(null);
+    const request = invoke<UpdateCheck>('check_for_update', { preferChina: this.preferChina() });
+    this.checkInFlight = request;
     try {
-      const result = await invoke<UpdateCheck>('check_for_update');
+      const result = await request;
+      if (result.latestVersion !== this.resultValue()?.latestVersion) {
+        this.installerOpened.set(false);
+        this.operationError.set(null);
+      }
       this.resultValue.set(result);
       return result;
     } catch (error) {
-      this.errorValue.set(typeof error === 'string' ? error : String(error));
+      this.errorValue.set(this.describeError(error));
       throw error;
     } finally {
+      this.checkInFlight = undefined;
       this.checkingValue.set(false);
     }
   }
@@ -139,29 +191,61 @@ export class UpdateService implements OnDestroy {
     if (!url) {
       return;
     }
-    if (!isTauriRuntime()) {
-      // Without a native shell the browsing device opens the page itself.
-      window.open(url, '_blank', 'noopener');
-      return;
+    this.operationError.set(null);
+    try {
+      if (isTauriRuntime()) {
+        await invoke('open_release_page', { url });
+      } else {
+        window.open(url, '_blank', 'noopener');
+      }
+    } catch (error) {
+      this.operationError.set(this.describeError(error));
     }
-    await invoke('open_release_page', { url });
   }
 
-  /**
-   * Installs the newest npm release and relaunches.
-   *
-   * Windows locks the running executable, so the install happens after Termexo exits — the app
-   * closes as part of this call and the new build starts on its own.
-   */
-  async updateViaNpm(): Promise<void> {
-    if (isTauriRuntime()) {
-      await invoke('update_via_npm');
-      return;
+  async download(): Promise<void> {
+    const result = this.resultValue();
+    if (!isTauriRuntime() || !result?.updateAvailable || result.installMethod === 'manual' ||
+        this.checkingValue() || this.downloading() || this.installing() || this.ready()) return;
+
+    this.downloading.set(true);
+    this.installerOpened.set(false);
+    this.operationError.set(null);
+    this.progress.set(null);
+    try {
+      const progress = new Channel<UpdateProgress>((event) => this.progress.set(event));
+      await invoke('download_update', {
+        version: result.latestVersion,
+        preferChina: this.preferChina(),
+        progress,
+      });
+      this.downloadedVersion.set(result.latestVersion);
+    } catch (error) {
+      this.operationError.set(this.describeError(error));
+    } finally {
+      this.downloading.set(false);
     }
-    if (hasBackend()) {
-      // Updating replaces the running executable and restarts it, which would strand this browser.
-      throw new Error('请在桌面端执行更新');
+  }
+
+  async install(): Promise<void> {
+    const version = this.downloadedVersion();
+    if (!isTauriRuntime() || !version || !this.ready() || this.checkingValue() || this.installing()) return;
+
+    this.installing.set(true);
+    this.operationError.set(null);
+    try {
+      const method = await invoke<InstallMethod>('install_downloaded_update', { version });
+      this.installerOpened.set(method === 'openInstaller');
+    } catch (error) {
+      this.downloadedVersion.set(null);
+      this.operationError.set(this.describeError(error));
+    } finally {
+      this.installing.set(false);
     }
+  }
+
+  private describeError(error: unknown): string {
+    return error instanceof Error ? error.message : String(error);
   }
 
   /** True when an update is published and the user has not dismissed that exact version. */

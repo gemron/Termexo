@@ -41,8 +41,9 @@ registerFullscreenTranslations();
         [attr.aria-expanded]="open()"
         [attr.aria-controls]="open() ? 'app-tools-panel' : null"
         aria-haspopup="dialog"
-        [title]="'workspace.moreTools' | t"
-        [attr.aria-label]="'workspace.moreTools' | t"
+        [class.update-available]="appUpdateAvailable()"
+        [title]="(appUpdateAvailable() ? 'update.view' : 'workspace.moreTools') | t"
+        [attr.aria-label]="(appUpdateAvailable() ? 'update.menuAvailable' : 'workspace.moreTools') | t"
         (click)="open.set(!open())"
       >
         <app-icon name="more" [size]="16" />
@@ -62,6 +63,12 @@ registerFullscreenTranslations();
             <app-icon name="settings" [size]="15" />
             {{ 'workspace.settings' | t }}
           </button>
+          @if (appUpdateAvailable()) {
+            <button type="button" class="app-update-link" data-testid="app-update-open" (click)="close(trigger); appUpdateOpened.emit()">
+              <app-icon name="download" [size]="15" />
+              {{ 'update.view' | t }}
+            </button>
+          }
           @if (localApp) {
             <app-remote-hosts-button (opened)="close(trigger); remoteHostsOpened.emit()" />
           }
@@ -134,6 +141,25 @@ registerFullscreenTranslations();
       box-shadow: 0 14px 35px rgb(0 0 0 / 40%);
     }
 
+    .overflow-trigger.update-available {
+      position: relative;
+    }
+
+    .overflow-trigger.update-available::after {
+      position: absolute;
+      inset-block-start: 4px;
+      inset-inline-end: 4px;
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: var(--accent);
+      content: '';
+    }
+
+    .overflow-menu button.app-update-link {
+      color: var(--accent);
+    }
+
     .overflow-menu button,
     .language-row {
       display: flex;
@@ -168,6 +194,8 @@ export class TopbarOverflowMenuComponent {
   readonly inspectorOpen = input(false);
   readonly phoneLayout = input(false);
   readonly upgradeCount = input(0);
+  readonly appUpdateAvailable = input(false);
+  readonly appUpdateOpened = output<void>();
   readonly inspectorToggled = output<void>();
   readonly settingsOpened = output<void>();
   readonly remoteAccessOpened = output<void>();

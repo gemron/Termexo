@@ -71,10 +71,12 @@ describe('AgentSettingsDialogComponent', () => {
     expect(component['tab']()).toBe('models');
     setQuery('xyzxyzxyz');
     expect(root.querySelector('.settings-navigation [role="status"]')).toBeTruthy();
-    expect(root.querySelectorAll('.settings-category-select option')).toHaveLength(10);
+    const options = Array.from(root.querySelectorAll<HTMLOptionElement>('.settings-category-select option'));
+    expect(options).toHaveLength(11);
+    expect(options.map((option) => option.value)).toContain('updates');
     search.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
     fixture.detectChanges();
-    expect(root.querySelectorAll('.settings-navigation button')).toHaveLength(10);
+    expect(root.querySelectorAll('.settings-navigation button')).toHaveLength(options.length);
   });
 
   it('does not infer the host credential store from a browser user agent', async () => {
