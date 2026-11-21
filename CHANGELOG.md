@@ -2,6 +2,13 @@
 
 Release notes for every Termexo version, newest first. The current release is summarised in [README.md](README.md).
 
+## V0.17.0
+
+- **See more commits at once.** The graph now uses 32-pixel rows, down from 48, with colored lines for branches and merges. Select **Load older commits** to continue through the selected history.
+- **Open a commit to see what changed.** View its full message, author, date, hash and changed files. Pick a file to see additions and deletions. Merge changes are shown against the first parent.
+- **Compare branches directly.** Choose local or tracked remote branches to see how many commits are unique to each side and review per-file differences from the base branch to the target. A button swaps the branches.
+- **Content preview fills the available width.** The preview uses the space freed by the Work status panel. The panel returns to its previous state when you switch back to a terminal.
+
 ## V0.16.0
 
 - **Multi-account isolation for OpenCode, Pi, and Grok Build.** Manage isolated accounts for OpenCode (`XDG_DATA_HOME`), Pi Agent (`PI_CODING_AGENT_DIR`), and Grok Build (`GROK_HOME`) in **Settings → Accounts**, pick an account at launch, scan sessions per account, and switch accounts from a terminal's account chip.

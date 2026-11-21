@@ -35,7 +35,7 @@ You can also run without a global installation:
 npx termexo@latest
 ```
 
-For a specific published release, run `npx termexo@0.16.0`.
+For a specific published release, run `npx termexo@0.17.0`.
 
 ### Linux system libraries
 
@@ -77,8 +77,10 @@ directory. `--help` and `--version` work without a display.
 Linux desktop and npm distribution are available in v0.12.1. For source builds and
 local package validation, see the [Linux guide](https://github.com/gemron/Termexo/blob/main/docs/linux.md).
 
-## Version 0.16.0
+## Version 0.17.0
 
+- Compact Git history with older commits, commit details and branch comparison.
+- Content previews fill the available workbench width.
 - Windows x64, macOS Apple Silicon / Intel and Linux x64 builds in one npm package.
 - Multiple content preview tabs and syntax highlighting that keeps source whitespace intact.
 - Saved project actions with working directories and environment variables.
@@ -92,7 +94,7 @@ local package validation, see the [Linux guide](https://github.com/gemron/Termex
 - File links that continue across terminal output lines and a Git commit graph filter for local or locally tracked remote branches.
 
 GitHub Actions builds and publishes the combined npm package and the Windows EXE/MSI,
-macOS DMG and Linux `.deb` installers. See the [release notes](https://github.com/gemron/Termexo/releases/tag/v0.16.0)
+macOS DMG and Linux `.deb` installers. See the [release notes](https://github.com/gemron/Termexo/releases/tag/v0.17.0)
 and [full changelog](https://github.com/gemron/Termexo/blob/main/CHANGELOG.md).
 
 ## Let one AI operate another through MCP
