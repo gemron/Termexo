@@ -2,6 +2,12 @@
 
 Release notes for every Termexo version, newest first. The current release is summarised in [README.md](README.md).
 
+## V0.17.1
+
+- **Antigravity status reporting is enabled by default.** Removed the standalone toggle and opt-out setting; Termexo automatically installs and refreshes the status feed whenever an Antigravity terminal starts or reconnects.
+- **Automatic restore for Antigravity sessions on reopen.** Reopening Termexo now resumes Antigravity terminals with their recorded conversation ID (`--conversation`) or falls back to `--continue`, and fixes resuming Antigravity sessions from Session Center and launching them from tasks.
+- **Fixed Git commit diff loading display and stability.** Resolved a DaisyUI `.status` class collision that squeezed the loading indicator into a vertical column with a grey dot, and kept unrelated workspace or terminal state updates from cancelling or resetting in-flight revision diffs.
+
 ## V0.17.0
 
 - **See more commits at once.** The graph now uses 32-pixel rows, down from 48, with colored lines for branches and merges. Select **Load older commits** to continue through the selected history.
