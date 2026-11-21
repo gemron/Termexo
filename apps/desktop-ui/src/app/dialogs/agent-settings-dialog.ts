@@ -51,7 +51,6 @@ import { AppUpdatePanelComponent } from './app-update-panel';
 import { ModalFocusDirective } from '../shared/modal-focus.directive';
 import { IconComponent } from '../shared/icon/icon';
 import { RemoteAccessPanelComponent } from './remote-access-panel';
-import { AntigravityStatusToggleComponent } from './antigravity-status-toggle';
 import { StoragePanelComponent } from './storage-panel';
 import { McpServerPanelComponent } from './mcp-server-panel';
 import { registerMcpServerTranslations } from '../core/i18n/mcp-server.i18n';
@@ -113,7 +112,6 @@ const DEFAULT_ALERT_THRESHOLD = 80;
     ModalFocusDirective,
     FormsModule,
     IconComponent,
-    AntigravityStatusToggleComponent,
     RemoteAccessPanelComponent,
     StoragePanelComponent,
     McpServerPanelComponent,
@@ -303,7 +301,6 @@ const DEFAULT_ALERT_THRESHOLD = 80;
                   </div>
                   <code>{{ grokInstallation()?.version ?? ('common.notDetected' | t) }}</code>
                 </div>
-                <app-antigravity-status-toggle />
                 <details class="diagnostic-details">
                   <summary>{{ 'settings.diagnosticDetails' | t }}</summary>
                   <dl>

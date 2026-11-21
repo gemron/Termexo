@@ -11,17 +11,17 @@
   </label>
   <div class="revision-diff" data-testid="git-revision-diff" tabindex="0" [attr.aria-label]="'git.ui.fileDiff' | t">
     @if (error()) {
-      <p class="status error" role="alert">{{ 'git.diffFailed' | t }} · {{ error() }}</p>
-      <button class="status" type="button" (click)="retryDiff()">{{ 'common.retry' | t }}</button>
+      <p class="revision-status error" role="alert">{{ 'git.diffFailed' | t }} · {{ error() }}</p>
+      <button class="revision-retry" type="button" (click)="retryDiff()">{{ 'common.retry' | t }}</button>
     } @else if (diff(); as fileDiff) {
       @if (fileDiff.truncated) {
-        <p class="status warning" role="status">{{ 'git.truncated' | t }}</p>
+        <p class="revision-status warning" role="status">{{ 'git.truncated' | t }}</p>
       }
       @if (fileDiff.binary) {
-        <p class="status">{{ 'git.binary' | t }}</p>
+        <p class="revision-status">{{ 'git.binary' | t }}</p>
       } @else if (!rows().length) {
         @if (!fileDiff.truncated) {
-          <p class="status">{{ 'git.noTextChanges' | t }}</p>
+          <p class="revision-status">{{ 'git.noTextChanges' | t }}</p>
         }
       } @else {
         <div class="revision-lines">
@@ -45,9 +45,12 @@
         </div>
       }
     } @else {
-      <p class="status" role="status">{{ 'git.loadingDiff' | t }}</p>
+      <p class="revision-status loading-status" role="status">
+        <span class="loading loading-spinner loading-xs"></span>
+        <span>{{ 'git.loadingDiff' | t }}</span>
+      </p>
     }
   </div>
 } @else {
-  <p class="status">{{ 'git.ui.noChangedFiles' | t }}</p>
+  <p class="revision-status">{{ 'git.ui.noChangedFiles' | t }}</p>
 }

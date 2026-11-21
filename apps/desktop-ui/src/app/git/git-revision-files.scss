@@ -91,12 +91,34 @@ select {
   color: var(--accent);
 }
 
-.status {
+.revision-status {
   margin: 0;
   padding: 8px 10px;
   color: var(--text-secondary);
   font-size: 11px;
+  line-height: 1.5;
   overflow-wrap: anywhere;
+}
+
+.loading-status {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.revision-retry {
+  margin: 0 10px 8px;
+  padding: 5px 12px;
+  border: 1px solid var(--border-strong);
+  border-radius: 6px;
+  color: var(--text-secondary);
+  background: var(--surface-2);
+  font-size: 10px;
+}
+
+.revision-retry:hover {
+  color: var(--text);
+  border-color: color-mix(in srgb, var(--accent) 45%, var(--border-strong));
 }
 
 .error {

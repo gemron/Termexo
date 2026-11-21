@@ -52,14 +52,6 @@ export interface AntigravityModel {
   readonly displayName: string;
 }
 
-/** Whether Termexo's status feed is installed in the Antigravity CLI's own settings. */
-export interface AntigravityStatusFeed {
-  readonly settingsPath: string;
-  readonly installed: boolean;
-  /** A status line is configured that is not Termexo's, which installing would replace. */
-  readonly foreignStatusLine: boolean;
-}
-
 export interface AgentInstallation {
   agentType: NativeAgentType;
   installed: boolean;

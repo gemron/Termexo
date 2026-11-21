@@ -131,6 +131,10 @@ describe('SessionCenterDialogComponent', () => {
     fixture.componentRef.setInput('openCodeInstallation', OPENCODE_INSTALLATION);
     fixture.componentRef.setInput('grokInstallation', GROK_INSTALLATION);
     fixture.componentRef.setInput('piInstallation', { ...GROK_INSTALLATION, agentType: 'pi' });
+    fixture.componentRef.setInput('antigravityInstallation', {
+      ...GROK_INSTALLATION,
+      agentType: 'antigravity',
+    });
     fixture.componentRef.setInput('sessions', SESSIONS);
     fixture.componentRef.setInput('profiles', [DEFAULT_PROFILE]);
     fixture.componentRef.setInput('projectPath', 'D:\\devlop\\Termexo');
@@ -206,6 +210,31 @@ describe('SessionCenterDialogComponent', () => {
     clickResumeFor('Pi review');
     expect(resumed).toEqual([
       { session: piSession, model: 'anthropic/sonnet', autoConfirm: undefined },
+    ]);
+  });
+
+  it('filters and resumes Antigravity sessions without a Termexo model profile', () => {
+    const agySession: AgentSession = {
+      id: 'agy-native-session',
+      agentType: 'antigravity',
+      nativeSessionId: 'agy-native-session',
+      projectPath: 'D:\\devlop\\Termexo',
+      title: 'Antigravity review',
+      status: 'HISTORICAL',
+      messageCount: 6,
+      transcriptPath: 'transcript.jsonl',
+      createdAt: 1_700_000_600_000,
+      lastUsedAt: 1_700_000_700_000,
+    };
+    fixture.componentRef.setInput('sessions', [...SESSIONS, agySession]);
+    fixture.detectChanges();
+    clickButton('Antigravity');
+    expect(root.querySelectorAll('.session-row')).toHaveLength(1);
+    const resumed: ResumeSessionValue[] = [];
+    component.resumed.subscribe((value) => resumed.push(value));
+    clickResumeFor('Antigravity review');
+    expect(resumed).toEqual([
+      { session: agySession, model: undefined, autoConfirm: undefined },
     ]);
   });
 

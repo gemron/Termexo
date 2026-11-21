@@ -370,6 +370,14 @@ impl HookEventStore {
         ])
     }
 
+    /// Clears remembered status from a previous process on this terminal so a relaunched
+    /// Antigravity session reports its initial ready state instead of being suppressed as a repeat.
+    pub fn reset_antigravity_status_memory(&self, terminal_id: &str) {
+        let event_file = self.event_file.to_string_lossy();
+        let memory_file = antigravity_status_memory_file(&event_file, terminal_id);
+        let _ = fs::remove_file(memory_file);
+    }
+
     pub fn prepare_pi_runtime(&self, terminal_id: &str) -> Result<String, HookError> {
         // Terminal IDs become filenames. Reject separators rather than escaping out of runtime.
         if terminal_id.is_empty()
@@ -2409,6 +2417,14 @@ mod tests {
         assert_eq!(memory.parent(), store.event_file.parent());
         fs::write(&memory, b"{ not json").unwrap();
         report("idle", "", false);
+        assert_eq!(mapped_types(), ["session.ready"]);
+
+        // Clearing memory on relaunch lets a resumed conversation report ready again even when it
+        // opens directly into the same idle state it ended on.
+        report("idle", conversation, false);
+        assert_eq!(mapped_types(), ["session.ready"]);
+        store.reset_antigravity_status_memory("terminal-agy");
+        report("idle", conversation, false);
         assert_eq!(mapped_types(), ["session.ready"]);
 
         fs::remove_dir_all(directory).unwrap();

@@ -186,6 +186,41 @@ describe('GitWorkbenchComponent states', () => {
     expect(root.querySelector('.commit-details')?.textContent).toContain('Full commit body');
   });
 
+  it('renders revision diff loading without DaisyUI status dot collision and keeps diff on equivalent target updates', async () => {
+    await showRepository();
+    const item = commit('Touch cast test', []);
+    vi.mocked(git.loadHistory).mockResolvedValue({ branches: [], commits: [item] });
+    const range = { baseOid: 'a'.repeat(40), headOid: item.oid };
+    const file = change('tests/bilibili-cast.js');
+    vi.spyOn(git, 'loadCommit').mockResolvedValue({
+      range, summary: item.summary, body: '', author: 'gemron', email: '', authoredAt: 0,
+      parents: ['a'.repeat(40)], files: [file],
+    });
+    let resolveDiff!: (value: { path: string; oldText: string; newText: string; binary: boolean; truncated: boolean }) => void;
+    const loadRevisionDiff = vi.spyOn(git, 'loadRevisionDiff').mockImplementation(
+      () => new Promise((resolve) => { resolveDiff = resolve; }),
+    );
+    root.querySelectorAll<HTMLButtonElement>('.sidebar-tabs button')[1].click();
+    await waitForCommits(1);
+    root.querySelector<HTMLButtonElement>('[data-testid="git-commit-details"]')!.click();
+    await vi.waitFor(() => {
+      fixture.detectChanges();
+      expect(root.querySelector('[data-testid="git-revision-diff"] .revision-status')).not.toBeNull();
+    });
+    expect(root.querySelector('[data-testid="git-revision-diff"] .status')).toBeNull();
+
+    // A fresh target object with identical identifiers must not cancel or re-trigger the diff load.
+    fixture.componentRef.setInput('target', { workspaceId: 'workspace-1', terminalId: 'terminal-1', runtimeRevision: 0 });
+    fixture.detectChanges();
+    expect(loadRevisionDiff).toHaveBeenCalledTimes(1);
+
+    resolveDiff({ path: file.path, oldText: 'old', newText: 'new', binary: false, truncated: false });
+    await vi.waitFor(() => {
+      fixture.detectChanges();
+      expect(root.querySelector('[data-testid="git-revision-diff"]')?.textContent).toContain('new');
+    });
+  });
+
   it('compares branches in the chosen direction and swaps them', async () => {
     await showRepository();
     const base = 'refs/heads/main';

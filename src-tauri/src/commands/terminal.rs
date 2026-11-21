@@ -4,7 +4,8 @@ use tauri::{AppHandle, Manager, State};
 
 use crate::agent::OpenCodeAdapter;
 use crate::commands::agent::{
-    account_login_relaunch_environment, network_environment, relaunch_environment, RelaunchRequest,
+    account_login_relaunch_environment, ensure_antigravity_status_feed, network_environment,
+    relaunch_environment, RelaunchRequest,
 };
 use crate::config::{CredentialStore, LaunchEnvironmentStore};
 use crate::database::WorkspaceDatabase;
@@ -188,6 +189,9 @@ pub fn create_terminal(
         }
     }
     crate::process::apply_node_runtime(&mut environment);
+    if request.agent_type.as_deref() == Some("antigravity") && !request.account_login {
+        ensure_antigravity_status_feed();
+    }
     if request.agent_type.as_deref() == Some("opencode") {
         OpenCodeAdapter::new()
             .ensure_private_server(&mut request.command)

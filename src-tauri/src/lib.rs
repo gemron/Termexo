@@ -187,8 +187,6 @@ pub fn run() {
             commands::agent::list_antigravity_models,
             commands::model_catalog::read_model_catalog,
             commands::model_catalog::fetch_provider_models,
-            commands::agent::read_antigravity_status_feed,
-            commands::agent::set_antigravity_status_feed,
             commands::agent::prepare_antigravity_launch,
             commands::agent::scan_claude_sessions,
             commands::agent::scan_codex_sessions,

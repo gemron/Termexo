@@ -758,7 +758,8 @@ export class SessionCenterDialogComponent {
     if (
       session.agentType === 'opencode' ||
       session.agentType === 'grok' ||
-      session.agentType === 'pi'
+      session.agentType === 'pi' ||
+      session.agentType === 'antigravity'
     ) {
       // These CLIs manage their own credentials. Termexo only passes an optional model for
       // OpenCode and the confirmation mode selected here.
@@ -767,7 +768,7 @@ export class SessionCenterDialogComponent {
         model:
           session.agentType === 'opencode'
             ? this.openCodeModel().trim() || session.modelName || undefined
-            : session.agentType === 'pi'
+            : session.agentType === 'pi' || session.agentType === 'antigravity'
               ? session.modelName || undefined
               : undefined,
         autoConfirm: this.autoConfirm() || undefined,

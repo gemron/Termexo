@@ -801,15 +801,6 @@ const EN: TranslationTable = {
     'Resumes the most recent conversation for this folder instead of starting one.',
   'launch.antigravityAutoConfirmHelp':
     'Runs every tool without asking, which the CLI calls skipping permissions.',
-  'settings.antigravityStatus': 'Antigravity status feed',
-  'settings.antigravityStatusHelp':
-    'Antigravity has no per-launch configuration, so reporting its state means writing a status-line command into its own settings file. It is installed the first time you open an Antigravity terminal; turning it off restores whatever was there before, and that choice is remembered.',
-  'settings.antigravityStatusOn': 'Installed — Termexo shows what the agent is doing',
-  'settings.antigravityStatusOff':
-    'Not installed — it installs itself the first time you open an Antigravity terminal',
-  'settings.antigravityStatusForeign':
-    'A status line is already configured; installing will replace it and put it back when removed.',
-  'settings.antigravityStatusFile': 'Settings file',
   'common.copy': 'Copy',
   'settings.available': '{name} available',
   'settings.unavailable': '{name} unavailable',
@@ -1754,13 +1745,6 @@ const ZH_CN: TranslationTable = {
   'launch.antigravityContinue': '继续上一次对话',
   'launch.antigravityContinueHelp': '恢复该目录下最近的一次对话，而不是新建。',
   'launch.antigravityAutoConfirmHelp': '所有工具调用都不再询问，即 CLI 所说的跳过权限确认。',
-  'settings.antigravityStatus': 'Antigravity 状态回传',
-  'settings.antigravityStatusHelp':
-    'Antigravity 没有按次启动的配置，因此要获知它的状态，只能把一条状态栏命令写入它自己的配置文件。它会在你第一次打开 Antigravity 终端时自动装上；关闭会恢复原本的内容，并且这个选择会被记住。',
-  'settings.antigravityStatusOn': '已启用——Termexo 能显示 agent 正在做什么',
-  'settings.antigravityStatusOff': '未启用——将在你第一次打开 Antigravity 终端时自动装上',
-  'settings.antigravityStatusForeign': '已存在其它状态栏配置；启用会替换它，关闭时再还原。',
-  'settings.antigravityStatusFile': '配置文件',
   'common.copy': '复制',
   'settings.available': '{name} 可用',
   'settings.unavailable': '{name} 不可用',

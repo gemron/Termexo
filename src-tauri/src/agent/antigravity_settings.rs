@@ -116,31 +116,6 @@ pub fn refresh(executable: &Path) -> Result<bool, AntigravitySettingsError> {
     Ok(true)
 }
 
-/// Removes Termexo's status feed and restores whatever it replaced.
-///
-/// A status line the user configured themselves is put back; one Termexo added to an installation
-/// that had none is removed entirely. A status line that is not Termexo's is left alone — this
-/// must never take away something it did not install.
-pub fn remove() -> Result<AntigravityStatusFeed, AntigravitySettingsError> {
-    let path = settings_path().ok_or(AntigravitySettingsError::NoSettingsDirectory)?;
-    let mut settings = read_settings(&path)?;
-
-    let ours = settings
-        .get(STATUS_LINE_KEY)
-        .is_some_and(is_termexo_status_line);
-    if ours {
-        match settings.remove(SAVED_STATUS_LINE_KEY) {
-            Some(previous) => settings.insert(STATUS_LINE_KEY.into(), previous),
-            None => settings.remove(STATUS_LINE_KEY),
-        };
-    } else {
-        // Nothing of ours is installed, but a saved value would otherwise linger forever.
-        settings.remove(SAVED_STATUS_LINE_KEY);
-    }
-    write_settings(&path, &settings)?;
-    describe()
-}
-
 /// Records a workspace as trusted, so opening a terminal in it does not stop to ask.
 ///
 /// The CLI asks about an unfamiliar workspace on first launch and waits for an answer. In a

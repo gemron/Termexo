@@ -8,7 +8,7 @@ use tauri::State;
 use crate::account;
 use crate::agent::{
     antigravity_settings, AgentAdapter, AgentInstallation, AgentLaunchSpec, AgentSession,
-    AntigravityAdapter, AntigravityLaunchOptions, AntigravityModel, AntigravityStatusFeed,
+    AntigravityAdapter, AntigravityLaunchOptions, AntigravityModel,
     ClaudeBackgroundSession, ClaudeCodeAdapter, ClaudeLaunchOptions, CodexCliAdapter,
     CodexLaunchOptions, GrokBuildAdapter, GrokLaunchOptions, OpenCodeAdapter,
     OpenCodeLaunchOptions, PiAdapter, PiLaunchOptions,
@@ -310,12 +310,6 @@ pub fn build_grok_launch_command(options: GrokLaunchOptions) -> Result<AgentLaun
         .build_launch_command(&options)
         .map_err(|error| error.to_string())
 }
-
-/// Set once the user turns the Antigravity status feed off.
-///
-/// The feed is on by default, so its absence cannot mean "not wanted yet" — only an explicit
-/// refusal can, and it has to outlive the launch that would otherwise reinstate it.
-const ANTIGRAVITY_FEED_OPT_OUT: &str = "antigravity_status_feed_opt_out";
 
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -867,46 +861,13 @@ pub async fn list_antigravity_models() -> Result<Vec<AntigravityModel>, String> 
     .map_err(|error| error.to_string())?
 }
 
-/// Reports whether Termexo's status feed is installed in the CLI's own settings.
-#[tauri::command(async)]
-pub fn read_antigravity_status_feed() -> Result<AntigravityStatusFeed, String> {
-    antigravity_settings::describe().map_err(|error| error.to_string())
-}
-
-/// Installs or removes the status feed.
+/// Ensures Termexo's Antigravity status feed is installed and points at this executable.
 ///
-/// Turning it off is recorded, because the feed installs itself on first launch and would
-/// otherwise come straight back — a switch that undoes itself is not one.
-#[tauri::command(async)]
-pub fn set_antigravity_status_feed(
-    enabled: bool,
-    database: State<'_, WorkspaceDatabase>,
-) -> Result<AntigravityStatusFeed, String> {
-    database
-        .write_app_setting(ANTIGRAVITY_FEED_OPT_OUT, if enabled { "" } else { "1" })
-        .map_err(|error| error.to_string())?;
-    if !enabled {
-        return antigravity_settings::remove().map_err(|error| error.to_string());
-    }
-    let executable = std::env::current_exe().map_err(|error| error.to_string())?;
-    antigravity_settings::install(&executable).map_err(|error| error.to_string())
-}
-
-/// Installs the status feed unless the user has turned it off.
-///
-/// Called from the launch rather than from startup: this writes to a file Termexo does not own, so
-/// it happens at the first moment the write is worth anything — and never on a machine whose owner
-/// does not run Antigravity at all. A failure is logged and the launch continues, because losing
-/// the status display is a far smaller thing than losing the terminal.
-fn ensure_antigravity_status_feed(database: &WorkspaceDatabase) {
-    let opted_out = database
-        .read_app_setting(ANTIGRAVITY_FEED_OPT_OUT)
-        .ok()
-        .flatten()
-        .is_some_and(|value| value == "1");
-    if opted_out {
-        return;
-    }
+/// Enabled by default without separate user configuration. Called when launching or reconnecting
+/// an Antigravity terminal so machines that never run Antigravity are untouched. A failure is
+/// logged and the launch continues, because losing the status display is a far smaller thing than
+/// losing the terminal.
+pub(crate) fn ensure_antigravity_status_feed() {
     let installed = match antigravity_settings::describe() {
         Ok(feed) => feed.installed,
         Err(error) => {
@@ -944,7 +905,7 @@ pub fn prepare_antigravity_launch(
         &request.terminal_id,
         request.workspace_id.as_deref(),
     )?;
-    ensure_antigravity_status_feed(&database);
+    ensure_antigravity_status_feed();
     // The CLI stops to ask about an unfamiliar workspace on first launch, which in a terminal
     // opened to do something else is the last thing the user expects to deal with.
     if let Some(directory) = request.working_directory.as_deref() {
@@ -1326,6 +1287,7 @@ fn antigravity_launch_environment(
     terminal_id: &str,
     workspace_id: Option<&str>,
 ) -> Result<HashMap<String, String>, String> {
+    hooks.reset_antigravity_status_memory(terminal_id);
     let mut environment = network_environment(database, credentials, workspace_id)?;
     environment.extend(hooks.antigravity_environment(terminal_id));
     Ok(environment)

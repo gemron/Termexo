@@ -11,7 +11,6 @@ use serde::{Deserialize, Serialize};
 
 pub use antigravity::{AntigravityAdapter, AntigravityModel, AntigravityUsage};
 pub(crate) use antigravity::{AntigravityUsageBucket, AntigravityUsageGroup};
-pub use antigravity_settings::AntigravityStatusFeed;
 pub use claude::{ClaudeBackgroundSession, ClaudeCodeAdapter};
 pub use codex::CodexCliAdapter;
 pub use grok::GrokBuildAdapter;

@@ -15,7 +15,6 @@ import {
   AgentSession,
   AntigravityLaunchRequest,
   AntigravityModel,
-  AntigravityStatusFeed,
   ClaudeBackgroundSession,
   ClaudeLaunchRequest,
   CliOperationPlan,
@@ -270,28 +269,6 @@ export class AgentService {
       return [];
     }
     return invoke<AntigravityModel[]>('list_antigravity_models');
-  }
-
-  /** Whether Termexo's status feed is installed in the Antigravity CLI's own settings. */
-  async readAntigravityStatusFeed(): Promise<AntigravityStatusFeed | null> {
-    if (!hasBackend()) {
-      return null;
-    }
-    return invoke<AntigravityStatusFeed>('read_antigravity_status_feed');
-  }
-
-  /**
-   * Installs or removes the status feed.
-   *
-   * Antigravity has no per-launch configuration, so this writes into the settings file its own
-   * installation reads — the only file Termexo edits that it does not own. It is therefore a
-   * switch the user throws rather than something a launch does on their behalf.
-   */
-  async setAntigravityStatusFeed(enabled: boolean): Promise<AntigravityStatusFeed | null> {
-    if (!hasBackend()) {
-      return null;
-    }
-    return invoke<AntigravityStatusFeed>('set_antigravity_status_feed', { enabled });
   }
 
   async refreshSessions(projectPath?: string): Promise<void> {

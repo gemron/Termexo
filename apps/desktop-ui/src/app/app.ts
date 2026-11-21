@@ -602,16 +602,27 @@ export class App {
   protected readonly showOnlyActiveTerminal = computed(
     () => this.terminalFillsLayout() || this.terminalFocusMode(),
   );
-  protected readonly gitTarget = computed<RepositoryTarget | null>(() => {
-    const workspace = this.state.activeWorkspace();
-    const terminal = this.state.activeTerminal();
-    if (!workspace || !terminal) return null;
-    return {
-      workspaceId: workspace.id,
-      terminalId: terminal.id,
-      runtimeRevision: terminal.runtimeRevision ?? 0,
-    };
-  });
+  protected readonly gitTarget = computed<RepositoryTarget | null>(
+    () => {
+      const workspace = this.state.activeWorkspace();
+      const terminal = this.state.activeTerminal();
+      if (!workspace || !terminal) return null;
+      return {
+        workspaceId: workspace.id,
+        terminalId: terminal.id,
+        runtimeRevision: terminal.runtimeRevision ?? 0,
+      };
+    },
+    {
+      equal: (left, right) =>
+        left === right ||
+        (left !== null &&
+          right !== null &&
+          left.workspaceId === right.workspaceId &&
+          left.terminalId === right.terminalId &&
+          left.runtimeRevision === right.runtimeRevision),
+    },
+  );
   protected readonly activeTodoCount = computed(() => {
     const workspaceId = this.state.activeWorkspace()?.id;
     return workspaceId ? this.todos.tasksFor(workspaceId).length : 0;
@@ -1543,13 +1554,18 @@ export class App {
             ? this.launchingPi
             : agentType === 'grok'
               ? this.launchingGrok
-              : this.launchingOpenCode;
+              : agentType === 'antigravity'
+                ? this.launchingAntigravity
+                : this.launchingOpenCode;
     if (!workspace || launching()) {
       return;
     }
 
     const profile =
-      agentType === 'opencode' || agentType === 'grok' || agentType === 'pi'
+      agentType === 'opencode' ||
+      agentType === 'grok' ||
+      agentType === 'pi' ||
+      agentType === 'antigravity'
         ? undefined
         : this.agents.modelProfiles().find((item) => item.id === value.profileId);
     if (profile && needsCredential(profile, agentType === 'claude' ? 'claude' : 'codex')) {
@@ -1558,6 +1574,7 @@ export class App {
     }
 
     const terminalId = createId();
+    const workingDirectory = value.session.projectPath ?? workspace.projectPath;
     launching.set(true);
     try {
       const reclaim: BackgroundReclaim =
@@ -1607,14 +1624,23 @@ export class App {
                     accountProfileId: value.accountProfileId ?? value.session.accountProfileId,
                     autoConfirm: value.autoConfirm,
                   })
-                : await this.agents.prepareOpenCodeLaunch({
-                    terminalId,
-                    workspaceId: workspace.id,
-                    sessionId: value.session.nativeSessionId,
-                    model: value.model,
-                    accountProfileId: value.accountProfileId ?? value.session.accountProfileId,
-                    autoConfirm: value.autoConfirm,
-                  });
+                : agentType === 'antigravity'
+                  ? await this.agents.prepareAntigravityLaunch({
+                      terminalId,
+                      workspaceId: workspace.id,
+                      workingDirectory,
+                      sessionId: value.session.nativeSessionId,
+                      model: value.model,
+                      autoConfirm: value.autoConfirm,
+                    })
+                  : await this.agents.prepareOpenCodeLaunch({
+                      terminalId,
+                      workspaceId: workspace.id,
+                      sessionId: value.session.nativeSessionId,
+                      model: value.model,
+                      accountProfileId: value.accountProfileId ?? value.session.accountProfileId,
+                      autoConfirm: value.autoConfirm,
+                    });
       const terminal = this.state.createTerminal({
         id: terminalId,
         agentType: value.session.agentType,
@@ -1634,9 +1660,11 @@ export class App {
                 ? 'Pi Agent'
                 : agentType === 'grok'
                   ? 'Grok Build'
-                  : OPENCODE_DEFAULT_MODEL),
+                  : agentType === 'antigravity'
+                    ? ANTIGRAVITY_DEFAULT_MODEL
+                    : OPENCODE_DEFAULT_MODEL),
         nativeSessionId: value.session.nativeSessionId,
-        workingDirectory: value.session.projectPath ?? workspace.projectPath,
+        workingDirectory,
         profileId: value.profileId,
         mcpProfileId: agentType === 'claude' ? value.mcpProfileId : undefined,
         accountProfileId: isAccountAgentType(agentType)
@@ -3676,11 +3704,12 @@ export class App {
     const workspace = this.state.activeWorkspace();
     const project = this.todos.project(task.projectId);
     const workingDirectory = todoWorkingDirectory(task, project);
-    // OpenCode, Grok Build and Pi resolve their own models and credentials.
+    // OpenCode, Grok Build, Pi and Antigravity resolve their own models and credentials.
     const isOpenCode = task.agentType === 'opencode';
     const isGrok = task.agentType === 'grok';
     const isPi = task.agentType === 'pi';
-    const usesOwnModel = isOpenCode || isGrok || isPi;
+    const isAntigravity = task.agentType === 'antigravity';
+    const usesOwnModel = isOpenCode || isGrok || isPi || isAntigravity;
     const profile = this.agents.modelProfiles().find((item) => item.id === task.profileId);
     if (!workspace || workspace.id !== task.workspaceId || !workingDirectory) {
       const message = this.i18n.t('taskFlow.error.workingDirectoryMissing');
@@ -3749,24 +3778,32 @@ export class App {
                 newSessionId: sessionId ? undefined : nativeSessionId,
                 model: task.modelName || undefined,
               })
-            : task.agentType === 'codex'
-              ? await this.agents.prepareCodexLaunch({
+            : isAntigravity
+              ? await this.agents.prepareAntigravityLaunch({
                   terminalId,
                   workspaceId: workspace.id,
+                  workingDirectory,
                   sessionId,
-                  model: profileModel(profile!, 'codex'),
-                  profileId: profile!.id,
-                  accountProfileId,
+                  model: task.modelName || undefined,
                 })
-              : await this.agents.prepareLaunch({
-                  terminalId,
-                  workspaceId: workspace.id,
-                  sessionId,
-                  profileId: profile!.id,
-                  accountProfileId,
-                  forkSession: reclaim.forkSession,
-                  attachShortId: reclaim.attachShortId,
-                });
+              : task.agentType === 'codex'
+                ? await this.agents.prepareCodexLaunch({
+                    terminalId,
+                    workspaceId: workspace.id,
+                    sessionId,
+                    model: profileModel(profile!, 'codex'),
+                    profileId: profile!.id,
+                    accountProfileId,
+                  })
+                : await this.agents.prepareLaunch({
+                    terminalId,
+                    workspaceId: workspace.id,
+                    sessionId,
+                    profileId: profile!.id,
+                    accountProfileId,
+                    forkSession: reclaim.forkSession,
+                    attachShortId: reclaim.attachShortId,
+                  });
       const terminal = this.state.createTerminal(
         {
           id: terminalId,
@@ -3774,7 +3811,14 @@ export class App {
           name: this.i18n.t('taskFlow.terminalName', { title: task.title }),
           command: launch.command,
           model: usesOwnModel
-            ? task.modelName || (isPi ? 'Pi Agent' : isGrok ? 'Grok Build' : OPENCODE_DEFAULT_MODEL)
+            ? task.modelName ||
+              (isPi
+                ? 'Pi Agent'
+                : isGrok
+                  ? 'Grok Build'
+                  : isAntigravity
+                    ? ANTIGRAVITY_DEFAULT_MODEL
+                    : OPENCODE_DEFAULT_MODEL)
             : profileModel(profile!, task.agentType as AgentProtocol),
           nativeSessionId,
           workingDirectory,
@@ -4215,6 +4259,7 @@ export class App {
     await this.refreshRestoredOpenCodeLaunches();
     await this.refreshRestoredNativeModelLaunches('grok');
     await this.refreshRestoredNativeModelLaunches('pi');
+    await this.refreshRestoredNativeModelLaunches('antigravity');
     this.mountWorkspace(this.state.activeWorkspace()?.id);
     const recoveredDraft = this.state.activeTerminal()
       ? this.promptAssets.draftForTerminal(this.state.activeTerminal()!.id)
@@ -4621,7 +4666,9 @@ export class App {
     }
   }
 
-  private async refreshRestoredNativeModelLaunches(agentType: 'grok' | 'pi'): Promise<void> {
+  private async refreshRestoredNativeModelLaunches(
+    agentType: 'grok' | 'pi' | 'antigravity',
+  ): Promise<void> {
     const agentName = AGENT_LABELS[agentType];
     const restored = this.state.workspaces().flatMap((workspace) =>
       workspace.terminals
@@ -4629,34 +4676,60 @@ export class App {
         .filter((terminal) => !this.state.isAdoptedTerminal(terminal.id))
         .map((terminal) => ({ workspaceId: workspace.id, terminal })),
     );
+    if (restored.length === 0) {
+      return;
+    }
     const results = await Promise.allSettled(
       restored.map(async ({ workspaceId, terminal }) => {
         const task = this.todos
           .tasksFor(workspaceId)
           .find((item) => item.terminalId === terminal.id);
+        const latestEventSessionId =
+          agentType === 'antigravity'
+            ? this.agents
+                .events()
+                .find(
+                  (event) =>
+                    event.terminalId === terminal.id &&
+                    event.agentType === 'antigravity' &&
+                    event.nativeSessionId?.trim(),
+                )?.nativeSessionId
+            : undefined;
         const sessionId = task
           ? compatibleTodoSessionId(task, this.agents.sessions(), this.agents.events())
           : compatibleNativeSessionId(
               agentType,
-              terminal.nativeSessionId,
+              latestEventSessionId ?? terminal.nativeSessionId,
               undefined,
               this.agents.sessions(),
               this.agents.events(),
             );
+        const explicitModel =
+          !terminal.model ||
+          terminal.model === agentName ||
+          (agentType === 'antigravity' && terminal.model === ANTIGRAVITY_DEFAULT_MODEL)
+            ? undefined
+            : terminal.model;
         const request = {
           terminalId: terminal.id,
           workspaceId,
           sessionId,
           continueLast: !sessionId,
-          model: terminal.model === agentName ? undefined : terminal.model,
+          model: explicitModel,
         };
         const launch =
           agentType === 'pi'
             ? await this.agents.preparePiLaunch(request)
-            : await this.agents.prepareGrokLaunch({
-                ...request,
-                autoConfirm: terminal.autoConfirm,
-              });
+            : agentType === 'antigravity'
+              ? await this.agents.prepareAntigravityLaunch({
+                  ...request,
+                  workingDirectory: terminal.workingDirectory,
+                  autoConfirm: terminal.autoConfirm,
+                })
+              : await this.agents.prepareGrokLaunch({
+                  ...request,
+                  autoConfirm: terminal.autoConfirm,
+                });
         if (
           !this.state.updateRestoredTerminalLaunch(terminal.id, launch.command, {
             model: terminal.model,

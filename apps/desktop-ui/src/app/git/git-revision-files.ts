@@ -1,4 +1,13 @@
-import { Component, computed, effect, inject, input, linkedSignal, signal } from '@angular/core';
+import {
+  Component,
+  computed,
+  effect,
+  inject,
+  input,
+  linkedSignal,
+  signal,
+  untracked,
+} from '@angular/core';
 import { TranslatePipe } from '../core/i18n/translate.pipe';
 import {
   buildDiffRows,
@@ -36,6 +45,10 @@ export class GitRevisionFilesComponent {
       ? withCollapsedEquals(buildDiffRows(diff.oldText, diff.newText), (row) => this.expanded().has(row.firstNewLine))
       : [];
   });
+  private readonly targetKey = computed(() => {
+    const target = this.target();
+    return `${target.workspaceId}:${target.terminalId}:${target.runtimeRevision}`;
+  });
   protected readonly status = repositoryChangeStatus;
 
   constructor() {
@@ -43,7 +56,8 @@ export class GitRevisionFilesComponent {
       const path = this.selected();
       const file = this.files().find((item) => item.path === path);
       const range = this.range();
-      const target = this.target();
+      this.targetKey();
+      const target = untracked(this.target);
       this.retry();
       this.diff.set(null);
       this.error.set('');
