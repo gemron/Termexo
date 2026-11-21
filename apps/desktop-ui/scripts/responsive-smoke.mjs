@@ -20,6 +20,8 @@ try {
   });
   page.on('pageerror', (error) => errors.push(error.message));
 
+  // Older clients may have a fixed preview width saved.
+  await page.addInitScript(() => localStorage.setItem('termexo.previewWidth', '640'));
   await page.goto(APP_URL, { waitUntil: 'networkidle' });
   await page.locator('.terminal-panel').first().waitFor();
 
@@ -430,6 +432,30 @@ try {
       },
     }),
   );
+
+  await page.evaluate(async () => {
+    const app = globalThis.ng.getComponent(document.querySelector('app-root'));
+    await app.openProjectPreview();
+  });
+  const preview = page.locator('.preview-tab-content:not(.view-hidden)');
+  const workStatus = page.locator('#agent-inspector');
+  await preview.waitFor();
+  await workStatus.waitFor({ state: 'hidden' });
+  for (const width of [1440, 2048]) {
+    await page.setViewportSize({ width, height: 800 });
+    const remaining = await preview.evaluate((tab) =>
+      tab.getBoundingClientRect().right -
+      tab.querySelector('app-project-preview-panel').getBoundingClientRect().right,
+    );
+    if (Math.abs(remaining) > 1) {
+      throw new Error(`preview leaves ${remaining}px unused when Work status is hidden at ${width}px`);
+    }
+  }
+  await page.evaluate(() => {
+    const app = globalThis.ng.getComponent(document.querySelector('app-root'));
+    app.selectTerminal(app.state.activeTerminal().id);
+  });
+  await workStatus.waitFor();
 
   if (errors.length > 0) {
     throw new Error(`browser errors:\n${errors.join('\n')}`);

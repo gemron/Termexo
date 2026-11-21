@@ -39,7 +39,7 @@ import {
   imports: [FormsModule, IconComponent],
   templateUrl: './project-preview-panel.html',
   styleUrl: './project-preview-panel.scss',
-  host: { '[class.expanded]': 'expanded()', '(keydown)': 'handleKeydown($event)' },
+  host: { '(keydown)': 'handleKeydown($event)' },
 })
 export class ProjectPreviewPanelComponent {
   readonly session = input<ProjectPreviewSession | null>(null);
@@ -59,7 +59,6 @@ export class ProjectPreviewPanelComponent {
   private readonly lineInput = viewChild<ElementRef<HTMLInputElement>>('lineInput');
   private readonly webFrame = viewChild<ElementRef<HTMLIFrameElement>>('webFrame');
   private readonly markdownDocument = viewChild<ElementRef<HTMLElement>>('markdownDocument');
-  protected readonly expanded = signal(false);
   protected readonly address = signal('');
   protected readonly fileFilter = signal('');
   protected readonly findOpen = signal(false);

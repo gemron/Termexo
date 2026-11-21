@@ -16,15 +16,9 @@ interface PreviewFlow {
   workspaceTools(): readonly { tool: string }[];
   chooseWorkspaceAction(tool: 'common-actions' | 'tasks' | 'git' | 'sessions'): void;
   closeWorkspaceTool(tool: 'common-actions' | 'tasks' | 'git' | 'sessions'): void;
-  previewWidth: WritableSignal<number>;
-  inspectorWidth: WritableSignal<number>;
   selectTerminal(id: string): void;
   openProjectPreview(): Promise<void>;
   handleWindowKeydown(event: KeyboardEvent): void;
-  startSidebarResize(target: 'preview', event: PointerEvent): void;
-  resizeSidebar(event: PointerEvent): void;
-  stopSidebarResize(): void;
-  previewMaxWidth(): number;
 }
 
 describe('content preview tab', () => {
@@ -32,7 +26,6 @@ describe('content preview tab', () => {
   let state: AppStateService;
   let preview: ProjectPreviewService;
   beforeEach(async () => {
-    localStorage.removeItem('termexo.previewWidth');
     vi.spyOn(App.prototype as unknown as { initialize(): Promise<void> }, 'initialize')
       .mockResolvedValue(undefined);
     TestBed.configureTestingModule({
@@ -48,7 +41,6 @@ describe('content preview tab', () => {
   });
   afterEach(() => {
     vi.restoreAllMocks();
-    localStorage.removeItem('termexo.previewWidth');
   });
 
   it('activates explicit opens, keeps multiple tabs, and closes each independently', async () => {
@@ -217,20 +209,5 @@ describe('content preview tab', () => {
     state.removeTerminal(first.id);
     state.removeTerminal(second.id);
     expect(flow.terminalFocusMode()).toBe(false);
-  });
-
-  it('resizes and remembers the preview width separately', () => {
-    flow.previewWidth.set(500);
-    const inspectorWidth = flow.inspectorWidth();
-    flow.startSidebarResize('preview', { button: 0, clientX: 500, preventDefault: vi.fn() } as unknown as PointerEvent);
-    flow.resizeSidebar({ clientX: 650 } as PointerEvent);
-    expect(flow.previewWidth()).toBe(650);
-    flow.resizeSidebar({ clientX: -1000 } as PointerEvent);
-    expect(flow.previewWidth()).toBe(320);
-    flow.resizeSidebar({ clientX: 10_000 } as PointerEvent);
-    expect(flow.previewWidth()).toBe(flow.previewMaxWidth());
-    flow.stopSidebarResize();
-    expect(localStorage.getItem('termexo.previewWidth')).toBe(String(flow.previewWidth()));
-    expect(flow.inspectorWidth()).toBe(inspectorWidth);
   });
 });

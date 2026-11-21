@@ -1300,24 +1300,12 @@ app-inspector-panel {
   min-height: 0;
   overflow: hidden;
   background: var(--surface-inset);
+
   > app-project-preview-panel {
-    flex: 0 1 auto;
-    max-width: calc(100% - 6px);
-    min-width: min(320px, calc(100% - 6px));
+    flex: 1;
   }
-  &.view-hidden { display: none; }
-}
-.preview-width-resizer {
-  flex: 0 0 6px;
-  cursor: col-resize;
-  touch-action: none;
-  background: var(--border);
-  &:hover { background: var(--accent); }
-}
-@media (max-width: 800px) {
-  .preview-tab-content > app-project-preview-panel {
-    width: 100% !important;
-    max-width: 100%;
+
+  &.view-hidden {
+    display: none;
   }
-  .preview-width-resizer { display: none; }
 }

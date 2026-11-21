@@ -187,7 +187,7 @@ import { CLI_NATIVE_PROFILE_ID, explicitCliModel, matchesRunningModel } from './
 import { WorkspaceSidebarComponent } from './workspace/workspace-sidebar';
 import { GitWorkbenchComponent } from './git/git-workbench';
 
-type SidebarResizeTarget = 'workspace' | 'inspector' | 'preview';
+type SidebarResizeTarget = 'workspace' | 'inspector';
 type WorkspaceTool = 'common-actions' | 'tasks' | 'git' | 'sessions';
 type WorkspaceView = 'terminal' | 'preview' | WorkspaceTool;
 type WorkbenchTab =
@@ -218,8 +218,6 @@ const WORKSPACE_SIDEBAR_MAX_WIDTH = 360;
 const INSPECTOR_DEFAULT_WIDTH = 280;
 const INSPECTOR_MIN_WIDTH = 240;
 const INSPECTOR_MAX_WIDTH = 460;
-const PREVIEW_MIN_WIDTH = 320;
-const PREVIEW_MAX_WIDTH = 2400;
 const INSPECTOR_AUTO_COLLAPSE_WIDTH = 900;
 const WORKSPACE_SIDEBAR_AUTO_COLLAPSE_WIDTH = 760;
 /**
@@ -561,14 +559,6 @@ export class App {
     ),
   );
   protected readonly resizingSidebar = signal<SidebarResizeTarget | null>(null);
-  protected readonly previewWidth = signal(
-    readStoredWidth(
-      'termexo.previewWidth',
-      Math.max(PREVIEW_MIN_WIDTH, Math.min(PREVIEW_MAX_WIDTH, window.innerWidth)),
-      PREVIEW_MIN_WIDTH,
-      PREVIEW_MAX_WIDTH,
-    ),
-  );
   protected readonly terminalFillsLayout = signal(false);
   protected readonly layoutRevision = signal(0);
   protected readonly launchingClaude = signal(false);
@@ -2389,27 +2379,17 @@ export class App {
   }
 
   protected startSidebarResize(target: SidebarResizeTarget, event: PointerEvent): void {
-    if (event.button !== 0 || (this.terminalFocusMode() && target !== 'preview')) {
+    if (event.button !== 0 || this.terminalFocusMode()) {
       return;
     }
     event.preventDefault();
     this.resizeStartX = event.clientX;
     this.resizeStartWidth = target === 'workspace'
       ? this.workspaceSidebarWidth()
-      : target === 'preview'
-        ? (event.currentTarget as HTMLElement | null)?.previousElementSibling?.getBoundingClientRect().width
-          || Math.min(this.previewWidth(), this.previewMaxWidth())
-        : this.inspectorWidth();
+      : this.inspectorWidth();
     const handle = event.currentTarget as HTMLElement | null;
     handle?.setPointerCapture?.(event.pointerId);
     this.resizingSidebar.set(target);
-  }
-
-  protected previewMaxWidth(): number {
-    const sidebar = this.workspaceSidebarOpen() && !this.terminalFocusMode()
-      ? Math.min(window.innerWidth * 0.3, Math.max(152, this.workspaceSidebarWidth())) + 5
-      : 0;
-    return Math.max(PREVIEW_MIN_WIDTH, Math.min(PREVIEW_MAX_WIDTH, window.innerWidth - sidebar - 15));
   }
 
   @HostListener('window:pointermove', ['$event'])
@@ -2426,10 +2406,6 @@ export class App {
           Math.max(WORKSPACE_SIDEBAR_MIN_WIDTH, this.resizeStartWidth + delta),
         ),
       );
-    } else if (target === 'preview') {
-      this.previewWidth.set(
-        Math.min(this.previewMaxWidth(), Math.max(PREVIEW_MIN_WIDTH, this.resizeStartWidth + delta)),
-      );
     } else {
       this.inspectorWidth.set(
         Math.min(INSPECTOR_MAX_WIDTH, Math.max(INSPECTOR_MIN_WIDTH, this.resizeStartWidth - delta)),
@@ -2445,12 +2421,8 @@ export class App {
       return;
     }
     this.storePreference(
-      target === 'workspace'
-        ? 'termexo.workspaceSidebarWidth'
-        : target === 'preview' ? 'termexo.previewWidth' : 'termexo.inspectorWidth',
-      target === 'workspace'
-        ? this.workspaceSidebarWidth()
-        : target === 'preview' ? this.previewWidth() : this.inspectorWidth(),
+      target === 'workspace' ? 'termexo.workspaceSidebarWidth' : 'termexo.inspectorWidth',
+      target === 'workspace' ? this.workspaceSidebarWidth() : this.inspectorWidth(),
     );
     this.resizingSidebar.set(null);
   }

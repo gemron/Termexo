@@ -17,16 +17,6 @@
     <button
       type="button"
       class="icon-button"
-      [attr.aria-label]="expanded() ? '还原预览宽度' : '展开预览'"
-      [title]="expanded() ? '还原预览宽度' : '展开至可用宽度'"
-      [attr.aria-pressed]="expanded()"
-      (click)="expanded.set(!expanded())"
-    >
-      <app-icon [name]="expanded() ? 'minimize' : 'maximize'" [size]="15" />
-    </button>
-    <button
-      type="button"
-      class="icon-button"
       aria-label="关闭预览"
       title="关闭此预览标签"
       (click)="preview.close()"

@@ -711,15 +711,7 @@
               role="tabpanel"
               [attr.aria-labelledby]="'content-preview-tab-' + tab.id"
             >
-              <app-project-preview-panel [session]="tab" [style.width.px]="previewWidth()" />
-              <div
-                class="preview-width-resizer"
-                role="separator"
-                aria-label="调整内容预览宽度"
-                aria-orientation="vertical"
-                data-testid="preview-resizer"
-                (pointerdown)="startSidebarResize('preview', $event)"
-              ></div>
+              <app-project-preview-panel [session]="tab" />
             </div>
           }
         }

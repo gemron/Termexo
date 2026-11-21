@@ -10,10 +10,6 @@
   color: var(--text);
   border-left: 1px solid var(--border);
 }
-:host(.expanded) {
-  width: 100% !important;
-  flex: 1 1 0 !important;
-}
 header {
   display: flex;
   flex: 0 0 48px;
