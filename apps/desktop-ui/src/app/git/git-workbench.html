@@ -53,6 +53,10 @@
           [attr.aria-pressed]="sidebarTab() === 'history'" (click)="sidebarTab.set('history')">
           {{ 'git.graph' | t }}
         </button>
+        <button type="button" [class.active]="sidebarTab() === 'compare'"
+          [attr.aria-pressed]="sidebarTab() === 'compare'" (click)="sidebarTab.set('compare')">
+          {{ 'git.ui.compareBranches' | t }}
+        </button>
       </nav>
     </div>
 
@@ -407,7 +411,8 @@
         </footer>
       </section>
     </div>
-    <section class="graph-panel" [hidden]="sidebarTab() !== 'history'" [style.--commit-graph-width.px]="graphWidth()">
+    <section class="graph-panel" [hidden]="sidebarTab() !== 'history'"
+      [style.--commit-graph-width.px]="graphWidth()" [style.--commit-row-height.px]="graphRowHeight">
       <div class="history-toolbar">
         <label class="history-branch">
           <app-icon name="git-branch" [size]="14" />
@@ -421,64 +426,182 @@
             }
           </select>
         </label>
+        @if (graphRows().length) {
+          <small>{{ 'git.ui.loadedCommits' | t: { count: graphRows().length } }}</small>
+        }
       </div>
-      <div class="commit-list" [attr.aria-busy]="historyLoading()">
-        @if (historyLoading()) {
-          <div class="empty-state compact" role="status">{{ 'common.loading' | t }}</div>
-        } @else if (historyError()) {
-          <div class="empty-state compact error" role="alert">
-            <strong>{{ 'git.ui.loadHistoryFailed' | t }}</strong>
-            <span>{{ historyError() }}</span>
-            <button type="button" class="retry-button" (click)="refresh()">{{ 'common.retry' | t }}</button>
-          </div>
-        } @else if (graphRows().length) {
-          <div class="commit-columns" aria-hidden="true">
-            <span></span>
-            <span>{{ 'git.ui.commitSummary' | t }}</span>
-            <span>{{ 'git.ui.commitAuthor' | t }}</span>
-            <span>{{ 'git.ui.commitDate' | t }}</span>
-            <span>{{ 'git.ui.commitHash' | t }}</span>
-          </div>
-          @for (row of graphRows(); track row.commit.oid) {
-            <article class="commit-row" [class.in-session]="row.commit.inSession">
-              <div class="commit-rails" aria-hidden="true">
-                <svg class="commit-graph" [attr.width]="graphWidth()" height="48">
-                  @for (edge of row.edges; track $index) {
-                    <path [attr.d]="edge.path" [attr.stroke]="edge.color" />
-                  }
-                  <circle
-                    [attr.cx]="row.nodeX" cy="24"
-                    [attr.r]="row.commit.parentOids.length > 1 ? 4.6 : 3.6"
-                    [attr.stroke]="row.color" [style.--commit-color]="row.color"
-                  />
-                </svg>
+      <div class="history-body" [class.details-open]="selectedCommit()">
+        <div class="history-log">
+          <div class="commit-list" [attr.aria-busy]="historyLoading() || historyPaging()">
+            @if (historyLoading()) {
+              <div class="empty-state compact" role="status">{{ 'common.loading' | t }}</div>
+            } @else if (historyError()) {
+              <div class="empty-state compact error" role="alert">
+                <strong>{{ 'git.ui.loadHistoryFailed' | t }}</strong>
+                <span>{{ historyError() }}</span>
+                <button type="button" class="retry-button" (click)="refresh()">{{ 'common.retry' | t }}</button>
               </div>
-              <div class="commit-copy">
-                <strong [title]="row.commit.summary">{{ row.commit.summary }}</strong>
-                @if (row.commit.decorations.length) {
-                  <div class="decorations">
-                    @for (decoration of row.commit.decorations; track decoration) {
-                      <em [title]="decoration">{{ decoration }}</em>
-                    }
+            } @else if (graphRows().length) {
+              <div class="commit-columns" aria-hidden="true">
+                <span></span>
+                <span>{{ 'git.ui.commitSummary' | t }}</span>
+                <span>{{ 'git.ui.commitAuthor' | t }}</span>
+                <span>{{ 'git.ui.commitDate' | t }}</span>
+                <span>{{ 'git.ui.commitHash' | t }}</span>
+              </div>
+              @for (row of graphRows(); track row.commit.oid) {
+                <article class="commit-row" [class.in-session]="row.commit.inSession"
+                  [class.selected]="selectedCommit()?.oid === row.commit.oid">
+                  <div class="commit-rails" aria-hidden="true">
+                    <svg class="commit-graph" [attr.width]="graphWidth()" [attr.height]="graphRowHeight">
+                      @for (edge of row.edges; track $index) {
+                        <path [attr.d]="edge.path" [attr.stroke]="edge.color" />
+                      }
+                      <circle [attr.cx]="row.nodeX" [attr.cy]="graphNodeCenter"
+                        [attr.r]="row.commit.parentOids.length > 1 ? 3.4 : 2.7"
+                        [attr.stroke]="row.color" [style.--commit-color]="row.color" />
+                    </svg>
                   </div>
-                }
-                <span class="commit-mobile-meta">{{ row.commit.author }} · {{ commitTime(row.commit) }}</span>
+                  <button type="button" class="commit-copy" data-testid="git-commit-details"
+                    [attr.aria-expanded]="selectedCommit()?.oid === row.commit.oid"
+                    [title]="row.commit.summary" (click)="selectedCommit.set(row.commit)">
+                    <strong>{{ row.commit.summary || ('git.ui.noCommitMessage' | t) }}</strong>
+                    @if (row.commit.decorations.length) {
+                      <span class="decorations">
+                        @for (decoration of row.commit.decorations; track $index) {
+                          <em [title]="decoration">{{ decoration }}</em>
+                        }
+                      </span>
+                    }
+                  </button>
+                  <span class="commit-author" [title]="row.commit.author">{{ row.commit.author }}</span>
+                  <time class="commit-time">{{ commitTime(row.commit) }}</time>
+                  <button type="button" class="commit-hash oid"
+                    [title]="'git.copyHash' | t"
+                    [attr.aria-label]="('git.copyHash' | t) + ': ' + row.commit.shortOid"
+                    (click)="copyOid(row.commit.oid)">
+                    <code>{{ copiedValue() === row.commit.oid ? '✓' : row.commit.shortOid }}</code>
+                  </button>
+                </article>
+              }
+              @if (historyPageError()) {
+                <div class="history-pagination error" role="alert">
+                  <span>{{ historyPageError() }}</span>
+                  <button type="button" class="retry-button" (click)="refresh()">{{ 'git.refresh' | t }}</button>
+                </div>
+              } @else if (hasOlderCommits()) {
+                <div class="history-pagination">
+                  <button type="button" class="retry-button" data-testid="git-history-more"
+                    [disabled]="historyPaging()" (click)="loadOlderCommits()">
+                    {{ (historyPaging() ? 'common.loading' : 'git.ui.loadOlder') | t }}
+                  </button>
+                </div>
+              }
+            } @else {
+              <div class="empty-state compact">{{ 'git.noCommits' | t }}</div>
+            }
+          </div>
+        </div>
+        @if (selectedCommit(); as commit) {
+          <aside class="commit-details" [attr.aria-label]="'git.ui.commitDetails' | t">
+            <header class="details-heading">
+              <strong>{{ 'git.ui.commitDetails' | t }}</strong>
+              <button type="button" class="diff-option" [attr.aria-label]="'common.close' | t"
+                (click)="selectedCommit.set(null)"><app-icon name="x" [size]="14" /></button>
+            </header>
+            @if (commitError()) {
+              <div class="empty-state compact error" role="alert">
+                <strong>{{ 'git.ui.loadCommitFailed' | t }}</strong>
+                <span>{{ commitError() }}</span>
+                <button type="button" class="retry-button" (click)="refresh()">{{ 'common.retry' | t }}</button>
               </div>
-              <span class="commit-author" [title]="row.commit.author">{{ row.commit.author }}</span>
-              <time class="commit-time">{{ commitTime(row.commit) }}</time>
-              <button type="button"
-                class="commit-hash oid"
-                [title]="'git.copyHash' | t"
-                [attr.aria-label]="('git.copyHash' | t) + ': ' + row.commit.shortOid"
-                (click)="copyOid(row.commit.oid)"
-              ><code>{{ copiedValue() === row.commit.oid ? '✓' : row.commit.shortOid }}</code></button>
-            </article>
-          }
-        } @else {
-          <div class="empty-state compact">{{ 'git.noCommits' | t }}</div>
+            } @else if (commitDetails(); as detail) {
+              <div class="commit-metadata">
+                <h2>{{ detail.summary || ('git.ui.noCommitMessage' | t) }}</h2>
+                <div class="commit-byline">
+                  <span [title]="detail.email">{{ detail.author }}</span>
+                  <time>{{ i18n.formatDateTime(detail.authoredAt * 1000) }}</time>
+                </div>
+                <button type="button" class="commit-hash" [title]="'git.copyHash' | t"
+                  [attr.aria-label]="'git.copyHash' | t" (click)="copyOid(commit.oid)">
+                  <code>{{ commit.oid }}</code>
+                </button>
+                @if (detail.body) {
+                  <p class="commit-message">{{ detail.body }}</p>
+                }
+                @if (detail.parents.length) {
+                  <p class="commit-parent">
+                    {{ 'git.ui.parents' | t }}
+                    @for (parent of detail.parents; track $index) {
+                      <code [title]="parent">{{ parent.slice(0, 8) }}</code>
+                    }
+                  </p>
+                }
+                @if (detail.parents.length > 1) {
+                  <small>{{ 'git.ui.firstParentDiff' | t }}</small>
+                }
+              </div>
+              @if (target(); as repositoryTarget) {
+                <app-git-revision-files [target]="repositoryTarget" [range]="detail.range" [files]="detail.files" />
+              }
+            } @else {
+              <div class="empty-state compact" role="status">{{ 'common.loading' | t }}</div>
+            }
+          </aside>
         }
       </div>
     </section>
+
+    @if (sidebarTab() === 'compare') {
+      <section class="branch-comparison" [attr.aria-label]="'git.ui.compareBranches' | t">
+        <div class="comparison-toolbar">
+          <label class="history-branch">
+            <span>{{ 'git.ui.baseBranch' | t }}</span>
+            <select data-testid="git-compare-base" (change)="selectComparisonBranch('base', $event)">
+              <option value="" [selected]="!comparisonBase()" disabled>{{ 'git.ui.chooseBranch' | t }}</option>
+              @for (branch of historyBranches(); track branch.reference) {
+                <option [value]="branch.reference" [selected]="comparisonBase() === branch.reference">{{ branch.name }}</option>
+              }
+            </select>
+          </label>
+          <button type="button" class="diff-option" [disabled]="!comparisonReady()"
+            [title]="'git.ui.swapBranches' | t" [attr.aria-label]="'git.ui.swapBranches' | t"
+            (click)="swapComparisonBranches()"><app-icon name="git-compare" [size]="16" /></button>
+          <label class="history-branch">
+            <span>{{ 'git.ui.targetBranch' | t }}</span>
+            <select data-testid="git-compare-head" (change)="selectComparisonBranch('head', $event)">
+              <option value="" [selected]="!comparisonHead()" disabled>{{ 'git.ui.chooseBranch' | t }}</option>
+              @for (branch of historyBranches(); track branch.reference) {
+                <option [value]="branch.reference" [selected]="comparisonHead() === branch.reference">{{ branch.name }}</option>
+              }
+            </select>
+          </label>
+        </div>
+        @if (historyError() || comparisonError()) {
+          <div class="empty-state compact error" role="alert">
+            <strong>{{ 'git.ui.compareFailed' | t }}</strong>
+            <span>{{ comparisonError() || historyError() }}</span>
+            <button type="button" class="retry-button" (click)="refresh()">{{ 'common.retry' | t }}</button>
+          </div>
+        } @else if (comparison(); as diff) {
+          <div class="comparison-summary" role="status">
+            <span [title]="branchName(comparisonBase())">{{ 'git.ui.branchOnly' | t: { branch: branchName(comparisonBase()), count: diff.baseOnly } }}</span>
+            <span [title]="branchName(comparisonHead())">{{ 'git.ui.branchOnly' | t: { branch: branchName(comparisonHead()), count: diff.headOnly } }}</span>
+          </div>
+          @if (target(); as repositoryTarget) {
+            <app-git-revision-files [target]="repositoryTarget" [range]="diff.range" [files]="diff.files" />
+          }
+        } @else {
+          <div class="empty-state compact" role="status">
+            @if (historyLoading() || comparisonReady()) {
+              {{ 'common.loading' | t }}
+            } @else {
+              {{ 'git.ui.comparePickBranches' | t }}
+            }
+          </div>
+        }
+      </section>
+    }
     } @else {
       <div class="empty-state">
         <app-icon name="git-branch" [size]="26" />

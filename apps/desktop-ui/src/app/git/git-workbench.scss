@@ -177,7 +177,7 @@ button:disabled {
   grid-template-rows: auto auto minmax(0, 1fr);
 }
 .graph-panel {
-  --commit-columns: min(var(--commit-graph-width), clamp(72px, 25%, 300px)) minmax(0, 1fr) minmax(84px, 15%) minmax(120px, 18%) 88px;
+  --commit-columns: min(var(--commit-graph-width), 24%) minmax(0, 1fr) minmax(64px, 13%) minmax(100px, 17%) 70px;
   display: grid;
   grid-row: 3;
   min-width: 0;
@@ -434,7 +434,9 @@ button:disabled {
 .history-toolbar {
   display: flex;
   align-items: center;
-  padding: 6px 10px;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 4px 9px;
   border-bottom: 1px solid var(--border);
 }
 
@@ -464,6 +466,32 @@ button:disabled {
   }
 }
 
+.history-toolbar small {
+  flex: none;
+  color: var(--text-muted);
+  font-size: 10px;
+}
+
+.history-body {
+  display: grid;
+  min-width: 0;
+  min-height: 0;
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-rows: minmax(0, 1fr);
+}
+
+.history-body.details-open {
+  grid-template-columns: minmax(0, 1fr) minmax(320px, 42%);
+}
+
+.history-log {
+  container: git-history / inline-size;
+  display: grid;
+  min-width: 0;
+  min-height: 0;
+  grid-template-rows: minmax(0, 1fr);
+}
+
 .commit-list {
   padding: 0;
 }
@@ -474,15 +502,15 @@ button:disabled {
   min-width: 0;
   grid-template-columns: var(--commit-columns);
   align-items: center;
-  gap: 8px;
-  padding-inline: 8px 10px;
+  gap: 6px;
+  padding-inline: 7px 8px;
 }
 
 .commit-columns {
   position: sticky;
-  z-index: 1;
+  z-index: 2;
   top: 0;
-  min-height: 29px;
+  min-height: 24px;
   border-bottom: 1px solid var(--border);
   color: var(--text-muted);
   background: var(--surface-1);
@@ -491,7 +519,8 @@ button:disabled {
 }
 
 .commit-row {
-  height: 48px;
+  position: relative;
+  height: var(--commit-row-height);
   background: var(--surface-0);
   box-shadow: inset 0 -1px 0 color-mix(in srgb, var(--border) 60%, transparent);
 }
@@ -502,6 +531,11 @@ button:disabled {
 
 .commit-row:is(:hover, :focus-within) {
   background: var(--surface-2);
+}
+
+.commit-row.selected {
+  background: color-mix(in srgb, var(--accent) 16%, var(--surface-1));
+  box-shadow: inset 2px 0 var(--accent);
 }
 
 .change-file,
@@ -530,12 +564,12 @@ button:disabled {
 
   path {
     fill: none;
-    stroke-width: 1.7;
+    stroke-width: 1.45;
   }
 
   circle {
     fill: var(--surface-0);
-    stroke-width: 1.9;
+    stroke-width: 1.6;
   }
 }
 
@@ -547,14 +581,22 @@ button:disabled {
   display: flex;
   min-width: 0;
   align-items: center;
-  gap: 7px;
+  height: 100%;
+  gap: 6px;
+  padding: 0;
+  text-align: start;
+}
+
+.commit-copy::before {
+  position: absolute;
+  inset: 0;
+  content: '';
 }
 
 .commit-copy strong,
 .commit-author,
 .commit-time,
-.decorations em,
-.commit-mobile-meta {
+.decorations em {
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -567,13 +609,13 @@ button:disabled {
 }
 
 .commit-author,
-.commit-time,
-.commit-mobile-meta {
+.commit-time {
   color: var(--text-muted);
   font-size: 11px;
 }
 
 .commit-hash {
+  position: relative;
   max-width: 100%;
   justify-self: start;
   padding: 2px 5px;
@@ -588,10 +630,6 @@ button:disabled {
   &:is(:hover, :focus-visible) {
     color: var(--accent);
   }
-}
-
-.commit-mobile-meta {
-  display: none;
 }
 
 .decorations {
@@ -611,9 +649,9 @@ button:disabled {
   font: normal 9px/1 var(--mono);
 }
 
-@container git-workbench (max-width: 620px) {
-  .graph-panel {
-    --commit-columns: min(var(--commit-graph-width), 26%) minmax(0, 1fr) 68px;
+@container git-history (max-width: 620px) {
+  .commit-list {
+    --commit-columns: min(var(--commit-graph-width), 24%) minmax(0, 1fr) 64px;
   }
 
   .commit-columns :nth-child(3),
@@ -622,20 +660,147 @@ button:disabled {
   .commit-time {
     display: none;
   }
+}
 
-  .commit-copy {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr) auto;
-    gap: 2px 6px;
+.history-pagination {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 8px;
+  color: var(--text-secondary);
+  font-size: 11px;
+}
+
+.history-pagination.error {
+  color: var(--color-error);
+}
+
+.commit-details,
+.branch-comparison {
+  display: flex;
+  min-width: 0;
+  min-height: 0;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.commit-details {
+  border-inline-start: 1px solid var(--border);
+  background: var(--surface-1);
+}
+
+.details-heading {
+  display: flex;
+  flex: none;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  padding: 4px 8px 4px 10px;
+  border-bottom: 1px solid var(--border);
+  font-size: 12px;
+}
+
+.commit-metadata {
+  flex: 0 1 auto;
+  max-height: 48%;
+  padding: 8px 10px;
+  overflow: auto;
+  overflow-wrap: anywhere;
+  font-size: 11px;
+}
+
+.commit-metadata h2 {
+  margin: 0 0 4px;
+  font-size: 13px;
+  font-weight: 650;
+}
+
+.commit-byline {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 10px;
+  margin-bottom: 4px;
+  color: var(--text-muted);
+}
+
+.commit-message {
+  margin: 8px 0 3px;
+  white-space: pre-wrap;
+}
+
+.commit-parent {
+  margin: 5px 0 0;
+  color: var(--text-secondary);
+}
+
+.commit-parent code {
+  margin-inline-start: 4px;
+}
+
+.commit-metadata small {
+  display: block;
+  margin-top: 4px;
+  color: var(--text-muted);
+}
+
+.branch-comparison {
+  grid-row: 3;
+  background: var(--surface-1);
+}
+
+.comparison-toolbar {
+  display: grid;
+  flex: none;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  align-items: end;
+  gap: 8px;
+  padding: 8px 10px;
+}
+
+.comparison-toolbar .history-branch {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+}
+
+.comparison-toolbar select {
+  width: 100%;
+  max-width: none;
+}
+
+.comparison-summary {
+  display: flex;
+  min-width: 0;
+  flex: none;
+  gap: 10px;
+  padding: 3px 10px 8px;
+  color: var(--text-secondary);
+  font-size: 11px;
+}
+
+.comparison-summary span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+@container git-workbench (max-width: 760px) {
+  .history-body.details-open {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: minmax(75px, 40%) minmax(0, 1fr);
   }
 
-  .commit-mobile-meta {
-    display: block;
-    grid-column: 1 / -1;
+  .commit-details {
+    border-inline-start: 0;
+    border-block-start: 1px solid var(--border);
   }
+}
 
-  .decorations {
-    max-width: 90px;
+@container git-workbench (max-width: 480px) {
+  .comparison-toolbar .history-branch {
+    grid-template-columns: minmax(0, 1fr);
   }
 }
 

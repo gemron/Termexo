@@ -1,0 +1,108 @@
+:host {
+  display: flex;
+  min-width: 0;
+  min-height: 0;
+  flex: 1 1 12rem;
+  flex-direction: column;
+}
+
+.file-select {
+  display: flex;
+  flex: none;
+  min-width: 0;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px;
+  border-block: 1px solid var(--border);
+  color: var(--text-secondary);
+  font-size: 11px;
+}
+
+.file-select span {
+  flex: none;
+}
+
+select {
+  min-width: 0;
+  min-height: 27px;
+  flex: 1;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-field);
+  background: var(--surface-0);
+  color: var(--text);
+}
+
+.revision-diff {
+  min-width: 0;
+  min-height: 0;
+  flex: 1;
+  overflow: auto;
+  background: var(--surface-0);
+  scrollbar-width: thin;
+}
+
+.revision-lines {
+  min-width: max-content;
+}
+
+.line {
+  display: grid;
+  grid-template-columns: 38px 38px 17px minmax(0, 1fr);
+  align-items: baseline;
+  padding-inline-end: 8px;
+  font: 11px/1.65 var(--mono);
+}
+
+.line span {
+  padding-inline-end: 5px;
+  color: var(--text-muted);
+  text-align: end;
+  user-select: none;
+}
+
+.line code {
+  white-space: pre;
+  tab-size: 4;
+}
+
+.line b {
+  text-align: center;
+  user-select: none;
+}
+
+.line.added {
+  background: color-mix(in srgb, var(--color-success) 15%, transparent);
+}
+
+.line.removed {
+  background: color-mix(in srgb, var(--color-error) 15%, transparent);
+}
+
+.equal-context {
+  width: 100%;
+  padding: 2px 8px;
+  color: var(--text-muted);
+  background: var(--surface-1);
+  text-align: start;
+  font-size: 11px;
+}
+
+.equal-context:is(:hover, :focus-visible) {
+  color: var(--accent);
+}
+
+.status {
+  margin: 0;
+  padding: 8px 10px;
+  color: var(--text-secondary);
+  font-size: 11px;
+  overflow-wrap: anywhere;
+}
+
+.error {
+  color: var(--color-error);
+}
+
+.warning {
+  color: var(--color-warning);
+}

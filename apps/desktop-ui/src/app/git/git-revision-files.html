@@ -1,0 +1,53 @@
+@if (files().length) {
+  <label class="file-select">
+    <span>{{ 'git.ui.changedFiles' | t: { count: files().length } }}</span>
+    <select data-testid="git-revision-file" (change)="select($event)">
+      @for (file of files(); track file.path) {
+        <option [value]="file.path" [selected]="selected() === file.path">
+          {{ status(file) }} · {{ file.oldPath ? file.oldPath + ' → ' : '' }}{{ file.path }}
+        </option>
+      }
+    </select>
+  </label>
+  <div class="revision-diff" data-testid="git-revision-diff" tabindex="0" [attr.aria-label]="'git.ui.fileDiff' | t">
+    @if (error()) {
+      <p class="status error" role="alert">{{ 'git.diffFailed' | t }} · {{ error() }}</p>
+      <button class="status" type="button" (click)="retryDiff()">{{ 'common.retry' | t }}</button>
+    } @else if (diff(); as fileDiff) {
+      @if (fileDiff.truncated) {
+        <p class="status warning" role="status">{{ 'git.truncated' | t }}</p>
+      }
+      @if (fileDiff.binary) {
+        <p class="status">{{ 'git.binary' | t }}</p>
+      } @else if (!rows().length) {
+        @if (!fileDiff.truncated) {
+          <p class="status">{{ 'git.noTextChanges' | t }}</p>
+        }
+      } @else {
+        <div class="revision-lines">
+          @for (row of rows(); track $index) {
+            @if (row.kind === 'collapsed') {
+              <button type="button" class="equal-context" (click)="expand(row.firstNewLine)">
+                {{ 'git.collapsedLines' | t: { count: row.count } }}
+              </button>
+            } @else {
+              @if (row.kind === 'removed' || row.kind === 'changed') {
+                <div class="line removed"><span>{{ row.oldLine }}</span><span></span><b>−</b><code>{{ row.oldText }}</code></div>
+              }
+              @if (row.kind === 'added' || row.kind === 'changed') {
+                <div class="line added"><span></span><span>{{ row.newLine }}</span><b>+</b><code>{{ row.newText }}</code></div>
+              }
+              @if (row.kind === 'equal') {
+                <div class="line"><span>{{ row.oldLine }}</span><span>{{ row.newLine }}</span><b></b><code>{{ row.newText }}</code></div>
+              }
+            }
+          }
+        </div>
+      }
+    } @else {
+      <p class="status" role="status">{{ 'git.loadingDiff' | t }}</p>
+    }
+  </div>
+} @else {
+  <p class="status">{{ 'git.ui.noChangedFiles' | t }}</p>
+}

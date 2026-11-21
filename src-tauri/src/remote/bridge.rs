@@ -111,6 +111,9 @@ pub const REMOTE_ALLOWED: &[&str] = &[
     "list_system_fonts",
     "get_repository_overview",
     "get_repository_history",
+    "get_repository_commit",
+    "compare_repository_branches",
+    "get_repository_revision_diff",
     "get_repository_diff",
     "export_network_profiles",
     "check_for_update",
@@ -231,6 +234,9 @@ pub fn is_read_only_command_allowed(command: &str) -> bool {
             | "list_system_fonts"
             | "get_repository_overview"
             | "get_repository_history"
+            | "get_repository_commit"
+            | "compare_repository_branches"
+            | "get_repository_revision_diff"
             | "get_repository_diff"
             | "list_project_directory"
             | "read_project_preview"

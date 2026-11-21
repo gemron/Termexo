@@ -49,6 +49,35 @@ export interface RepositoryBranch {
 export interface RepositoryHistory {
   branches: RepositoryBranch[];
   commits: RepositoryCommit[];
+  next?: HistoryCursor | null;
+}
+
+export interface HistoryCursor {
+  offset: number;
+  snapshot: string;
+}
+
+export interface RevisionRange {
+  baseOid: string | null;
+  headOid: string;
+}
+
+export interface CommitDetails {
+  range: RevisionRange;
+  summary: string;
+  body: string;
+  author: string;
+  email: string;
+  authoredAt: number;
+  parents: string[];
+  files: RepositoryChange[];
+}
+
+export interface BranchComparison {
+  range: RevisionRange;
+  baseOnly: number;
+  headOnly: number;
+  files: RepositoryChange[];
 }
 
 export interface RepositoryDiff {

@@ -1,7 +1,12 @@
 import { computed, Injectable, signal } from '@angular/core';
 
 import type {
+  BranchComparison,
+  CommitDetails,
   DiffLayout,
+  HistoryCursor,
+  RepositoryChange,
+  RevisionRange,
   RepositoryDiff,
   RepositoryHistory,
   RepositoryOverview,
@@ -146,10 +151,28 @@ export class GitService {
     }
   }
 
-  async loadHistory(target: RepositoryTarget, branch: string | null): Promise<RepositoryHistory> {
+  async loadHistory(
+    target: RepositoryTarget,
+    branch: string | null,
+    cursor?: HistoryCursor,
+  ): Promise<RepositoryHistory> {
     if (!hasBackend()) throw new Error('Git 提交图需要连接桌面应用。');
     return invoke<RepositoryHistory>('get_repository_history', {
-      request: { target, branch, commitLimit: COMMIT_LIMIT },
+      request: { target, branch, ...(cursor && { cursor }), commitLimit: COMMIT_LIMIT },
+    });
+  }
+
+  async loadCommit(target: RepositoryTarget, oid: string): Promise<CommitDetails> {
+    return invoke<CommitDetails>('get_repository_commit', { request: { target, oid } });
+  }
+
+  async compareBranches(target: RepositoryTarget, base: string, head: string): Promise<BranchComparison> {
+    return invoke<BranchComparison>('compare_repository_branches', { request: { target, base, head } });
+  }
+
+  async loadRevisionDiff(target: RepositoryTarget, range: RevisionRange, file: RepositoryChange): Promise<RepositoryDiff> {
+    return invoke<RepositoryDiff>('get_repository_revision_diff', {
+      request: { target, range, path: file.path, oldPath: file.oldPath },
     });
   }
 

@@ -6,7 +6,8 @@ use std::path::Path;
 
 use crate::git::watch::RepositoryWatcher;
 use crate::git::{
-    RepositoryDiff, RepositoryHistory, RepositoryManager, RepositoryOverview, RepositoryTarget,
+    BranchComparison, CommitDetails, HistoryCursor, RepositoryDiff, RepositoryHistory,
+    RepositoryManager, RepositoryOverview, RepositoryTarget, RevisionRange,
 };
 
 #[derive(Debug, Deserialize)]
@@ -65,6 +66,7 @@ pub fn get_repository_overview(
 pub struct RepositoryHistoryRequest {
     target: RepositoryTargetRequest,
     branch: Option<String>,
+    cursor: Option<HistoryCursor>,
     commit_limit: Option<usize>,
 }
 
@@ -78,6 +80,7 @@ pub fn get_repository_history(
         &request.target.into(),
         &database,
         request.branch.as_deref(),
+        request.cursor.as_ref(),
         request.commit_limit,
     )
 }
@@ -89,4 +92,66 @@ pub fn get_repository_diff(
     database: State<'_, WorkspaceDatabase>,
 ) -> Result<RepositoryDiff, String> {
     repositories.diff(&request.target.into(), &database, request.path.trim())
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CommitDetailsRequest {
+    target: RepositoryTargetRequest,
+    oid: String,
+}
+
+#[tauri::command(async)]
+pub fn get_repository_commit(
+    request: CommitDetailsRequest,
+    repositories: State<'_, RepositoryManager>,
+    database: State<'_, WorkspaceDatabase>,
+) -> Result<CommitDetails, String> {
+    repositories.commit_details(&request.target.into(), &database, &request.oid)
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct BranchComparisonRequest {
+    target: RepositoryTargetRequest,
+    base: String,
+    head: String,
+}
+
+#[tauri::command(async)]
+pub fn compare_repository_branches(
+    request: BranchComparisonRequest,
+    repositories: State<'_, RepositoryManager>,
+    database: State<'_, WorkspaceDatabase>,
+) -> Result<BranchComparison, String> {
+    repositories.compare_branches(
+        &request.target.into(),
+        &database,
+        &request.base,
+        &request.head,
+    )
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RevisionDiffRequest {
+    target: RepositoryTargetRequest,
+    range: RevisionRange,
+    path: String,
+    old_path: Option<String>,
+}
+
+#[tauri::command(async)]
+pub fn get_repository_revision_diff(
+    request: RevisionDiffRequest,
+    repositories: State<'_, RepositoryManager>,
+    database: State<'_, WorkspaceDatabase>,
+) -> Result<RepositoryDiff, String> {
+    repositories.revision_diff(
+        &request.target.into(),
+        &database,
+        &request.range,
+        &request.path,
+        request.old_path.as_deref(),
+    )
 }

@@ -19,6 +19,8 @@ import {
 
 import {
   buildDiffRows,
+  type BranchComparison,
+  type CommitDetails,
   changeBlockStarts,
   withCollapsedEquals,
   type CollapsedEqualRow,
@@ -37,6 +39,7 @@ import { TranslatePipe } from '../core/i18n/translate.pipe';
 import { GitService } from '../core/services/git.service';
 import { writeClipboardText } from '../core/services/clipboard-text';
 import { IconComponent } from '../shared/icon/icon';
+import { GitRevisionFilesComponent } from './git-revision-files';
 
 /**
  * How far below the viewport's top edge a jumped-to change is placed, as a share of the height.
@@ -47,8 +50,8 @@ import { IconComponent } from '../shared/icon/icon';
 const CHANGE_SCROLL_HEADROOM = 0.3;
 const CLIPBOARD_FEEDBACK_MS = 1500;
 const COMPACT_GIT_WIDTH = 680;
-const GRAPH_LANE_WIDTH = 16;
-const GRAPH_CENTER = 24;
+const GRAPH_LANE_WIDTH = 12;
+const GRAPH_CENTER = 16;
 const GRAPH_COLORS = ['var(--accent)', '#829fea', '#e28ab4', '#e4b56d', '#6bbad0', '#b19aeb'];
 
 interface CommitGraphEdge {
@@ -66,7 +69,7 @@ interface CommitGraphRow {
 
 @Component({
   selector: 'app-git-workbench',
-  imports: [IconComponent, NgTemplateOutlet, TranslatePipe],
+  imports: [IconComponent, GitRevisionFilesComponent, NgTemplateOutlet, TranslatePipe],
   templateUrl: './git-workbench.html',
   styleUrl: './git-workbench.scss',
 })
@@ -133,7 +136,8 @@ export class GitWorkbenchComponent {
   private readonly collapsedDirs = signal<ReadonlySet<string>>(new Set());
   protected readonly copiedValue = signal('');
   protected readonly copyError = signal('');
-  protected readonly sidebarTab = signal<'changes' | 'history'>('changes');
+  protected readonly sidebarTab = signal<'changes' | 'history' | 'compare'>('changes');
+  private readonly historyVisible = computed(() => this.sidebarTab() !== 'changes');
   private readonly compact = signal(false);
   private readonly focusPreference = signal<boolean | null>(null);
   protected readonly focusDiff = computed(() => this.focusPreference() ?? this.compact());
@@ -182,15 +186,48 @@ export class GitWorkbenchComponent {
   private readonly history = signal<{ scope: string; data: RepositoryHistory } | null>(null);
   protected readonly historyLoading = signal(false);
   protected readonly historyError = signal('');
+  protected readonly historyPaging = signal(false);
+  protected readonly historyPageError = signal('');
+  private historyGeneration = 0;
   private readonly currentHistory = computed(() => {
     const history = this.history();
     return history && history.scope === this.historyScope() ? history.data : null;
   });
+  protected readonly hasOlderCommits = computed(() => !!this.currentHistory()?.next);
   protected readonly historyBranches = computed(() => this.currentHistory()?.branches ?? []);
   protected readonly graphRows = computed(() => buildCommitGraph(this.currentHistory()?.commits ?? []));
+  protected readonly graphRowHeight = GRAPH_CENTER * 2;
+  protected readonly graphNodeCenter = GRAPH_CENTER;
   protected readonly graphWidth = computed(
     () => Math.max(1, ...this.graphRows().map((row) => row.lanes)) * GRAPH_LANE_WIDTH,
   );
+
+  protected readonly selectedCommit = linkedSignal({
+    source: this.historyScope,
+    computation: (): RepositoryCommit | null => null,
+  });
+  protected readonly commitDetails = signal<CommitDetails | null>(null);
+  protected readonly commitError = signal('');
+  protected readonly comparisonHead = linkedSignal({
+    source: this.historyScope,
+    computation: () => '',
+  });
+  private readonly chosenComparisonBase = linkedSignal({
+    source: this.historyScope,
+    computation: () => '',
+  });
+  protected readonly comparisonBase = computed(() => (
+    this.chosenComparisonBase() ||
+    this.historyBranches().find((item) => item.reference === 'refs/heads/' + this.overview()?.branch)?.reference ||
+    this.historyBranches()[0]?.reference || ''
+  ));
+  protected readonly comparison = signal<BranchComparison | null>(null);
+  protected readonly comparisonError = signal('');
+  protected readonly comparisonReady = computed(() => {
+    const base = this.comparisonBase();
+    const head = this.comparisonHead();
+    return !!base && !!head && head !== base;
+  });
 
   private readonly diffViewport = viewChild<ElementRef<HTMLElement>>('diffViewport');
   protected readonly changeBlocks = computed(() => changeBlockStarts(this.rows()));
@@ -248,14 +285,19 @@ export class GitWorkbenchComponent {
     effect((onCleanup) => {
       const scope = this.historyScope();
       const target = untracked(this.target);
-      if (!scope || !target || this.sidebarTab() !== 'history') return;
+      if (!scope || !target || !this.historyVisible()) return;
       const branch = this.historyBranch();
       this.historyHead();
       this.historyRefresh();
       this.historyLoading.set(true);
+      this.historyPaging.set(false);
       this.historyError.set('');
+      this.historyPageError.set('');
       let cancelled = false;
-      onCleanup(() => { cancelled = true; });
+      onCleanup(() => {
+        cancelled = true;
+        this.historyGeneration++;
+      });
       void this.git.loadHistory(target, branch)
         .then((data) => {
           if (!cancelled) this.history.set({ scope, data });
@@ -266,6 +308,34 @@ export class GitWorkbenchComponent {
         .finally(() => {
           if (!cancelled) this.historyLoading.set(false);
         });
+    });
+    effect((onCleanup) => {
+      const commit = this.selectedCommit();
+      const target = untracked(this.target);
+      this.historyRefresh();
+      this.commitDetails.set(null);
+      this.commitError.set('');
+      if (!commit || !target) return;
+      let cancelled = false;
+      onCleanup(() => { cancelled = true; });
+      void this.git.loadCommit(target, commit.oid)
+        .then((data) => { if (!cancelled) this.commitDetails.set(data); })
+        .catch((error: unknown) => { if (!cancelled) this.commitError.set(String(error)); });
+    });
+    effect((onCleanup) => {
+      const target = untracked(this.target);
+      const base = this.comparisonBase();
+      const head = this.comparisonHead();
+      this.historyHead();
+      this.historyRefresh();
+      this.comparison.set(null);
+      this.comparisonError.set('');
+      if (!this.historyScope() || !target || this.sidebarTab() !== 'compare' || !this.comparisonReady()) return;
+      let cancelled = false;
+      onCleanup(() => { cancelled = true; });
+      void this.git.compareBranches(target, base, head)
+        .then((data) => { if (!cancelled) this.comparison.set(data); })
+        .catch((error: unknown) => { if (!cancelled) this.comparisonError.set(String(error)); });
     });
     effect(() => {
       if (!this.refreshing()) {
@@ -411,10 +481,47 @@ export class GitWorkbenchComponent {
 
   protected selectHistoryBranch(event: Event): void {
     this.historyBranch.set((event.target as HTMLSelectElement).value || null);
+    this.selectedCommit.set(null);
+  }
+
+  protected async loadOlderCommits(): Promise<void> {
+    const history = this.currentHistory();
+    const scope = this.historyScope();
+    const target = this.target();
+    const branch = this.historyBranch();
+    if (!history?.next || !scope || !target || this.historyLoading() || this.historyPaging()) return;
+    const generation = this.historyGeneration;
+    this.historyPaging.set(true);
+    this.historyPageError.set('');
+    try {
+      const data = await this.git.loadHistory(target, branch, history.next);
+      if (generation !== this.historyGeneration || scope !== this.historyScope() || branch !== this.historyBranch()) return;
+      this.history.set({ scope, data: { ...data, commits: [...history.commits, ...data.commits] } });
+    } catch (error) {
+      if (generation === this.historyGeneration) this.historyPageError.set(String(error));
+    } finally {
+      if (generation === this.historyGeneration) this.historyPaging.set(false);
+    }
+  }
+
+  protected selectComparisonBranch(side: 'base' | 'head', event: Event): void {
+    const value = (event.target as HTMLSelectElement).value;
+    (side === 'base' ? this.chosenComparisonBase : this.comparisonHead).set(value);
+  }
+
+  protected swapComparisonBranches(): void {
+    const base = this.comparisonBase();
+    const head = this.comparisonHead();
+    this.chosenComparisonBase.set(head);
+    this.comparisonHead.set(base);
+  }
+
+  protected branchName(reference: string): string {
+    return this.historyBranches().find((branch) => branch.reference === reference)?.name ?? reference;
   }
 
   protected refresh(): void {
-    if (this.sidebarTab() === 'history') this.historyRefresh.update((version) => version + 1);
+    if (this.historyVisible()) this.historyRefresh.update((version) => version + 1);
     this.manualRefreshing.set(true);
     this.refreshRequested.emit();
     const path = this.selectedPath();

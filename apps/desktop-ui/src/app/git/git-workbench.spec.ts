@@ -57,12 +57,12 @@ describe('buildCommitGraph', () => {
       commit('side-parent', []),
     ]);
 
-    expect(rows[0].nodeX).toBe(8);
-    expect(rows[0].edges.map((edge) => edge.path)).toEqual(['M8 24 V48', 'M8 24 C8 36 24 36 24 48']);
+    expect(rows[0].nodeX).toBe(6);
+    expect(rows[0].edges.map((edge) => edge.path)).toEqual(['M6 16 V32', 'M6 16 C6 24 18 24 18 32']);
     expect(rows[0].edges[0].color).not.toBe(rows[0].edges[1].color);
     expect(rows[1].lanes).toBe(2);
-    expect(rows[1].edges).toContainEqual(expect.objectContaining({ path: 'M24 0 C24 24 8 24 8 48' }));
-    expect(rows[2].nodeX).toBe(8);
+    expect(rows[1].edges).toContainEqual(expect.objectContaining({ path: 'M18 0 C18 16 6 16 6 32' }));
+    expect(rows[2].nodeX).toBe(6);
   });
 
   it('collapses duplicate lanes when merge parents converge', () => {
@@ -73,7 +73,7 @@ describe('buildCommitGraph', () => {
       commit('root', []),
     ]);
 
-    expect(rows[2].edges).toContainEqual(expect.objectContaining({ path: 'M24 24 C24 36 8 36 8 48' }));
+    expect(rows[2].edges).toContainEqual(expect.objectContaining({ path: 'M18 16 C18 24 6 24 6 32' }));
     expect(rows[3].lanes).toBe(1);
   });
 });
@@ -149,6 +149,71 @@ describe('GitWorkbenchComponent states', () => {
     fixture.detectChanges();
     expect(root.querySelectorAll('.change-file')).toHaveLength(2);
     expect(git.selectedPath()).toBe(OVERVIEW.changes[0].path);
+  });
+
+  it('appends older commits and shows their metadata and file differences', async () => {
+    await showRepository();
+    const cursor = { offset: 1, snapshot: 'history' };
+    const latest = commit('recent', ['older']);
+    const older = commit('older', []);
+    vi.mocked(git.loadHistory).mockImplementation(async (_target, _branch, next) => ({
+      branches: [],
+      commits: next ? [older] : [latest],
+      next: next ? null : cursor,
+    }));
+    const range = { baseOid: null, headOid: older.oid };
+    const file = change('README.md');
+    vi.spyOn(git, 'loadCommit').mockResolvedValue({
+      range, summary: 'Start project', body: 'Full commit body', author: 'Termexo', email: '', authoredAt: 0,
+      parents: [], files: [file],
+    });
+    vi.spyOn(git, 'loadRevisionDiff').mockResolvedValue({
+      path: file.path, oldText: '', newText: 'Initial content', binary: false, truncated: false,
+    });
+    root.querySelectorAll<HTMLButtonElement>('.sidebar-tabs button')[1].click();
+    await waitForCommits(1);
+    root.querySelector<HTMLButtonElement>('[data-testid="git-history-more"]')!.click();
+    await waitForCommits(2);
+    expect(vi.mocked(git.loadHistory).mock.calls.at(-1)?.[2]).toEqual(cursor);
+    expect(root.querySelectorAll('.commit-row')).toHaveLength(2);
+    expect(root.querySelector('[data-testid="git-history-more"]')).toBeNull();
+    root.querySelectorAll<HTMLButtonElement>('[data-testid="git-commit-details"]')[1].click();
+    await vi.waitFor(() => {
+      fixture.detectChanges();
+      expect(root.querySelector('[data-testid="git-revision-diff"]')?.textContent).toContain('Initial content');
+    });
+    expect(git.loadCommit).toHaveBeenCalledWith(expect.anything(), older.oid);
+    expect(root.querySelector('.commit-details')?.textContent).toContain('Full commit body');
+  });
+
+  it('compares branches in the chosen direction and swaps them', async () => {
+    await showRepository();
+    const base = 'refs/heads/main';
+    const head = 'refs/remotes/origin/feature';
+    vi.mocked(git.loadHistory).mockResolvedValue({
+      branches: [{ reference: base, name: 'main' }, { reference: head, name: 'origin/feature' }],
+      commits: [],
+    });
+    const compare = vi.spyOn(git, 'compareBranches').mockResolvedValue({
+      range: { baseOid: 'base-oid', headOid: 'head-oid' }, baseOnly: 2, headOnly: 4, files: [],
+    });
+    root.querySelectorAll<HTMLButtonElement>('.sidebar-tabs button')[2].click();
+    const input = await vi.waitFor(() => {
+      fixture.detectChanges();
+      const select = root.querySelector<HTMLSelectElement>('[data-testid="git-compare-head"]')!;
+      expect(select.options).toHaveLength(3);
+      return select;
+    });
+    input.value = head;
+    input.dispatchEvent(new Event('change', { bubbles: true }));
+    await vi.waitFor(() => {
+      fixture.detectChanges();
+      expect(root.querySelector('.comparison-summary')?.textContent).toContain('origin/feature only · 4 commits');
+    });
+    expect(compare).toHaveBeenCalledWith(expect.anything(), base, head);
+    root.querySelector<HTMLButtonElement>('button[aria-label="Swap branches"]')!.click();
+    fixture.detectChanges();
+    expect(compare).toHaveBeenLastCalledWith(expect.anything(), head, base);
   });
 
   it('loads the selected branch and keeps the current diff selection', async () => {

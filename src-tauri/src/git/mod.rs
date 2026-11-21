@@ -1,4 +1,8 @@
+mod revisions;
 pub mod watch;
+
+use revisions::collect_history;
+pub use revisions::{BranchComparison, CommitDetails, HistoryCursor, RevisionRange};
 
 use std::collections::{HashMap, HashSet};
 use std::fs::{self, File};
@@ -115,6 +119,7 @@ pub struct RepositoryBranch {
 pub struct RepositoryHistory {
     pub branches: Vec<RepositoryBranch>,
     pub commits: Vec<RepositoryCommit>,
+    pub next: Option<HistoryCursor>,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -434,6 +439,7 @@ impl RepositoryManager {
         target: &RepositoryTarget,
         database: &WorkspaceDatabase,
         branch: Option<&str>,
+        cursor: Option<&HistoryCursor>,
         commit_limit: Option<usize>,
     ) -> Result<RepositoryHistory, String> {
         let (directory, baseline) = self.resolve_target(target, database)?;
@@ -458,6 +464,7 @@ impl RepositoryManager {
             &root,
             head.as_deref(),
             branch,
+            cursor,
             commit_limit
                 .unwrap_or(DEFAULT_COMMIT_LIMIT)
                 .clamp(1, MAX_COMMIT_LIMIT),
@@ -1009,102 +1016,59 @@ fn commits_since(
         .collect())
 }
 
-fn collect_history(
-    root: &Path,
-    head: Option<&str>,
-    branch: Option<&str>,
-    limit: usize,
-    session_oids: &HashSet<String>,
-) -> Result<RepositoryHistory, String> {
-    let output = run_git(
-        root,
-        &[
-            "for-each-ref",
-            "--sort=refname",
-            "--format=%(refname)%00%(symref)",
-            "refs/heads/",
-            "refs/remotes/",
-        ],
-    )?;
-    let branches: Vec<_> = String::from_utf8_lossy(&output)
-        .lines()
-        .filter_map(|line| {
-            let (reference, symbolic_target) = line.split_once('\0')?;
-            if !symbolic_target.is_empty() {
-                return None;
-            }
-            let name = reference
-                .strip_prefix("refs/heads/")
-                .or_else(|| reference.strip_prefix("refs/remotes/"))?;
-            Some(RepositoryBranch {
-                reference: reference.to_owned(),
-                name: name.to_owned(),
-            })
-        })
-        .collect();
-
-    let commits = if let Some(reference) = branch {
-        // Use exactly the full ref advertised by Git, so option-like values and revision syntax
-        // cannot change the command or select a different object.
-        let branch = branches
-            .iter()
-            .find(|branch| branch.reference == reference)
-            .ok_or_else(|| "该分支已不存在，请选择其他分支。".to_owned())?;
-        collect_commits(root, limit, session_oids, &[&branch.reference])?
-    } else if branches.is_empty() && head.is_none() {
-        Vec::new()
-    } else {
-        let mut revisions = vec!["--branches", "--remotes"];
-        revisions.extend(head);
-        collect_commits(root, limit, session_oids, &revisions)?
-    };
-    Ok(RepositoryHistory { branches, commits })
-}
-
 fn collect_commits(
     root: &Path,
     limit: usize,
     session_oids: &HashSet<String>,
     revisions: &[&str],
 ) -> Result<Vec<RepositoryCommit>, String> {
+    collect_commit_page(root, limit, 0, session_oids, revisions)
+}
+
+fn collect_commit_page(
+    root: &Path,
+    limit: usize,
+    offset: usize,
+    session_oids: &HashSet<String>,
+    revisions: &[&str],
+) -> Result<Vec<RepositoryCommit>, String> {
     let max_count = format!("--max-count={limit}");
+    let skip = format!("--skip={offset}");
     let mut arguments = vec![
         "log",
+        "-z",
         "--topo-order",
+        "--no-show-signature",
+        "--no-notes",
         "--decorate=short",
         &max_count,
-        "--pretty=format:%H%x1f%h%x1f%P%x1f%D%x1f%an%x1f%at%x1f%s%x1e",
+        &skip,
+        "--pretty=tformat:%H%x00%h%x00%P%x00%D%x00%an%x00%at%x00%s",
     ];
     arguments.extend_from_slice(revisions);
     arguments.push("--");
     let output = run_git(root, &arguments)?;
     let text = String::from_utf8_lossy(&output);
-    Ok(text
-        .split('\u{1e}')
-        .filter_map(|record| {
-            let record = record.trim_matches(['\r', '\n']);
-            if record.is_empty() {
-                return None;
-            }
-            let fields: Vec<&str> = record.split('\u{1f}').collect();
-            if fields.len() != 7 {
-                return None;
-            }
-            Some(RepositoryCommit {
-                oid: fields[0].to_owned(),
-                short_oid: fields[1].to_owned(),
-                parent_oids: fields[2].split_whitespace().map(str::to_owned).collect(),
-                decorations: fields[3]
-                    .split(',')
-                    .map(str::trim)
-                    .filter(|value| !value.is_empty())
-                    .map(sanitize_text)
-                    .collect(),
-                author: sanitize_text(fields[4]),
-                committed_at: fields[5].parse().unwrap_or_default(),
-                summary: sanitize_text(fields[6]),
-                in_session: session_oids.contains(fields[0]),
-            })
+    let fields: Vec<_> = text.split_terminator('\0').collect();
+    if fields.len() % 7 != 0 {
+        return Err("Git 提交输出格式无效。".into());
+    }
+    Ok(fields
+        .chunks_exact(7)
+        .map(|fields| RepositoryCommit {
+            oid: fields[0].to_owned(),
+            short_oid: fields[1].to_owned(),
+            parent_oids: fields[2].split_whitespace().map(str::to_owned).collect(),
+            decorations: fields[3]
+                .split(',')
+                .map(str::trim)
+                .filter(|value| !value.is_empty())
+                .map(sanitize_text)
+                .collect(),
+            author: sanitize_text(fields[4]),
+            committed_at: fields[5].parse().unwrap_or_default(),
+            summary: sanitize_text(fields[6]),
+            in_session: session_oids.contains(fields[0]),
         })
         .collect())
 }
@@ -1579,7 +1543,7 @@ mod tests {
         let head = current_head(&root).unwrap();
         let session_oids = HashSet::from([head.clone().unwrap()]);
 
-        let all = collect_history(&root, head.as_deref(), None, 50, &session_oids).unwrap();
+        let all = collect_history(&root, head.as_deref(), None, None, 50, &session_oids).unwrap();
         assert_eq!(all.commits.len(), 3);
         assert_eq!(
             all.branches
@@ -1593,9 +1557,15 @@ mod tests {
             .iter()
             .any(|commit| commit.in_session && commit.summary == "main commit"));
         for reference in ["refs/heads/feature", "refs/remotes/origin/feature"] {
-            let history =
-                collect_history(&root, head.as_deref(), Some(reference), 50, &session_oids)
-                    .unwrap();
+            let history = collect_history(
+                &root,
+                head.as_deref(),
+                Some(reference),
+                None,
+                50,
+                &session_oids,
+            )
+            .unwrap();
             assert_eq!(
                 history
                     .commits
@@ -1605,10 +1575,64 @@ mod tests {
                 ["feature commit", "common"]
             );
         }
-        assert!(
-            collect_history(&root, head.as_deref(), Some("--help"), 50, &session_oids).is_err()
+        assert!(collect_history(
+            &root,
+            head.as_deref(),
+            Some("--help"),
+            None,
+            50,
+            &session_oids
+        )
+        .is_err());
+        let summaries = |history: &RepositoryHistory| {
+            history
+                .commits
+                .iter()
+                .map(|commit| commit.summary.clone())
+                .collect::<Vec<_>>()
+        };
+        let first_page =
+            collect_history(&root, head.as_deref(), None, None, 1, &session_oids).unwrap();
+        let second_page = collect_history(
+            &root,
+            head.as_deref(),
+            None,
+            first_page.next.as_ref(),
+            1,
+            &session_oids,
+        )
+        .unwrap();
+        let third_page = collect_history(
+            &root,
+            head.as_deref(),
+            None,
+            second_page.next.as_ref(),
+            1,
+            &session_oids,
+        )
+        .unwrap();
+        assert_eq!(
+            [
+                summaries(&first_page),
+                summaries(&second_page),
+                summaries(&third_page)
+            ]
+            .concat(),
+            summaries(&all)
         );
+        assert!(third_page.next.is_none());
         assert_eq!(current_head(&root).unwrap(), head);
+        commit("history moved");
+        let moved = current_head(&root).unwrap();
+        assert!(collect_history(
+            &root,
+            moved.as_deref(),
+            None,
+            first_page.next.as_ref(),
+            1,
+            &session_oids
+        )
+        .is_err());
         fs::remove_dir_all(&root).ok();
     }
 
