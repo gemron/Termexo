@@ -64,8 +64,8 @@
     <title>Termexo — Let AI operate your coding agents through MCP</title>
     <link rel="canonical" href="https://www.termexo.com/" />
     <link rel="icon" href="assets/termexo-mark.svg" type="image/svg+xml" />
-    <link rel="stylesheet" href="styles.css?v=c64af7392e7e" />
-    <script src="app.js?v=9ebc8bc1f770" defer></script>
+    <link rel="stylesheet" href="styles.css?v=fleet01" />
+    <script src="app.js?v=fleet01" defer></script>
     <script src="analytics.js" defer></script>
   </head>
   <body class="home-page">
@@ -88,6 +88,7 @@
           data-nav
         >
           <a href="#ai-control" data-i18n="navMcp">MCP control</a>
+          <a href="#fleet" data-i18n="navFleet">Fleet</a>
           <a href="#workbench" data-i18n="navWorkbench">Workbench</a>
           <a href="#remote-relay" data-i18n="navRelay">Remote relay</a>
           <a href="#solutions" data-i18n="navSolutions">Use cases</a>
@@ -462,6 +463,89 @@
         <div class="mcp-section-footer">
           <p data-i18n="mcpBoundary">All six support interaction with existing terminals. Task-board execution supports Claude Code, Codex, OpenCode, Pi Agent and Grok Build. Sending input or starting a task does not mean it has finished.</p>
           <a class="button secondary" href="guide.en.html#ai-control" data-i18n="mcpFullGuide">Open the step-by-step MCP guide →</a>
+        </div>
+      </section>
+
+      <section class="section shell fleet-section" id="fleet" aria-labelledby="fleet-title">
+        <div class="section-heading reveal">
+          <div>
+            <span class="section-index fleet-index-row">
+              <img src="assets/fleet-mark.svg" alt="" width="18" height="18" />
+              <span data-i18n="fleetIndex">ECOSYSTEM / TERMEXO FLEET · PREVIEW V0.1</span>
+            </span>
+            <h2 id="fleet-title" data-i18n="fleetTitle">Scale Termexo into an autonomous multi-machine AI fleet.</h2>
+          </div>
+          <p data-i18n="fleetLead">Termexo Fleet is the companion desktop commander built on Termexo MCP. Grade tasks across L1–L4 difficulty tiers, route accounts &amp; models automatically, let parent agents spawn worktree-isolated sub-agents, and track savings across multiple Termexo machines — with zero black-box execution.</p>
+        </div>
+
+        <div class="fleet-showcase reveal" data-fleet-showcase>
+          <div class="fleet-tabs" role="tablist" aria-label="Termexo Fleet screens">
+            <button type="button" class="fleet-tab active" role="tab" aria-selected="true" data-fleet-tab="deck" data-fleet-img="assets/fleet-mission-deck.png" data-i18n="fleetTabDeck">Mission Deck &amp; DAG</button>
+            <button type="button" class="fleet-tab" role="tab" aria-selected="false" data-fleet-tab="swarm" data-fleet-img="assets/fleet-swarm-tree.png" data-i18n="fleetTabSwarm">Sub-Agent Swarm Tree</button>
+            <button type="button" class="fleet-tab" role="tab" aria-selected="false" data-fleet-tab="routing" data-fleet-img="assets/fleet-routing-ladder.png" data-i18n="fleetTabRouting">L1–L4 Routing Ladder</button>
+            <button type="button" class="fleet-tab" role="tab" aria-selected="false" data-fleet-tab="topology" data-fleet-img="assets/fleet-topology.png" data-i18n="fleetTabTopology">Multi-Machine Topology</button>
+            <button type="button" class="fleet-tab" role="tab" aria-selected="false" data-fleet-tab="analytics" data-fleet-img="assets/fleet-analytics.png" data-i18n="fleetTabAnalytics">Ledger &amp; Alerts</button>
+          </div>
+
+          <figure class="fleet-frame">
+            <div class="fleet-frame-bar">
+              <span class="fleet-frame-dots" aria-hidden="true"><i></i><i></i><i></i></span>
+              <span class="fleet-frame-title">Termexo Fleet · v0.1.0-preview.1</span>
+              <span class="fleet-frame-badge" data-i18n="fleetFrameBadge">Zero Black-Box · Real Termexo PTYs</span>
+            </div>
+            <img
+              class="fleet-screen"
+              src="assets/fleet-mission-deck.png"
+              width="2880"
+              height="1800"
+              alt="Termexo Fleet mission control deck with L1-L4 routing forecast and 3-stage DAG pipeline"
+              loading="lazy"
+              data-fleet-screen
+            />
+            <figcaption class="fleet-frame-caption" data-fleet-caption data-i18n="fleetCapDeck">
+              Mission Composer with one-click templates, live L1–L4 route forecast, and multi-stage DAG pipelines executing inside real Termexo terminals.
+            </figcaption>
+          </figure>
+        </div>
+
+        <div class="fleet-pillars">
+          <article class="fleet-pillar reveal">
+            <span class="fleet-pillar-tag">L1–L4</span>
+            <h3 data-i18n="fleetPillar1Title">Difficulty-aware routing &amp; failover</h3>
+            <p data-i18n="fleetPillar1Body">Send quick edits to low-cost L1 slots, reserve L3 for hard architecture work, and enforce L4 cross-family reviews. Auto-cool failing slots on 429/402/422 and escalate on retry.</p>
+          </article>
+          <article class="fleet-pillar reveal" data-delay="1">
+            <span class="fleet-pillar-tag">MCP :7425</span>
+            <h3 data-i18n="fleetPillar2Title">Autonomous sub-agents with guardrails</h3>
+            <p data-i18n="fleetPillar2Body">Built-in reverse MCP lets parent agents submit DAG plans and spawn child agents in isolated Git Worktrees — bounded by depth, concurrency, and budget caps.</p>
+          </article>
+          <article class="fleet-pillar reveal" data-delay="2">
+            <span class="fleet-pillar-tag">LAN / VPN</span>
+            <h3 data-i18n="fleetPillar3Title">Multi-machine fleet topology</h3>
+            <p data-i18n="fleetPillar3Body">Connect Windows, macOS, and Linux Termexo nodes over local, private LAN, or Tailscale VPN with live RTT/capability probes and tag-affinity routing.</p>
+          </article>
+          <article class="fleet-pillar reveal" data-delay="3">
+            <span class="fleet-pillar-tag">SQLite + Alerts</span>
+            <h3 data-i18n="fleetPillar4Title">Execution ledger &amp; notifications</h3>
+            <p data-i18n="fleetPillar4Body">Track success rates, escalations, and estimated savings vs. an all-L3 baseline. Push completion and approval alerts to Feishu, WeCom, Slack, or Termexo WeChat.</p>
+          </article>
+        </div>
+
+        <div class="fleet-cta reveal">
+          <a
+            class="button primary"
+            href="https://github.com/gemron/Termexo-Fleet/releases/tag/v0.1.0-preview.1"
+            target="_blank"
+            rel="noopener"
+            data-i18n="fleetDownloadBtn"
+          >Download Fleet Preview (Windows)</a>
+          <a
+            class="button secondary"
+            href="https://github.com/gemron/Termexo-Fleet"
+            target="_blank"
+            rel="noopener"
+            data-i18n="fleetRepoBtn"
+          >Explore Termexo Fleet on GitHub →</a>
         </div>
       </section>
 
@@ -1135,6 +1219,12 @@ On your computer.</h2>
         <p data-i18n="footerTagline">One window for every coding agent</p>
         <div>
           <a href="guide.en.html" data-i18n="navGuide">User guide</a>
+          <a
+            href="https://github.com/gemron/Termexo-Fleet"
+            target="_blank"
+            rel="noreferrer"
+            >Termexo Fleet</a
+          >
           <a
             href="https://www.npmjs.com/package/termexo"
             target="_blank"

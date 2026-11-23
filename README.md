@@ -121,6 +121,16 @@ After that, try a project task:
 
 [Online illustrated guide](https://www.termexo.com/guide.en.html#ai-control) · [MCP reference and troubleshooting](./docs/mcp-server.md)
 
+## Companion Commander: Termexo Fleet (Preview)
+
+Want to orchestrate **multiple Termexo instances** with automatic `L1–L4` difficulty routing, autonomous sub-agent spawning in Git Worktrees, automatic rate-limit failover, and cost/efficiency analytics?
+
+Check out **[Termexo Fleet](https://github.com/gemron/Termexo-Fleet)** — the standalone local-first AI fleet commander built on top of Termexo MCP. Every task and sub-agent still executes transparently inside real Termexo terminals.
+
+[![Termexo Fleet Mission Control](website/assets/fleet-mission-deck.png)](https://www.termexo.com/#fleet)
+
+**[Download Termexo Fleet Preview (Windows)](https://github.com/gemron/Termexo-Fleet/releases/tag/v0.1.0-preview.1)** · [Website Showcase](https://www.termexo.com/#fleet) · [Termexo Fleet Repository](https://github.com/gemron/Termexo-Fleet)
+
 ## From your desk to your phone, through your own relay
 
 1. Open a project on your PC and start Claude Code, Codex, OpenCode, Antigravity, or Grok Build.

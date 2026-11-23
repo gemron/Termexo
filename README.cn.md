@@ -121,6 +121,14 @@ MCP 是 AI 与 Termexo 之间的连接。**你用日常语言提出要求，不�
 
 [完整 MCP 使用说明与排查](./docs/mcp-server.md) · [在线图文指南](https://www.termexo.com/guide.html#ai-control)
 
+## 生态扩展：Termexo Fleet 舰队指挥官（预览版）
+
+如果你希望统一编排**一台或多台 Termexo**，实现按 `L1–L4` 任务难度自动选择账号与模型、让父 Agent 在独立 Git Worktree 中自主派生子 Agent、限流自动容灾升档，并用本地账本量化节省比例与推送飞书/微信告警——欢迎体验独立配套应用 **[Termexo Fleet](https://github.com/gemron/Termexo-Fleet)**。所有执行依然全程透明运行在 Termexo 真实终端中，零黑盒。
+
+[![Termexo Fleet 任务指挥甲板](website/assets/fleet-mission-deck.png)](https://www.termexo.com/#fleet)
+
+**[下载 Termexo Fleet 预览版（Windows）](https://github.com/gemron/Termexo-Fleet/releases/tag/v0.1.0-preview.1)** · [官网展示页](https://www.termexo.com/#fleet) · [Termexo Fleet 仓库](https://github.com/gemron/Termexo-Fleet)
+
 ## 通过自建中继，从电脑接到手机
 
 1. 在电脑上打开项目，启动 Claude Code、Codex、OpenCode、Pi Agent、Antigravity 或 Grok Build。
