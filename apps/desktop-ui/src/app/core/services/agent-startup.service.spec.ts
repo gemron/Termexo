@@ -5,11 +5,25 @@ import {
   AGENT_STARTUP_QUIET_MS,
   AGENT_STARTUP_SETTLE_FLOOR_MS,
   AGENT_STARTUP_TIMEOUT_MS,
+  OPENCODE_FOCUS_RETRY_DELAY_MS,
+  isOpenCodeComposerIdle,
 } from '../models/agent-startup';
 import { AgentStartupService } from './agent-startup.service';
 
 const ESCAPE = String.fromCharCode(27);
 const CURSOR_UP = '\x1b[A';
+/** Mirrors OpenCode TUI landing screen when an update banner or focus lag drops the first prompt. */
+const OPENCODE_IDLE_FRAME = [
+  '  /update to install v2.3.2',
+  '  ┃  Ask anything… "Fix a TODO in the codebase"',
+  '  ┃  Build · DeepSeek V4.1 Flash Free OpenCode · max',
+  '  D:\\devlop\\Termexo:main  shift+tab agents  ctrl+p commands',
+].join('\n');
+const OPENCODE_ACTIVE_FRAME = [
+  '  ┃  FLEET_E2E_OK_2026',
+  '     Build · DeepSeek V4.1 Flash Free · 2.2s · 6.1 tok/s',
+  '     Context 6,772 tokens',
+].join('\n');
 /** Mirrors Claude Code's current folder-trust screen, which preselects the declining option. */
 const CLAUDE_TRUST_DIALOG = [
   'D:\\devlop\\Termexo',
@@ -197,5 +211,89 @@ describe('AgentStartupService', () => {
 
     expect(handlers.calls).toEqual([]);
     expect(service.awaitingTerminalIds()).toEqual([]);
+  });
+
+  it('recognises OpenCode composer and retries once when the first prompt is dropped while unfocused', async () => {
+    const service = new AgentStartupService();
+    const handlers = {
+      ...trace(),
+      shouldRetryAfterSubmit: vi.fn((frame: string) => isOpenCodeComposerIdle(frame)),
+    };
+    service.arm('opencode-1', handlers);
+    service.markRuntimeStarted('opencode-1');
+
+    service.ingest('opencode-1', OPENCODE_IDLE_FRAME);
+    await vi.advanceTimersByTimeAsync(AGENT_STARTUP_QUIET_MS);
+    expect(handlers.submit).toHaveBeenCalledTimes(1);
+    expect(service.awaitingTerminalIds()).toEqual([]);
+
+    // OpenCode stayed completely silent on the empty composer -> retries exactly once.
+    await vi.advanceTimersByTimeAsync(OPENCODE_FOCUS_RETRY_DELAY_MS);
+    expect(handlers.submit).toHaveBeenCalledTimes(2);
+    expect(handlers.shouldRetryAfterSubmit).toHaveBeenCalledTimes(1);
+
+    // Bounded to a single retry even if OpenCode stays idle afterwards.
+    await vi.advanceTimersByTimeAsync(OPENCODE_FOCUS_RETRY_DELAY_MS * 3);
+    expect(handlers.submit).toHaveBeenCalledTimes(2);
+    expect(service.awaitingTerminalIds()).toEqual([]);
+  });
+
+  it('skips the OpenCode retry once OpenCode accepts the prompt and enters the conversation view', async () => {
+    const service = new AgentStartupService();
+    const handlers = {
+      ...trace(),
+      shouldRetryAfterSubmit: vi.fn((frame: string) => isOpenCodeComposerIdle(frame)),
+    };
+    service.arm('opencode-2', handlers);
+    service.markRuntimeStarted('opencode-2');
+
+    service.ingest('opencode-2', OPENCODE_IDLE_FRAME);
+    await vi.advanceTimersByTimeAsync(AGENT_STARTUP_QUIET_MS);
+    expect(handlers.submit).toHaveBeenCalledTimes(1);
+
+    // OpenCode accepted the prompt and rendered active session output.
+    service.ingest('opencode-2', OPENCODE_ACTIVE_FRAME);
+    await vi.advanceTimersByTimeAsync(OPENCODE_FOCUS_RETRY_DELAY_MS);
+    expect(handlers.submit).toHaveBeenCalledTimes(1);
+    expect(handlers.shouldRetryAfterSubmit).toHaveBeenCalledTimes(1);
+  });
+
+  it('retries once if an early floor submit ran before OpenCode painted its landing composer', async () => {
+    const service = new AgentStartupService();
+    const handlers = {
+      ...trace(),
+      shouldRetryAfterSubmit: vi.fn((frame: string) => isOpenCodeComposerIdle(frame)),
+    };
+    service.arm('opencode-3', handlers);
+    service.markRuntimeStarted('opencode-3');
+
+    // Slow cold boot hits the settle floor before OpenCode finishes painting.
+    service.ingest('opencode-3', 'PS D:\\devlop\\Termexo> opencode');
+    await vi.advanceTimersByTimeAsync(AGENT_STARTUP_SETTLE_FLOOR_MS);
+    expect(handlers.submit).toHaveBeenCalledTimes(1);
+
+    // OpenCode finishes painting its empty composer right after the dropped first delivery.
+    service.ingest('opencode-3', OPENCODE_IDLE_FRAME);
+    await vi.advanceTimersByTimeAsync(OPENCODE_FOCUS_RETRY_DELAY_MS);
+    expect(handlers.submit).toHaveBeenCalledTimes(2);
+  });
+
+  it('cancels the pending OpenCode focus retry if the terminal is cancelled', async () => {
+    const service = new AgentStartupService();
+    const handlers = {
+      ...trace(),
+      shouldRetryAfterSubmit: vi.fn((frame: string) => isOpenCodeComposerIdle(frame)),
+    };
+    service.arm('opencode-4', handlers);
+    service.markRuntimeStarted('opencode-4');
+
+    service.ingest('opencode-4', OPENCODE_IDLE_FRAME);
+    await vi.advanceTimersByTimeAsync(AGENT_STARTUP_QUIET_MS);
+    expect(handlers.submit).toHaveBeenCalledTimes(1);
+
+    service.cancel('opencode-4');
+    await vi.advanceTimersByTimeAsync(OPENCODE_FOCUS_RETRY_DELAY_MS * 2);
+    expect(handlers.submit).toHaveBeenCalledTimes(1);
+    expect(handlers.shouldRetryAfterSubmit).not.toHaveBeenCalled();
   });
 });

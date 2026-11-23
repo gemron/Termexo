@@ -214,6 +214,7 @@ export interface ClaudeLaunchRequest {
   profileId?: string;
   model?: string;
   mcpProfileId?: string;
+  mcpProfileIds?: string[];
   accountProfileId?: string;
   autoConfirm?: boolean;
   /** Branches the resumed conversation instead of reusing an id the CLI still has running. */
@@ -251,6 +252,7 @@ export interface CodexLaunchRequest {
   model?: string;
   profileId?: string;
   accountProfileId?: string;
+  mcpProfileIds?: string[];
   autoConfirm?: boolean;
   /** Overrides the profile's reasoning depth for this terminal only; omitted keeps it. */
   reasoningEffort?: string;
@@ -274,6 +276,7 @@ export interface OpenCodeLaunchRequest {
   sessionId?: string;
   model?: string;
   accountProfileId?: string;
+  mcpProfileIds?: string[];
   continueLast?: boolean;
   autoConfirm?: boolean;
 }

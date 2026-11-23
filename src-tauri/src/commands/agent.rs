@@ -322,6 +322,8 @@ pub struct PrepareClaudeLaunchRequest {
     /// Explicit official model selected without a saved provider profile.
     pub model: Option<String>,
     pub mcp_profile_id: Option<String>,
+    #[serde(default)]
+    pub mcp_profile_ids: Vec<String>,
     pub account_profile_id: Option<String>,
     #[serde(default)]
     pub auto_confirm: bool,
@@ -348,6 +350,8 @@ pub struct PrepareCodexLaunchRequest {
     pub profile_id: Option<String>,
     pub account_profile_id: Option<String>,
     #[serde(default)]
+    pub mcp_profile_ids: Vec<String>,
+    #[serde(default)]
     pub auto_confirm: bool,
     /// Overrides the profile's reasoning depth for this terminal; absent keeps what it stores.
     #[serde(default)]
@@ -363,6 +367,8 @@ pub struct PrepareOpenCodeLaunchRequest {
     pub model: Option<String>,
     #[serde(default)]
     pub account_profile_id: Option<String>,
+    #[serde(default)]
+    pub mcp_profile_ids: Vec<String>,
     #[serde(default)]
     pub continue_last: bool,
     #[serde(default)]
@@ -438,19 +444,19 @@ pub fn prepare_claude_launch(
     let runtime = hooks
         .prepare_claude_runtime(&request.terminal_id)
         .map_err(|error| error.to_string())?;
-    let mcp_config_path = match request.mcp_profile_id.as_deref() {
-        Some(profile_id) => {
-            let profile = database
-                .find_mcp_profile(profile_id)
-                .map_err(|error| error.to_string())?
-                .ok_or_else(|| "MCP Profile 不存在".to_owned())?;
-            Some(
-                hooks
-                    .write_mcp_config(&request.terminal_id, &profile.config_json)
-                    .map_err(|error| error.to_string())?,
-            )
-        }
-        None => None,
+    let selected_mcp_ids =
+        collect_mcp_profile_ids(request.mcp_profile_id.as_deref(), &request.mcp_profile_ids);
+    let mcp_config_path = if selected_mcp_ids.is_empty() {
+        None
+    } else {
+        let servers = load_mcp_profile_servers(&database, &selected_mcp_ids)?;
+        let merged = serde_json::to_string(&json!({ "mcpServers": servers }))
+            .map_err(|error| error.to_string())?;
+        Some(
+            hooks
+                .write_mcp_config(&request.terminal_id, &merged)
+                .map_err(|error| error.to_string())?,
+        )
     };
     // The launch dialog may override what the profile stores, for this one terminal. Both
     // settings are fixed at launch: neither the context window nor the effort can be changed
@@ -638,6 +644,10 @@ pub fn prepare_codex_launch(
             toml_literal(&reasoning_effort).map_err(|error| error.to_string())?
         ));
     }
+    if !request.mcp_profile_ids.is_empty() {
+        let servers = load_mcp_profile_servers(&database, &request.mcp_profile_ids)?;
+        provider_configs.extend(codex_mcp_server_configs(&servers)?);
+    }
     log_proxy_environment(&environment);
     launch_environment
         .put(request.terminal_id.clone(), environment)
@@ -721,7 +731,7 @@ pub fn prepare_opencode_launch(
     launch_environment: State<'_, LaunchEnvironmentStore>,
     hooks: State<'_, HookEventStore>,
 ) -> Result<AgentLaunchSpec, String> {
-    let environment = opencode_launch_environment(
+    let mut environment = opencode_launch_environment(
         &database,
         &credentials,
         &hooks,
@@ -731,6 +741,10 @@ pub fn prepare_opencode_launch(
         request.account_profile_id.as_deref(),
         &OpenCodeAdapter::new(),
     )?;
+    if !request.mcp_profile_ids.is_empty() {
+        let servers = load_mcp_profile_servers(&database, &request.mcp_profile_ids)?;
+        merge_opencode_mcp_servers(&mut environment, &servers)?;
+    }
     log_proxy_environment(&environment);
     launch_environment
         .put(request.terminal_id, environment)
@@ -743,6 +757,170 @@ pub fn prepare_opencode_launch(
             auto_confirm: request.auto_confirm,
         })
         .map_err(|error| error.to_string())
+}
+
+fn collect_mcp_profile_ids(single: Option<&str>, many: &[String]) -> Vec<String> {
+    let mut ids = Vec::new();
+    for id in single.into_iter().chain(many.iter().map(String::as_str)) {
+        let trimmed = id.trim();
+        if !trimmed.is_empty() && !ids.iter().any(|existing| existing == trimmed) {
+            ids.push(trimmed.to_owned());
+        }
+    }
+    ids
+}
+
+fn load_mcp_profile_servers(
+    database: &WorkspaceDatabase,
+    profile_ids: &[String],
+) -> Result<serde_json::Map<String, Value>, String> {
+    let mut merged = serde_json::Map::new();
+    for profile_id in profile_ids {
+        let profile = database
+            .find_mcp_profile(profile_id)
+            .map_err(|error| error.to_string())?
+            .ok_or_else(|| format!("MCP Profile 不存在: {profile_id}"))?;
+        let parsed: Value = serde_json::from_str(&profile.config_json)
+            .map_err(|error| format!("MCP Profile「{}」JSON 无效: {error}", profile.name))?;
+        let servers = parsed
+            .get("mcpServers")
+            .and_then(Value::as_object)
+            .or_else(|| parsed.as_object())
+            .ok_or_else(|| format!("MCP Profile「{}」必须为 JSON 对象", profile.name))?;
+        for (name, spec) in servers {
+            merged.insert(name.clone(), spec.clone());
+        }
+    }
+    Ok(merged)
+}
+
+fn codex_mcp_server_configs(
+    servers: &serde_json::Map<String, Value>,
+) -> Result<Vec<String>, String> {
+    let mut configs = Vec::new();
+    for (name, spec) in servers {
+        let Some(object) = spec.as_object() else {
+            continue;
+        };
+        let mut fields = Vec::new();
+        if let Some(url) = object.get("url").and_then(Value::as_str) {
+            fields.push(format!(
+                "url={}",
+                toml_literal(url).map_err(|error| error.to_string())?
+            ));
+            if let Some(headers) = object.get("headers").and_then(Value::as_object) {
+                let mut pairs = Vec::new();
+                for (key, value) in headers {
+                    if let Some(text) = value.as_str() {
+                        pairs.push(format!(
+                            "{}={}",
+                            toml_literal(key).map_err(|error| error.to_string())?,
+                            toml_literal(text).map_err(|error| error.to_string())?
+                        ));
+                    }
+                }
+                if !pairs.is_empty() {
+                    fields.push(format!("http_headers={{{}}}", pairs.join(", ")));
+                }
+            }
+        } else if let Some(command) = object.get("command").and_then(Value::as_str) {
+            fields.push(format!(
+                "command={}",
+                toml_literal(command).map_err(|error| error.to_string())?
+            ));
+            if let Some(args) = object.get("args").and_then(Value::as_array) {
+                let mut items = Vec::new();
+                for arg in args {
+                    if let Some(text) = arg.as_str() {
+                        items.push(toml_literal(text).map_err(|error| error.to_string())?);
+                    }
+                }
+                fields.push(format!("args=[{}]", items.join(", ")));
+            }
+        } else {
+            continue;
+        }
+        fields.push("enabled=true".into());
+        let key = toml_literal(name).map_err(|error| error.to_string())?;
+        configs.push(format!("mcp_servers.{key}={{{}}}", fields.join(", ")));
+    }
+    Ok(configs)
+}
+
+fn merge_opencode_mcp_servers(
+    environment: &mut HashMap<String, String>,
+    servers: &serde_json::Map<String, Value>,
+) -> Result<(), String> {
+    if servers.is_empty() {
+        return Ok(());
+    }
+    let mut config: Value = match environment.get("OPENCODE_CONFIG_CONTENT") {
+        Some(value) => serde_json::from_str(value)
+            .map_err(|error| format!("Invalid OpenCode config: {error}"))?,
+        None => json!({}),
+    };
+    let config_obj = config
+        .as_object_mut()
+        .ok_or("OpenCode config must be an object")?;
+    let v2 = config_obj.contains_key("plugins")
+        || config_obj
+            .get("mcp")
+            .and_then(|mcp| mcp.get("servers"))
+            .is_some();
+    let mcp = config_obj
+        .entry("mcp")
+        .or_insert_with(|| json!({}))
+        .as_object_mut()
+        .ok_or("OpenCode mcp must be an object")?;
+    let target = if v2 {
+        mcp.entry("servers")
+            .or_insert_with(|| json!({}))
+            .as_object_mut()
+            .ok_or("OpenCode mcp.servers must be an object")?
+    } else {
+        mcp
+    };
+    for (name, spec) in servers {
+        let Some(object) = spec.as_object() else {
+            continue;
+        };
+        let entry = if let Some(url) = object.get("url").and_then(Value::as_str) {
+            let mut item = serde_json::Map::new();
+            item.insert("type".into(), json!("remote"));
+            item.insert("url".into(), json!(url));
+            if let Some(headers) = object.get("headers") {
+                item.insert("headers".into(), headers.clone());
+            }
+            if v2 {
+                item.insert("disabled".into(), json!(false));
+            } else {
+                item.insert("enabled".into(), json!(true));
+            }
+            Value::Object(item)
+        } else if let Some(command) = object.get("command").and_then(Value::as_str) {
+            let mut cmd = vec![command.to_owned()];
+            if let Some(args) = object.get("args").and_then(Value::as_array) {
+                for arg in args {
+                    if let Some(text) = arg.as_str() {
+                        cmd.push(text.to_owned());
+                    }
+                }
+            }
+            if v2 {
+                json!({ "type": "local", "command": cmd, "disabled": false })
+            } else {
+                json!({ "type": "local", "command": cmd, "enabled": true })
+            }
+        } else {
+            continue;
+        };
+        target.insert(name.clone(), entry);
+    }
+    environment.insert(
+        "OPENCODE_CONFIG_CONTENT".into(),
+        serde_json::to_string(&config).map_err(|error| error.to_string())?,
+    );
+    Ok(())
 }
 
 #[tauri::command(async)]
@@ -2170,5 +2348,54 @@ mod tests {
         assert!(plugin.unwrap().contains("ses_123"));
         drop(database);
         std::fs::remove_dir_all(&directory).ok();
+    }
+
+    #[test]
+    fn converts_http_and_stdio_mcp_profiles_for_codex_and_opencode() {
+        let servers = json!({
+            "termexo-fleet": {
+                "type": "http",
+                "url": "http://127.0.0.1:7425/mcp",
+                "headers": { "Authorization": "Bearer tok-123" }
+            },
+            "local-helper": {
+                "command": "node",
+                "args": ["helper.js", "--flag"]
+            }
+        })
+        .as_object()
+        .unwrap()
+        .clone();
+
+        let codex = codex_mcp_server_configs(&servers).unwrap();
+        assert!(codex.iter().any(|item| {
+            item.contains("mcp_servers.'''termexo-fleet'''")
+                && item.contains("http://127.0.0.1:7425/mcp")
+                && item.contains("http_headers=")
+                && item.contains("Bearer tok-123")
+        }));
+        assert!(codex.iter().any(|item| {
+            item.contains("mcp_servers.'''local-helper'''")
+                && item.contains("command='''node'''")
+                && item.contains("args=['''helper.js''', '''--flag''']")
+        }));
+
+        let mut env = HashMap::new();
+        env.insert(
+            "OPENCODE_CONFIG_CONTENT".into(),
+            json!({ "plugins": ["existing"] }).to_string(),
+        );
+        merge_opencode_mcp_servers(&mut env, &servers).unwrap();
+        let merged: Value = serde_json::from_str(env.get("OPENCODE_CONFIG_CONTENT").unwrap()).unwrap();
+        assert_eq!(
+            merged["mcp"]["servers"]["termexo-fleet"]["url"],
+            "http://127.0.0.1:7425/mcp"
+        );
+        assert_eq!(merged["mcp"]["servers"]["termexo-fleet"]["type"], "remote");
+        assert_eq!(merged["mcp"]["servers"]["termexo-fleet"]["disabled"], false);
+        assert_eq!(
+            merged["mcp"]["servers"]["local-helper"]["command"],
+            json!(["node", "helper.js", "--flag"])
+        );
     }
 }

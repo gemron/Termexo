@@ -16,6 +16,11 @@ export const AGENT_STARTUP_TIMEOUT_MS = 60_000;
  * is not reading stdin yet and is lost. A recognised ready marker still submits immediately.
  */
 export const AGENT_STARTUP_SETTLE_FLOOR_MS = 6_000;
+/**
+ * How long after initial prompt delivery to verify whether OpenCode's TUI actually accepted the
+ * prompt before performing a single focus-ready retry.
+ */
+export const OPENCODE_FOCUS_RETRY_DELAY_MS = 2_500;
 /** Startup dialogs are few — more answers than this would mean the matcher is misfiring. */
 export const AGENT_STARTUP_MAX_CONFIRMATIONS = 3;
 /** Only the latest frame is matched; older scrollback would keep re-matching stale dialogs. */
@@ -63,8 +68,13 @@ const READY_PHRASES: readonly RegExp[] = [
   /\?\s*for shortcuts/i,
   /esc\s+to\s+interrupt/i,
   /ctrl\s*\+?\s*c\s+to\s+(?:quit|exit)/i,
+  /ctrl\s*\+?\s*p\s+commands/i,
+  /shift\s*\+?\s*tab\s+agents/i,
+  /ask\s+anything(?:…|\.{3})?/i,
   /╰[─━]{4,}╯/,
 ];
+/** Placeholder OpenCode paints inside its empty home composer before any prompt is accepted. */
+const OPENCODE_IDLE_COMPOSER = /ask\s+anything(?:…|\.{3})?/i;
 
 /** One parsed option of a startup dialog. */
 interface StartupChoice {
@@ -89,6 +99,17 @@ export function isStartupConfirmation(frame: string): boolean {
 /** True when the frame shows the agent's composer, meaning a prompt written now is read. */
 export function isAgentReadyForPrompt(frame: string): boolean {
   return !isStartupConfirmation(frame) && READY_PHRASES.some((phrase) => phrase.test(frame));
+}
+
+/**
+ * True when OpenCode's landing composer is still sitting empty (`Ask anything…`).
+ *
+ * OpenCode TUI (e.g. while an `/update` banner or initial MCP connection settles) can paint its
+ * composer before input focus is live and silently drop the first pasted prompt. Once OpenCode
+ * accepts a prompt, the landing screen switches to the conversation view and this marker disappears.
+ */
+export function isOpenCodeComposerIdle(frame: string): boolean {
+  return !isStartupConfirmation(frame) && OPENCODE_IDLE_COMPOSER.test(frame);
 }
 
 /**

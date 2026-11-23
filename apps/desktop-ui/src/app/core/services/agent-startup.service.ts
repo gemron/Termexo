@@ -5,6 +5,7 @@ import {
   AGENT_STARTUP_QUIET_MS,
   AGENT_STARTUP_SETTLE_FLOOR_MS,
   AGENT_STARTUP_TIMEOUT_MS,
+  OPENCODE_FOCUS_RETRY_DELAY_MS,
   isAgentReadyForPrompt,
   isStartupConfirmation,
   normalizeStartupFrame,
@@ -17,16 +18,28 @@ export interface AgentStartupRequest {
   /** Hands the task prompt to the agent once its input is ready to receive one. */
   submit: () => Promise<void>;
   onFailed: (message: string) => void;
+  /**
+   * Optional post-submit verification for TUI agents (such as OpenCode) whose input focus can lag
+   * behind the first rendered frame. When this returns true after `retryDelayMs`, `retrySubmit`
+   * (or `submit`) runs once so a dropped first delivery still lands.
+   */
+  shouldRetryAfterSubmit?: (frame: string) => boolean;
+  retrySubmit?: () => Promise<void>;
+  retryDelayMs?: number;
 }
 
 interface PendingStartup extends AgentStartupRequest {
   frame: string;
+  postSubmitFrame: string;
   confirmations: number;
   submitting: boolean;
+  submitted: boolean;
+  retried: boolean;
   /** When the PTY reported itself started, or undefined while the terminal is still launching. */
   startedAt?: number;
   quietTimer?: number;
   deadlineTimer?: number;
+  retryTimer?: number;
 }
 
 /**
@@ -50,7 +63,15 @@ export class AgentStartupService {
 
   arm(terminalId: string, request: AgentStartupRequest): void {
     this.cancel(terminalId);
-    this.pending.set(terminalId, { ...request, frame: '', confirmations: 0, submitting: false });
+    this.pending.set(terminalId, {
+      ...request,
+      frame: '',
+      postSubmitFrame: '',
+      confirmations: 0,
+      submitting: false,
+      submitted: false,
+      retried: false,
+    });
     this.publishPendingIds();
   }
 
@@ -74,6 +95,10 @@ export class AgentStartupService {
     const entry = this.pending.get(terminalId);
     if (!entry) return;
     entry.frame = normalizeStartupFrame(entry.frame, data);
+    if (entry.submitted) {
+      entry.postSubmitFrame = normalizeStartupFrame(entry.postSubmitFrame, data);
+      return;
+    }
     // Before the PTY reports started there is no deadline to race, so the frame is only collected.
     if (entry.startedAt !== undefined) {
       this.scheduleSettledCheck(terminalId, entry);
@@ -129,8 +154,38 @@ export class AgentStartupService {
     const entry = this.pending.get(terminalId);
     if (!entry || entry.submitting) return;
     entry.submitting = true;
+    entry.postSubmitFrame = '';
     this.clearTimers(entry);
-    void this.run(terminalId, entry, entry.submit).finally(() => {
+    void this.run(terminalId, entry, entry.submit).then((succeeded) => {
+      if (!succeeded || this.pending.get(terminalId) !== entry) return;
+      if (entry.shouldRetryAfterSubmit && !entry.retried) {
+        entry.submitting = false;
+        entry.submitted = true;
+        this.publishPendingIds();
+        const delay = entry.retryDelayMs ?? OPENCODE_FOCUS_RETRY_DELAY_MS;
+        entry.retryTimer = window.setTimeout(() => this.handlePostSubmitRetry(terminalId), delay);
+        return;
+      }
+      this.pending.delete(terminalId);
+      this.publishPendingIds();
+    });
+  }
+
+  private handlePostSubmitRetry(terminalId: string): void {
+    const entry = this.pending.get(terminalId);
+    if (!entry || entry.submitting || entry.retried) return;
+    entry.retryTimer = undefined;
+    const latestFrame = entry.postSubmitFrame.trim().length > 0 ? entry.postSubmitFrame : entry.frame;
+    if (!entry.shouldRetryAfterSubmit?.(latestFrame)) {
+      this.pending.delete(terminalId);
+      this.publishPendingIds();
+      return;
+    }
+    entry.retried = true;
+    entry.submitting = true;
+    this.publishPendingIds();
+    const action = entry.retrySubmit ?? entry.submit;
+    void this.run(terminalId, entry, action).finally(() => {
       if (this.pending.get(terminalId) !== entry) return;
       this.pending.delete(terminalId);
       this.publishPendingIds();
@@ -141,21 +196,31 @@ export class AgentStartupService {
     terminalId: string,
     entry: PendingStartup,
     action: () => Promise<void>,
-  ): Promise<void> {
+  ): Promise<boolean> {
     try {
       await action();
+      return true;
     } catch (error) {
       this.cancel(terminalId);
       entry.onFailed(error instanceof Error ? error.message : String(error));
+      return false;
     }
   }
 
   private clearTimers(entry: PendingStartup): void {
     window.clearTimeout(entry.quietTimer);
     window.clearTimeout(entry.deadlineTimer);
+    window.clearTimeout(entry.retryTimer);
+    entry.quietTimer = undefined;
+    entry.deadlineTimer = undefined;
+    entry.retryTimer = undefined;
   }
 
   private publishPendingIds(): void {
-    this.pendingIds.set([...this.pending.keys()]);
+    this.pendingIds.set(
+      [...this.pending.entries()]
+        .filter(([, entry]) => !entry.submitted || entry.submitting)
+        .map(([id]) => id),
+    );
   }
 }

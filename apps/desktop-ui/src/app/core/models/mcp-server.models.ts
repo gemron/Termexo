@@ -5,6 +5,7 @@ export interface McpServerSettings {
   terminalAccess: boolean;
   taskAccess: boolean;
   settingsAccess: boolean;
+  allowLan?: boolean;
 }
 
 export interface McpServerStatus {
@@ -12,13 +13,14 @@ export interface McpServerStatus {
   running: boolean;
   error: string | null;
   url: string;
+  lanUrls?: string[];
   token: string;
 }
 
 export interface McpToolRequest {
   id: string;
   name: string;
-  arguments: Record<string, string | number | boolean>;
+  arguments: Record<string, string | number | boolean | string[]>;
   deadline: number;
 }
 

@@ -101,6 +101,25 @@ describe('McpDesktopService', () => {
           provide: AgentService,
           useValue: {
             modelProfiles: () => [profile],
+            accountProfiles: () => [
+              {
+                id: 'acc-codex-1',
+                name: 'Codex Pro',
+                agentType: 'codex',
+                configDir: 'C:/secret-home/codex',
+                isDefault: true,
+                isSystem: false,
+                authenticated: true,
+                diagnostic: '',
+              },
+            ],
+            mcpProfiles: () => [
+              {
+                id: 'mcp-fleet',
+                name: 'Termexo Fleet',
+                configJson: '{"mcpServers":{"fleet":{"headers":{"Authorization":"Bearer secret"}}}}',
+              },
+            ],
             networkProfiles: () => [network],
             saveNetworkProfile: vi.fn(async (input) => Object.assign(network, input)),
             saveModelProfile: vi.fn(async (input) => Object.assign(profile, input)),
@@ -399,8 +418,22 @@ describe('McpDesktopService', () => {
   });
 
   it('excludes credential locations from settings and preserves stored keys on model updates', async () => {
-    const settings = await service.execute('settings_get', {});
+    const settings = (await service.execute('settings_get', {})) as {
+      accountProfiles: Array<Record<string, unknown>>;
+      mcpProfiles: Array<Record<string, unknown>>;
+    };
     expect(JSON.stringify(settings)).not.toContain('secret');
+    expect(settings.accountProfiles).toEqual([
+      {
+        id: 'acc-codex-1',
+        name: 'Codex Pro',
+        agentType: 'codex',
+        authenticated: true,
+        isDefault: true,
+        isSystem: false,
+      },
+    ]);
+    expect(settings.mcpProfiles).toEqual([{ id: 'mcp-fleet', name: 'Termexo Fleet' }]);
     await service.execute('model_profile_update', { profileId: 'model', codexModel: 'updated' });
     const agents = TestBed.inject(AgentService);
     expect(agents.saveModelProfile).toHaveBeenCalledWith(
@@ -408,6 +441,53 @@ describe('McpDesktopService', () => {
     );
     expect(vi.mocked(agents.saveModelProfile).mock.calls[0][0].apiKey).toBeUndefined();
     expect(profile.credentialTarget).toBe('secret-location');
+  });
+
+  it('persists accountProfileId, mcpProfileIds and antigravity on task_create and rejects invalid bindings', async () => {
+    const projectId = todos.projectsFor('w2')[0].id;
+    const codexTask = (await service.execute('task_create', {
+      workspaceId: 'w2',
+      projectId,
+      title: 'Routed Codex Task',
+      agentType: 'codex',
+      accountProfileId: 'acc-codex-1',
+      mcpProfileIds: ['mcp-fleet'],
+      modelName: 'gpt-5.4',
+    })) as { accountProfileId?: string; mcpProfileIds?: string[]; modelName: string };
+    expect(codexTask.accountProfileId).toBe('acc-codex-1');
+    expect(codexTask.mcpProfileIds).toEqual(['mcp-fleet']);
+    expect(codexTask.modelName).toBe('gpt-5.4');
+
+    const agyTask = (await service.execute('task_create', {
+      workspaceId: 'w2',
+      projectId,
+      title: 'Antigravity Task',
+      agentType: 'antigravity',
+      modelName: 'gemini-pro',
+    })) as { agentType: string; profileId: string; modelName: string };
+    expect(agyTask.agentType).toBe('antigravity');
+    expect(agyTask.profileId).toBe('');
+    expect(agyTask.modelName).toBe('gemini-pro');
+
+    await expect(
+      service.execute('task_create', {
+        workspaceId: 'w2',
+        projectId,
+        title: 'Bad account',
+        agentType: 'claude',
+        accountProfileId: 'acc-codex-1',
+      }),
+    ).rejects.toThrow();
+
+    await expect(
+      service.execute('task_create', {
+        workspaceId: 'w2',
+        projectId,
+        title: 'Bad MCP',
+        agentType: 'codex',
+        mcpProfileIds: ['missing-mcp'],
+      }),
+    ).rejects.toThrow('MCP profile not found');
   });
 
   it('does not execute expired desktop requests and reports their failure', async () => {

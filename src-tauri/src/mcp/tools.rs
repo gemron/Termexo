@@ -28,8 +28,8 @@ pub fn list(settings: &McpSettings) -> Value {
     json!({ "tools": tools })
 }
 
-/// The catalog only uses flat objects with primitive values. Reject unknown fields before a
-/// request reaches the desktop, so extra fields cannot become privileged service arguments.
+/// The catalog uses flat objects with primitive values and string arrays. Reject unknown fields
+/// before a request reaches the desktop, so extra fields cannot become privileged service arguments.
 pub fn validate_arguments(schema: &Value, arguments: &Value) -> Result<(), String> {
     let object = arguments
         .as_object()
@@ -45,37 +45,61 @@ pub fn validate_arguments(schema: &Value, arguments: &Value) -> Result<(), Strin
         let field = properties
             .get(name)
             .ok_or_else(|| format!("Unknown argument: {name}"))?;
-        let correct_type = match field["type"].as_str() {
-            Some("string") => value.is_string(),
-            Some("boolean") => value.is_boolean(),
-            Some("integer") => value.as_i64().is_some(),
-            _ => false,
-        };
-        let length = value.as_str().map(|s| s.chars().count() as u64);
-        let number = value.as_i64();
-        if !correct_type
-            || field["enum"]
-                .as_array()
-                .is_some_and(|items| !items.contains(value))
-            || field["minLength"]
-                .as_u64()
-                .zip(length)
-                .is_some_and(|(min, len)| len < min)
-            || field["maxLength"]
-                .as_u64()
-                .zip(length)
-                .is_some_and(|(max, len)| len > max)
-            || field["minimum"]
-                .as_i64()
-                .zip(number)
-                .is_some_and(|(min, n)| n < min)
-            || field["maximum"]
-                .as_i64()
-                .zip(number)
-                .is_some_and(|(max, n)| n > max)
+        validate_field(name, field, value)?;
+    }
+    Ok(())
+}
+
+fn validate_field(name: &str, field: &Value, value: &Value) -> Result<(), String> {
+    if field["type"].as_str() == Some("array") {
+        let items = value
+            .as_array()
+            .ok_or_else(|| format!("Invalid argument: {name}"))?;
+        if field["maxItems"]
+            .as_u64()
+            .is_some_and(|max| items.len() as u64 > max)
         {
             return Err(format!("Invalid argument: {name}"));
         }
+        let item_schema = &field["items"];
+        if item_schema["type"].as_str() != Some("string") {
+            return Err(format!("Invalid argument: {name}"));
+        }
+        for item in items {
+            validate_field(name, item_schema, item)?;
+        }
+        return Ok(());
+    }
+    let correct_type = match field["type"].as_str() {
+        Some("string") => value.is_string(),
+        Some("boolean") => value.is_boolean(),
+        Some("integer") => value.as_i64().is_some(),
+        _ => false,
+    };
+    let length = value.as_str().map(|s| s.chars().count() as u64);
+    let number = value.as_i64();
+    if !correct_type
+        || field["enum"]
+            .as_array()
+            .is_some_and(|items| !items.contains(value))
+        || field["minLength"]
+            .as_u64()
+            .zip(length)
+            .is_some_and(|(min, len)| len < min)
+        || field["maxLength"]
+            .as_u64()
+            .zip(length)
+            .is_some_and(|(max, len)| len > max)
+        || field["minimum"]
+            .as_i64()
+            .zip(number)
+            .is_some_and(|(min, n)| n < min)
+        || field["maximum"]
+            .as_i64()
+            .zip(number)
+            .is_some_and(|(max, n)| n > max)
+    {
+        return Err(format!("Invalid argument: {name}"));
     }
     Ok(())
 }
@@ -145,6 +169,35 @@ mod tests {
             json!({"terminalId":"","data":"hi"}),
         ] {
             assert!(validate_arguments(schema, &args).is_err());
+        }
+    }
+
+    #[test]
+    fn task_create_validates_account_and_mcp_profile_arrays() {
+        let tool = catalog()
+            .into_iter()
+            .find(|tool| tool["name"] == "task_create")
+            .unwrap();
+        let schema = &tool["inputSchema"];
+        assert!(validate_arguments(
+            schema,
+            &json!({
+                "workspaceId": "w1",
+                "projectId": "p1",
+                "title": "Plan",
+                "agentType": "antigravity",
+                "accountProfileId": "acc-1",
+                "mcpProfileIds": ["mcp-fleet", "mcp-db"]
+            })
+        )
+        .is_ok());
+        for bad in [
+            json!({"workspaceId":"w1","projectId":"p1","title":"t","agentType":"claude","mcpProfileIds":"not-array"}),
+            json!({"workspaceId":"w1","projectId":"p1","title":"t","agentType":"claude","mcpProfileIds":[""]}),
+            json!({"workspaceId":"w1","projectId":"p1","title":"t","agentType":"claude","mcpProfileIds":[123]}),
+            json!({"workspaceId":"w1","projectId":"p1","title":"t","agentType":"claude","accountProfileId":""}),
+        ] {
+            assert!(validate_arguments(schema, &bad).is_err());
         }
     }
 }

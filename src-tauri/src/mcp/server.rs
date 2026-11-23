@@ -47,16 +47,38 @@ pub(super) fn router<B: McpBackend>(manager: Arc<B>) -> Router {
         .with_state(manager)
 }
 
-fn validate_headers(headers: &HeaderMap, port: u16) -> Result<(), StatusCode> {
+fn host_allowed(host: &str, port: u16, allow_lan: bool) -> bool {
+    if host == format!("127.0.0.1:{port}") || host == format!("localhost:{port}") {
+        return true;
+    }
+    if !allow_lan {
+        return false;
+    }
+    let Some((ip_str, port_str)) = host.rsplit_once(':') else {
+        return false;
+    };
+    if port_str.parse::<u16>().ok() != Some(port) {
+        return false;
+    }
+    ip_str
+        .parse::<std::net::Ipv4Addr>()
+        .ok()
+        .is_some_and(super::is_private_lan_ipv4)
+}
+
+fn validate_headers(headers: &HeaderMap, port: u16, allow_lan: bool) -> Result<(), StatusCode> {
     let host = headers
         .get(header::HOST)
         .and_then(|v| v.to_str().ok())
         .ok_or(StatusCode::FORBIDDEN)?;
-    if ![format!("127.0.0.1:{port}"), format!("localhost:{port}")].contains(&host.to_owned()) {
+    if !host_allowed(host, port, allow_lan) {
         return Err(StatusCode::FORBIDDEN);
     }
     if let Some(origin) = headers.get(header::ORIGIN) {
-        if origin.to_str().ok() != Some(format!("http://{host}").as_str()) {
+        let origin_str = origin.to_str().ok();
+        if origin_str != Some(format!("http://{host}").as_str())
+            && origin_str != Some(format!("https://{host}").as_str())
+        {
             return Err(StatusCode::FORBIDDEN);
         }
     }
@@ -77,7 +99,7 @@ fn authorize<B: McpBackend>(manager: &B, headers: &HeaderMap) -> Result<(), Stat
     if !settings.enabled {
         return Err(StatusCode::SERVICE_UNAVAILABLE);
     }
-    validate_headers(headers, settings.port)?;
+    validate_headers(headers, settings.port, settings.allow_lan)?;
     let token = headers
         .get(header::AUTHORIZATION)
         .and_then(|v| v.to_str().ok())
@@ -390,17 +412,49 @@ mod tests {
     #[test]
     fn local_origin_and_protocol_are_checked() {
         let mut headers = HeaderMap::new();
-        assert_eq!(validate_headers(&headers, 7421), Err(StatusCode::FORBIDDEN));
+        assert_eq!(
+            validate_headers(&headers, 7421, false),
+            Err(StatusCode::FORBIDDEN)
+        );
         headers.insert(header::HOST, "127.0.0.1:7421".parse().unwrap());
-        assert!(validate_headers(&headers, 7421).is_ok());
+        assert!(validate_headers(&headers, 7421, false).is_ok());
         headers.insert(header::ORIGIN, "https://evil.example".parse().unwrap());
-        assert_eq!(validate_headers(&headers, 7421), Err(StatusCode::FORBIDDEN));
+        assert_eq!(
+            validate_headers(&headers, 7421, false),
+            Err(StatusCode::FORBIDDEN)
+        );
         headers.insert(header::ORIGIN, "http://127.0.0.1:7421".parse().unwrap());
-        assert!(validate_headers(&headers, 7421).is_ok());
+        assert!(validate_headers(&headers, 7421, false).is_ok());
         headers.insert("mcp-protocol-version", "unsupported".parse().unwrap());
         assert_eq!(
-            validate_headers(&headers, 7421),
+            validate_headers(&headers, 7421, false),
             Err(StatusCode::BAD_REQUEST)
+        );
+    }
+
+    #[test]
+    fn lan_mode_allows_private_lan_and_tailscale_hosts_while_blocking_public_hosts() {
+        let mut lan = HeaderMap::new();
+        lan.insert(header::HOST, "192.168.1.50:7421".parse().unwrap());
+        assert_eq!(validate_headers(&lan, 7421, false), Err(StatusCode::FORBIDDEN));
+        assert!(validate_headers(&lan, 7421, true).is_ok());
+
+        let mut tailscale = HeaderMap::new();
+        tailscale.insert(header::HOST, "100.88.12.5:7421".parse().unwrap());
+        assert!(validate_headers(&tailscale, 7421, true).is_ok());
+
+        let mut public_ip = HeaderMap::new();
+        public_ip.insert(header::HOST, "8.8.8.8:7421".parse().unwrap());
+        assert_eq!(
+            validate_headers(&public_ip, 7421, true),
+            Err(StatusCode::FORBIDDEN)
+        );
+
+        let mut evil_domain = HeaderMap::new();
+        evil_domain.insert(header::HOST, "evil.example:7421".parse().unwrap());
+        assert_eq!(
+            validate_headers(&evil_domain, 7421, true),
+            Err(StatusCode::FORBIDDEN)
         );
     }
 

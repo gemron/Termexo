@@ -24,6 +24,7 @@ const CREDENTIAL_TARGET: &str = "mcp-server-token";
 const REQUEST_EVENT: &str = "mcp-tool-request";
 const MAIN_WINDOW: &str = "main";
 const TOOL_TIMEOUT: Duration = Duration::from_secs(60);
+const ACTION_LOCK_TIMEOUT: Duration = Duration::from_secs(15);
 const DEFAULT_PORT: u16 = 7421;
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
@@ -35,6 +36,7 @@ pub struct McpSettings {
     pub terminal_access: bool,
     pub task_access: bool,
     pub settings_access: bool,
+    pub allow_lan: bool,
 }
 
 impl Default for McpSettings {
@@ -46,6 +48,7 @@ impl Default for McpSettings {
             terminal_access: true,
             task_access: true,
             settings_access: false,
+            allow_lan: false,
         }
     }
 }
@@ -57,6 +60,7 @@ pub struct McpStatus {
     pub running: bool,
     pub error: Option<String>,
     pub url: String,
+    pub lan_urls: Vec<String>,
     pub token: String,
 }
 
@@ -143,8 +147,14 @@ impl McpManager {
             .as_ref()
             .is_some_and(|task| !task.inner().is_finished());
         let running = running && settings.enabled;
+        let lan_urls = if settings.allow_lan {
+            discover_lan_urls(settings.port)
+        } else {
+            Vec::new()
+        };
         McpStatus {
             url: format!("http://127.0.0.1:{}/mcp", settings.port),
+            lan_urls,
             settings,
             running,
             token: self.token.read().unwrap_or_else(|e| e.into_inner()).clone(),
@@ -264,10 +274,15 @@ impl McpManager {
             }
         };
         *self.token.write().unwrap_or_else(|e| e.into_inner()) = token;
+        let bind_ip = if self.settings().allow_lan {
+            std::net::Ipv4Addr::UNSPECIFIED
+        } else {
+            std::net::Ipv4Addr::LOCALHOST
+        };
         let listener =
-            tokio::net::TcpListener::bind((std::net::Ipv4Addr::LOCALHOST, self.settings().port))
+            tokio::net::TcpListener::bind((bind_ip, self.settings().port))
                 .await
-                .map_err(|e| format!("Cannot start local MCP server: {e}"))?;
+                .map_err(|e| format!("Cannot start MCP server: {e}"))?;
         let manager = self.clone();
         *running = Some(tauri::async_runtime::spawn(async move {
             if let Err(error) = axum::serve(listener, server::router(manager.clone())).await {
@@ -286,7 +301,7 @@ impl McpManager {
             .find(|tool| tool["name"] == name)
             .ok_or("Unknown MCP tool")?;
         tools::validate_arguments(&tool["inputSchema"], &arguments)?;
-        let _action = action_guard(&self.action, name)?;
+        let _action = action_guard(&self.action, name, ACTION_LOCK_TIMEOUT).await?;
         let settings = self.settings();
         if !settings.enabled || !tools::allowed(&tool, &settings) {
             return Err("MCP access to this tool is disabled".into());
@@ -341,15 +356,53 @@ impl McpManager {
     }
 }
 
-fn action_guard<'a>(
+pub(super) fn is_private_lan_ipv4(ip: std::net::Ipv4Addr) -> bool {
+    let [a, b, _, _] = ip.octets();
+    ip.is_private() || (a == 100 && (64..=127).contains(&b))
+}
+
+fn discover_lan_urls(port: u16) -> Vec<String> {
+    let Ok(interfaces) = if_addrs::get_if_addrs() else {
+        return Vec::new();
+    };
+    let mut urls = Vec::new();
+    for iface in interfaces {
+        if let std::net::IpAddr::V4(ip) = iface.ip() {
+            if !ip.is_loopback() && is_private_lan_ipv4(ip) {
+                let url = format!("http://{ip}:{port}/mcp");
+                if !urls.contains(&url) {
+                    urls.push(url);
+                }
+            }
+        }
+    }
+    urls.sort();
+    urls
+}
+
+fn is_read_only_tool(name: &str) -> bool {
+    matches!(
+        name,
+        "workspace_list"
+            | "terminal_list"
+            | "terminal_read"
+            | "task_list"
+            | "settings_get"
+            | "common_action_list"
+            | "wechat_notification_status"
+    )
+}
+
+async fn action_guard<'a>(
     action: &'a AsyncMutex<()>,
     name: &str,
+    wait_timeout: Duration,
 ) -> Result<Option<tokio::sync::MutexGuard<'a, ()>>, String> {
-    if matches!(name, "workspace_list" | "terminal_list" | "terminal_read") {
+    if is_read_only_tool(name) {
         Ok(None)
     } else {
-        action
-            .try_lock()
+        tokio::time::timeout(wait_timeout, action.lock())
+            .await
             .map(Some)
             .map_err(|_| "Another MCP action is in progress; try again when it finishes".into())
     }
@@ -360,16 +413,47 @@ mod action_tests {
     use super::*;
 
     #[tokio::test]
-    async fn observations_do_not_block_terminal_actions_and_mutations_remain_exclusive() {
-        let action = AsyncMutex::new(());
-        let mutation = action_guard(&action, "terminal_write").unwrap();
-        for tool in ["workspace_list", "terminal_list", "terminal_read"] {
-            assert!(action_guard(&action, tool).unwrap().is_none());
+    async fn observations_do_not_block_terminal_actions_and_mutations_serialize_with_timeout() {
+        let action = Arc::new(AsyncMutex::new(()));
+        let mutation = action_guard(&action, "terminal_write", Duration::from_millis(50))
+            .await
+            .unwrap();
+        for tool in [
+            "workspace_list",
+            "terminal_list",
+            "terminal_read",
+            "task_list",
+            "settings_get",
+            "common_action_list",
+            "wechat_notification_status",
+        ] {
+            assert!(action_guard(&action, tool, Duration::from_millis(50))
+                .await
+                .unwrap()
+                .is_none());
         }
-        assert!(action_guard(&action, "terminal_close").is_err());
+        assert!(action_guard(&action, "terminal_close", Duration::from_millis(20))
+            .await
+            .is_err());
+
+        // Concurrent mutations queue briefly instead of immediately rejecting.
+        let waiter_action = action.clone();
+        let waiter = tokio::spawn(async move {
+            action_guard(&waiter_action, "task_create", Duration::from_millis(300))
+                .await
+                .map(|guard| guard.is_some())
+        });
+        tokio::time::sleep(Duration::from_millis(25)).await;
         drop(mutation);
-        let read = action_guard(&action, "terminal_read").unwrap();
-        assert!(action_guard(&action, "terminal_write").unwrap().is_some());
+        assert_eq!(waiter.await.unwrap().unwrap(), true);
+
+        let read = action_guard(&action, "terminal_read", Duration::from_millis(50))
+            .await
+            .unwrap();
+        assert!(action_guard(&action, "terminal_write", Duration::from_millis(50))
+            .await
+            .unwrap()
+            .is_some());
         drop(read);
     }
 }

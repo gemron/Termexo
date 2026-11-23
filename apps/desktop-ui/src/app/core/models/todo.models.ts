@@ -61,6 +61,8 @@ export interface TodoTask {
   nativeSessionAgentType?: TodoTask['agentType'];
   /** Account home that owns the native session, needed when resuming from a managed account. */
   accountProfileId?: string;
+  /** Optional MCP profile IDs mounted exclusively when launching this task. */
+  mcpProfileIds?: string[];
   executionState: TodoExecutionState;
   /** Tracks whether the task instructions actually reached the bound terminal's stdin. */
   promptDeliveryState: TodoPromptDeliveryState;
@@ -100,6 +102,8 @@ export interface TodoTaskDraft {
   agentType: TodoTask['agentType'];
   profileId: string;
   modelName: string;
+  accountProfileId?: string;
+  mcpProfileIds?: string[];
   preferredTerminalId?: string;
   recurring?: boolean;
 }

@@ -5,6 +5,7 @@ import { ProjectPreviewPanelComponent } from './preview/project-preview-panel';
 import { ProjectPreviewService, type ProjectPreviewSession } from './core/services/project-preview.service';
 import { CommonActionsDialogComponent } from './dialogs/common-actions-dialog';
 import { CommonActionsService } from './core/services/common-actions.service';
+import { isOpenCodeComposerIdle } from './core/models/agent-startup';
 import { terminalCommonAction, type CommonActionTerminalRequest } from './core/models/common-action';
 import type { ProfileSaveCompleted, SettingsProfileKind } from './dialogs/profile-drafts';
 import { ModelCatalogService } from './core/services/model-catalog.service';
@@ -3732,15 +3733,11 @@ export class App {
       return;
     }
 
-    // A task carries no account of its own until it has resumed a native session, while the
-    // backend silently falls back to the agent's default account. Resolving it here keeps the
-    // terminal record honest about the subscription it spends, which is what the inspector
-    // matches provider allowances against. These CLIs have no Termexo account profile.
-    const accountProfileId = usesOwnModel
+    const accountProfileId = isAntigravity
       ? undefined
       : resolveAccountProfileId(
           this.agents.accountProfiles(),
-          task.agentType as AgentProtocol,
+          task.agentType as AccountAgentType,
           task.accountProfileId,
         );
 
@@ -3762,6 +3759,8 @@ export class App {
             workspaceId: workspace.id,
             sessionId,
             model: task.modelName || undefined,
+            accountProfileId,
+            mcpProfileIds: task.mcpProfileIds,
           })
         : isPi
           ? await this.agents.preparePiLaunch({
@@ -3769,6 +3768,7 @@ export class App {
               workspaceId: workspace.id,
               sessionId,
               model: task.modelName || undefined,
+              accountProfileId,
             })
           : isGrok
             ? await this.agents.prepareGrokLaunch({
@@ -3777,6 +3777,7 @@ export class App {
                 sessionId,
                 newSessionId: sessionId ? undefined : nativeSessionId,
                 model: task.modelName || undefined,
+                accountProfileId,
               })
             : isAntigravity
               ? await this.agents.prepareAntigravityLaunch({
@@ -3791,16 +3792,19 @@ export class App {
                     terminalId,
                     workspaceId: workspace.id,
                     sessionId,
-                    model: profileModel(profile!, 'codex'),
+                    model: task.modelName || profileModel(profile!, 'codex'),
                     profileId: profile!.id,
                     accountProfileId,
+                    mcpProfileIds: task.mcpProfileIds,
                   })
                 : await this.agents.prepareLaunch({
                     terminalId,
                     workspaceId: workspace.id,
                     sessionId,
+                    model: task.modelName || undefined,
                     profileId: profile!.id,
                     accountProfileId,
+                    mcpProfileIds: task.mcpProfileIds,
                     forkSession: reclaim.forkSession,
                     attachShortId: reclaim.attachShortId,
                   });
@@ -3819,7 +3823,7 @@ export class App {
                   : isAntigravity
                     ? ANTIGRAVITY_DEFAULT_MODEL
                     : OPENCODE_DEFAULT_MODEL)
-            : profileModel(profile!, task.agentType as AgentProtocol),
+            : task.modelName || profileModel(profile!, task.agentType as AgentProtocol),
           nativeSessionId,
           workingDirectory,
           profileId: profile?.id,
@@ -3986,11 +3990,16 @@ export class App {
       this.pendingCommonActionLaunch = null;
       this.openWorkspaceTool('common-actions');
     }
+    const isOpenCode = located?.terminal.agentType === 'opencode';
     this.agentStartup.arm(terminalId, {
       confirm: (writes) => this.writeTerminalSequence(terminalId, writes),
       submit: requestId
         ? () => this.submitCommonActionRecognition(located!.workspace.id, terminalId, requestId)
         : async () => undefined,
+      shouldRetryAfterSubmit:
+        requestId && isOpenCode
+          ? (frame) => this.shouldRetryOpenCodePrompt(terminalId, frame)
+          : undefined,
       onFailed: (message) => {
         if (requestId) this.commonActions.updateRecognition(located!.workspace.id, requestId, { waiting: false, error: message });
       },
@@ -4001,9 +4010,13 @@ export class App {
   }
 
   private armTodoPrompt(terminalId: string, taskId: string, prompt: string): void {
+    const isOpenCode = this.findTerminal(terminalId)?.terminal.agentType === 'opencode';
     this.agentStartup.arm(terminalId, {
       confirm: (writes) => this.writeTerminalSequence(terminalId, writes),
       submit: () => this.submitTodoPrompt(taskId, terminalId, prompt),
+      shouldRetryAfterSubmit: isOpenCode
+        ? (frame) => this.shouldRetryOpenCodePrompt(terminalId, frame)
+        : undefined,
       onFailed: (message) => {
         this.todos.setExecutionError(taskId, message, terminalId);
         this.showToast(this.i18n.t('taskFlow.toast.sendFailed', { error: message }), 'attention');
@@ -4013,6 +4026,13 @@ export class App {
     if (['RUNNING', 'IDLE'].includes(this.findTerminal(terminalId)?.terminal.status ?? '')) {
       this.agentStartup.markRuntimeStarted(terminalId);
     }
+  }
+
+  private shouldRetryOpenCodePrompt(terminalId: string, frame: string): boolean {
+    const located = this.findTerminal(terminalId);
+    if (!located || located.terminal.agentType !== 'opencode') return false;
+    if (!['STARTING', 'RUNNING', 'IDLE'].includes(located.terminal.status)) return false;
+    return isOpenCodeComposerIdle(frame);
   }
 
   private async submitTodoPrompt(

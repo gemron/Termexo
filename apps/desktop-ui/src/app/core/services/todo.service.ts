@@ -275,6 +275,8 @@ export class TodoService {
       agentType: draft.agentType,
       profileId: draft.profileId,
       modelName: draft.modelName,
+      accountProfileId: draft.accountProfileId?.trim() || undefined,
+      mcpProfileIds: draft.mcpProfileIds?.length ? [...draft.mcpProfileIds] : undefined,
       preferredTerminalId: draft.preferredTerminalId?.trim() || undefined,
       executionState: 'idle',
       promptDeliveryState: 'idle',
@@ -312,7 +314,18 @@ export class TodoService {
       terminalId: agentChanged ? undefined : located.task.terminalId,
       nativeSessionId: agentChanged ? undefined : located.task.nativeSessionId,
       nativeSessionAgentType: agentChanged ? undefined : located.task.nativeSessionAgentType,
-      accountProfileId: agentChanged ? undefined : located.task.accountProfileId,
+      accountProfileId:
+        draft.accountProfileId !== undefined
+          ? draft.accountProfileId.trim() || undefined
+          : agentChanged
+            ? undefined
+            : located.task.accountProfileId,
+      mcpProfileIds:
+        draft.mcpProfileIds !== undefined
+          ? draft.mcpProfileIds.length
+            ? [...draft.mcpProfileIds]
+            : undefined
+          : located.task.mcpProfileIds,
       lastTerminalStatus: agentChanged ? undefined : located.task.lastTerminalStatus,
       lastError: agentChanged ? undefined : located.task.lastError,
       promptDeliveryState: agentChanged ? 'idle' : located.task.promptDeliveryState,

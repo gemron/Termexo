@@ -125,7 +125,15 @@ export class McpDesktopService {
     try {
       if (Date.now() > request.deadline)
         throw new Error('MCP request expired before the desktop received it');
-      const readOnly = ['workspace_list', 'terminal_list', 'terminal_read'].includes(request.name);
+      const readOnly = [
+        'workspace_list',
+        'terminal_list',
+        'terminal_read',
+        'task_list',
+        'settings_get',
+        'common_action_list',
+        'wechat_notification_status',
+      ].includes(request.name);
       if (readOnly) {
         value = await this.execute(request.name, request.arguments);
       } else {
@@ -366,6 +374,20 @@ export class McpDesktopService {
           modelProfiles: this.agents
             .modelProfiles()
             .map(({ credentialTarget: _target, ...profile }) => profile),
+          accountProfiles: (this.agents.accountProfiles?.() ?? []).map(
+            ({ id, name, agentType, authenticated, isDefault, isSystem }) => ({
+              id,
+              name,
+              agentType,
+              authenticated,
+              isDefault,
+              isSystem,
+            }),
+          ),
+          mcpProfiles: (this.agents.mcpProfiles?.() ?? []).map(({ id, name }) => ({
+            id,
+            name,
+          })),
           networkProfiles: this.agents
             .networkProfiles()
             .map(({ credentialTarget: _target, ...profile }) => profile),
@@ -454,7 +476,11 @@ export class McpDesktopService {
     const agentType = (args['agentType'] ??
       existing?.agentType ??
       'claude') as TodoTaskDraft['agentType'];
-    const ownsModel = agentType === 'opencode' || agentType === 'grok' || agentType === 'pi';
+    const ownsModel =
+      agentType === 'opencode' ||
+      agentType === 'grok' ||
+      agentType === 'pi' ||
+      agentType === 'antigravity';
     const retainedProfile = existing?.agentType === agentType ? existing.profileId : undefined;
     const profiles = ownsModel
       ? []
@@ -470,6 +496,34 @@ export class McpDesktopService {
     );
     const profile = profiles.find((profile) => profile.id === profileId);
     if (!ownsModel && !profile) throw new Error('Choose a model profile enabled for this agent');
+
+    const requestedAccountId =
+      typeof args['accountProfileId'] === 'string' ? args['accountProfileId'].trim() : undefined;
+    if (requestedAccountId) {
+      const accounts = this.agents.accountProfiles?.() ?? [];
+      const account = accounts.find(
+        (item) => item.id === requestedAccountId && item.agentType === agentType,
+      );
+      if (!account) {
+        throw new Error('Choose an account profile configured for this agent');
+      }
+    }
+    const accountProfileId =
+      requestedAccountId ??
+      (existing?.agentType === agentType ? existing.accountProfileId : undefined);
+
+    const requestedMcpProfileIds = Array.isArray(args['mcpProfileIds'])
+      ? args['mcpProfileIds'].map((item) => String(item).trim()).filter(Boolean)
+      : undefined;
+    if (requestedMcpProfileIds?.length) {
+      const knownMcpIds = new Set((this.agents.mcpProfiles?.() ?? []).map((item) => item.id));
+      const missing = requestedMcpProfileIds.find((id) => !knownMcpIds.has(id));
+      if (missing) {
+        throw new Error(`MCP profile not found: ${missing}`);
+      }
+    }
+    const mcpProfileIds = requestedMcpProfileIds ?? existing?.mcpProfileIds;
+
     return {
       projectId: String(args['projectId'] ?? existing?.projectId ?? ''),
       title: String(args['title'] ?? existing?.title ?? ''),
@@ -483,6 +537,8 @@ export class McpDesktopService {
           (existing?.agentType === agentType ? existing.modelName : undefined) ??
           (profile ? profileModel(profile, agentType as AgentProtocol) : ''),
       ),
+      accountProfileId,
+      mcpProfileIds,
       workingDirectory: String(args['workingDirectory'] ?? existing?.workingDirectory ?? ''),
       preferredTerminalId: (args['preferredTerminalId'] ?? existing?.preferredTerminalId) as
         string | undefined,

@@ -215,10 +215,24 @@
         },
         "agentType": {
           "type": "string",
-          "enum": ["claude", "codex", "opencode", "pi", "grok"]
+          "enum": ["claude", "codex", "opencode", "pi", "grok", "antigravity"]
         },
         "profileId": {
           "type": "string"
+        },
+        "accountProfileId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        },
+        "mcpProfileIds": {
+          "type": "array",
+          "maxItems": 16,
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 256
+          }
         },
         "modelName": {
           "type": "string"
@@ -279,10 +293,24 @@
         },
         "agentType": {
           "type": "string",
-          "enum": ["claude", "codex", "opencode", "pi", "grok"]
+          "enum": ["claude", "codex", "opencode", "pi", "grok", "antigravity"]
         },
         "profileId": {
           "type": "string"
+        },
+        "accountProfileId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        },
+        "mcpProfileIds": {
+          "type": "array",
+          "maxItems": 16,
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 256
+          }
         },
         "modelName": {
           "type": "string"
@@ -451,7 +479,7 @@
   {
     "name": "settings_get",
     "group": "settings",
-    "description": "Read language, terminal display preferences and available model/network profiles. Credentials and MCP access tokens are excluded.",
+    "description": "Read language, terminal display preferences and available model, account, MCP and network profiles. Credentials, MCP configs and access tokens are excluded.",
     "inputSchema": {
       "type": "object",
       "properties": {},
