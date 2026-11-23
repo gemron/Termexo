@@ -3603,3 +3603,186 @@ html:not(.motion-ready) *::after {
   .hero-copy,
   .hero-scene { min-width: 0; width: 100%; }
 }
+
+
+/* Termexo Fleet Ecosystem Showcase */
+.fleet-section {
+  position: relative;
+}
+
+.fleet-index-row {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.fleet-showcase {
+  margin-top: 28px;
+}
+
+.fleet-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.fleet-tab {
+  padding: 9px 16px;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  background: var(--bg-raised);
+  color: var(--text-soft);
+  font-size: 13.5px;
+  font-weight: 600;
+  transition: all 0.18s var(--ease);
+}
+
+.fleet-tab:hover {
+  border-color: var(--line-strong);
+  color: var(--text);
+  transform: translateY(-1px);
+}
+
+.fleet-tab.active {
+  background: #0d1f1b;
+  border-color: #2c8f6e;
+  color: #dcffef;
+  box-shadow: 0 8px 20px rgba(13, 31, 27, 0.16);
+}
+
+.fleet-frame {
+  border-radius: 20px;
+  overflow: hidden;
+  border: 1px solid rgba(20, 38, 48, 0.14);
+  background: #0a1210;
+  box-shadow:
+    0 28px 70px rgba(14, 30, 38, 0.18),
+    0 6px 18px rgba(14, 30, 38, 0.08);
+}
+
+.fleet-frame-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 11px 18px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  background: linear-gradient(90deg, #0d1815, #122420);
+  color: #cfe4dc;
+  font-size: 12px;
+}
+
+.fleet-frame-dots {
+  display: inline-flex;
+  gap: 6px;
+}
+
+.fleet-frame-dots i {
+  width: 10px;
+  height: 10px;
+  border-radius: 999px;
+  display: inline-block;
+  background: rgba(255, 255, 255, 0.22);
+}
+
+.fleet-frame-dots i:nth-child(1) { background: #ee6f61; }
+.fleet-frame-dots i:nth-child(2) { background: #ebae42; }
+.fleet-frame-dots i:nth-child(3) { background: #3ec691; }
+
+.fleet-frame-title {
+  font-family: var(--mono);
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+
+.fleet-frame-badge {
+  padding: 3px 10px;
+  border-radius: 999px;
+  border: 1px solid rgba(62, 198, 145, 0.38);
+  background: rgba(62, 198, 145, 0.14);
+  color: #79efc0;
+  font: 11px/1.3 var(--mono);
+}
+
+.fleet-screen {
+  width: 100%;
+  display: block;
+  aspect-ratio: 16 / 10;
+  object-fit: cover;
+  object-position: top center;
+}
+
+.fleet-frame-caption {
+  padding: 13px 18px;
+  font-size: 13px;
+  color: #a9c4ba;
+  border-top: 1px solid rgba(255, 255, 255, 0.07);
+  background: #0c1614;
+}
+
+.fleet-pillars {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 16px;
+  margin-top: 24px;
+}
+
+.fleet-pillar {
+  padding: 20px;
+  border-radius: 16px;
+  border: 1px solid var(--line);
+  background: var(--bg-raised);
+  transition: transform 0.2s var(--ease), border-color 0.2s var(--ease);
+}
+
+.fleet-pillar:hover {
+  transform: translateY(-2px);
+  border-color: var(--line-strong);
+}
+
+.fleet-pillar-tag {
+  display: inline-block;
+  padding: 3px 9px;
+  border-radius: 999px;
+  font: 700 11px/1.3 var(--mono);
+  background: rgba(24, 116, 146, 0.1);
+  color: var(--green);
+  margin-bottom: 10px;
+}
+
+.fleet-pillar h3 {
+  margin: 0 0 8px;
+  font-size: 16px;
+  line-height: 1.35;
+}
+
+.fleet-pillar p {
+  margin: 0;
+  font-size: 13.5px;
+  line-height: 1.6;
+  color: var(--text-soft);
+}
+
+.fleet-cta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+  margin-top: 24px;
+}
+
+@media (max-width: 1024px) {
+  .fleet-pillars {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 640px) {
+  .fleet-pillars {
+    grid-template-columns: 1fr;
+  }
+  .fleet-frame-badge {
+    display: none;
+  }
+}

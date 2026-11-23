@@ -1,6 +1,41 @@
 const translations = {
   en: {
     navMcp: "MCP control",
+    navFleet: "Fleet",
+    fleetIndex: "ECOSYSTEM / TERMEXO FLEET · PREVIEW V0.1",
+    fleetTitle: "Scale Termexo into an autonomous multi-machine AI fleet.",
+    fleetLead:
+      "Termexo Fleet is the companion desktop commander built on Termexo MCP. Grade tasks across L1–L4 difficulty tiers, route accounts & models automatically, let parent agents spawn worktree-isolated sub-agents, and track savings across multiple Termexo machines — with zero black-box execution.",
+    fleetTabDeck: "Mission Deck & DAG",
+    fleetTabSwarm: "Sub-Agent Swarm Tree",
+    fleetTabRouting: "L1–L4 Routing Ladder",
+    fleetTabTopology: "Multi-Machine Topology",
+    fleetTabAnalytics: "Ledger & Alerts",
+    fleetFrameBadge: "Zero Black-Box · Real Termexo PTYs",
+    fleetCapDeck:
+      "Mission Composer with one-click templates, live L1–L4 route forecast, and multi-stage DAG pipelines executing inside real Termexo terminals.",
+    fleetCapSwarm:
+      "Inspect parent-child sub-agent spawning trees, isolated Git Worktree branches, and real-time depth, concurrency, and budget guardrails.",
+    fleetCapRouting:
+      "Test any natural-language prompt against the live L1–L4 ladder, view slot health and concurrency pips, and toggle tier assignments in one click.",
+    fleetCapTopology:
+      "Hub-and-spoke view of connected Windows, macOS, and Linux Termexo nodes with live load meters, OS tags, and RTT connectivity probes.",
+    fleetCapAnalytics:
+      "Local SQLite execution ledger quantifying L1–L4 routing savings, model/node rankings, and Feishu / WeCom / Slack / WeChat alert channels.",
+    fleetPillar1Title: "Difficulty-aware routing & failover",
+    fleetPillar1Body:
+      "Send quick edits to low-cost L1 slots, reserve L3 for hard architecture work, and enforce L4 cross-family reviews. Auto-cool failing slots on 429/402/422 and escalate on retry.",
+    fleetPillar2Title: "Autonomous sub-agents with guardrails",
+    fleetPillar2Body:
+      "Built-in reverse MCP lets parent agents submit DAG plans and spawn child agents in isolated Git Worktrees — bounded by depth, concurrency, and budget caps.",
+    fleetPillar3Title: "Multi-machine fleet topology",
+    fleetPillar3Body:
+      "Connect Windows, macOS, and Linux Termexo nodes over local, private LAN, or Tailscale VPN with live RTT/capability probes and tag-affinity routing.",
+    fleetPillar4Title: "Execution ledger & notifications",
+    fleetPillar4Body:
+      "Track success rates, escalations, and estimated savings vs. an all-L3 baseline. Push completion and approval alerts to Feishu, WeCom, Slack, or Termexo WeChat.",
+    fleetDownloadBtn: "Download Fleet Preview (Windows)",
+    fleetRepoBtn: "Explore Termexo Fleet on GitHub →",
     mcpIndex: "MCP / AGENTS IN CONTROL",
     mcpTitle: "Stop carrying messages between agents.",
     mcpLead: "MCP is the connection that lets an AI use Termexo's tools. You describe the next step; your connected agent can find another terminal, send input and read its output.",
@@ -581,6 +616,41 @@ const translations = {
     relayDeploy: "部署自己的中继 ↗",
     relaySetup: "查看连接步骤 ↗",
     relayCompatibility: "桌面版支持 Windows x64、macOS Apple Silicon / Intel 和 Linux x64。中继支持 Linux / macOS / Windows、x64 / arm64 和容器部署。可使用只读链接分享查看，不开放终端输入。",
+    navFleet: "Fleet 舰队",
+    fleetIndex: "生态扩展 / TERMEXO FLEET · 预览版 V0.1",
+    fleetTitle: "把多台 Termexo 编织成自主协同的 AI 研发舰队。",
+    fleetLead:
+      "Termexo Fleet 是基于 Termexo MCP 打造的独立桌面指挥中枢：按 L1–L4 难度自动路由账号与模型、允许父 Agent 在独立 Git Worktree 中自主派生子 Agent、统一调度多台本机/局域网 Termexo 并量化节省成本——全程零黑盒，所有任务真实运行在 Termexo 终端中。",
+    fleetTabDeck: "任务甲板与 DAG",
+    fleetTabSwarm: "子 Agent 蜂群树",
+    fleetTabRouting: "L1–L4 难度天梯",
+    fleetTabTopology: "多机舰队拓扑",
+    fleetTabAnalytics: "效能账本与告警",
+    fleetFrameBadge: "零黑盒 · 真实 Termexo 终端执行",
+    fleetCapDeck:
+      "内置一键场景模板与实时路由预判条，直观编排三段式流水线与多阶段 DAG，点击卡片即可拉出侧滑实时终端抽屉直接对话。",
+    fleetCapSwarm:
+      "清晰呈现父子 Agent 派生树、独立 Git Worktree 分支与递归深度 / 并发 / 总派生预算三大安全护栏仪表盘。",
+    fleetCapRouting:
+      "输入任意需求实时测试 L1–L4 命中哪台机器与账号；点击槽位上的档位胶囊即可即时调整分工并查看健康状态。",
+    fleetCapTopology:
+      "星型拓扑统一管理 Windows、macOS、Linux 多台 Termexo，支持局域网 / Tailscale VPN 连通性探测与标签亲和派发。",
+    fleetCapAnalytics:
+      "本地 SQLite 账本量化难度路由节省比例、模型与节点效能排行，支持飞书 / 企微 / Slack Webhook 与 Termexo 微信联动告警。",
+    fleetPillar1Title: "L1–L4 难度路由与自动容灾",
+    fleetPillar1Body:
+      "轻量任务走低成本 L1 槽位，复杂重构用 L3，关键审查强制 L4 跨模型家族异构复核；429/402/422 自动冷却切号与升档重试。",
+    fleetPillar2Title: "自主派生子 Agent + 硬性护栏",
+    fleetPillar2Body:
+      "内置反向 MCP（:7425/mcp），父 Agent 可自主提交并行 DAG 或在独立 Git Worktree 中雇佣子 Agent，受深度、并发与预算护栏保护。",
+    fleetPillar3Title: "多机局域网 / VPN 算力协同",
+    fleetPillar3Body:
+      "通过本机、受控私网 LAN 或 Tailscale VPN 连接多台 Termexo，内置延迟与能力探测，按 #windows / #macos 标签智能分派。",
+    fleetPillar4Title: "效能账本与多通道通知",
+    fleetPillar4Body:
+      "本地统计成功率、平均耗时、升档次数与相对全量 L3 的节省比例，完工或等待审批自动推送飞书 / 企微 / Slack / 微信。",
+    fleetDownloadBtn: "下载 Fleet 预览版（Windows）",
+    fleetRepoBtn: "前往 Termexo Fleet GitHub →",
   },
 };
 
@@ -877,3 +947,43 @@ if ("IntersectionObserver" in window) {
   navigationObserver.observe(hero);
 }
 updateMotionControl();
+
+// Interactive Termexo Fleet screenshot tabs on the home page.
+const fleetShowcase = document.querySelector("[data-fleet-showcase]");
+if (fleetShowcase) {
+  const fleetTabs = [...fleetShowcase.querySelectorAll("[data-fleet-tab]")];
+  const fleetScreen = fleetShowcase.querySelector("[data-fleet-screen]");
+  const fleetCaption = fleetShowcase.querySelector("[data-fleet-caption]");
+  const captionKeyByTab = {
+    deck: "fleetCapDeck",
+    swarm: "fleetCapSwarm",
+    routing: "fleetCapRouting",
+    topology: "fleetCapTopology",
+    analytics: "fleetCapAnalytics",
+  };
+  let activeFleetTab = "deck";
+
+  const syncFleetCaption = () => {
+    const key = captionKeyByTab[activeFleetTab] || "fleetCapDeck";
+    fleetCaption.dataset.i18n = key;
+    const dict = translations[activeLanguage] || translations.en;
+    if (dict[key]) fleetCaption.textContent = dict[key];
+  };
+
+  fleetTabs.forEach((btn) => {
+    btn.addEventListener("click", () => {
+      activeFleetTab = btn.dataset.fleetTab || "deck";
+      fleetTabs.forEach((other) => {
+        const isCurrent = other === btn;
+        other.classList.toggle("active", isCurrent);
+        other.setAttribute("aria-selected", String(isCurrent));
+      });
+      if (btn.dataset.fleetImg && fleetScreen) {
+        fleetScreen.src = btn.dataset.fleetImg;
+      }
+      syncFleetCaption();
+    });
+  });
+
+  document.addEventListener("languagechange", syncFleetCaption);
+}
