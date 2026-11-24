@@ -42,6 +42,67 @@ describe('remote terminal output frames', () => {
     expect(vi.getTimerCount()).toBe(0);
   });
 
+  it('keeps the old screen until the replacement arrives in a later remote frame', () => {
+    buffer.enqueue('\x1b[H\x1b[2J', false);
+    paint();
+    vi.advanceTimersByTime(80);
+    buffer.enqueue('\x1b[?25l\x1b[', false);
+    paint();
+    vi.advanceTimersByTime(40);
+    expect(write).not.toHaveBeenCalled();
+
+    buffer.enqueue('1mAI answer', false);
+    paint();
+    expect(write).toHaveBeenCalledExactlyOnceWith('\x1b[H\x1b[2J\x1b[?25l\x1b[1mAI answer', false);
+    expect(vi.getTimerCount()).toBe(0);
+  });
+
+  it('recognises a clear command split across writes without delaying preceding text', () => {
+    buffer.enqueue('prompt\x1b[2', false);
+    paint();
+    expect(write).toHaveBeenCalledExactlyOnceWith('prompt\x1b[2', false);
+
+    buffer.enqueue('J\x1b[H', false);
+    paint();
+    expect(write).toHaveBeenCalledTimes(1);
+    buffer.enqueue('new screen', false);
+    paint();
+    expect(write).toHaveBeenLastCalledWith('J\x1b[Hnew screen', false);
+  });
+
+  it('executes a standalone clear at the deadline even if cursor updates keep arriving', () => {
+    buffer.enqueue('\x9b2J', false);
+    paint();
+    vi.advanceTimersByTime(100);
+    buffer.enqueue('\x1b[H', false);
+    paint();
+    vi.advanceTimersByTime(99);
+    expect(write).not.toHaveBeenCalled();
+
+    vi.advanceTimersByTime(1);
+    expect(write).toHaveBeenCalledExactlyOnceWith('\x9b2J\x1b[H', false);
+    expect(vi.getTimerCount()).toBe(0);
+    buffer.enqueue('>', false);
+    paint();
+    expect(write).toHaveBeenLastCalledWith('>', false);
+  });
+
+  it('keeps a pending live clear ahead of a replay and subsequent live output', () => {
+    buffer.enqueue('\x1b[2J', false);
+    paint();
+    expect(write).not.toHaveBeenCalled();
+
+    buffer.enqueue('history', true);
+    buffer.enqueue('live', false);
+    paint();
+    expect(write.mock.calls).toEqual([
+      ['\x1b[2J', false],
+      ['history', true],
+      ['live', false],
+    ]);
+    expect(vi.getTimerCount()).toBe(0);
+  });
+
   it('preserves split ANSI sequences, native synchronized frames, and unicode exactly', () => {
     const packets = ['\x1b[?202', '6h\x1b[2', 'J\x1b[H中', '文 😀\x1b[?2026l'];
     packets.forEach((data) => buffer.enqueue(data, false));
