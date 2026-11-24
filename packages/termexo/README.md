@@ -35,7 +35,7 @@ You can also run without a global installation:
 npx termexo@latest
 ```
 
-For a specific published release, run `npx termexo@0.17.1`.
+For a specific published release, run `npx termexo@0.17.2`.
 
 ### Linux system libraries
 
@@ -77,7 +77,11 @@ directory. `--help` and `--version` work without a display.
 Linux desktop and npm distribution are available in v0.12.1. For source builds and
 local package validation, see the [Linux guide](https://github.com/gemron/Termexo/blob/main/docs/linux.md).
 
-## Version 0.17.1
+## Version 0.17.2
+
+- Smoother remote terminal updates when clear and redraw arrive separately.
+- Per-task agent accounts and MCP profiles for tasks created or updated through MCP.
+- Opt-in MCP access over the LAN and a first-prompt retry for OpenCode.
 
 - Antigravity status reporting enabled by default with automatic session restore on reopen.
 - Fixed Git commit diff loading display and stability.
@@ -96,7 +100,7 @@ local package validation, see the [Linux guide](https://github.com/gemron/Termex
 - File links that continue across terminal output lines and a Git commit graph filter for local or locally tracked remote branches.
 
 GitHub Actions builds and publishes the combined npm package and the Windows EXE/MSI,
-macOS DMG and Linux `.deb` installers. See the [release notes](https://github.com/gemron/Termexo/releases/tag/v0.17.1)
+macOS DMG and Linux `.deb` installers. See the [release notes](https://github.com/gemron/Termexo/releases/tag/v0.17.2)
 and [full changelog](https://github.com/gemron/Termexo/blob/main/CHANGELOG.md).
 
 ## Let one AI operate another through MCP

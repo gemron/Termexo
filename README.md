@@ -11,7 +11,7 @@
 </p>
 
 <p align="center">
-  <img alt="Version 0.17.1" src="https://img.shields.io/badge/version-0.17.1-58c7a0">
+  <img alt="Version 0.17.2" src="https://img.shields.io/badge/version-0.17.2-58c7a0">
   <img alt="Windows" src="https://img.shields.io/badge/platform-Windows-0078D4?logo=windows">
   <img alt="macOS" src="https://img.shields.io/badge/platform-macOS-222222?logo=apple">
   <img alt="Linux" src="https://img.shields.io/badge/platform-Linux-FCC624?logo=linux&logoColor=black">
@@ -74,7 +74,7 @@ With several AI coding tools running, you spend time sending requests, checking 
 
 ## Get started on Windows, macOS or Linux
 
-1. **[Download v0.17.1](https://github.com/gemron/Termexo/releases/tag/v0.17.1)** — choose Windows EXE/MSI, the Mac DMG for Apple Silicon (`aarch64`) or Intel (`x64`), or the Linux x64 Debian package. No Rust or build tools needed.
+1. **[Download v0.17.2](https://github.com/gemron/Termexo/releases/tag/v0.17.2)** — choose Windows EXE/MSI, the Mac DMG for Apple Silicon (`aarch64`) or Intel (`x64`), or the Linux x64 Debian package. No Rust or build tools needed.
 2. Open Termexo and create a workspace for a project folder on your PC.
 3. Start a terminal with an installed agent. If none is installed, check detection and install a CLI from Settings.
 4. Run a task and watch its status in the terminal tab and right panel. Enable phone access later if you need it.
@@ -150,7 +150,7 @@ Keep the token private. Closing Termexo or stopping the PC ends the running proc
 
 ## Latest release
 
-**[v0.17.1](https://github.com/gemron/Termexo/releases/tag/v0.17.1)** enables Antigravity status reporting by default with automatic session restore on reopen, and fixes Git commit diff loading display and stability.
+**[v0.17.2](https://github.com/gemron/Termexo/releases/tag/v0.17.2)** fixes blank frames during remote terminal updates, adds per-task accounts and tools through MCP, and improves OpenCode's first prompt delivery.
 [Full changelog](CHANGELOG.md).
 
 If Termexo helps your workflow, a **Star on this repository** helps other developers discover it.
@@ -493,7 +493,8 @@ identifiers still use a legacy name. This does not affect the Termexo product na
 | V0.15.0 | App updates, China mirror downloads, notice layout and narrow-window improvements | Released |
 | V0.16.0 | Multi-account isolation for OpenCode / Pi / Grok, provider API model fetching, and login/switch fixes | Released |
 | V0.17.0 | Compact Git graph, older history, commit details, branch comparison and preview layout | Released |
-| V0.17.1 | Default Antigravity status reporting, session auto-restore and Git commit diff fix | Current |
+| V0.17.1 | Default Antigravity status reporting, session auto-restore and Git commit diff fix | Released |
+| V0.17.2 | Remote terminal flicker fix, per-task MCP settings and OpenCode prompt retry | Current |
 | V1.0 | Stability, security hardening, and recovery experience | Planned |
 
 See [open issues](https://github.com/gemron/Termexo/issues) for ongoing work and

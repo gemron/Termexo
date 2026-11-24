@@ -11,7 +11,7 @@
 </p>
 
 <p align="center">
-  <img alt="Version 0.17.1" src="https://img.shields.io/badge/version-0.17.1-58c7a0">
+  <img alt="Version 0.17.2" src="https://img.shields.io/badge/version-0.17.2-58c7a0">
   <img alt="Windows" src="https://img.shields.io/badge/platform-Windows-0078D4?logo=windows">
   <img alt="macOS" src="https://img.shields.io/badge/platform-macOS-222222?logo=apple">
   <img alt="Linux" src="https://img.shields.io/badge/platform-Linux-FCC624?logo=linux&logoColor=black">
@@ -74,7 +74,7 @@
 
 ## 在 Windows、macOS 或 Linux 上开始使用
 
-1. **[下载 v0.17.1](https://github.com/gemron/Termexo/releases/tag/v0.17.1)**：Windows 选择 EXE/MSI；Mac 按芯片选择 Apple Silicon（`aarch64`）或 Intel（`x64`）的 DMG；Linux x64 可选择 Debian 安装包，无需 Rust 或编译工具。
+1. **[下载 v0.17.2](https://github.com/gemron/Termexo/releases/tag/v0.17.2)**：Windows 选择 EXE/MSI；Mac 按芯片选择 Apple Silicon（`aarch64`）或 Intel（`x64`）的 DMG；Linux x64 可选择 Debian 安装包，无需 Rust 或编译工具。
 2. 打开 Termexo，为本机项目目录创建工作区。
 3. 在工作区中新建终端，选择已安装的 Agent；若尚未安装，可在设置中查看检测结果并安装 CLI。
 4. 运行一个任务，查看终端标签和右侧面板的状态；手机访问可在本地流程跑通后按需启用。
@@ -147,7 +147,7 @@ MCP 是 AI 与 Termexo 之间的连接。**你用日常语言提出要求，不�
 
 ## 最新版本
 
-**[v0.17.1](https://github.com/gemron/Termexo/releases/tag/v0.17.1)** 默认启用 Antigravity 状态回传并支持重新打开时自动恢复会话，同时修复 Git 提交详情 Diff 加载显示与重复重置问题。
+**[v0.17.2](https://github.com/gemron/Termexo/releases/tag/v0.17.2)** 修复远程网页终端分批刷新时的闪黑，支持通过 MCP 为任务选择账号和工具，并改进 OpenCode 首条任务指令的发送。
 [完整更新记录](CHANGELOG.cn.md)。
 
 如果 Termexo 帮到了你，欢迎 **给仓库点一个 Star**，帮助更多开发者发现它。
@@ -470,7 +470,8 @@ flowchart LR
 | V0.15.0 | 应用升级、中国大陆加速、通知布局与窄窗口改进 | 已发布 |
 | V0.16.0 | OpenCode / Pi / Grok 多账号隔离、API 自动拉取模型列表与多账号登录切换修复 | 已发布 |
 | V0.17.0 | 紧凑提交图、历史分页、提交详情、分支对比和预览布局修复 | 已发布 |
-| V0.17.1 | Antigravity 默认状态回传与会话自动恢复、Git 提交 Diff 加载修复 | 当前版本 |
+| V0.17.1 | Antigravity 默认状态回传与会话自动恢复、Git 提交 Diff 加载修复 | 已发布 |
+| V0.17.2 | 远程终端闪黑修复、任务 MCP 配置与 OpenCode 指令重试 | 当前版本 |
 | V1.0 | 稳定性、安全加固与恢复体验 | 规划中 |
 
 进行中的工作见 [Issues](https://github.com/gemron/Termexo/issues)，实际交付内容见

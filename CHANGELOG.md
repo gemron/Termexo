@@ -2,6 +2,13 @@
 
 Release notes for every Termexo version, newest first. The current release is summarised in [README.md](README.md).
 
+## V0.17.2
+
+- **Smoother terminal updates in the remote browser.** If an erase command arrives ahead of its replacement content, the terminal briefly keeps the previous screen visible and applies the update together.
+- **Choose accounts and tools per task through MCP.** Select the agent account and the MCP profiles to load when creating or updating a task through MCP. LAN access to the MCP server is opt-in and still requires a token.
+- **More reliable OpenCode task prompts.** Termexo retries the first prompt once if OpenCode still shows an empty composer after startup.
+- **Termexo Fleet preview on the website.** The website and project README now include preview screenshots.
+
 ## V0.17.1
 
 - **Antigravity status reporting is enabled by default.** Removed the standalone toggle and opt-out setting; Termexo automatically installs and refreshes the status feed whenever an Antigravity terminal starts or reconnects.
