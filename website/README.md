@@ -61,9 +61,8 @@ node --test scripts/website-guide.test.mjs
 
 ## 校验与发布命令
 
-首页首屏与 `#ai-control` 以 MCP 操控为核心：接入的 AI → 本地 Termexo MCP → 六种 Agent 的已有终端。
-流程图由 HTML/CSS 绘制，手机端自动纵向排列；图注明确它是连接示意，回复来自实际终端输出。
-上手步骤为准备项目与 CLI、在设置启用 MCP 后启动或重启 Agent、发送只读检查；后续示例明确发送 `hi`、提交回车及读取回复。
+首页 `#ai-control` 用可点击的三步示例展示找到终端、发送指令和读回输出。访客可逐步查看或播放一轮示例。
+示例在浏览器中展示固定文案和输出，实际连接步骤可在下方展开，也可从指南打开。
 中英文文案维护在 `app.js`，新增 MCP 完整指南入口也随语言切换到对应的 `#ai-control` 章节。
 六种 Agent 支持已有终端交互；任务看板执行仅支持 Claude Code、Codex、OpenCode、Pi Agent 和 Grok Build。
 发送或启动成功不等于任务完成。新增内容不得把旧工作台实录标成 MCP 操控实录。
@@ -74,19 +73,21 @@ node --test scripts/website-guide.test.mjs
 README 与官网共用这些素材，图中的连线表示工作组织和访问关系，不表示 Agent 自动编排。
 修改图中文字或布局后运行 `python scripts/build-workflow-illustrations.py`，并复核两种语言、两种布局。
 
-首页采用浅色冰蓝主题，界面动效由原生 CSS 与 `app.js` 驱动，无动画库依赖；演示视频仅在用户操作后播放。
-工作台段落嵌入一段可手动播放的 30 秒 MP4；首屏、社交预览和 README 共用从这段真实桌面录屏截出的封面。
+首页以深墨色、荧光绿和暖白组织首屏、MCP 示例及产品展示。首页样式位于 `home.css`，动效由 CSS 与 `app.js` 驱动。
+工作台段落嵌入一段可手动播放的 30 秒 MP4，视频封面和首屏桌面截图共用 WebP 素材。社交预览和项目 README 使用同一录屏的 PNG 封面。
 素材录制于 v0.10.6：两个真实 Antigravity 会话、完成提醒、返回会话、回复后继续执行和分屏结果。视频附中英字幕，明确标注等待片段已经剪去。
 视频使用 `preload="none"`，首屏只加载静态封面。
 原片信息、实际镜头、可复现的剪辑命令与首次体验验收步骤见 [demo-recording.md](demo-recording.md)。
-设计参考 CBDC 的玻璃材质与悬浮构图：
-https://dribbble.com/shots/24093396-CBDC-Web-Design-for-Digital-Currency-Website
-参考页视频受访问验证限制，本实现是基于封面构图重新设计的动效，不是逐帧复刻。
+首屏使用 [原创光纤背景](assets/termexo-fiber.webp)，由内置 ImageGen 生成并压缩为 WebP。页面节奏参考 [Google Antigravity 官网](https://antigravity.google/)。
 
-- 鼠标视差只在精确指针设备启用；滚动使用浏览器原生行为。
-- 首屏可暂停动效；系统开启减少动态效果时自动关闭动画。
-- 首屏设备使用真实桌面截图与手机截图的 SVG 视口裁切，显示器和手机外壳由 CSS 绘制；双向连接光点仅作场景示意，随全局动效控制暂停。
-- 离开视口或切到后台时暂停相关循环动画；JavaScript 不可用时保持静态内容可读。
+生成提示词
+
+> Use case: stylized-concept. Asset type: 16:9 background photograph for a premium dark software landing page. An abstract macro studio photograph of one continuous ribbon bundle of extremely fine pale chartreuse and jade-green fiber-optic filaments sweeping in a smooth elliptical orbit around a dark void, with a few long-exposure falling trails. The most luminous arc sits in the bottom right quadrant, sweeps toward the upper right corner, then fades into the distance. Left half and top left remain entirely dark nearly black (#111713), smooth negative space for white web typography. Right middle is also dark enough for a software screenshot composited later. Side-lit obsidian atmosphere, forest-black background, subtle analog grain, graceful sharp high contrast fiber detail, sage reflections, acid lime highlights, sophisticated and sparse contemporary design studio photography, no purple or blue. No lettering, no logo, no UI, no device, no stars or planets, no watermark. Wide horizontal image.
+
+- 光轨和工作台随原生滚动产生层次变化，悬浮视差和屏幕反光仅在精确指针设备启用。
+- 首屏可暂停动效，系统的减少动态效果偏好也会被尊重。
+- 浏览窗口及手机外壳由 CSS 绘制，内部为真实桌面与手机截图。
+- 工作台边框动画在离开视口或切到后台时暂停，MCP 播放也会停止。首页内容和指南链接可静态显示。
 - `styles.css` 同时供中英文指南使用，调整主题时需检查指南的页头和正文对比度。
 
 ```powershell

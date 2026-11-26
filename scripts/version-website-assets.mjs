@@ -6,6 +6,10 @@ const pages = {
   "index.html": [
     "app.js",
     "styles.css",
+    "home.css",
+    "assets/termexo-fiber.webp",
+    "assets/termexo-hero-desktop.webp",
+    "assets/termexo-hero-phone.webp",
     "assets/termexo-workbench-demo.mp4",
     "assets/termexo-workbench-demo.png",
   ],

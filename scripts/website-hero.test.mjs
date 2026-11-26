@@ -11,8 +11,8 @@ const app = readFileSync(new URL("app.js", site), "utf8").replace(
   "\n",
 );
 const hero = html.slice(
-  html.indexOf('<section class="hero'),
-  html.indexOf('<section class="signal-strip'),
+  html.indexOf('<section class="launch-hero'),
+  html.indexOf('<section class="launch-agents'),
 );
 const dictionaryContext = vm.createContext({});
 test("homepage keeps one complete, accessible main heading when copy changes", () => {
@@ -35,15 +35,9 @@ test("desktop and phone workflow have complete bilingual copy and honest boundar
   for (const lang of ["en", "zh"]) {
     for (const key of keys)
       assert.ok(dictionaries[lang][key]?.trim(), `${lang}: ${key}`);
-    assert.match(dictionaries[lang].heroRemoteNote, /VPN/);
-    assert.match(dictionaries[lang].heroRemoteNote, /token|令牌/);
-    assert.match(
-      dictionaries[lang].heroRemoteNote,
-      /PC running|电脑需保持运行/,
-    );
     assert.match(
       dictionaries[lang].sceneCaption,
-      /not a live session|非实时会话/,
+      /illustration|示意/,
     );
     assert.match(dictionaries[lang].demoCaption, /v0\.10\.6/);
     assert.match(dictionaries[lang].demoCaption, /Antigravity/);
@@ -51,8 +45,8 @@ test("desktop and phone workflow have complete bilingual copy and honest boundar
   }
   assert.match(dictionaries.zh.heroLine1, /AI.*Agent/);
   assert.match(dictionaries.en.heroLine1, /AI.*agents/);
-  assert.match(dictionaries.zh.heroLine2, /读回结果/);
-  assert.match(dictionaries.en.heroLine2, /Read results/);
+  assert.match(dictionaries.zh.heroLead, /MCP.*读回实际输出/);
+  assert.match(dictionaries.en.heroLead, /MCP.*read their real output/i);
   assert.match(hero, /data-i18n="heroDownload"/);
   assert.match(hero, /href="#workbench-demo"/);
   assert.doesNotMatch(
@@ -63,16 +57,16 @@ test("desktop and phone workflow have complete bilingual copy and honest boundar
     hero.indexOf("<figure"),
     hero.indexOf("</figure>") + "</figure>".length,
   );
-  assert.match(scene, /class="desktop-window"/);
-  assert.match(scene, /class="mobile-window"/);
-  assert.doesNotMatch(scene, /<(button|input|textarea)\b/);
+  assert.match(scene, /class="launch-window"/);
+  assert.match(scene, /class="launch-phone"/);
+  assert.match(scene, /href="#remote-relay"/);
   assert.match(scene, /aria-labelledby="scene-caption"/);
   assert.match(scene, /id="scene-caption"/);
 });
 
 test("remote guide follows language changes and preserves the remote chapter", () => {
   const link = {
-    dataset: { i18n: "heroRemoteGuide" },
+    dataset: { i18n: "relaySetup" },
     attrs: {},
     setAttribute(key, value) {
       this.attrs[key] = value;
@@ -98,7 +92,7 @@ test("remote guide follows language changes and preserves the remote chapter", (
       link.attrs.href,
       lang === "zh" ? "guide.html#remote" : "guide.en.html#remote",
     );
-    assert.equal(link.textContent, dictionaries[lang].heroRemoteGuide);
+    assert.equal(link.textContent, dictionaries[lang].relaySetup);
     assert.equal(
       context.document.title,
       lang === "zh"
@@ -121,9 +115,9 @@ test("static homepage links resolve and real demo artwork is used in social prev
     if (link.startsWith("#")) assert.ok(ids.includes(link.slice(1)), link);
     else assert.ok(existsSync(new URL(link.split(/[?#]/)[0], site)), link);
   }
-  assert.match(html, /href="guide.en.html#remote"\s+data-i18n="heroRemoteGuide"/);
+  assert.match(html, /href="guide.en.html#remote"\s+data-i18n="relaySetup"/);
   assert.match(html, /property="og:image"\s+content="https:\/\/www.termexo.com\/assets\/termexo-workbench-demo.png\?v=[a-f0-9]{12}"/);
-  assert.match(html, /<video controls playsinline preload="none" poster="assets\/termexo-workbench-demo.png\?v=[a-f0-9]{12}"/);
+  assert.match(html, /<video controls playsinline preload="none" poster="assets\/termexo-hero-desktop.webp\?v=[a-f0-9]{12}"/);
   assert.match(html, /<source src="assets\/termexo-workbench-demo.mp4\?v=[a-f0-9]{12}" type="video\/mp4"/);
   const { version } = JSON.parse(
     readFileSync(new URL("../package.json", import.meta.url), "utf8"),
@@ -136,17 +130,22 @@ test("static homepage links resolve and real demo artwork is used in social prev
 });
 
 test("homepage asset versions match their content so returning visitors fetch new translations", () => {
-  for (const asset of ["app.js", "styles.css", "assets/termexo-workbench-demo.mp4", "assets/termexo-workbench-demo.png"]) {
+  for (const asset of ["app.js", "styles.css", "home.css", "assets/termexo-fiber.webp", "assets/termexo-hero-desktop.webp", "assets/termexo-hero-phone.webp", "assets/termexo-workbench-demo.mp4", "assets/termexo-workbench-demo.png"]) {
     // Match Git's normalized text content across LF and CRLF checkouts.
     const bytes = readFileSync(new URL(asset, site));
     const contents = /\.(js|css)$/.test(asset) ? bytes.toString('utf8').replace(/\r\n/g, "\n") : bytes;
     const version = createHash("sha256").update(contents).digest("hex").slice(0, 12);
-    assert.ok(html.includes(`"${asset}?v=${version}"`), `Refresh version for ${asset}`);
+    const reference = `${asset}?v=${version}"`;
+    assert.ok(
+      html.includes(`"${reference}`) || html.includes(`"https://www.termexo.com/${reference}`),
+      `Refresh version for ${asset}`,
+    );
   }
 });
 
 test("every use-case label switches to Chinese and back, including the direction heading", () => {
-  const section = html.slice(html.indexOf('id="solutions"'), html.indexOf('id="workbench"'));
+  const start = html.indexOf('id="solutions"');
+  const section = html.slice(start, html.indexOf("</section>", start));
   const elements = [...section.matchAll(/data-i18n="([^"]+)"/g)].map((match) => ({
     dataset: { i18n: match[1] }, textContent: "",
   }));
