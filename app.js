@@ -3,7 +3,7 @@ const translations = {
     navMcp: "MCP control",
     navFleet: "Fleet",
     fleetIndex: "ECOSYSTEM / TERMEXO FLEET · PREVIEW V0.1",
-    fleetTitle: "Scale Termexo into an autonomous multi-machine AI fleet.",
+    fleetTitle: "Run agents across machines.",
     fleetLead:
       "Termexo Fleet is the companion desktop commander built on Termexo MCP. Grade tasks across L1–L4 difficulty tiers, route accounts & models automatically, let parent agents spawn worktree-isolated sub-agents, and track savings across multiple Termexo machines — with zero black-box execution.",
     fleetTabDeck: "Mission Deck & DAG",
@@ -37,16 +37,20 @@ const translations = {
     fleetDownloadBtn: "Download Fleet Preview (Windows)",
     fleetRepoBtn: "Explore Termexo Fleet on GitHub →",
     mcpIndex: "MCP / AGENTS IN CONTROL",
-    mcpTitle: "Stop carrying messages between agents.",
-    mcpLead: "MCP is the connection that lets an AI use Termexo's tools. You describe the next step; your connected agent can find another terminal, send input and read its output.",
-    mcpSourceLabel: "YOU ASK A CONNECTED AI",
-    mcpSourceTitle: "One clear instruction",
-    mcpSourceBody: "Tell the agent what to send and which reply to bring back.",
-    mcpHubLabel: "THE LOCAL CONNECTION",
-    mcpHubBody: "Find the terminal → send input → submit Enter → read output",
-    mcpLocal: "Runs locally on Windows, macOS and Linux",
-    mcpTargetLabel: "SIX KINDS OF AGENT TERMINALS",
-    mcpFlowCaption: "How the connection works. The target terminal must be running; a reply comes from its actual output.",
+    mcpTitle: "From prompt to output.",
+    mcpLead: "Pick a step to see how a connected AI finds a terminal through Termexo MCP, sends an instruction and reads what the agent returns.",
+    mcpDemoLabel: "Interactive example",
+    mcpPlay: "Play example",
+    mcpStop: "Stop example",
+    mcpDemoSteps: "MCP example steps",
+    mcpConnect: "Connect",
+    mcpConnectBody: "Find a running terminal.",
+    mcpSend: "Send an instruction",
+    mcpSendBody: "Submit input to the selected agent.",
+    mcpRead: "Read the output",
+    mcpReadBody: "See what the terminal returned.",
+    mcpSetup: "Set up MCP on your computer",
+    mcpFlowCaption: "Illustrative output. Your results come from a running terminal connected to Termexo.",
     mcpStep1Title: "Prepare your workspace",
     mcpStep1Body: "Open Termexo and a project. Make sure your agent CLI is installed and signed in, and keep Termexo running.",
     mcpStep2Title: "Enable the connection",
@@ -95,37 +99,17 @@ const translations = {
     navRoadmap: "Roadmap",
     navPrinciples: "Privacy",
     navGuide: "User guide",
+    navDownload: "Download",
     github: "GitHub",
-    eyebrow: "WINDOWS + MACOS + LINUX / MCP AGENT CONTROL",
-    heroLine1: "Let AI operate your agents.",
-    heroLine2: "Send work. Read results.",
-    heroLead:
-      "Connect an AI to Termexo MCP. Ask it to find a Claude Code, Codex, OpenCode, Pi Agent, Grok Build or Antigravity terminal, send an instruction and read the real reply. Keep tasks, sessions and optional phone access together on Windows, macOS or Linux.",
-    heroRemoteNote:
-      "Phone access is optional. Keep your PC running and use a reachable HTTPS relay plus a desktop access token, or connect directly over a trusted LAN or VPN.",
-    heroDownload: "Download desktop app",
-    heroMcp: "See how MCP works",
-    heroDemo: "Watch the 30-second workbench demo →",
-    heroRemoteGuide:
-      "Set up remote relay access ↗",
-    sceneHeading: "One workspace. Two ways in.",
-    sceneDesktop: "RUN ON YOUR PC",
-    sceneMobile: "CONTINUE ON YOUR PHONE",
-    sceneTask: "› Review the latest changes",
-    sceneResult: "Review complete. Ready for tests.",
-    sceneWaiting: "Waiting for your next instruction",
-    sceneHost: "Session runs on this PC",
-    sceneDesktopNote:
-      "Your agents and project stay on the host. No session to move or restart.",
-    sceneConnection:
-      "Relay · HTTPS",
-    sceneSync: "Two-way connection",
-    sceneSameSession: "The same live terminal",
-    sceneInstruction: "› Run the tests and summarize any failures.",
-    sceneContinue: "↳ Continuing on your PC…",
-    sceneInput: "Send the next instruction",
-    sceneCaption:
-      "Real Termexo screenshots: desktop v0.10.6 and an earlier phone interface. Devices and connection are illustrative, not a live session.",
+    eyebrow: "Local-first AI workspace",
+    heroLine1: "Your AI agents.",
+    heroLine2: "One workbench.",
+    heroLead: "Run coding agents side by side. With Termexo MCP, a connected AI can send instructions to your terminals and read their real output.",
+    heroDownload: "Download Termexo",
+    heroMcp: "Explore MCP control",
+    heroDemo: "Watch demo",
+    launchRemote: "Optional phone access",
+    sceneCaption: "Termexo desktop and mobile screenshots. Connection shown for illustration.",
     runFromNpm: "Run it now",
     download: "Download installer",
     copyCommand: "Copy",
@@ -244,10 +228,10 @@ const translations = {
     remoteCaption:
       "The same terminal the desktop is running, one screen at a time.",
 
-    roadmapTitle: "What comes next.",
+    roadmapTitle: "Release milestones.",
     roadmapLead:
-      "Everything above already works. Here is what has shipped, and what is being built next — anything still marked planned is not being sold as finished.",
-    current: "YOU ARE HERE",
+      "See how the workbench developed, or open GitHub for the latest release notes.",
+    roadmapArchive: "Browse earlier milestones",
     shipped: "SHIPPED",
     planned: "PLANNED",
     roadmap02Title: "Run several agents side by side",
@@ -299,7 +283,7 @@ const translations = {
     starGithub: "Star on GitHub",
     supportProject:
       "Built in the open, under the MIT license. If Termexo helps your workflow, a GitHub Star helps others discover it. Bug reports and contributions are welcome too.",
-    indexWorkbench: "01 / WORKBENCH",
+    indexWorkbench: "WORKBENCH",
     indexAttention: "02 / NEVER MISS ONE",
     indexSession: "03 / NOTHING IS LOST",
     indexModel: "04 / MODEL ROUTING",
@@ -338,16 +322,20 @@ const translations = {
   zh: {
     navMcp: "MCP 操控",
     mcpIndex: "MCP / 让 AI 操控 AGENT",
-    mcpTitle: "不用再给 Agent 来回复制消息。",
-    mcpLead: "MCP 就是让 AI 使用 Termexo 工具的连接。你说出下一步，接入的 Agent 就能找到另一个终端、发送指令，再把它的实际输出读回来。",
-    mcpSourceLabel: "你告诉已接入的 AI",
-    mcpSourceTitle: "一句清楚的指令",
-    mcpSourceBody: "说明要发给哪个 Agent，以及需要读回什么结果。",
-    mcpHubLabel: "本地连接",
-    mcpHubBody: "找到终端 → 发送指令 → 提交回车 → 读取输出",
-    mcpLocal: "本地运行于 Windows、macOS 和 Linux",
-    mcpTargetLabel: "六种 AGENT 终端",
-    mcpFlowCaption: "连接流程示意。目标终端需保持运行，回复来自终端的真实输出。",
+    mcpTitle: "从指令到结果。",
+    mcpLead: "点选任一步，看看接入的 AI 如何通过 Termexo MCP 找到终端、发出指令，再读回 Agent 的实际输出。",
+    mcpDemoLabel: "交互示例",
+    mcpPlay: "播放示例",
+    mcpStop: "停止播放",
+    mcpDemoSteps: "MCP 示例步骤",
+    mcpConnect: "找到终端",
+    mcpConnectBody: "在项目中找到正在运行的 Agent。",
+    mcpSend: "发送指令",
+    mcpSendBody: "把指令提交给选中的 Agent。",
+    mcpRead: "读回结果",
+    mcpReadBody: "查看终端实际返回的内容。",
+    mcpSetup: "在电脑上配置 MCP",
+    mcpFlowCaption: "输出为示意。使用时，回复来自 Termexo 中运行的真实终端。",
     mcpStep1Title: "准备好工作台",
     mcpStep1Body: "打开 Termexo 和项目，确认 Agent CLI 已安装、已登录，并保持 Termexo 运行。",
     mcpStep2Title: "打开 MCP 连接",
@@ -396,35 +384,17 @@ const translations = {
     navRoadmap: "开发计划",
     navPrinciples: "隐私",
     navGuide: "使用说明",
+    navDownload: "下载",
     github: "GitHub",
-    eyebrow: "WINDOWS + MACOS + LINUX / MCP 操控 AGENT",
-    heroLine1: "让 AI 操控你的 Agent。",
-    heroLine2: "发出指令，读回结果。",
-    heroLead:
-      "通过 Termexo MCP，让 AI 找到 Claude Code、Codex、OpenCode、Pi Agent、Grok Build 或 Antigravity 终端，发送指令，再读回真实回复。在 Windows、macOS 或 Linux 上集中管理任务、会话，并按需接入手机访问。",
-    heroRemoteNote:
-      "手机访问按需开启：电脑需保持运行，使用双方可达的 HTTPS 中继与桌面访问令牌，也可在可信局域网或 VPN 内直连。",
-    heroDownload: "下载桌面版",
-    heroMcp: "了解 MCP 怎么用",
-    heroDemo: "看 30 秒工作台实录 →",
-    heroRemoteGuide:
-      "了解如何配置中继访问 ↗",
-    sceneHeading: "同一个工作台，电脑与手机接续操作。",
-    sceneDesktop: "电脑运行 AGENT",
-    sceneMobile: "手机远程接着操作",
-    sceneTask: "› 检查最新的代码变更",
-    sceneResult: "检查完成，可以开始测试。",
-    sceneWaiting: "等待你的下一步指令",
-    sceneHost: "会话在这台电脑上运行",
-    sceneDesktopNote: "Agent 和项目留在电脑上，无需搬运会话，也无需重新启动。",
-    sceneConnection:
-      "中继访问 · HTTPS",
-    sceneSync: "双向连接",
-    sceneSameSession: "同一个正在运行的终端",
-    sceneInstruction: "› 运行测试，并汇总失败项。",
-    sceneContinue: "↳ 正在电脑上继续执行…",
-    sceneInput: "发送下一步指令",
-    sceneCaption: "真实 Termexo 界面截图：桌面为 v0.10.6，手机为早期版本；设备与连接为场景示意，非实时会话。",
+    eyebrow: "本地优先的 AI 开发工作台",
+    heroLine1: "多个 AI Agent。",
+    heroLine2: "一个工作台。",
+    heroLead: "把编程 Agent 集中在同一个工作台。通过 Termexo MCP，让接入的 AI 向终端发指令、读回实际输出。",
+    heroDownload: "下载 Termexo",
+    heroMcp: "探索 MCP 操控",
+    heroDemo: "观看 30 秒实录",
+    launchRemote: "按需开启手机访问",
+    sceneCaption: "Termexo 桌面与手机实拍截图，连接效果为示意。",
     runFromNpm: "立即运行",
     download: "下载安装包",
     copyCommand: "复制",
@@ -528,10 +498,10 @@ const translations = {
       "电脑保持开机、Termexo 连接中继；中继登录与桌面访问令牌独立校验",
     remoteCaption: "屏幕上是同一个终端，桌面端正在跑的那个。",
 
-    roadmapTitle: "接下来做什么。",
+    roadmapTitle: "版本里程碑。",
     roadmapLead:
-      "上面写的都已经能用了。这里是已经发布的部分和接下来要做的顺序——标着「计划中」的都还没做完，不会当成已完成来讲。",
-    current: "现在在这",
+      "回顾工作台的演进，也可以前往 GitHub 查看最新版本说明。",
+    roadmapArchive: "展开早期里程碑",
     shipped: "已发布",
     planned: "计划中",
     roadmap02Title: "几个 Agent 并排干活",
@@ -582,7 +552,7 @@ const translations = {
     starGithub: "在 GitHub 上 Star",
     supportProject:
       "MIT 开源。如果 Termexo 帮到了你的工作，欢迎在 GitHub 点个 Star，让更多开发者发现它；也欢迎反馈问题和参与贡献。",
-    indexWorkbench: "01 / 工作台",
+    indexWorkbench: "工作台",
     indexAttention: "02 / 一个都不漏",
     indexSession: "03 / 什么都没丢",
     indexModel: "04 / 模型路由",
@@ -618,7 +588,7 @@ const translations = {
     relayCompatibility: "桌面版支持 Windows x64、macOS Apple Silicon / Intel 和 Linux x64。中继支持 Linux / macOS / Windows、x64 / arm64 和容器部署。可使用只读链接分享查看，不开放终端输入。",
     navFleet: "Fleet 舰队",
     fleetIndex: "生态扩展 / TERMEXO FLEET · 预览版 V0.1",
-    fleetTitle: "把多台 Termexo 编织成自主协同的 AI 研发舰队。",
+    fleetTitle: "把多台电脑的 Agent 连起来。",
     fleetLead:
       "Termexo Fleet 是基于 Termexo MCP 打造的独立桌面指挥中枢：按 L1–L4 难度自动路由账号与模型、允许父 Agent 在独立 Git Worktree 中自主派生子 Agent、统一调度多台本机/局域网 Termexo 并量化节省成本——全程零黑盒，所有任务真实运行在 Termexo 终端中。",
     fleetTabDeck: "任务甲板与 DAG",
@@ -691,12 +661,17 @@ function setLanguage(language) {
     if (["mcpGuide", "mcpFullGuide"].includes(element.dataset.i18n)) {
       element.setAttribute("href", language === "zh" ? "guide.html#ai-control" : "guide.en.html#ai-control");
     }
-    if (["heroRemoteGuide", "relaySetup"].includes(element.dataset.i18n)) {
+    if (element.dataset.i18n === "relaySetup") {
       element.setAttribute(
         "href",
         language === "zh" ? "guide.html#remote" : "guide.en.html#remote",
       );
     }
+  });
+
+  document.querySelectorAll("[data-i18n-aria]").forEach((element) => {
+    const value = dictionary[element.dataset.i18nAria];
+    if (value) element.setAttribute("aria-label", value);
   });
 
   languageButtons.forEach((button) => {
@@ -776,7 +751,7 @@ const revealObserver =
             }
           });
         },
-        { rootMargin: "0px 0px -8% 0px", threshold: 0.08 },
+        { rootMargin: "0px 0px -2% 0px", threshold: 0.02 },
       )
     : null;
 
@@ -784,14 +759,6 @@ document.querySelectorAll(".reveal").forEach((element) => {
   if (revealObserver) revealObserver.observe(element);
   else element.classList.add("visible");
 });
-document.documentElement.classList.add("motion-ready");
-
-window.addEventListener(
-  "scroll",
-  () => header.classList.toggle("scrolled", window.scrollY > 16),
-  { passive: true },
-);
-
 document.querySelector("[data-year]").textContent = new Date().getFullYear();
 
 let storedLanguage;
@@ -800,106 +767,515 @@ try {
 } catch {
   /* Use the default language. */
 }
-setLanguage(storedLanguage || "en");
+setLanguage(storedLanguage || (navigator.language.startsWith("zh") ? "zh" : "en"));
 
-// Native scrolling drives the scene; there is no scroll interception or perpetual render loop.
 const motionPreference = window.matchMedia("(prefers-reduced-motion: reduce)");
 const precisePointer = window.matchMedia("(hover: hover) and (pointer: fine)");
 const motionToggle = document.querySelector("[data-motion-toggle]");
 const motionLabel = document.querySelector("[data-motion-label]");
-const hero = document.querySelector(".hero");
-const scene = document.querySelector(".hero-scene");
+const hero = document.querySelector(".launch-hero");
+const scene = hero.querySelector(".launch-scene");
 const workbench = document.querySelector("#workbench .product-frame");
-let motionPaused = motionPreference.matches;
+const ctaSection = document.querySelector("#download");
+let motionPausedByUser = false;
 let motionFrame = 0;
 let pointerX = 0;
 let pointerY = 0;
 
+function isMotionPaused() {
+  return motionPausedByUser || motionPreference.matches;
+}
+
+/* ── 1. Zero-Gravity Orbital Particle Field (Hero Canvas) ────────────────── */
+const heroCanvas = document.querySelector("[data-hero-canvas]");
+const heroParticlesState = {
+  active: true,
+  raf: 0,
+  width: 0,
+  height: 0,
+  dpr: 1,
+  mouseX: -9999,
+  mouseY: -9999,
+  mouseActive: false,
+  ripples: [],
+  particles: [],
+  time: 0,
+};
+
+function initHeroParticles() {
+  if (!heroCanvas || typeof heroCanvas.getContext !== "function") return;
+  const ctx = heroCanvas.getContext("2d");
+  if (!ctx) return;
+
+  const palette = [
+    "rgba(16, 185, 129, ",   // Termexo emerald
+    "rgba(14, 165, 233, ",   // Spatial cyan
+    "rgba(99, 102, 241, ",   // Antigravity iris
+    "rgba(17, 19, 24, ",     // Crisp obsidian
+  ];
+
+  const resize = () => {
+    const rect = hero.getBoundingClientRect();
+    heroParticlesState.width = Math.max(1, rect.width);
+    heroParticlesState.height = Math.max(1, rect.height);
+    heroParticlesState.dpr = Math.min(window.devicePixelRatio || 1, 2);
+    heroCanvas.width = Math.round(heroParticlesState.width * heroParticlesState.dpr);
+    heroCanvas.height = Math.round(heroParticlesState.height * heroParticlesState.dpr);
+    ctx.setTransform(heroParticlesState.dpr, 0, 0, heroParticlesState.dpr, 0, 0);
+
+    const count = heroParticlesState.width < 650 ? 64 : 148;
+    const cx = heroParticlesState.width * 0.5;
+    const cy = Math.min(heroParticlesState.height * 0.29, 320);
+    const rxBase = Math.min(heroParticlesState.width * 0.48, 660);
+    const ryBase = Math.min(heroParticlesState.height * 0.33, 300);
+
+    heroParticlesState.particles = Array.from({ length: count }, (_, i) => {
+      const ring = i % 3;
+      const angle = (i / count) * Math.PI * 2 + ring * 0.42;
+      // Frame the centered headline cleanly in a luminous outer halo
+      const spread = 0.68 + ring * 0.19 + (Math.sin(i * 12.9898) * 0.5 + 0.5) * 0.22;
+      const homeX = cx + Math.cos(angle) * rxBase * spread;
+      const homeY = cy + Math.sin(angle) * ryBase * spread;
+      return {
+        angle,
+        speed: (0.00042 + (i % 7) * 0.00011) * (ring === 1 ? -1 : 1),
+        spread,
+        x: homeX,
+        y: homeY,
+        vx: 0,
+        vy: 0,
+        size: 1.6 + (i % 4) * 0.65,
+        capsule: i % 3 !== 0,
+        length: 5 + (i % 4) * 3.2,
+        alpha: 0.22 + (i % 5) * 0.11,
+        color: palette[i % palette.length],
+        phase: i * 0.71,
+      };
+    });
+    drawHeroFrame(ctx, true);
+  };
+
+  function drawHeroFrame(context, staticOnly = false) {
+    const { width, height, particles, ripples } = heroParticlesState;
+    context.clearRect(0, 0, width, height);
+    const cx = width * 0.5;
+    const cy = Math.min(height * 0.29, 320);
+    const rxBase = Math.min(width * 0.48, 660);
+    const ryBase = Math.min(height * 0.33, 300);
+
+    if (!staticOnly) heroParticlesState.time += 0.016;
+    const t = heroParticlesState.time;
+
+    // Subtle expanding zero-gravity shockwaves on click
+    for (let r = ripples.length - 1; r >= 0; r--) {
+      const ripple = ripples[r];
+      if (!staticOnly) {
+        ripple.radius += 7.5;
+        ripple.alpha *= 0.945;
+      }
+      if (ripple.alpha < 0.015) {
+        ripples.splice(r, 1);
+        continue;
+      }
+      context.beginPath();
+      context.arc(ripple.x, ripple.y, ripple.radius, 0, Math.PI * 2);
+      context.strokeStyle = `rgba(16, 185, 129, ${ripple.alpha.toFixed(3)})`;
+      context.lineWidth = 1.25;
+      context.stroke();
+    }
+
+    const nearCursor = [];
+    for (let i = 0; i < particles.length; i++) {
+      const p = particles[i];
+      if (!staticOnly) {
+        p.angle += p.speed;
+      }
+      const targetX = cx + Math.cos(p.angle) * rxBase * p.spread + Math.sin(t + p.phase) * 8;
+      const targetY = cy + Math.sin(p.angle) * ryBase * p.spread + Math.cos(t * 0.8 + p.phase) * 6;
+
+      if (!staticOnly) {
+        p.vx += (targetX - p.x) * 0.032;
+        p.vy += (targetY - p.y) * 0.032;
+
+        if (heroParticlesState.mouseActive) {
+          const dx = p.x - heroParticlesState.mouseX;
+          const dy = p.y - heroParticlesState.mouseY;
+          const distSq = dx * dx + dy * dy;
+          const radius = 185;
+          if (distSq < radius * radius && distSq > 1) {
+            const dist = Math.sqrt(distSq);
+            const force = (1 - dist / radius) * 1.5;
+            const nx = dx / dist;
+            const ny = dy / dist;
+            p.vx += nx * force * 1.9 - ny * force * 0.7;
+            p.vy += ny * force * 1.9 + nx * force * 0.7;
+            if (dist < 148) nearCursor.push(p);
+          }
+        }
+
+        for (let r = 0; r < ripples.length; r++) {
+          const ripple = ripples[r];
+          const dx = p.x - ripple.x;
+          const dy = p.y - ripple.y;
+          const dist = Math.hypot(dx, dy) || 1;
+          if (Math.abs(dist - ripple.radius) < 38) {
+            p.vx += (dx / dist) * 1.7 * ripple.alpha * 3;
+            p.vy += (dy / dist) * 1.7 * ripple.alpha * 3;
+          }
+        }
+
+        p.vx *= 0.86;
+        p.vy *= 0.86;
+        p.x += p.vx;
+        p.y += p.vy;
+      } else {
+        p.x = targetX;
+        p.y = targetY;
+      }
+
+      // Softly attenuate particles that drift close to the center headline zone
+      const normCenter = Math.hypot((p.x - cx) / Math.max(240, rxBase * 0.56), (p.y - cy) / Math.max(135, ryBase * 0.58));
+      const haloMask = Math.min(1, Math.max(0.08, (normCenter - 0.55) / 0.55));
+      const breathe = 0.82 + Math.sin(t * 1.4 + p.phase) * 0.18;
+      const alpha = p.alpha * breathe * haloMask;
+      if (alpha < 0.025) continue;
+
+      context.fillStyle = `${p.color}${alpha.toFixed(3)})`;
+      if (p.capsule) {
+        const heading = Math.atan2(p.y - cy, p.x - cx) + Math.PI * 0.5;
+        context.save();
+        context.translate(p.x, p.y);
+        context.rotate(heading);
+        const w = p.length * breathe;
+        const h = Math.max(1.8, p.size * 0.82);
+        context.beginPath();
+        context.roundRect(-w * 0.5, -h * 0.5, w, h, h * 0.5);
+        context.fill();
+        context.restore();
+      } else {
+        context.beginPath();
+        context.arc(p.x, p.y, p.size * breathe, 0, Math.PI * 2);
+        context.fill();
+      }
+    }
+
+    // Fleeting agent-mesh constellation threads near cursor
+    if (!staticOnly && nearCursor.length > 1) {
+      context.lineWidth = 0.85;
+      for (let i = 0; i < nearCursor.length; i++) {
+        for (let j = i + 1; j < nearCursor.length; j++) {
+          const a = nearCursor[i];
+          const b = nearCursor[j];
+          const d = Math.hypot(a.x - b.x, a.y - b.y);
+          if (d < 92) {
+            const opacity = (1 - d / 92) * 0.22;
+            context.beginPath();
+            context.moveTo(a.x, a.y);
+            context.lineTo(b.x, b.y);
+            context.strokeStyle = `rgba(16, 185, 129, ${opacity.toFixed(3)})`;
+            context.stroke();
+          }
+        }
+      }
+    }
+  }
+
+  const loop = () => {
+    heroParticlesState.raf = 0;
+    if (!heroParticlesState.active || isMotionPaused() || document.hidden) return;
+    drawHeroFrame(ctx, false);
+    heroParticlesState.raf = requestAnimationFrame(loop);
+  };
+
+  heroParticlesState.start = () => {
+    if (!heroParticlesState.raf && heroParticlesState.active && !isMotionPaused() && !document.hidden) {
+      heroParticlesState.raf = requestAnimationFrame(loop);
+    }
+  };
+  heroParticlesState.stop = () => {
+    if (heroParticlesState.raf) {
+      cancelAnimationFrame(heroParticlesState.raf);
+      heroParticlesState.raf = 0;
+    }
+    drawHeroFrame(ctx, true);
+  };
+
+  hero.addEventListener("pointermove", (event) => {
+    if (isMotionPaused() || !precisePointer.matches) return;
+    const rect = hero.getBoundingClientRect();
+    heroParticlesState.mouseX = event.clientX - rect.left;
+    heroParticlesState.mouseY = event.clientY - rect.top;
+    heroParticlesState.mouseActive = true;
+  }, { passive: true });
+
+  hero.addEventListener("pointerleave", () => {
+    heroParticlesState.mouseActive = false;
+  });
+
+  hero.addEventListener("pointerdown", (event) => {
+    if (isMotionPaused() || event.target.closest("a, button")) return;
+    const rect = hero.getBoundingClientRect();
+    heroParticlesState.ripples.push({
+      x: event.clientX - rect.left,
+      y: event.clientY - rect.top,
+      radius: 12,
+      alpha: 0.38,
+    });
+  }, { passive: true });
+
+  window.addEventListener("resize", resize, { passive: true });
+  resize();
+}
+
+/* ── 2. Morphing Obsidian Particle Constellation (CTA Canvas) ────────────── */
+const ctaCanvas = document.querySelector("[data-cta-canvas]");
+const ctaParticlesState = {
+  active: false,
+  raf: 0,
+  width: 0,
+  height: 0,
+  dpr: 1,
+  time: 0,
+  particles: [],
+};
+
+function initCtaParticles() {
+  if (!ctaCanvas || !ctaSection || typeof ctaCanvas.getContext !== "function") return;
+  const ctx = ctaCanvas.getContext("2d");
+  if (!ctx) return;
+
+  const count = 132;
+  const colors = [
+    "rgba(52, 211, 153, ",
+    "rgba(56, 189, 248, ",
+    "rgba(129, 140, 248, ",
+    "rgba(241, 245, 249, ",
+  ];
+
+  const resize = () => {
+    const rect = ctaSection.getBoundingClientRect();
+    ctaParticlesState.width = Math.max(1, rect.width);
+    ctaParticlesState.height = Math.max(1, rect.height);
+    ctaParticlesState.dpr = Math.min(window.devicePixelRatio || 1, 2);
+    ctaCanvas.width = Math.round(ctaParticlesState.width * ctaParticlesState.dpr);
+    ctaCanvas.height = Math.round(ctaParticlesState.height * ctaParticlesState.dpr);
+    ctx.setTransform(ctaParticlesState.dpr, 0, 0, ctaParticlesState.dpr, 0, 0);
+
+    if (ctaParticlesState.particles.length === 0) {
+      ctaParticlesState.particles = Array.from({ length: count }, (_, i) => ({
+        x: ctaParticlesState.width * 0.72,
+        y: ctaParticlesState.height * 0.5,
+        size: 1.2 + (i % 4) * 0.55,
+        alpha: 0.25 + (i % 5) * 0.12,
+        color: colors[i % colors.length],
+      }));
+    }
+    drawCta(ctx, true);
+  };
+
+  function formationTarget(index, mode, w, h, t) {
+    const cx = w > 760 ? w * 0.76 : w * 0.5;
+    const cy = h * 0.52;
+    const u = index / count;
+    if (mode === 0) {
+      // Orbital Halo
+      const a = u * Math.PI * 2 + t * 0.25;
+      const ring = 95 + (index % 3) * 38;
+      return [cx + Math.cos(a) * ring * 1.35, cy + Math.sin(a) * ring * 0.78];
+    }
+    if (mode === 1) {
+      // Multi-Terminal Matrix Grid
+      const cols = 12;
+      const rows = Math.ceil(count / cols);
+      const col = index % cols;
+      const row = Math.floor(index / cols);
+      const gx = (col - (cols - 1) / 2) * 26;
+      const gy = (row - (rows - 1) / 2) * 22;
+      return [cx + gx + Math.sin(t + row * 0.4) * 6, cy + gy + Math.cos(t + col * 0.4) * 6];
+    }
+    // Harmonic Signal Wave
+    const wx = (u - 0.5) * Math.min(w * 0.52, 420);
+    const wy = Math.sin(u * Math.PI * 5 + t * 1.4) * 64 + Math.cos(u * Math.PI * 9 - t) * 22;
+    return [cx + wx, cy + wy];
+  }
+
+  function drawCta(context, staticOnly = false) {
+    const { width, height, particles } = ctaParticlesState;
+    context.clearRect(0, 0, width, height);
+    if (!staticOnly) ctaParticlesState.time += 0.016;
+    const t = ctaParticlesState.time;
+    const mode = Math.floor(t / 5.5) % 3;
+
+    for (let i = 0; i < particles.length; i++) {
+      const p = particles[i];
+      const [tx, ty] = formationTarget(i, mode, width, height, t);
+      if (staticOnly) {
+        p.x = tx;
+        p.y = ty;
+      } else {
+        p.x += (tx - p.x) * 0.045;
+        p.y += (ty - p.y) * 0.045;
+      }
+      if (i > 0 && i % 2 === 0) {
+        const prev = particles[i - 1];
+        const d = Math.hypot(p.x - prev.x, p.y - prev.y);
+        if (d < 54) {
+          context.beginPath();
+          context.moveTo(prev.x, prev.y);
+          context.lineTo(p.x, p.y);
+          context.strokeStyle = `rgba(52, 211, 153, ${((1 - d / 54) * 0.22).toFixed(3)})`;
+          context.lineWidth = 0.85;
+          context.stroke();
+        }
+      }
+      context.beginPath();
+      context.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+      context.fillStyle = `${p.color}${p.alpha.toFixed(2)})`;
+      context.fill();
+    }
+  }
+
+  const loop = () => {
+    ctaParticlesState.raf = 0;
+    if (!ctaParticlesState.active || isMotionPaused() || document.hidden) return;
+    drawCta(ctx, false);
+    ctaParticlesState.raf = requestAnimationFrame(loop);
+  };
+
+  ctaParticlesState.start = () => {
+    if (!ctaParticlesState.raf && ctaParticlesState.active && !isMotionPaused() && !document.hidden) {
+      ctaParticlesState.raf = requestAnimationFrame(loop);
+    }
+  };
+  ctaParticlesState.stop = () => {
+    if (ctaParticlesState.raf) {
+      cancelAnimationFrame(ctaParticlesState.raf);
+      ctaParticlesState.raf = 0;
+    }
+    drawCta(ctx, true);
+  };
+
+  window.addEventListener("resize", resize, { passive: true });
+  resize();
+}
+
+/* ── 3. Magnetic Pill Buttons, Cursor Spotlights & 3D Gallery Frames ─────── */
+function bindInteractiveSurfaces() {
+  if (!precisePointer.matches) return;
+
+  document.querySelectorAll("[data-magnetic]").forEach((el) => {
+    el.addEventListener("pointermove", (event) => {
+      if (isMotionPaused()) return;
+      const rect = el.getBoundingClientRect();
+      const dx = (event.clientX - (rect.left + rect.width / 2)) * 0.16;
+      const dy = (event.clientY - (rect.top + rect.height / 2)) * 0.22;
+      el.style.transform = `translate3d(${dx.toFixed(1)}px, ${dy.toFixed(1)}px, 0)`;
+    }, { passive: true });
+    el.addEventListener("pointerleave", () => {
+      el.style.transform = "";
+    });
+  });
+
+  document.querySelectorAll("[data-spotlight]").forEach((el) => {
+    el.addEventListener("pointermove", (event) => {
+      if (isMotionPaused()) return;
+      const rect = el.getBoundingClientRect();
+      el.style.setProperty("--mx", `${(event.clientX - rect.left).toFixed(0)}px`);
+      el.style.setProperty("--my", `${(event.clientY - rect.top).toFixed(0)}px`);
+    }, { passive: true });
+  });
+
+  document.querySelectorAll("[data-tilt-card]").forEach((card) => {
+    card.addEventListener("pointermove", (event) => {
+      if (isMotionPaused()) return;
+      const rect = card.getBoundingClientRect();
+      const rx = ((event.clientY - rect.top) / rect.height - 0.5) * -4.2;
+      const ry = ((event.clientX - rect.left) / rect.width - 0.5) * 4.8;
+      card.style.setProperty("--card-rx", `${rx.toFixed(2)}deg`);
+      card.style.setProperty("--card-ry", `${ry.toFixed(2)}deg`);
+    }, { passive: true });
+    card.addEventListener("pointerleave", () => {
+      card.style.removeProperty("--card-rx");
+      card.style.removeProperty("--card-ry");
+    });
+  });
+}
+
 function renderMotion() {
   motionFrame = 0;
-  if (motionPaused || document.hidden) return;
-  const heroBounds = hero.getBoundingClientRect();
-  if (heroBounds.bottom > 0 && heroBounds.top < window.innerHeight) {
-    const progress = Math.min(
-      1,
-      Math.max(0, -heroBounds.top / heroBounds.height),
-    );
-    scene.style.setProperty("--scene-scroll", progress.toFixed(3));
+  const scrollRange = document.documentElement.scrollHeight - window.innerHeight;
+  const progress = scrollRange > 0 ? Math.min(1, Math.max(0, window.scrollY / scrollRange)) : 0;
+  header.style.setProperty("--page-progress", progress.toFixed(4));
+  header.classList.toggle("scrolled", window.scrollY > 16);
+
+  if (isMotionPaused() || document.hidden) return;
+  const bounds = hero.getBoundingClientRect();
+  if (bounds.bottom > 0 && bounds.top < window.innerHeight) {
+    const travel = Math.min(1, Math.max(0, -bounds.top / bounds.height));
+    hero.style.setProperty("--art-shift", `${(travel * 54).toFixed(1)}px`);
+    scene.style.setProperty("--device-shift", `${(travel * -28).toFixed(1)}px`);
     scene.style.setProperty("--pointer-x", `${pointerX.toFixed(2)}deg`);
     scene.style.setProperty("--pointer-y", `${pointerY.toFixed(2)}deg`);
+    scene.style.setProperty("--glint-x", `${(50 + pointerX * 14).toFixed(1)}%`);
+    scene.style.setProperty("--glint-y", `${(50 - pointerY * 18).toFixed(1)}%`);
   }
-  const frameBounds = workbench.getBoundingClientRect();
-  if (frameBounds.bottom > 0 && frameBounds.top < window.innerHeight) {
-    const progress = Math.min(
-      1,
-      Math.max(
-        0,
-        (window.innerHeight - frameBounds.top) / (window.innerHeight * 0.8),
-      ),
-    );
-    workbench.style.setProperty(
-      "--frame-scale",
-      (0.9 + progress * 0.1).toFixed(4),
-    );
-    workbench.style.setProperty(
-      "--frame-tilt",
-      `${((1 - progress) * 7).toFixed(2)}deg`,
-    );
+  const frame = workbench.getBoundingClientRect();
+  if (frame.bottom > 0 && frame.top < window.innerHeight) {
+    const entry = Math.min(1, Math.max(0, (window.innerHeight - frame.top) / (window.innerHeight * 0.72)));
+    workbench.style.setProperty("--frame-scale", (0.93 + entry * 0.07).toFixed(4));
+    workbench.style.setProperty("--frame-tilt", `${((1 - entry) * 5.5).toFixed(2)}deg`);
   }
 }
 
 function scheduleMotion() {
-  if (!motionPaused && !document.hidden && !motionFrame)
-    motionFrame = requestAnimationFrame(renderMotion);
+  if (!document.hidden && !motionFrame) motionFrame = requestAnimationFrame(renderMotion);
 }
 
 function updateMotionControl() {
-  document.documentElement.classList.toggle("motion-paused", motionPaused);
-  motionToggle.setAttribute("aria-pressed", String(motionPaused));
+  const paused = isMotionPaused();
+  document.documentElement.classList.toggle("motion-paused", paused);
+  motionToggle.setAttribute("aria-pressed", String(paused));
   motionToggle.disabled = motionPreference.matches;
-  motionLabel.textContent =
-    translations[activeLanguage][
-      motionPreference.matches
-        ? "reducedMotion"
-        : motionPaused
-          ? "resumeMotion"
-          : "pauseMotion"
-    ];
-  motionToggle.querySelector(".motion-icon").textContent = motionPaused
-    ? "▷"
-    : "Ⅱ";
-  if (motionPaused) {
-    cancelAnimationFrame(motionFrame);
-    motionFrame = 0;
-    scene.style.removeProperty("--scene-scroll");
-    scene.style.removeProperty("--pointer-x");
-    scene.style.removeProperty("--pointer-y");
-    workbench.style.removeProperty("--frame-scale");
-    workbench.style.removeProperty("--frame-tilt");
-  } else scheduleMotion();
+  motionLabel.textContent = translations[activeLanguage][
+    motionPreference.matches ? "reducedMotion" : paused ? "resumeMotion" : "pauseMotion"
+  ];
+  motionToggle.querySelector(".motion-icon").textContent = paused ? "▷" : "Ⅱ";
+
+  if (paused) {
+    hero.classList.remove("launch-intro");
+    pointerX = 0;
+    pointerY = 0;
+    hero.style.removeProperty("--art-shift");
+    for (const property of ["--device-shift", "--pointer-x", "--pointer-y", "--glint-x", "--glint-y"]) {
+      scene.style.removeProperty(property);
+    }
+    for (const property of ["--frame-scale", "--frame-tilt"]) {
+      workbench.style.removeProperty(property);
+    }
+    document.querySelectorAll("[data-magnetic]").forEach((el) => { el.style.transform = ""; });
+    heroParticlesState.stop?.();
+    ctaParticlesState.stop?.();
+  } else {
+    heroParticlesState.start?.();
+    ctaParticlesState.start?.();
+  }
+  scheduleMotion();
 }
 
 motionToggle.addEventListener("click", () => {
-  motionPaused = !motionPaused;
+  motionPausedByUser = !motionPausedByUser;
   updateMotionControl();
 });
-motionPreference.addEventListener("change", () => {
-  motionPaused = motionPreference.matches;
-  updateMotionControl();
-});
+motionPreference.addEventListener("change", updateMotionControl);
 document.addEventListener("languagechange", updateMotionControl);
-hero.addEventListener(
-  "pointermove",
-  (event) => {
-    if (motionPaused || !precisePointer.matches) return;
-    const bounds = hero.getBoundingClientRect();
-    pointerX = ((event.clientX - bounds.left) / bounds.width - 0.5) * 6;
-    pointerY = ((event.clientY - bounds.top) / bounds.height - 0.5) * -5;
-    scheduleMotion();
-  },
-  { passive: true },
-);
-hero.addEventListener("pointerleave", () => {
+scene.addEventListener("pointermove", (event) => {
+  if (isMotionPaused() || !precisePointer.matches) return;
+  const bounds = scene.getBoundingClientRect();
+  pointerX = ((event.clientX - bounds.left) / bounds.width - 0.5) * 6;
+  pointerY = ((event.clientY - bounds.top) / bounds.height - 0.5) * -4.2;
+  scheduleMotion();
+}, { passive: true });
+scene.addEventListener("pointerleave", () => {
   pointerX = 0;
   pointerY = 0;
   scheduleMotion();
@@ -908,49 +1284,173 @@ window.addEventListener("scroll", scheduleMotion, { passive: true });
 window.addEventListener("resize", scheduleMotion, { passive: true });
 document.addEventListener("visibilitychange", () => {
   document.documentElement.classList.toggle("page-hidden", document.hidden);
+  if (document.hidden) {
+    heroParticlesState.stop?.();
+    ctaParticlesState.stop?.();
+  } else if (!isMotionPaused()) {
+    heroParticlesState.start?.();
+    ctaParticlesState.start?.();
+  }
   scheduleMotion();
 });
+document.documentElement.classList.toggle("page-hidden", document.hidden);
+document.querySelectorAll("details").forEach((details) => details.addEventListener("toggle", scheduleMotion));
 
-// A second, non-semantic copy makes the ticker loop without a visible jump.
-const signalTrack = document.querySelector(".signal-track");
-const signalCopy = signalTrack.cloneNode(true);
-signalCopy.setAttribute("aria-hidden", "true");
-signalTrack.parentElement.append(signalCopy);
-
-// Suspend CSS loops after their surface leaves the viewport.
 if ("IntersectionObserver" in window) {
   const activityObserver = new IntersectionObserver((entries) => {
-    entries.forEach((entry) =>
-      entry.target.classList.toggle("motion-offscreen", !entry.isIntersecting),
-    );
+    entries.forEach((entry) => {
+      if (entry.target === hero) {
+        heroParticlesState.active = entry.isIntersecting;
+        if (entry.isIntersecting && !isMotionPaused()) heroParticlesState.start?.();
+        else heroParticlesState.stop?.();
+      } else if (entry.target === scene) {
+        scene.classList.toggle("motion-offscreen", !entry.isIntersecting);
+      } else if (entry.target === ctaSection) {
+        ctaParticlesState.active = entry.isIntersecting;
+        if (entry.isIntersecting && !isMotionPaused()) ctaParticlesState.start?.();
+        else ctaParticlesState.stop?.();
+      }
+    });
   });
+  activityObserver.observe(hero);
   activityObserver.observe(scene);
-  activityObserver.observe(signalTrack.parentElement);
+  if (ctaSection) activityObserver.observe(ctaSection);
 
   const sectionLinks = [...nav.querySelectorAll('a[href^="#"]')];
-  const navigationObserver = new IntersectionObserver(
-    (entries) => {
-      const entering = entries.find((entry) => entry.isIntersecting);
-      if (!entering) return;
-      sectionLinks.forEach((link) => {
-        if (link.hash === `#${entering.target.id}`)
-          link.setAttribute("aria-current", "location");
-        else link.removeAttribute("aria-current");
-      });
-    },
-    { rootMargin: "-15% 0px -65% 0px" },
-  );
+  const navigationObserver = new IntersectionObserver((entries) => {
+    const entering = entries.find((entry) => entry.isIntersecting);
+    if (!entering) return;
+    sectionLinks.forEach((link) => {
+      if (link.hash === `#${entering.target.id}`) link.setAttribute("aria-current", "location");
+      else link.removeAttribute("aria-current");
+    });
+  }, { rootMargin: "-15% 0px -65% 0px" });
   sectionLinks.forEach((link) => {
     const section = document.querySelector(link.hash);
     if (section) navigationObserver.observe(section);
   });
   navigationObserver.observe(hero);
 }
+initHeroParticles();
+initCtaParticles();
+bindInteractiveSurfaces();
 updateMotionControl();
+if (!isMotionPaused()) {
+  hero.classList.add("launch-intro");
+  scene.addEventListener("animationend", () => hero.classList.remove("launch-intro"), { once: true });
+}
+document.documentElement.classList.add("motion-ready");
 
-// Interactive Termexo Fleet screenshot tabs on the home page.
+const mcpExamples = {
+  connect: {
+    command: "terminal_list",
+    en: ["Find the OpenCode terminal in this workspace.", "✓ demo-web / OpenCode found\n  running · terminal: opencode-1"],
+    zh: ["在当前工作区查找 OpenCode 终端。", "✓ 已找到 demo-web / OpenCode\n  运行中 · 终端 opencode-1"],
+  },
+  send: {
+    command: "terminal_write",
+    en: ["Ask OpenCode to run the project tests and summarize the result.", "→ Run the tests and summarize the result.\n✓ Submitted to opencode-1"],
+    zh: ["请 OpenCode 运行项目测试并总结结果。", "→ 运行测试并总结结果。\n✓ 已将指令提交给 opencode-1"],
+  },
+  read: {
+    command: "terminal_read",
+    en: ["Read the latest output from the same terminal.", "✓ 12 tests passed\n  No failing tests. Ready for code review."],
+    zh: ["读回同一个终端的最新输出。", "✓ 12 项测试通过\n  所有测试均已通过，可开始代码审查。"],
+  },
+};
+const demo = document.querySelector("[data-mcp-demo]");
+const demoSteps = [...demo.querySelectorAll("[data-mcp-step]")];
+const demoTerminal = demo.querySelector(".mcp-demo-terminal");
+const demoCommand = demo.querySelector("[data-mcp-command]");
+const demoInstruction = demo.querySelector("[data-mcp-instruction]");
+const demoOutput = demo.querySelector("[data-mcp-output]");
+const demoPlayButton = demo.querySelector("[data-mcp-play]");
+const demoPlayLabel = demo.querySelector("[data-mcp-play-label]");
+const demoInterval = 2_600;
+let demoStepIndex = 0;
+let demoTransition;
+let demoPlaybackTimer;
+
+function showMcpStep() {
+  const example = mcpExamples[demoSteps[demoStepIndex].dataset.mcpStep];
+  const [instruction, output] = example[activeLanguage];
+  demoCommand.textContent = example.command;
+  demoInstruction.textContent = instruction;
+  demoOutput.textContent = output;
+}
+
+function selectMcpStep(index) {
+  if (demoStepIndex === index) return;
+  demoStepIndex = index;
+  demoSteps.forEach((step, index) => step.setAttribute("aria-pressed", String(index === demoStepIndex)));
+  showMcpStep();
+  demoTransition?.cancel();
+  if (!isMotionPaused() && typeof demoTerminal.animate === "function") {
+    demoTransition = demoTerminal.animate(
+      [{ opacity: 0.56, clipPath: "inset(1% 0 0 0)" }, { opacity: 1, clipPath: "inset(0 0 0 0)" }],
+      { duration: 380, easing: "cubic-bezier(.2,.8,.2,1)" },
+    );
+  }
+}
+
+function updateDemoPlayLabel() {
+  demoPlayLabel.textContent = translations[activeLanguage][demoPlaybackTimer ? "mcpStop" : "mcpPlay"];
+}
+
+function stopMcpPlayback() {
+  clearTimeout(demoPlaybackTimer);
+  demoPlaybackTimer = undefined;
+  demo.removeAttribute("data-playing");
+  updateDemoPlayLabel();
+}
+
+function advanceMcpPlayback() {
+  if (demoStepIndex === demoSteps.length - 1) {
+    stopMcpPlayback();
+    return;
+  }
+  selectMcpStep(demoStepIndex + 1);
+  demoPlaybackTimer = setTimeout(advanceMcpPlayback, demoInterval);
+}
+
+demoPlayButton.addEventListener("click", () => {
+  if (demoPlaybackTimer) {
+    stopMcpPlayback();
+    return;
+  }
+  selectMcpStep(0);
+  demo.style.setProperty("--mcp-step-duration", `${demoInterval}ms`);
+  demo.setAttribute("data-playing", "");
+  demoPlaybackTimer = setTimeout(advanceMcpPlayback, demoInterval);
+  updateDemoPlayLabel();
+});
+
+demoSteps.forEach((button, index) => {
+  button.addEventListener("click", () => {
+    stopMcpPlayback();
+    selectMcpStep(index);
+  });
+});
+motionToggle.addEventListener("click", () => { if (isMotionPaused()) demoTransition?.cancel(); });
+motionPreference.addEventListener("change", () => { if (isMotionPaused()) demoTransition?.cancel(); });
+document.addEventListener("visibilitychange", () => { if (document.hidden) stopMcpPlayback(); });
+if ("IntersectionObserver" in window) {
+  new IntersectionObserver(([entry]) => {
+    if (!entry.isIntersecting) stopMcpPlayback();
+  }).observe(demo);
+}
+document.addEventListener("languagechange", () => {
+  showMcpStep();
+  updateDemoPlayLabel();
+});
+showMcpStep();
+updateDemoPlayLabel();
+
+// The Fleet gallery keeps one focusable tab and announces the active screenshot.
 const fleetShowcase = document.querySelector("[data-fleet-showcase]");
 if (fleetShowcase) {
+  const fleetTabsBar = fleetShowcase.querySelector("[data-fleet-tabs]");
+  const fleetIndicator = fleetShowcase.querySelector("[data-fleet-indicator]");
   const fleetTabs = [...fleetShowcase.querySelectorAll("[data-fleet-tab]")];
   const fleetScreen = fleetShowcase.querySelector("[data-fleet-screen]");
   const fleetCaption = fleetShowcase.querySelector("[data-fleet-caption]");
@@ -962,28 +1462,75 @@ if (fleetShowcase) {
     analytics: "fleetCapAnalytics",
   };
   let activeFleetTab = "deck";
+  let fleetTransition;
+
+  const positionFleetIndicator = () => {
+    if (!fleetTabsBar || !fleetIndicator) return;
+    const current = fleetTabs.find((tab) => tab.classList.contains("active"));
+    if (!current) return;
+    // Disable sliding pill when wrapped onto multiple lines on narrow viewports
+    const wraps = fleetTabs.some((tab) => Math.abs(tab.offsetTop - current.offsetTop) > 4);
+    if (wraps) {
+      fleetTabsBar.classList.remove("has-indicator");
+      return;
+    }
+    fleetTabsBar.classList.add("has-indicator");
+    fleetIndicator.style.width = `${current.offsetWidth}px`;
+    fleetIndicator.style.transform = `translate3d(${current.offsetLeft}px, 0, 0)`;
+  };
+
+  fleetScreen.addEventListener("load", () => {
+    fleetTransition?.cancel();
+    if (!isMotionPaused() && typeof fleetScreen.animate === "function") {
+      fleetTransition = fleetScreen.animate(
+        [{ opacity: 0.72, transform: "scale(1.008)" }, { opacity: 1, transform: "scale(1)" }],
+        { duration: 550, easing: "cubic-bezier(.2,.8,.2,1)" },
+      );
+    }
+  });
 
   const syncFleetCaption = () => {
     const key = captionKeyByTab[activeFleetTab] || "fleetCapDeck";
     fleetCaption.dataset.i18n = key;
     const dict = translations[activeLanguage] || translations.en;
-    if (dict[key]) fleetCaption.textContent = dict[key];
+    fleetCaption.textContent = dict[key];
+    fleetScreen.alt = dict[key];
+    requestAnimationFrame(positionFleetIndicator);
   };
 
-  fleetTabs.forEach((btn) => {
+  fleetTabs.forEach((btn, index) => {
+    btn.tabIndex = btn.getAttribute("aria-selected") === "true" ? 0 : -1;
     btn.addEventListener("click", () => {
+      if (activeFleetTab === btn.dataset.fleetTab) return;
       activeFleetTab = btn.dataset.fleetTab || "deck";
       fleetTabs.forEach((other) => {
         const isCurrent = other === btn;
         other.classList.toggle("active", isCurrent);
         other.setAttribute("aria-selected", String(isCurrent));
+        other.tabIndex = isCurrent ? 0 : -1;
       });
+      positionFleetIndicator();
       if (btn.dataset.fleetImg && fleetScreen) {
         fleetScreen.src = btn.dataset.fleetImg;
       }
+      fleetScreen.closest("[role=tabpanel]").setAttribute("aria-labelledby", btn.id);
       syncFleetCaption();
+    });
+    btn.addEventListener("keydown", (event) => {
+      const nextIndex = {
+        ArrowRight: (index + 1) % fleetTabs.length,
+        ArrowLeft: (index + fleetTabs.length - 1) % fleetTabs.length,
+        Home: 0,
+        End: fleetTabs.length - 1,
+      }[event.key];
+      if (nextIndex === undefined) return;
+      event.preventDefault();
+      fleetTabs[nextIndex].focus();
+      fleetTabs[nextIndex].click();
     });
   });
 
+  window.addEventListener("resize", positionFleetIndicator, { passive: true });
   document.addEventListener("languagechange", syncFleetCaption);
+  requestAnimationFrame(positionFleetIndicator);
 }
