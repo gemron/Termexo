@@ -12,6 +12,8 @@ const pages = {
     "assets/termexo-hero-phone.webp",
     "assets/termexo-workbench-demo.mp4",
     "assets/termexo-workbench-demo.png",
+    "assets/termexo-fleet-promo.mp4",
+    "assets/termexo-fleet-promo-cover.png",
   ],
   "guide.html": ["styles.css", "guide.css"],
   "guide.en.html": ["styles.css", "guide.css"],
