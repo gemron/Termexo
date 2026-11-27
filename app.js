@@ -6,6 +6,9 @@ const translations = {
     fleetTitle: "Run agents across machines.",
     fleetLead:
       "Termexo Fleet is the companion desktop commander built on Termexo MCP. Grade tasks across L1–L4 difficulty tiers, route accounts & models automatically, let parent agents spawn worktree-isolated sub-agents, and track savings across multiple Termexo machines — with zero black-box execution.",
+    fleetPromoTitle: "Termexo Fleet product tour",
+    fleetPromoDuration: "45 seconds",
+    fleetPromoMp4: "Open MP4",
     fleetTabDeck: "Mission Deck & DAG",
     fleetTabSwarm: "Sub-Agent Swarm Tree",
     fleetTabRouting: "L1–L4 Routing Ladder",
@@ -591,6 +594,9 @@ const translations = {
     fleetTitle: "把多台电脑的 Agent 连起来。",
     fleetLead:
       "Termexo Fleet 是基于 Termexo MCP 打造的独立桌面指挥中枢：按 L1–L4 难度自动路由账号与模型、允许父 Agent 在独立 Git Worktree 中自主派生子 Agent、统一调度多台本机/局域网 Termexo 并量化节省成本——全程零黑盒，所有任务真实运行在 Termexo 终端中。",
+    fleetPromoTitle: "Termexo Fleet 产品宣传片",
+    fleetPromoDuration: "45 秒",
+    fleetPromoMp4: "打开 MP4",
     fleetTabDeck: "任务甲板与 DAG",
     fleetTabSwarm: "子 Agent 蜂群树",
     fleetTabRouting: "L1–L4 难度天梯",

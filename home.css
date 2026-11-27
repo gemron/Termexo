@@ -1481,7 +1481,7 @@ html {
   color: var(--mint-glow);
 }
 
-.home-page #workbench .product-frame {
+.home-page :is(#workbench, #fleet) .product-frame {
   width: min(100%, 1060px, calc(72svh * 1.44 + 20px));
   margin-inline: auto;
   padding: 10px;
@@ -1494,16 +1494,16 @@ html {
   will-change: transform;
 }
 
-.home-page #workbench .product-frame video {
+.home-page :is(#workbench, #fleet) .product-frame video {
   border-radius: 16px;
   background: #070a0f;
 }
 
-.home-page #workbench :is(.frame-label, .demo-caption) {
+.home-page :is(#workbench, #fleet) :is(.frame-label, .demo-caption) {
   color: #cbd5e1;
 }
 
-.home-page #workbench .frame-label i {
+.home-page :is(#workbench, #fleet) .frame-label i {
   background: var(--mint-glow);
   box-shadow: 0 0 10px rgba(52, 211, 153, 0.8);
 }
@@ -1535,6 +1535,15 @@ html {
 }
 
 /* ── Termexo Fleet Interactive Showcase ──────────────────────────────────── */
+
+.home-page #fleet #fleet-promo {
+  width: min(100%, 1060px, calc(72svh * 16 / 9 + 20px));
+  scroll-margin-top: 24px;
+}
+
+.home-page #fleet-promo video {
+  aspect-ratio: 16 / 9;
+}
 
 .home-page .fleet-tabs {
   position: relative;
